@@ -1,0 +1,221 @@
+---
+title: "Extra Lecture — Pseudobulk Differential Expression"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: Single Cell RNA-seq Workshop
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+# Referenced but not evaluated in these slides:
+# library(Seurat)
+# library(DESeq2)
+# library(edgeR)
+# library(limma)
+# library(glmGamPoi)
+
+theme_set(theme_minimal(base_size = 14))
+set.seed(2026)
+```
+
+# Pseudobulk Differential Expression {background-color="#2c3e50"}
+
+## Goals of this lecture
+
+::: incremental
+-   Understand why per-cell DE between **conditions** is often statistically wrong
+-   See how pseudobulk fixes it
+-   Run a pseudobulk workflow in Seurat + DESeq2
+-   Know when pseudobulk is and is not the right tool
+:::
+
+# Part 1 — The problem with per-cell DE {background-color="#2c3e50"}
+
+## The scientific question
+
+> In *cell type X*, which genes differ between **treated** and **control** subjects?
+
+## Why per-cell tests go wrong
+
+::: incremental
+-   Cells from one subject are **not independent observations** — they share genetics, library prep, batch, treatment
+-   Treating each cell as an independent replicate inflates the effective N by 100×–10,000×
+-   Result: **anti-conservative p-values** — thousands of spuriously "significant" genes
+-   This has been shown repeatedly in benchmarks (Squair et al. 2021; Zimmerman et al. 2021)
+:::
+
+::: callout-important
+If your experimental unit is the **subject**, your statistical unit should be the **subject**.
+:::
+
+## The fix in one sentence
+
+> **Aggregate counts per (sample, cell type); run DESeq2 / edgeR / limma-voom on the result.**
+
+# Part 2 — Pseudobulk, visually {background-color="#2c3e50"}
+
+## What pseudobulk does
+
+![](images/pseudobulk_concept.svg){fig-align="center" width="95%"}
+
+## What changes vs. bulk RNA-seq?
+
+::: incremental
+-   Structurally — **nothing**. The pseudobulk matrix looks like a bulk counts matrix
+-   You use the **same tools**: DESeq2, edgeR, limma-voom
+-   The only differences are:
+    -   One matrix **per cell type**
+    -   Samples with too few cells in that type get dropped or flagged
+:::
+
+# Part 3 — Doing it in Seurat + DESeq2 {background-color="#2c3e50"}
+
+## Build the pseudobulk matrix
+
+``` r
+library(Seurat)
+
+# seu is an integrated, annotated Seurat object with:
+#   seu$sample    — biological sample ID (subject / replicate)
+#   seu$condition — treatment vs control
+#   seu$celltype  — annotated cell type
+
+pb <- AggregateExpression(
+  seu,
+  assays    = "RNA",
+  group.by  = c("celltype", "sample"),
+  return.seurat = FALSE
+)$RNA
+```
+
+`pb` is a genes × (celltype_sample) count matrix — ready for DESeq2.
+
+## Fit DESeq2 per cell type
+
+``` r
+library(DESeq2)
+
+run_pb_de <- function(ct, pb_mat, sample_meta) {
+  cols <- grep(paste0("^", ct, "_"), colnames(pb_mat), value = TRUE)
+  mat  <- pb_mat[, cols]
+  meta <- sample_meta[match(sub(paste0("^", ct, "_"), "", cols),
+                            sample_meta$sample), ]
+
+  dds <- DESeqDataSetFromMatrix(countData = mat,
+                                colData   = meta,
+                                design    = ~ condition)
+  dds <- DESeq(dds)
+  results(dds, contrast = c("condition", "treated", "control")) |> as.data.frame()
+}
+
+res_by_ct <- lapply(unique(seu$celltype),
+                    run_pb_de, pb_mat = pb, sample_meta = sample_meta)
+names(res_by_ct) <- unique(seu$celltype)
+```
+
+## edgeR and limma-voom alternatives
+
+``` r
+library(edgeR)
+y <- DGEList(counts = mat, group = meta$condition)
+y <- calcNormFactors(y)
+design <- model.matrix(~ condition, meta)
+y <- estimateDisp(y, design)
+fit <- glmQLFit(y, design)
+qlf <- glmQLFTest(fit, coef = 2)
+topTags(qlf)
+```
+
+``` r
+library(limma)
+v   <- voom(y, design, plot = FALSE)
+fit <- lmFit(v, design) |> eBayes()
+topTable(fit, coef = 2, number = Inf)
+```
+
+::: callout-tip
+All three give well-calibrated inference. DESeq2 is the most common default in the scRNA-seq literature.
+:::
+
+## Python alternative — decoupleR + PyDESeq2
+
+``` python
+import decoupler as dc
+import pydeseq2.ds as ds
+
+pb = dc.get_pseudobulk(adata, sample_col="sample",
+                       groups_col="celltype", min_cells=10, min_counts=1000)
+
+# Then fit PyDESeq2 per celltype, contrast=treated vs control
+```
+
+# Part 4 — Practical guidance {background-color="#2c3e50"}
+
+## When to use pseudobulk
+
+::: incremental
+-   Comparing **conditions across biological samples** (treatment, genotype, time)
+-   You have at least \~3 samples per group (ideally 5+)
+-   Cell type of interest has enough cells per sample (a common rule: \~10+ cells)
+:::
+
+## When **not** to use pseudobulk
+
+::: incremental
+-   Finding **cluster markers** for annotation — use within-cell methods (`FindAllMarkers`, Wilcoxon, MAST)
+-   Only 1–2 samples per condition — no replication to pseudobulk over
+-   Continuous traits measured per cell (e.g. pseudotime) — use models that handle the continuous covariate
+:::
+
+## Common pitfalls
+
+::: incremental
+-   **Too few cells per sample** per cell type → zero-inflated pseudobulk; drop that cell type or those samples with a `min_cells` filter
+-   **Confounded designs**: if every treated sample is on one 10x run, integration won't rescue bad design
+-   **Ignoring covariates**: include `batch`, `sex`, `age` in the design formula — DESeq2 will use them
+-   **Reporting single-cell N**: always report N = number of **samples**, not number of cells, for condition-level DE
+:::
+
+## Diagnostic plots worth running
+
+::: incremental
+-   PCA of the pseudobulk samples **within a cell type** — do replicates cluster by condition, or by batch?
+-   MA / volcano plots per cell type
+-   Hierarchical clustering of pseudobulk samples — quick confound check
+:::
+
+## Summary
+
+::: incremental
+-   Per-cell DE between conditions → **anti-conservative p-values**
+-   Pseudobulk recovers proper replication and lets you use battle-tested bulk tools
+-   Keep per-cell methods for **marker genes within a dataset**, use pseudobulk for **condition comparisons across subjects**
+:::
+
+## Further reading
+
+-   Squair *et al.* 2021, *Nature Communications* — "Confronting false discoveries in single-cell differential expression"
+-   Zimmerman *et al.* 2021, *Nature Communications* — "A practical solution to pseudoreplication bias in single-cell studies"
+-   Crowell *et al.* 2020, *Nature Communications* — muscat, a pseudobulk toolkit for scRNA-seq
+-   Heumos *et al.* 2023 — "Best practices for single-cell analysis across modalities"
