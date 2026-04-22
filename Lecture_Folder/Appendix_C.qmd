@@ -1,0 +1,614 @@
+---
+title: "Appendix C - GREP, Regular Expressions & Shell Scripting"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: BioE_Stats_2026 - Knight Campus
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 14))
+set.seed(2026)
+```
+
+# Appendix C: GREP, Regular Expressions & Shell Scripting {background-color="#2c3e50"}
+
+## Overview
+
+::: {.callout-tip title="Pre-requisite Material"}
+This appendix covers two essential Unix skills: (1) using GREP and regular expressions for powerful pattern matching in text files, and (2) writing shell scripts to automate repetitive tasks. These are critical skills for working with large datasets in bioinformatics and bioengineering.
+:::
+
+# GREP and Regular Expressions {background-color="#2c3e50"}
+
+## What is GREP? {.smaller}
+
+-   **GREP** = Global Regular Expression Print
+-   Powerful text search tool in Unix
+-   Searches for patterns in files or input streams
+-   Returns lines that match the pattern
+-   Essential for large data processing
+
+Basic syntax:
+
+``` bash
+grep [options] pattern [file...]
+```
+
+## Basic GREP Usage {.smaller}
+
+::: panel-tabset
+### Common Options
+
+``` bash
+# Search for a simple pattern
+grep "ACGT" sequences.txt
+
+# Case-insensitive search
+grep -i "gene" annotations.txt
+
+# Count matching lines
+grep -c ">" proteins.fasta
+
+# Show line numbers
+grep -n "ERROR" logfile.txt
+
+# Invert match (show non-matching lines)
+grep -v "^#" data.txt    # Skip comment lines
+
+# Search multiple files
+grep "mutation" *.txt
+```
+
+### Interpretation
+
+-   `-i` ignores case --- useful when you're unsure of capitalization
+-   `-c` returns just the count, not the matching lines
+-   `-n` shows line numbers --- helpful for locating matches in large files
+-   `-v` inverts the match --- essential for filtering out headers or comments
+-   Searching multiple files with wildcards saves time
+:::
+
+## Introduction to Regular Expressions {.smaller}
+
+::: panel-tabset
+### Metacharacters
+
+Regular expressions (regex) are patterns for matching text:
+
+-   **`.`** = any single character
+-   **`*`** = zero or more of preceding character
+-   **`+`** = one or more of preceding character
+-   **`?`** = zero or one of preceding character
+-   **`^`** = start of line
+-   **`$`** = end of line
+-   **`[abc]`** = any character in set
+-   **`[^abc]`** = any character NOT in set
+-   **`\`** = escape special characters
+
+### Examples
+
+``` bash
+# Match DNA sequences
+grep "^ATG" genes.txt         # Lines starting with ATG
+grep "TAG$" genes.txt         # Lines ending with TAG
+grep "A.G" sequences.txt      # A, any char, then G
+
+# Character classes
+grep "[ACGT]" dna.txt         # Any DNA base
+grep "[^ACGT]" dna.txt        # Non-DNA characters
+grep "[0-9]" data.txt         # Any digit
+
+# Quantifiers
+grep "A\{3\}" sequence.txt    # Exactly 3 A's
+grep "T\{2,4\}" sequence.txt  # 2 to 4 T's
+grep "GC*" sequence.txt       # G followed by 0+ C's
+```
+:::
+
+## Extended Regular Expressions {.smaller}
+
+::: panel-tabset
+### Syntax
+
+Use `grep -E` or `egrep` for extended regex:
+
+``` bash
+# Alternation (OR)
+grep -E "start|stop|pause" commands.txt
+
+# Grouping
+grep -E "(ATG|GTG|TTG)" codons.txt
+
+# Plus quantifier (one or more)
+grep -E "A+T+G+" sequences.txt
+
+# Question mark (optional)
+grep -E "colou?r" british_american.txt
+
+# Complex patterns for bioinformatics
+grep -E "^>sp\|[A-Z0-9]+\|" uniprot.fasta  # UniProt headers
+grep -E "[ACGT]{20,}" primers.txt          # Sequences 20bp+
+```
+
+### Combining with Pipes
+
+``` bash
+# Count unique sequence headers
+grep "^>" sequences.fasta | sort | uniq | wc -l
+
+# Extract gene names from GFF file
+grep -v "^#" annotation.gff | cut -f9 | grep -oE "gene=[^;]+"
+
+# Find sequences without stop codons
+grep -v -E "(TAA|TAG|TGA)" orfs.txt
+
+# Search and replace with sed (uses regex)
+grep "gene" data.txt | sed 's/gene/GENE/g'
+```
+:::
+
+## Analyzing Sequence Content with GREP {.smaller}
+
+::: panel-tabset
+### Base Counting
+
+``` bash
+# Count total bases in a genome
+grep -v "^>" human_genome.fa | tr -d '\n' | wc -c
+
+# Count each type of base
+grep -v "^>" human_genome.fa | tr -d '\n' |
+  fold -w1 | sort | uniq -c
+
+# Calculate GC content
+grep -v "^>" human_genome.fa | tr -d '\n' |
+  tr -cd 'GCgc' | wc -c
+```
+
+### Pattern Finding
+
+``` bash
+# Find all instances of a restriction enzyme site (EcoRI: GAATTC)
+grep -v "^>" human_genome.fa | \
+  tr -d '\n' | \
+  grep -o "GAATTC" | \
+  wc -l
+
+# Find simple sequence repeats (e.g., "ATATAT...")
+grep -v "^>" human_genome.fa | grep -oE "(AT){5,}"
+
+# Find all start codons and their positions
+grep -v "^>" human_genome.fa | \
+  tr -d '\n' | \
+  grep -b -o "ATG" | \
+  head -20
+```
+:::
+
+# Shell Scripting {background-color="#2c3e50"}
+
+## What is a Shell Script? {.smaller}
+
+-   Text file containing Unix commands
+-   Automates repetitive tasks
+-   Makes complex workflows reproducible
+-   Essential for bioinformatics pipelines
+-   Can include:
+    -   Variables and arrays
+    -   Conditionals (if/then/else)
+    -   Loops (for/while)
+    -   Functions
+    -   Command-line arguments
+
+## Creating Your First Script {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+# This is a shebang - tells system which interpreter to use
+
+# This is a comment - documents your code
+echo "Hello, Bioengineering!"
+
+# Set a variable
+NAME="DNA Analysis"
+echo "Running $NAME"
+
+# Use command output as variable
+DATE=$(date +%Y-%m-%d)
+echo "Analysis date: $DATE"
+
+# Simple calculation
+COUNT=5
+DOUBLE=$((COUNT * 2))
+echo "Double of $COUNT is $DOUBLE"
+```
+
+### How to Run
+
+``` bash
+# Save as first_script.sh, then:
+
+# Option 1: Run with bash
+bash first_script.sh
+
+# Option 2: Make executable first
+chmod +x first_script.sh
+./first_script.sh
+```
+
+### Interpretation
+
+-   The `#!/bin/bash` shebang tells the system which interpreter to use
+-   Comments with `#` document your code
+-   Variables are assigned with `=` (no spaces around `=`)
+-   `$()` captures command output as a variable
+-   `$(())` performs arithmetic
+:::
+
+## Command-Line Arguments {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+# Script: process_fasta.sh
+
+echo "Script name: $0"       # $0 is the script name
+echo "Number of arguments: $#"
+
+# Check if enough arguments provided
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 input.fasta output.txt"
+    exit 1
+fi
+
+echo "Processing file: $1"   # First argument
+echo "Output will be: $2"    # Second argument
+echo "All arguments: $@"     # All arguments
+```
+
+### Usage
+
+``` bash
+# Run as:
+./process_fasta.sh input.fa results.txt
+```
+
+### Interpretation
+
+-   `$0` = script name, `$1` = first argument, `$2` = second, etc.
+-   `$#` = total number of arguments
+-   `$@` = all arguments as a list
+-   Always validate arguments before using them
+:::
+
+## Variables and Arrays {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+
+# Variables (no spaces around =)
+SPECIES="Homo sapiens"
+CHROMOSOME=21
+GENE_COUNT=234
+
+# Arrays
+BASES=(A C G T)
+echo "First base: ${BASES[0]}"
+echo "All bases: ${BASES[@]}"
+
+# Add to array
+BASES+=(N)
+
+# Array length
+echo "Number of bases: ${#BASES[@]}"
+
+# String operations
+FILE="sample_001.fastq.gz"
+NAME="${FILE%.fastq.gz}"     # Remove suffix
+echo "Sample name: $NAME"
+```
+
+### Interpretation
+
+-   Variables: no spaces around `=`, reference with `$`
+-   Arrays: created with `()`, indexed with `${arr[i]}`
+-   `${#arr[@]}` gives array length
+-   `${var%pattern}` removes suffix pattern from variable
+:::
+
+## Conditionals (if/then/else) {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+
+# Numeric comparisons
+COUNT=100
+if [ $COUNT -gt 50 ]; then
+    echo "High read count"
+elif [ $COUNT -gt 10 ]; then
+    echo "Medium read count"
+else
+    echo "Low read count"
+fi
+
+# String comparisons
+FILETYPE="fasta"
+if [ "$FILETYPE" = "fasta" ]; then
+    echo "Processing FASTA file"
+fi
+
+# File tests
+if [ -f "data.txt" ]; then
+    echo "File exists"
+fi
+
+if [ -d "results" ]; then
+    echo "Directory exists"
+else
+    mkdir results
+fi
+```
+
+### Operators
+
+| Operator | Meaning              |
+|----------|----------------------|
+| `-gt`    | Greater than         |
+| `-lt`    | Less than            |
+| `-eq`    | Equal to             |
+| `-ne`    | Not equal to         |
+| `-ge`    | Greater than or equal|
+| `-le`    | Less than or equal   |
+| `-f`     | File exists          |
+| `-d`     | Directory exists     |
+| `=`      | String equality      |
+| `!=`     | String inequality    |
+:::
+
+## Loops {.smaller}
+
+::: panel-tabset
+### For Loops
+
+``` bash
+#!/bin/bash
+
+# For loop over list
+for BASE in A C G T; do
+    echo "Processing base: $BASE"
+done
+
+# For loop over files
+for FILE in *.fasta; do
+    echo "Analyzing $FILE"
+    grep -c ">" "$FILE"
+done
+
+# For loop with counter
+for i in {1..10}; do
+    echo "Iteration $i"
+done
+```
+
+### While Loops
+
+``` bash
+#!/bin/bash
+
+# While loop with counter
+COUNT=1
+while [ $COUNT -le 5 ]; do
+    echo "Count: $COUNT"
+    COUNT=$((COUNT + 1))
+done
+
+# Read file line by line
+while read LINE; do
+    echo "Processing: $LINE"
+done < input.txt
+```
+
+### Interpretation
+
+-   `for` loops iterate over a list of items (words, files, numbers)
+-   `while` loops continue as long as a condition is true
+-   Reading files line-by-line with `while read` is very common
+-   Always use `"$FILE"` in quotes to handle filenames with spaces
+:::
+
+## Functions {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+
+# Define a function
+count_sequences() {
+    local FILE=$1  # Local variable
+    local COUNT=$(grep -c "^>" "$FILE")
+    echo "File $FILE has $COUNT sequences"
+    return $COUNT
+}
+
+# Function with multiple parameters
+process_fasta() {
+    local INPUT=$1
+    local OUTPUT=$2
+
+    echo "Processing $INPUT..."
+    grep "^>" "$INPUT" > "$OUTPUT"
+    count_sequences "$INPUT"
+}
+
+# Call functions
+count_sequences "proteins.fasta"
+process_fasta "input.fasta" "headers.txt"
+```
+
+### Interpretation
+
+-   Functions use `local` variables to avoid name conflicts
+-   Arguments accessed with `$1`, `$2`, etc. (just like scripts)
+-   `return` sets an exit code (0--255), not a value
+-   Use `echo` to return string/text values
+-   Functions must be defined before they are called
+:::
+
+## Error Handling {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+
+# Exit on error
+set -e
+
+# Exit on undefined variable
+set -u
+
+# Pipe failure detection
+set -o pipefail
+
+# Custom error handling
+check_file() {
+    if [ ! -f "$1" ]; then
+        echo "Error: File $1 not found!" >&2
+        exit 1
+    fi
+}
+
+# Trap errors
+trap 'echo "Error on line $LINENO"' ERR
+
+# Try-catch style
+if ! grep "pattern" file.txt > /dev/null 2>&1; then
+    echo "Pattern not found"
+fi
+```
+
+### Best Practices
+
+1.  Always include a shebang: `#!/bin/bash`
+2.  Comment your code: Explain what and why
+3.  Use meaningful variable names: `GENE_COUNT` not `GC`
+4.  Check inputs: Validate files exist and arguments are correct
+5.  Handle errors gracefully: Use `set -e` and error checking
+6.  Make scripts portable: Don't hardcode paths
+7.  Use version control: Track changes with Git
+8.  Test incrementally: Build scripts step by step
+9.  Create help messages: Document usage
+10. Log important steps: Keep records of what was done
+:::
+
+## Complete Bioinformatics Script Example {.smaller}
+
+::: panel-tabset
+### Code
+
+``` bash
+#!/bin/bash
+# Script: fasta_stats.sh
+# Purpose: Calculate basic statistics for FASTA files
+
+# Check arguments
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 sequences.fasta"
+    exit 1
+fi
+
+INPUT=$1
+
+# Check if file exists
+if [ ! -f "$INPUT" ]; then
+    echo "Error: File $INPUT not found!"
+    exit 1
+fi
+
+echo "=== FASTA Statistics for $INPUT ==="
+
+# Count sequences
+SEQ_COUNT=$(grep -c "^>" "$INPUT")
+echo "Number of sequences: $SEQ_COUNT"
+
+# Calculate total length
+TOTAL_LENGTH=$(grep -v "^>" "$INPUT" | tr -d '\n' | wc -c)
+echo "Total length: $TOTAL_LENGTH bp"
+
+# Average length
+AVG_LENGTH=$((TOTAL_LENGTH / SEQ_COUNT))
+echo "Average length: $AVG_LENGTH bp"
+
+# GC content
+GC_COUNT=$(grep -v "^>" "$INPUT" | tr -d '\n' | grep -o "[GC]" | wc -l)
+GC_PERCENT=$((GC_COUNT * 100 / TOTAL_LENGTH))
+echo "GC content: $GC_PERCENT%"
+```
+
+### Usage
+
+``` bash
+# Make executable and run
+chmod +x fasta_stats.sh
+./fasta_stats.sh my_sequences.fasta
+```
+
+### Interpretation
+
+This script demonstrates several best practices:
+
+-   Input validation (checking argument count and file existence)
+-   Use of pipes for data processing
+-   Meaningful variable names
+-   Clear output formatting
+-   Comments explaining each section
+:::
+
+## Practice: Build Your Own Pipeline {.smaller}
+
+::: {.callout-tip title="Hands-On Exercise"}
+Build a complete analysis pipeline:
+
+1.  Download a bacterial genome (smaller, \~5 MB)
+2.  Count the total number of genes (hint: count headers)
+3.  Calculate the genome size in base pairs
+4.  Find the 10 most common 6-base sequences
+5.  Extract all genes with "ribosomal" in the header
+6.  Save your pipeline as a shell script for reproducibility
+:::

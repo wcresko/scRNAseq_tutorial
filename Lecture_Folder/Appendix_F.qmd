@@ -1,0 +1,515 @@
+---
+title: "Appendix F - High-Performance Computing with Talapas"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: BioE_Stats_2026 - Knight Campus
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 14))
+set.seed(2026)
+```
+
+# Appendix F: High-Performance Computing with Talapas {background-color="#2c3e50"}
+
+## Overview
+
+::: {.callout-tip title="Pre-requisite Material"}
+This appendix covers the University of Oregon's high-performance computing (HPC) cluster, Talapas. You will learn how to access the cluster, submit jobs using SLURM, manage software modules, and run GPU-accelerated computations. See Appendix A for background on cluster computing concepts.
+:::
+
+# What is Talapas? {background-color="#2c3e50"}
+
+## Talapas Overview {.smaller}
+
+-   **Talapas** is UO's high-performance computing (HPC) cluster
+-   Named from Chinook word for coyote (educator and keeper of knowledge)
+-   Managed by Research Advanced Computing Services (RACS)
+-   Located in the Allen Hall Data Center
+-   Documentation: [uoracs.github.io/talapas2-knowledge-base](https://uoracs.github.io/talapas2-knowledge-base/)
+
+### Key Resources:
+
+-   Over 14,520 CPU cores
+-   129 TB of memory
+-   89 GPUs (including A100, H100, V100)
+-   3+ Petabytes of storage
+
+## Talapas Architecture {.smaller}
+
+![Talapas Architecture](images/appendix_F_S03_talapas_architecture.svg){fig-align="center" width="85%"}
+
+<!--
+DUPLICATE SLIDE - Original Mermaid (remove when SVG is finalized)
+
+## Talapas Architecture (Mermaid Original) {.smaller}
+
+```{mermaid}
+%%| fig-width: 10
+%%| fig-height: 6
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '18px', 'fontFamily': 'arial', 'primaryTextColor': '#000000'}}}%%
+flowchart TB
+    U[Your Computer] --> SSH([SSH])
+    SSH --> L1[login1]
+    SSH --> L2[login2]
+    SSH --> L3[login3]
+    SSH --> L4[login4]
+    L1 --> S[SLURM Scheduler]
+    L2 --> S
+    L3 --> S
+    L4 --> S
+    S --> SB([sbatch])
+    S --> SR([srun])
+    SB --> C1[CPU Nodes]
+    SR --> C1
+    SB --> C2[GPU Nodes]
+    SB --> C3[Fat Nodes]
+    C1 --> ST[(Storage)]
+    C2 --> ST
+    C3 --> ST
+
+    style U fill:#e3f2fd,stroke:#333,stroke-width:2px,color:#000000
+    style L1 fill:#87ceeb,stroke:#333,stroke-width:2px,color:#000000
+    style L2 fill:#87ceeb,stroke:#333,stroke-width:2px,color:#000000
+    style L3 fill:#87ceeb,stroke:#333,stroke-width:2px,color:#000000
+    style L4 fill:#87ceeb,stroke:#333,stroke-width:2px,color:#000000
+    style S fill:#f9d71c,stroke:#333,stroke-width:2px,color:#000000
+    style C1 fill:#98fb98,stroke:#333,stroke-width:2px,color:#000000
+    style C2 fill:#ffa07a,stroke:#333,stroke-width:2px,color:#000000
+    style C3 fill:#dda0dd,stroke:#333,stroke-width:2px,color:#000000
+    style ST fill:#c8e6c9,stroke:#333,stroke-width:2px,color:#000000
+    style SSH fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style SB fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style SR fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+```
+-->
+
+# Accessing Talapas {background-color="#2c3e50"}
+
+## Login Nodes vs Compute Nodes {.smaller}
+
+::: panel-tabset
+### Login Nodes
+
+-   Where you land when you SSH into Talapas
+-   For **light tasks only**: file management, editing, job submission
+-   Shared by all users --- be considerate!
+-   Heavy processes will be killed
+
+### Compute Nodes
+
+-   Where your actual work runs
+-   Accessed through the SLURM scheduler
+-   Different types for different needs:
+    -   Standard CPU nodes
+    -   GPU nodes
+    -   High-memory ("fat") nodes
+:::
+
+## Node Types {.smaller}
+
+| Node Type      | Cores   | Memory     | Purpose                |
+|----------------|---------|------------|------------------------|
+| Standard CPU   | 28--128 | 128--512 GB| General computation    |
+| Large Memory   | 56      | 1--4 TB    | Memory-intensive work  |
+| GPU (K80/A100) | 28--48  | 256--512 GB| Machine learning, CUDA |
+| Interactive    | Various | Various    | Testing, development   |
+
+### Partitions (Queues):
+
+-   `compute` --- General purpose CPU partition (default)
+-   `short` --- Jobs up to 24 hours
+-   `long` --- Jobs up to 14 days
+-   `gpu` / `longgpu` --- GPU-enabled nodes
+-   `fat` / `longfat` --- High-memory nodes
+-   `preempt` --- Access to all nodes (may be interrupted)
+
+## Getting Access {.smaller}
+
+::: panel-tabset
+### Step 1: Join a PIRG
+
+-   **PIRG** = Principal Investigator Research Group
+-   Contact your PI to be added to their PIRG
+-   Or contact RACS to create a new PIRG
+
+### Step 2: Request Access
+
+-   Visit [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access)
+-   Your username = your Duck ID
+-   Your password = your UO password
+:::
+
+## Logging In {.smaller}
+
+::: panel-tabset
+### Web Browser
+
+[ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu)
+
+-   No command line needed!
+-   File browser for uploads/downloads
+-   Interactive applications: JupyterLab, RStudio, MATLAB, Remote desktop
+-   Great for beginners and quick data analysis
+
+### Command Line
+
+``` bash
+# Basic SSH connection
+ssh yourduckid@login.talapas.uoregon.edu
+
+# Or specific login node
+ssh yourduckid@login1.talapas.uoregon.edu
+```
+
+**From Windows:** Use PuTTY, MobaXterm, or Windows Terminal
+
+**Off Campus?** First connect to UO VPN, then SSH as normal
+:::
+
+# Storage on Talapas {background-color="#2c3e50"}
+
+## Storage Structure {.smaller}
+
+::: panel-tabset
+### Directory Map
+
+![Storage Structure](images/appendix_F_S09_storage_structure.svg){fig-align="center" width="100%"}
+
+<!--
+DUPLICATE SLIDE - Original Mermaid (remove when SVG is finalized)
+
+```{mermaid}
+%%| fig-width: 10
+%%| fig-height: 4
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '18px', 'fontFamily': 'arial', 'primaryTextColor': '#000000'}}}%%
+flowchart LR
+    R["/"] --> H["/home"]
+    R --> P["/projects"]
+    R --> T["/tmp"]
+    H --> HD["/home/duckid"]
+    P --> PG["/projects/PIRG"]
+    PG --> PGU["/projects/PIRG/duckid"]
+    PG --> PGS["/projects/PIRG/shared"]
+
+    style R fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style H fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style P fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style PG fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style HD fill:#87ceeb,stroke:#333,stroke-width:2px,color:#000000
+    style PGU fill:#98fb98,stroke:#333,stroke-width:2px,color:#000000
+    style PGS fill:#f9d71c,stroke:#333,stroke-width:2px,color:#000000
+    style T fill:#ffa07a,stroke:#333,stroke-width:2px,color:#000000
+```
+-->
+
+### Quotas
+
+| Location                | Quota                 | Purpose                     |
+|-------------------------|-----------------------|-----------------------------|
+| `/home/duckid`          | 250 GB                | Config files, small scripts |
+| `/projects/PIRG/duckid` | Shared (2 TB default) | Large data, analysis        |
+| `/projects/PIRG/shared` | Shared                | Files shared with group     |
+| `/tmp`                  | Local to node         | Temporary scratch space     |
+
+### Important Notes
+
+-   **Data is NOT automatically backed up!**
+-   Use `/projects` for large files
+-   Clean up when done
+
+``` bash
+# Check your storage usage
+df -h ~
+du -sh /projects/myPIRG/myusername
+```
+:::
+
+# SLURM Job Scheduler {background-color="#2c3e50"}
+
+## What is SLURM? {.smaller}
+
+-   **S**imple **L**inux **U**tility for **R**esource **M**anagement
+-   Job scheduler and workload manager
+-   Allocates resources fairly among users
+-   Ensures efficient cluster utilization
+
+![SLURM Job Workflow](images/appendix_F_S10_slurm_workflow.svg){fig-align="center" width="100%"}
+
+<!--
+DUPLICATE SLIDE - Original Mermaid (remove when SVG is finalized)
+
+## What is SLURM? (Mermaid Original) {.smaller}
+
+```{mermaid}
+%%| fig-width: 10
+%%| fig-height: 4
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '18px', 'fontFamily': 'arial', 'primaryTextColor': '#000000'}}}%%
+flowchart LR
+    A[Submit Job] --> SB([sbatch])
+    SB --> B[SLURM Queue]
+    B --> W([Waits])
+    W --> C[Job Runs on Compute Node]
+    C --> CO([Completes])
+    CO --> D[Output Files]
+
+    style A fill:#f9d71c,stroke:#333,stroke-width:2px,color:#000000
+    style B fill:#87ceeb,stroke:#333,stroke-width:2px,color:#000000
+    style C fill:#98fb98,stroke:#333,stroke-width:2px,color:#000000
+    style D fill:#ffa07a,stroke:#333,stroke-width:2px,color:#000000
+    style SB fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style W fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+    style CO fill:#ffffff,stroke:#333,stroke-width:2px,color:#000000
+```
+-->
+
+### Key Concepts:
+
+-   **Jobs**: Units of work you submit
+-   **Partitions**: Queues with different properties
+-   **Accounts**: Your PIRG for resource tracking
+
+## Essential SLURM Commands {.smaller}
+
+::: panel-tabset
+### Submit & Monitor
+
+``` bash
+# Submit a batch job
+sbatch myscript.sh
+
+# Check your jobs in the queue
+squeue -u $USER
+
+# Check all jobs on a partition
+squeue -p short
+
+# Cancel a job
+scancel JOBID
+
+# Get detailed job info
+scontrol show job JOBID
+```
+
+### After Completion
+
+``` bash
+# Check job history and resource usage
+sacct -j JOBID --format=JobID,Elapsed,MaxRSS
+
+# View partition information
+sinfo -p short
+```
+
+### Status Codes
+
+| Code | Meaning           |
+|------|-------------------|
+| PD   | Pending (waiting) |
+| R    | Running           |
+| CG   | Completing        |
+| CD   | Completed         |
+| F    | Failed            |
+:::
+
+## Interactive Jobs {.smaller}
+
+::: panel-tabset
+### Command
+
+``` bash
+# Start an interactive session
+srun --pty --partition=compute --account=myPIRG \
+     --time=2:00:00 --cpus-per-task=4 --mem=8G /bin/bash
+```
+
+### When to Use
+
+-   Testing your workflow before batch submission
+-   Debugging code
+-   Quick data exploration
+-   Running GUI applications
+
+**Note**: Your prompt will change from `login1` to something like `n049`
+:::
+
+# Writing Batch Scripts {background-color="#2c3e50"}
+
+## SLURM Batch Script Template {.smaller}
+
+::: panel-tabset
+### Template
+
+``` bash
+#!/bin/bash
+#SBATCH --job-name=my_analysis      # Job name
+#SBATCH --partition=compute         # Partition (queue)
+#SBATCH --account=myPIRG            # Your PIRG name
+#SBATCH --output=output_%j.log      # Standard output (%j = job ID)
+#SBATCH --error=error_%j.log        # Standard error
+#SBATCH --time=04:00:00             # Time limit (HH:MM:SS)
+#SBATCH --nodes=1                   # Number of nodes
+#SBATCH --ntasks-per-node=1         # Tasks per node
+#SBATCH --cpus-per-task=4           # CPUs per task
+#SBATCH --mem=16G                   # Memory per node
+
+# Load required modules
+module load R/4.3.3
+
+# Run your program
+Rscript my_analysis.R
+```
+
+### Directives
+
+| Directive         | Description         | Example                           |
+|-------------------|---------------------|-----------------------------------|
+| `--partition`     | Queue to use        | `compute`, `short`, `long`, `gpu` |
+| `--account`       | PIRG for accounting | `nereus`                          |
+| `--time`          | Max runtime         | `1-12:00:00` (1 day, 12 hrs)      |
+| `--nodes`         | Number of nodes     | `1`                               |
+| `--cpus-per-task` | Cores per task      | `8`                               |
+| `--mem`           | Memory per node     | `32G`                             |
+| `--gres`          | Generic resources   | `gpu:1`                           |
+
+### Interpretation
+
+-   Lines starting with `#SBATCH` are directives for the scheduler
+-   `%j` in filenames is replaced by the job ID
+-   Request only what you need --- smaller jobs run sooner!
+-   Always load modules after the SBATCH directives
+:::
+
+## GPU Jobs {.smaller}
+
+::: panel-tabset
+### Script
+
+``` bash
+#!/bin/bash
+#SBATCH --job-name=gpu_job
+#SBATCH --partition=gpu             # GPU partition
+#SBATCH --account=myPIRG
+#SBATCH --time=1-00:00:00           # 1 day
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:1                # Request 1 GPU
+#SBATCH --mem=32G
+
+# Load CUDA and your software
+module load cuda/12.4
+module load miniconda3/20240410
+
+# Activate your conda environment
+conda activate my_ml_env
+
+# Run your GPU code
+python train_model.py
+```
+
+### Check GPUs
+
+``` bash
+# See available GPUs
+/packages/racs/bin/slurm-show-gpus
+```
+:::
+
+# Software Modules {background-color="#2c3e50"}
+
+## Managing Software with LMOD {.smaller}
+
+::: panel-tabset
+### Commands
+
+``` bash
+# List all available modules
+module avail
+
+# Search for specific software
+module spider R
+module spider python
+
+# Load a module
+module load R/4.3.3
+module load miniconda3/20240410
+
+# See what's loaded
+module list
+
+# Unload a module
+module unload R
+
+# Reset to default
+module purge
+```
+
+### Best Practices
+
+::: {.callout-note title="Module Tips"}
+-   In batch scripts, always load modules after the SBATCH directives
+-   Use `module spider` to find available versions
+-   `module purge` resets your environment to defaults
+-   Specify version numbers for reproducibility (e.g., `R/4.3.3` not just `R`)
+:::
+:::
+
+# Best Practices {background-color="#2c3e50"}
+
+## Talapas Best Practices {.smaller}
+
+::::: columns
+::: {.column width="50%"}
+### Do:
+
+-   Request only resources you need
+-   Test with small datasets first
+-   Use `--time` conservatively
+-   Clean up old files regularly
+-   Use `/projects` for large data
+:::
+
+::: {.column width="50%"}
+### Don't:
+
+-   Run heavy computation on login nodes
+-   Leave jobs running indefinitely
+-   Store sensitive data without encryption
+-   Forget to acknowledge RACS in publications
+:::
+:::::
+
+## Getting Help {.smaller}
+
+### Resources:
+
+-   **Documentation**: [uoracs.github.io/talapas2-knowledge-base](https://uoracs.github.io/talapas2-knowledge-base/)
+-   **Service Desk**: [hpcrcf.atlassian.net/servicedesk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1)
+-   **Email**: racs\@uoregon.edu
+-   **Office Hours**: Knight Library, Dream Lab 122E (Wednesdays 1--3pm)
+
+### Acknowledgment Text:
+
+> "The authors acknowledge Research Advanced Computing Services (RACS) at the University of Oregon for providing computing resources that have contributed to the research results reported within this publication."
