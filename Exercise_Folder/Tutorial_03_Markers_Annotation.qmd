@@ -1,0 +1,300 @@
+---
+title: "Tutorial 03 — scRNA-seq: Markers & Cell Type Annotation"
+subtitle: "Find cluster markers, visualize, label by hand and with SingleR"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+Part three of the series. We start from the **clustered object saved in Tutorial 02** and walk through:
+
+-   Finding marker genes per cluster
+-   The canonical marker visualizations (Vln / Feature / Heatmap / Ridge / Dot)
+-   Manual cell-type annotation with `RenameIdents`
+-   Automatic annotation with `SingleR`
+-   Saving the final, annotated object
+
+## Learning goals
+
+-   Use `FindMarkers` / `FindAllMarkers` appropriately
+-   Read each of the five standard marker-visualization plots and know when to pick which
+-   Assign cell-type labels manually and with a reference-based classifier
+-   Cross-check manual and automatic labels to catch ambiguity
+
+## Setup
+
+```{r}
+#| label: setup
+#| eval: true
+
+library(Seurat)
+library(tidyverse)
+
+# For automatic annotation
+# BiocManager::install(c("SingleR", "celldex"))
+# library(SingleR)
+# library(celldex)
+
+set.seed(2026)
+```
+
+```{r}
+#| label: resume
+
+nsclc.seurat.obj <- readRDS("../data/nsclc_clustered.rds")
+Idents(nsclc.seurat.obj) <- "RNA_snn_res.0.5"
+nsclc.seurat.obj
+```
+
+------------------------------------------------------------------------
+
+## Step 1 — Find markers for one cluster
+
+```{r}
+#| label: markers-one
+
+cluster1.markers <- FindMarkers(nsclc.seurat.obj, ident.1 = 1, min.pct = 0.25)
+head(cluster1.markers, 10)
+```
+
+::: {.callout-important title="Think about it"}
+1.  What does `min.pct = 0.25` do, and why is that a useful default?
+2.  The output has `avg_log2FC`, `pct.1`, `pct.2`. Which gene would you pick as a *specific* marker for this cluster?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Only tests genes detected in ≥ 25% of cells in at least one of the two groups. Prunes low-expression noise and speeds the test up significantly.
+2.  A specific marker has **high `pct.1` and low `pct.2`** (expressed in almost all cluster-1 cells, almost none elsewhere) *and* high positive `avg_log2FC`. Markers that are broadly expressed (high `pct.2`) may be real but aren't *specific*.
+
+</details>
+:::
+
+## Step 2 — Markers distinguishing one cluster from a pair
+
+```{r}
+#| label: markers-vs
+
+cluster5.markers <- FindMarkers(
+  nsclc.seurat.obj,
+  ident.1 = 5,
+  ident.2 = c(0, 3),
+  min.pct = 0.25
+)
+head(cluster5.markers, 10)
+```
+
+::: {.callout-important title="Think about it"}
+1.  Why might you compare cluster 5 *only* to clusters 0 and 3, rather than to all other cells?
+2.  What's a situation where you'd want `ident.1` vs `ident.2` to be two groups of clusters (e.g. `ident.1 = c(5, 7)`)?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  If 0 and 3 look similar on UMAP or markers to cluster 5, you want genes that **specifically** separate 5 from *those neighbors* — genome-wide vs-all tests can be dominated by genes separating cluster 5 from totally unrelated populations.
+2.  When you have **biological groups** of clusters, e.g. merging two T-cell subtypes (5 + 7) to compare against NK cells (3 + 8). Grouping lets you test at the lineage level rather than the cluster level.
+
+</details>
+:::
+
+## Step 3 — Markers for every cluster
+
+```{r}
+#| label: markers-all
+
+nsclc.markers <- FindAllMarkers(
+  nsclc.seurat.obj,
+  only.pos        = TRUE,
+  min.pct         = 0.25,
+  logfc.threshold = 0.25
+)
+
+top_markers <- nsclc.markers |>
+  group_by(cluster) |>
+  slice_max(avg_log2FC, n = 5)
+top_markers
+```
+
+::: {.callout-important title="Think about it"}
+1.  `only.pos = TRUE` — what do you lose?
+2.  For condition-level DE (treated vs control), is `FindAllMarkers` the right tool?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  You only see genes **up** in the cluster of interest. Sometimes a gene is a strong *negative* marker (consistently *lower* than elsewhere) and also diagnostic. Rerun without `only.pos` if you want both directions.
+2.  No. `FindAllMarkers` / `FindMarkers` treat each cell as an independent observation, which is anti-conservative for condition-level comparisons across biological samples. For that, use **pseudobulk** + DESeq2/edgeR/limma (see the Pseudobulk extra lecture).
+
+</details>
+:::
+
+## Step 4 — Visualizing markers
+
+### 4a. Violin plots — expression distribution per cluster
+
+```{r}
+#| label: viz-vln
+
+top_genes <- top_markers |> ungroup() |> slice_head(n = 6) |> pull(gene)
+VlnPlot(nsclc.seurat.obj, features = top_genes, pt.size = 0, ncol = 3)
+```
+
+### 4b. Feature plots — expression on UMAP
+
+```{r}
+#| label: viz-feature
+
+FeaturePlot(nsclc.seurat.obj, features = top_genes[1:4])
+```
+
+### 4c. Heatmap — top markers across clusters
+
+```{r}
+#| label: viz-heatmap
+
+top10 <- nsclc.markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
+DoHeatmap(nsclc.seurat.obj, features = top10$gene) + NoLegend()
+```
+
+### 4d. Ridge plots — expression density per cluster
+
+```{r}
+#| label: viz-ridge
+
+RidgePlot(nsclc.seurat.obj, features = top_genes[1:4], ncol = 2)
+```
+
+### 4e. Dot plot — % expressing × mean expression
+
+```{r}
+#| label: viz-dot
+
+DotPlot(nsclc.seurat.obj, features = top_genes) + RotatedAxis()
+```
+
+::: {.callout-important title="Think about it"}
+1.  Which of the five plot types is best for **showing a 20-gene marker panel across 10 clusters on one page**?
+2.  Which is best for **checking whether a single gene has spatial structure on the UMAP**?
+3.  Which is most misleading if your cluster sizes are very unequal, and why?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  **Dot plot** — compact, shows both percent-expressing (dot size) and mean expression (color) in a genes × clusters grid.
+2.  **Feature plot** — overlays expression on the 2-D embedding so you can see geography.
+3.  **Heatmap** can be misleading: it shows cells, not clusters, so a dominant cluster (say 40% of cells) visually monopolizes the plot. Dot plot normalizes per cluster and avoids this.
+
+</details>
+:::
+
+## Step 5 — Manual annotation
+
+```{r}
+#| label: rename
+
+# Example only — replace these with the labels appropriate for YOUR markers.
+# Work through the top markers per cluster, look them up in CellMarker 2.0
+# or PanglaoDB, and decide the biology.
+
+# new.cluster.ids <- c("T cells", "Macrophages", "Epithelial",
+#                      "Fibroblasts", "B cells", ...)
+# names(new.cluster.ids) <- levels(nsclc.seurat.obj)
+# nsclc.seurat.obj <- RenameIdents(nsclc.seurat.obj, new.cluster.ids)
+# nsclc.seurat.obj$celltype_manual <- Idents(nsclc.seurat.obj)
+
+# DimPlot(nsclc.seurat.obj, reduction = "umap", label = TRUE, repel = TRUE) +
+#   NoLegend()
+```
+
+::: {.callout-important title="Think about it"}
+1.  Two clusters share KRT8/KRT18 as top markers. Are they the same cell type?
+2.  What's the risk of assigning a label from a single marker gene?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Not necessarily — KRT8/18 are broad epithelial markers. Both clusters are likely epithelial, but could be distinct subtypes (tumor vs. normal epithelium, alveolar type I vs. II, etc.). You need *discriminating* markers on top of the shared ones.
+2.  Many markers are non-specific, and biological "marker genes" are often graded rather than binary. Label from **combinations** (a marker *plus* absence of another marker) and always cross-check with an automatic method.
+
+</details>
+:::
+
+## Step 6 — Automatic annotation with SingleR
+
+```{r}
+#| label: singler
+
+# library(SingleR)
+# library(celldex)
+#
+# # Pick a reference appropriate for your tissue
+# ref <- celldex::HumanPrimaryCellAtlasData()
+#
+# # SingleR expects log-normalized expression
+# expr <- GetAssayData(nsclc.seurat.obj, slot = "data")
+#
+# singler.labels <- SingleR(
+#   test    = expr,
+#   ref     = ref,
+#   labels  = ref$label.main
+# )
+#
+# nsclc.seurat.obj$celltype_singler <- singler.labels$labels
+#
+# DimPlot(nsclc.seurat.obj, group.by = "celltype_singler", label = TRUE, repel = TRUE) +
+#   NoLegend()
+```
+
+::: {.callout-important title="Think about it"}
+1.  How would you check whether SingleR is *confident* about a label vs just picking the best of a bad set?
+2.  What would you do when SingleR and your manual annotation disagree on a cluster?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Inspect `singler.labels$scores` and the `pruned.labels` column (labels it declines to assign when score gaps are small). You can also plot `plotScoreHeatmap(singler.labels)` to see per-cell confidence.
+2.  Disagreements often flag **real ambiguity** — rare subtypes, transitional states, or references that don't include your biology (e.g. a tumor reference vs a healthy-tissue reference). Re-check markers, pick a more tissue-appropriate reference, and document the uncertainty.
+
+</details>
+:::
+
+## Step 7 — Save the final object
+
+```{r}
+#| label: save
+
+saveRDS(nsclc.seurat.obj, file = "../data/nsclc_annotated.rds")
+```
+
+## Next steps
+
+-   **Condition-level DE** with pseudobulk (see the Pseudobulk extra lecture)
+-   **Integration** across samples or batches (Harmony / CCA / scVI)
+-   **Trajectory inference** with Monocle3 / Slingshot
+-   **Cell–cell communication** with CellChat / LIANA
+
+## Credits
+
+-   Dataset: 10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex
+-   Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow
+-   Reference: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html) · [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html)

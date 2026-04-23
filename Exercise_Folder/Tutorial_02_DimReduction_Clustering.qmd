@@ -1,0 +1,246 @@
+---
+title: "Tutorial 02 — scRNA-seq: Dimensionality Reduction & Clustering"
+subtitle: "PCA, how many PCs, neighbor graph, Leiden at multiple resolutions, UMAP"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+Part two of the series. We start from the **preprocessed object saved in Tutorial 01** and walk through:
+
+-   Linear dimensionality reduction with PCA
+-   Choosing how many PCs to keep
+-   Building the shared nearest-neighbor graph
+-   Clustering at multiple resolutions and comparing them
+-   UMAP embedding
+
+## Learning goals
+
+-   Run `RunPCA()` and read PCA diagnostic plots
+-   Use `ElbowPlot()` to pick a defensible number of PCs
+-   Run `FindNeighbors()` → `FindClusters()` at several resolutions and inspect the difference
+-   Switch the active identity between clusterings with `Idents()`
+-   Generate a UMAP and overlay cluster labels
+
+## Setup
+
+```{r}
+#| label: setup
+#| eval: true
+
+library(Seurat)
+library(tidyverse)
+set.seed(2026)
+```
+
+```{r}
+#| label: resume
+
+nsclc.seurat.obj <- readRDS("../data/nsclc_preprocessed.rds")
+nsclc.seurat.obj
+```
+
+------------------------------------------------------------------------
+
+## Step 1 — Linear dimensionality reduction (PCA)
+
+```{r}
+#| label: pca
+
+nsclc.seurat.obj <- RunPCA(
+  nsclc.seurat.obj,
+  features = VariableFeatures(object = nsclc.seurat.obj)
+)
+
+print(nsclc.seurat.obj[["pca"]], dims = 1:5, nfeatures = 5)
+DimHeatmap(nsclc.seurat.obj, dims = 1, cells = 500, balanced = TRUE)
+```
+
+::: {.callout-important title="Think about it"}
+1.  PCA here runs on HVGs, not all genes. What would change if we included all genes?
+2.  `DimHeatmap(dims = 1, cells = 500)` — why show only 500 cells per PC?
+3.  What does a PC whose top loadings are all mitochondrial genes usually mean?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  PCs would be dominated by highly-expressed housekeeping genes whose variance simply reflects sequencing depth. HVG-restricted PCA isolates biologically-variable signal.
+2.  The heatmap orders cells along the PC and shows gene expression for the extreme low and high cells. 500 is enough to see the gradient; more would just smear the display and slow rendering.
+3.  It's a **technical PC** tracking cell quality / stress rather than biology. If it dominates, consider regressing `percent.mt` in `ScaleData`, or excluding it from downstream clustering dims.
+
+</details>
+:::
+
+## Step 2 — Choose how many PCs to keep
+
+```{r}
+#| label: elbow
+
+ElbowPlot(nsclc.seurat.obj, ndims = 40)
+```
+
+::: {.callout-important title="Think about it"}
+1.  Where is "the elbow" on an ElbowPlot, and why does it suggest a cutoff?
+2.  What's a principled alternative to eyeballing the elbow?
+3.  Is it risky to choose too *few* PCs? Too *many*?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  The elbow is where the variance explained per PC flattens out — additional PCs stop adding much signal. Picking the elbow captures most of the biological structure without the noise-heavy tail.
+2.  `JackStraw()` + `JackStrawPlot()` (permutation-based significance) is more principled but slow on large datasets. `Stuart et al. 2019` also showed that results are fairly robust across reasonable PC counts, so the heuristic is fine in practice.
+3.  **Too few** loses cell-type resolution (rare populations blur together). **Too many** pulls in noisy dimensions and inflates distances in the neighbor graph. Being slightly generous (e.g. 15–30) is usually safe.
+
+</details>
+:::
+
+```{r}
+#| label: n-pcs
+
+n_pcs <- 15
+```
+
+## Step 3 — Build the neighbor graph
+
+```{r}
+#| label: neighbors
+
+nsclc.seurat.obj <- FindNeighbors(nsclc.seurat.obj, dims = 1:n_pcs)
+```
+
+::: {.callout-important title="Think about it"}
+1.  What graph does `FindNeighbors()` build?
+2.  Why operate on PC space rather than raw expression?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  It builds a **k-nearest-neighbor** graph (default `k = 20`) and then a **shared-nearest-neighbor** graph: two cells are connected if they share many nearest neighbors. The Jaccard-weighted SNN graph is what clustering runs on.
+2.  PC space is denoised, low-dimensional, and has well-behaved Euclidean distance. Raw expression is sparse, high-dimensional, and distance-distorted by the *curse of dimensionality*.
+
+</details>
+:::
+
+## Step 4 — Cluster at several resolutions
+
+```{r}
+#| label: cluster
+
+nsclc.seurat.obj <- FindClusters(
+  nsclc.seurat.obj,
+  resolution = c(0.1, 0.3, 0.5, 0.7, 1.0)
+)
+
+head(nsclc.seurat.obj@meta.data)
+```
+
+::: {.callout-important title="Think about it"}
+1.  What does `resolution` control intuitively?
+2.  Each resolution creates its own `RNA_snn_res.XYZ` column in the metadata. How do you make one of them the *active* identity?
+3.  Try `clustree::clustree(nsclc.seurat.obj, prefix = "RNA_snn_res.")`. What does it show?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  The granularity knob for the graph-based community detection. Higher resolution ⇒ smaller, more numerous clusters.
+2.  `Idents(nsclc.seurat.obj) <- "RNA_snn_res.0.3"` — or any of the resolution columns. `DimPlot(..., group.by = "RNA_snn_res.0.3")` also works without changing active idents.
+3.  A **clustering tree**: each row is a resolution, each node is a cluster, and edges show how cells flow from one resolution to the next. Stable clusters stay as one node across levels; unstable ones fragment. It's a great way to pick a resolution visually.
+
+</details>
+:::
+
+## Step 5 — Visualize cluster counts across resolutions
+
+```{r}
+#| label: cluster-counts
+
+# quick summary of cluster counts per resolution
+nsclc.seurat.obj@meta.data |>
+  select(starts_with("RNA_snn_res.")) |>
+  map_int(~ length(unique(.x)))
+```
+
+::: {.callout-important title="Think about it"}
+1.  At `res = 0.1` you might see 6 clusters; at `res = 1.0` you might see 20+. Which is "right"?
+2.  Does changing resolution change the *underlying biology* or just how the same biology is partitioned?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Neither is objectively right. Resolution is a **knob** — choose the one that matches the biological question. For a broad cell-type atlas, lower resolution is fine; to split subtypes, you need higher. Confirm with markers.
+2.  Just the partitioning. The underlying graph and cell embeddings are unchanged — resolution decides where to draw the cluster boundaries.
+
+</details>
+:::
+
+## Step 6 — Pick a resolution, set identities, and plot
+
+```{r}
+#| label: pick-res
+
+Idents(nsclc.seurat.obj) <- "RNA_snn_res.0.5"
+DimPlot(
+  nsclc.seurat.obj,
+  group.by = "RNA_snn_res.0.5",
+  label    = TRUE
+)
+```
+
+## Step 7 — Non-linear embedding (UMAP)
+
+```{r}
+#| label: umap
+
+nsclc.seurat.obj <- RunUMAP(nsclc.seurat.obj, dims = 1:n_pcs)
+DimPlot(nsclc.seurat.obj, reduction = "umap", label = TRUE)
+```
+
+::: {.callout-important title="Think about it"}
+1.  Clusters are defined on the graph, *not* on UMAP. How can clustering and UMAP disagree visually?
+2.  Why shouldn't you compare UMAP distances quantitatively between clusters?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  UMAP is a separate non-linear projection. A cluster may occasionally split visually on UMAP while still being one graph community — and vice versa. Trust the graph-based cluster call; use UMAP as a sanity check.
+2.  UMAP preserves *local* neighborhoods but distorts *global* distances to fit in 2D. A cluster that looks far away on UMAP isn't necessarily biologically more distant than one nearby.
+
+</details>
+:::
+
+## Save and continue to Tutorial 03
+
+```{r}
+#| label: save
+
+saveRDS(nsclc.seurat.obj, file = "../data/nsclc_clustered.rds")
+```
+
+::: callout-tip
+Continue with **Tutorial 03 — Markers & Cell Type Annotation**.
+:::
+
+## Credits
+
+-   Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow
+-   References: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html) · [clustree](https://cran.r-project.org/package=clustree)
