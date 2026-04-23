@@ -22,12 +22,51 @@ editor: visual
 
 The first of a three-part series walking the standard **Seurat** scRNA-seq workflow, using the public **10x Genomics NSCLC DTC** dataset (20k cells, 7 donors, 3' v3.1 Multiplex). This part stops after **ScaleData** — the object you save here is the input to Tutorial 02.
 
--   Data: [20k NSCLC DTC (10x)](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
 -   Upstream script: *Khushbu Patel, single-cell RNA-seq standard workflow*
 -   Reference vignette: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
 
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it (chunks default to `eval: false`). To actually run the analysis:
+
+1.  [Download the `.qmd` source](Tutorial_01_QC_Preprocessing.qmd) and open it in RStudio.
+2.  Download the dataset (below) into a `data/` folder at the repository root.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+## Dataset — 20k NSCLC DTC (10x Genomics)
+
+**What it is.** Twenty-thousand dissociated tumor cells (DTCs) pooled from **seven non-small-cell lung cancer (NSCLC) donors**, run on the 10x Chromium **3' v3.1** assay with **CellPlex multiplexing** (CMO hashing) so that every cell carries both a gene-expression profile and a sample-of-origin barcode.
+
+-   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
+-   Reference genome: GRCh38 (human)
+-   Chemistry: 10x Chromium Single Cell 3' v3.1 (dual index, Next GEM), CellPlex multiplexing
+-   Cell count (target recovery): \~20,000 post-filter cells across 7 donors
+
+### Files used in this tutorial
+
+| File | Size (approx.) | What it is |
+|---|---|---|
+| `20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5` | \~1.5 GB | HDF5 sparse matrix of **raw** UMI counts: `features × barcodes`. Contains both `Gene Expression` and `Multiplexing Capture` assays in one file. |
+
+Download from the 10x landing page (the file sits under *Output and supplemental files → Feature / cell matrix HDF5 (raw)*), then place it at `../data/`.
+
+### Data dictionary — `Read10X_h5()` return value
+
+`Read10X_h5()` on this multiplex file returns a **named list** of sparse matrices (one per assay). Each sparse matrix has:
+
+| Slot | Type | Description |
+|---|---|---|
+| `dimnames[[1]]` (rows) | character | Gene **symbols** (e.g. `MT-ND1`, `CD3D`, `KRT8`). Feature-level metadata (Ensembl IDs, biotype) lives in `features/` inside the HDF5 and is not returned by `Read10X_h5()`. |
+| `dimnames[[2]]` (cols) | character | 16-bp 10x **cell barcodes** (e.g. `AAACCTGAGAAACCAT-1`). The `-1` suffix is the GEM-well index. |
+| values | integer | **UMI counts** — the number of unique transcript molecules observed for that (gene, cell) pair. Raw counts, no normalization. |
+
+| Named slot in the returned list | Matrix shape | Meaning |
+|---|---|---|
+| `$\`Gene Expression\`` | \~36,600 genes × \~725,000 barcodes | The gene-expression counts. This is what the tutorial uses. |
+| `$\`Multiplexing Capture\`` | \~12 CMOs × \~725,000 barcodes | Per-barcode CellPlex hashtag counts, used to demultiplex donors. Not used in this tutorial. |
+
 ::: callout-note
-Chunks default to `eval: false`. Place the downloaded `.h5` in `../data/` (or adjust the path) and flip chunks to `eval: true` as you work through them.
+The matrix is **raw** (all barcodes, including empty droplets). `min.cells = 3` and `min.features = 200` in `CreateSeuratObject()` apply the first-pass filters.
 :::
 
 ## Learning goals
