@@ -2,8 +2,11 @@
 # Render script for the Single Cell RNA-seq Workshop site.
 #
 # Produces three kinds of output in docs/:
-#   1. Lecture slides (revealjs)      — Lecture_Folder/_quarto.yml
-#   2. Course website pages (html)    — root _quarto.yml
+#   1. Lecture slides (revealjs)              — Lecture_Folder/_quarto.yml
+#   2. Course website pages (html)            — root _quarto.yml
+#      This includes the long-form reading material in Resources_Folder/
+#      (appendices, Glossary, VS Code & Talapas) which renders as plain
+#      HTML pages, not slides.
 #   3. Exercise HTML + downloadable .qmd sources side-by-side:
 #        docs/Exercise_Folder/Tutorial_01_QC_Preprocessing.html
 #        docs/Exercise_Folder/Tutorial_01_QC_Preprocessing.qmd  (download)
