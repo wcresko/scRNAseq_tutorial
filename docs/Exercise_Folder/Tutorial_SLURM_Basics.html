@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Tutorial 01 — scRNA-seq: QC &amp; Preprocessing – Single Cell RNA-seq Workshop</title>
+<title>Tutorial — SLURM Basics on Talapas – Single Cell RNA-seq Workshop</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -3920,23 +3920,28 @@ vertical-align: -.125em;
    
   <ul>
   <li><a href="#about-this-tutorial" id="toc-about-this-tutorial" class="nav-link active" data-scroll-target="#about-this-tutorial">About this tutorial</a></li>
-  <li><a href="#dataset-20k-nsclc-dtc-10x-genomics" id="toc-dataset-20k-nsclc-dtc-10x-genomics" class="nav-link" data-scroll-target="#dataset-20k-nsclc-dtc-10x-genomics">Dataset — 20k NSCLC DTC (10x Genomics)</a>
+  <li><a href="#why-slurm" id="toc-why-slurm" class="nav-link" data-scroll-target="#why-slurm">1. Why SLURM?</a></li>
+  <li><a href="#prerequisites" id="toc-prerequisites" class="nav-link" data-scroll-target="#prerequisites">2. Prerequisites</a></li>
+  <li><a href="#key-slurm-commands-at-a-glance" id="toc-key-slurm-commands-at-a-glance" class="nav-link" data-scroll-target="#key-slurm-commands-at-a-glance">3. Key SLURM commands at a glance</a></li>
+  <li><a href="#talapas-partitions-queues" id="toc-talapas-partitions-queues" class="nav-link" data-scroll-target="#talapas-partitions-queues">4. Talapas partitions (queues)</a></li>
+  <li><a href="#interactive-mode-srun" id="toc-interactive-mode-srun" class="nav-link" data-scroll-target="#interactive-mode-srun">5. Interactive mode — <code>srun</code></a>
   <ul class="collapse">
-  <li><a href="#files-used-in-this-tutorial" id="toc-files-used-in-this-tutorial" class="nav-link" data-scroll-target="#files-used-in-this-tutorial">Files used in this tutorial</a></li>
-  <li><a href="#data-dictionary-read10x_h5-return-value" id="toc-data-dictionary-read10x_h5-return-value" class="nav-link" data-scroll-target="#data-dictionary-read10x_h5-return-value">Data dictionary — <code>Read10X_h5()</code> return value</a></li>
+  <li><a href="#a-minimum-interactive-session" id="toc-a-minimum-interactive-session" class="nav-link" data-scroll-target="#a-minimum-interactive-session">5.1 A minimum interactive session</a></li>
+  <li><a href="#using-the-short-interactive-partition" id="toc-using-the-short-interactive-partition" class="nav-link" data-scroll-target="#using-the-short-interactive-partition">5.2 Using the short <code>interactive</code> partition</a></li>
+  <li><a href="#interactive-gpu-session" id="toc-interactive-gpu-session" class="nav-link" data-scroll-target="#interactive-gpu-session">5.3 Interactive GPU session</a></li>
+  <li><a href="#graphical-interactive-jobs" id="toc-graphical-interactive-jobs" class="nav-link" data-scroll-target="#graphical-interactive-jobs">5.4 Graphical interactive jobs</a></li>
   </ul></li>
-  <li><a href="#learning-goals" id="toc-learning-goals" class="nav-link" data-scroll-target="#learning-goals">Learning goals</a></li>
-  <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a></li>
-  <li><a href="#step-1-read-the-10x-.h5" id="toc-step-1-read-the-10x-.h5" class="nav-link" data-scroll-target="#step-1-read-the-10x-.h5">Step 1 — Read the 10x <code>.h5</code></a></li>
-  <li><a href="#step-2-create-the-seurat-object" id="toc-step-2-create-the-seurat-object" class="nav-link" data-scroll-target="#step-2-create-the-seurat-object">Step 2 — Create the Seurat object</a></li>
-  <li><a href="#step-3-add-qc-metrics" id="toc-step-3-add-qc-metrics" class="nav-link" data-scroll-target="#step-3-add-qc-metrics">Step 3 — Add QC metrics</a></li>
-  <li><a href="#step-4-visualize-qc" id="toc-step-4-visualize-qc" class="nav-link" data-scroll-target="#step-4-visualize-qc">Step 4 — Visualize QC</a></li>
-  <li><a href="#step-5-filter-low-quality-cells" id="toc-step-5-filter-low-quality-cells" class="nav-link" data-scroll-target="#step-5-filter-low-quality-cells">Step 5 — Filter low-quality cells</a></li>
-  <li><a href="#step-6-normalize" id="toc-step-6-normalize" class="nav-link" data-scroll-target="#step-6-normalize">Step 6 — Normalize</a></li>
-  <li><a href="#step-7-highly-variable-features" id="toc-step-7-highly-variable-features" class="nav-link" data-scroll-target="#step-7-highly-variable-features">Step 7 — Highly variable features</a></li>
-  <li><a href="#step-8-scale" id="toc-step-8-scale" class="nav-link" data-scroll-target="#step-8-scale">Step 8 — Scale</a></li>
-  <li><a href="#save-and-continue-to-tutorial-02" id="toc-save-and-continue-to-tutorial-02" class="nav-link" data-scroll-target="#save-and-continue-to-tutorial-02">Save and continue to Tutorial 02</a></li>
-  <li><a href="#credits" id="toc-credits" class="nav-link" data-scroll-target="#credits">Credits</a></li>
+  <li><a href="#batch-mode-sbatch" id="toc-batch-mode-sbatch" class="nav-link" data-scroll-target="#batch-mode-sbatch">6. Batch mode — <code>sbatch</code></a>
+  <ul class="collapse">
+  <li><a href="#a-first-batch-script" id="toc-a-first-batch-script" class="nav-link" data-scroll-target="#a-first-batch-script">6.1 A first batch script</a></li>
+  <li><a href="#anatomy-of-sbatch-directives" id="toc-anatomy-of-sbatch-directives" class="nav-link" data-scroll-target="#anatomy-of-sbatch-directives">6.2 Anatomy of <code>#SBATCH</code> directives</a></li>
+  <li><a href="#a-realistic-scrna-seq-job" id="toc-a-realistic-scrna-seq-job" class="nav-link" data-scroll-target="#a-realistic-scrna-seq-job">6.3 A realistic scRNA-seq job</a></li>
+  <li><a href="#gpu-batch-job" id="toc-gpu-batch-job" class="nav-link" data-scroll-target="#gpu-batch-job">6.4 GPU batch job</a></li>
+  </ul></li>
+  <li><a href="#choosing-the-right-resources" id="toc-choosing-the-right-resources" class="nav-link" data-scroll-target="#choosing-the-right-resources">7. Choosing the right resources</a></li>
+  <li><a href="#monitoring-cancelling-and-troubleshooting" id="toc-monitoring-cancelling-and-troubleshooting" class="nav-link" data-scroll-target="#monitoring-cancelling-and-troubleshooting">8. Monitoring, cancelling, and troubleshooting</a></li>
+  <li><a href="#being-a-good-cluster-citizen-at-uo" id="toc-being-a-good-cluster-citizen-at-uo" class="nav-link" data-scroll-target="#being-a-good-cluster-citizen-at-uo">9. Being a good cluster citizen at UO</a></li>
+  <li><a href="#where-to-go-next" id="toc-where-to-go-next" class="nav-link" data-scroll-target="#where-to-go-next">10. Where to go next</a></li>
   </ul>
 </nav>
     </div>
@@ -3945,8 +3950,8 @@ vertical-align: -.125em;
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Tutorial 01 — scRNA-seq: QC &amp; Preprocessing</h1>
-<p class="subtitle lead">Load a 10x dataset, filter cells, normalize, pick HVGs, scale</p>
+<h1 class="title">Tutorial — SLURM Basics on Talapas</h1>
+<p class="subtitle lead">Interactive sessions and batch scripts on UO’s HPC cluster</p>
 </div>
 
 
@@ -3971,11 +3976,9 @@ vertical-align: -.125em;
 
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
-<p>The first of a three-part series walking the standard <strong>Seurat</strong> scRNA-seq workflow, using the public <strong>10x Genomics NSCLC DTC</strong> dataset (20k cells, 7 donors, 3’ v3.1 Multiplex). This part stops after <strong>ScaleData</strong> — the object you save here is the input to Tutorial 02.</p>
-<ul>
-<li>Upstream script: <em>Khushbu Patel, single-cell RNA-seq standard workflow</em></li>
-<li>Reference vignette: <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial.html">Seurat PBMC 3k tutorial</a></li>
-</ul>
+<p>This tutorial covers the <strong>basics of using SLURM</strong> (the job scheduler on the University of Oregon’s Talapas HPC cluster) — both in <strong>interactive mode</strong> and through <strong>batch scripts</strong>. It is aimed at workshop participants who have a Duck ID and Talapas account and are ready to run their first jobs.</p>
+<p>All examples are specific to UO and Talapas. If you have not yet logged in to Talapas for the first time, see the <a href="../VSCode.html"><strong>VS Code &amp; Talapas</strong></a> appendix first.</p>
+<p>Material is adapted from the <a href="https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html">Talapas Quick Start Guide</a> and the <a href="https://uoracs.github.io/talapas2-knowledge-base/">How-To articles</a> in the Talapas Knowledge Base.</p>
 <div class="callout callout-style-default callout-tip callout-titled" title="How to use this page">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -3986,452 +3989,378 @@ How to use this page
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The rendered HTML shows the code but does <strong>not</strong> execute it (chunks default to <code>eval: false</code>). To actually run the analysis:</p>
-<ol type="1">
-<li><a href="../Exercise_Folder/Tutorial_01_QC_Preprocessing.html">Download the <code>.qmd</code> source</a> and open it in RStudio.</li>
-<li>Download the dataset (below) into a <code>data/</code> folder at the repository root.</li>
-<li>Work through the chunks, flipping <code>eval: true</code> as you go.</li>
-</ol>
+<p>Read this page top to bottom the first time. Later, treat it as a reference — the commands here cover ~95% of what you will do in the workshop.</p>
 </div>
-</div>
-</section>
-<section id="dataset-20k-nsclc-dtc-10x-genomics" class="level2">
-<h2 class="anchored" data-anchor-id="dataset-20k-nsclc-dtc-10x-genomics">Dataset — 20k NSCLC DTC (10x Genomics)</h2>
-<p><strong>What it is.</strong> Twenty-thousand dissociated tumor cells (DTCs) pooled from <strong>seven non-small-cell lung cancer (NSCLC) donors</strong>, run on the 10x Chromium <strong>3’ v3.1</strong> assay with <strong>CellPlex multiplexing</strong> (CMO hashing) so that every cell carries both a gene-expression profile and a sample-of-origin barcode.</p>
-<ul>
-<li>Landing page: <a href="https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0">10x Genomics — 20k NSCLC DTC, 3’ v3.1 Multiplex</a></li>
-<li>Reference genome: GRCh38 (human)</li>
-<li>Chemistry: 10x Chromium Single Cell 3’ v3.1 (dual index, Next GEM), CellPlex multiplexing</li>
-<li>Cell count (target recovery): ~20,000 post-filter cells across 7 donors</li>
-</ul>
-<section id="files-used-in-this-tutorial" class="level3">
-<h3 class="anchored" data-anchor-id="files-used-in-this-tutorial">Files used in this tutorial</h3>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>File</th>
-<th>Size (approx.)</th>
-<th>What it is</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5</code></td>
-<td>~1.5 GB</td>
-<td>HDF5 sparse matrix of <strong>raw</strong> UMI counts: <code>features × barcodes</code>. Contains both <code>Gene Expression</code> and <code>Multiplexing Capture</code> assays in one file.</td>
-</tr>
-</tbody>
-</table>
-<p>Download from the 10x landing page (the file sits under <em>Output and supplemental files → Feature / cell matrix HDF5 (raw)</em>), then place it at <code>../data/</code>.</p>
-</section>
-<section id="data-dictionary-read10x_h5-return-value" class="level3">
-<h3 class="anchored" data-anchor-id="data-dictionary-read10x_h5-return-value">Data dictionary — <code>Read10X_h5()</code> return value</h3>
-<p><code>Read10X_h5()</code> on this multiplex file returns a <strong>named list</strong> of sparse matrices (one per assay). Each sparse matrix has:</p>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Slot</th>
-<th>Type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>dimnames[[1]]</code> (rows)</td>
-<td>character</td>
-<td>Gene <strong>symbols</strong> (e.g. <code>MT-ND1</code>, <code>CD3D</code>, <code>KRT8</code>). Feature-level metadata (Ensembl IDs, biotype) lives in <code>features/</code> inside the HDF5 and is not returned by <code>Read10X_h5()</code>.</td>
-</tr>
-<tr class="even">
-<td><code>dimnames[[2]]</code> (cols)</td>
-<td>character</td>
-<td>16-bp 10x <strong>cell barcodes</strong> (e.g. <code>AAACCTGAGAAACCAT-1</code>). The <code>-1</code> suffix is the GEM-well index.</td>
-</tr>
-<tr class="odd">
-<td>values</td>
-<td>integer</td>
-<td><strong>UMI counts</strong> — the number of unique transcript molecules observed for that (gene, cell) pair. Raw counts, no normalization.</td>
-</tr>
-</tbody>
-</table>
-<table class="caption-top table">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Named slot in the returned list</th>
-<th>Matrix shape</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>$\</code>Gene Expression`<code>| \~36,600 genes × \~725,000 barcodes | The gene-expression counts. This is what the tutorial uses. | |</code>$`Multiplexing Capture``</td>
-<td>~12 CMOs × ~725,000 barcodes</td>
-<td>Per-barcode CellPlex hashtag counts, used to demultiplex donors. Not used in this tutorial.</td>
-</tr>
-</tbody>
-</table>
-<div class="callout callout-style-default callout-note callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Note
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The matrix is <strong>raw</strong> (all barcodes, including empty droplets). <code>min.cells = 3</code> and <code>min.features = 200</code> in <code>CreateSeuratObject()</code> apply the first-pass filters.</p>
-</div>
-</div>
-</section>
-</section>
-<section id="learning-goals" class="level2">
-<h2 class="anchored" data-anchor-id="learning-goals">Learning goals</h2>
-<p>By the end of this tutorial you will be able to:</p>
-<ul>
-<li>Read a 10x <code>.h5</code> file into Seurat</li>
-<li>Add per-cell QC metrics and visualize them</li>
-<li>Choose filtering thresholds that are defensible for <em>your</em> dataset</li>
-<li>Run <code>NormalizeData</code> → <code>FindVariableFeatures</code> → <code>ScaleData</code> and understand what each does</li>
-</ul>
-</section>
-<section id="setup" class="level2">
-<h2 class="anchored" data-anchor-id="setup">Setup</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <hr>
 </section>
-<section id="step-1-read-the-10x-.h5" class="level2">
-<h2 class="anchored" data-anchor-id="step-1-read-the-10x-.h5">Step 1 — Read the 10x <code>.h5</code></h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>nsclc.sparse.m <span class="ot">&lt;-</span> <span class="fu">Read10X_h5</span>(<span class="at">filename =</span> <span class="st">&quot;../data/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5&quot;</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 10x multi-modal h5 files return a list; keep the Gene Expression slice</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">str</span>(nsclc.sparse.m)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>cts <span class="ot">&lt;-</span> nsclc.sparse.m<span class="sc">$</span><span class="st">`</span><span class="at">Gene Expression</span><span class="st">`</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">dim</span>(cts)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>Why does <code>Read10X_h5</code> sometimes return a <strong>list</strong> instead of a matrix?</li>
-<li>What does each dimension of <code>cts</code> represent?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>10x Multiplex / CellPlex / CITE-seq / multiome runs produce multiple measurement types in one file (e.g. <code>Gene Expression</code>, <code>Antibody Capture</code>, <code>Peaks</code>). The reader returns a named list so you can pull the slice you want.</li>
-<li>Rows = genes (features), columns = cell barcodes. <code>dim(cts)[1]</code> is the gene count, <code>dim(cts)[2]</code> is the cell count.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-2-create-the-seurat-object" class="level2">
-<h2 class="anchored" data-anchor-id="step-2-create-the-seurat-object">Step 2 — Create the Seurat object</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts       =</span> cts,</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">project      =</span> <span class="st">&quot;NSCLC&quot;</span>,</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.cells    =</span> <span class="dv">3</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.features =</span> <span class="dv">200</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>What exactly do <code>min.cells = 3</code> and <code>min.features = 200</code> remove?</li>
-<li>The <code>nsclc.sparse.m</code> list still sits in memory. What would <code>rm(nsclc.sparse.m); gc()</code> do, and why might you want to?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li><code>min.cells = 3</code> drops genes detected in fewer than 3 cells (likely noise). <code>min.features = 200</code> drops barcodes with fewer than 200 detected genes — mostly empty droplets and broken cells. These are <em>permissive</em> first-pass filters.</li>
-<li>It releases the raw list and its memory. The full 10x raw feature matrix is large (often several GB); once counts are inside the Seurat object, the raw list is redundant.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-3-add-qc-metrics" class="level2">
-<h2 class="anchored" data-anchor-id="step-3-add-qc-metrics">Step 3 — Add QC metrics</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj[[<span class="st">&quot;percent.mt&quot;</span>]] <span class="ot">&lt;-</span> <span class="fu">PercentageFeatureSet</span>(nsclc.seurat.obj, <span class="at">pattern =</span> <span class="st">&quot;^MT-&quot;</span>)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(nsclc.seurat.obj<span class="sc">@</span>meta.data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>What biological signal does <code>percent.mt</code> capture?</li>
-<li>Why <code>&quot;^MT-&quot;</code> specifically? What would you use for mouse?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>Dying or stressed cells leak cytoplasmic RNA while retaining mitochondrial RNA, so their mitochondrial fraction rises. High <code>percent.mt</code> flags apoptotic / compromised cells.</li>
-<li><code>&quot;^MT-&quot;</code> matches human mitochondrial gene symbols (MT-ND1, MT-CO1, …). For mouse the convention is lowercase: <code>&quot;^mt-&quot;</code>.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-4-visualize-qc" class="level2">
-<h2 class="anchored" data-anchor-id="step-4-visualize-qc">Step 4 — Visualize QC</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">VlnPlot</span>(nsclc.seurat.obj,</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;nFeature_RNA&quot;</span>, <span class="st">&quot;nCount_RNA&quot;</span>, <span class="st">&quot;percent.mt&quot;</span>),</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">ncol =</span> <span class="dv">3</span>)</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">FeatureScatter</span>(nsclc.seurat.obj,</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>               <span class="at">feature1 =</span> <span class="st">&quot;nCount_RNA&quot;</span>,</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">feature2 =</span> <span class="st">&quot;nFeature_RNA&quot;</span>) <span class="sc">+</span></span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">&quot;lm&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>What does a <strong>fat tail</strong> on the <code>nFeature_RNA</code> violin suggest?</li>
-<li>On the <code>nCount_RNA</code> vs <code>nFeature_RNA</code> scatter, what would a doublet look like? A dying cell?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>A long upper tail often means <strong>doublets</strong> — barcodes where two cells got trapped in one droplet, inflating both UMI count and unique gene count.</li>
-<li>Doublets sit <strong>high on both axes</strong>, often above the main trend line. Dying cells are <strong>low</strong> on both and tend to have <strong>high <code>percent.mt</code></strong> (check by coloring or faceting).</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-5-filter-low-quality-cells" class="level2">
-<h2 class="anchored" data-anchor-id="step-5-filter-low-quality-cells">Step 5 — Filter low-quality cells</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">subset</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  nsclc.seurat.obj,</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">subset =</span> nFeature_RNA <span class="sc">&gt;</span> <span class="dv">200</span> <span class="sc">&amp;</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>           nFeature_RNA <span class="sc">&lt;</span> <span class="dv">2500</span> <span class="sc">&amp;</span></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>           percent.mt   <span class="sc">&lt;</span> <span class="dv">5</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>The default cutoff here is <code>percent.mt &lt; 5</code>. Is that appropriate for tumor tissue?</li>
-<li>How would you set thresholds <em>empirically</em> rather than by default?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>Not always — tumor and certain primary tissues routinely have higher baseline <code>percent.mt</code> (~10–20%). A 5% cutoff can strip out viable tumor cells. <strong>Inspect the distribution first</strong>; set the knee.</li>
-<li>Look at the violin/histogram shape; choose thresholds that trim the clear <strong>tails</strong> (not the mode). Some workshops use median ± <em>k</em> × MAD, or the <code>scater::isOutlier()</code> function for an automated rule.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-6-normalize" class="level2">
-<h2 class="anchored" data-anchor-id="step-6-normalize">Step 6 — Normalize</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">NormalizeData</span>(nsclc.seurat.obj)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Equivalent explicit form:</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># NormalizeData(nsclc.seurat.obj,</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">#               normalization.method = &quot;LogNormalize&quot;,</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#               scale.factor = 10000)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>What does <code>LogNormalize</code> do algebraically?</li>
-<li>When would you prefer <code>SCTransform()</code> instead?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>For each cell: divide each gene’s count by the cell’s total count, multiply by <code>scale.factor</code> (default 10 000), then take <code>log1p</code>. In formula form: <code>log(1 + (count_gc / total_c) * 10000)</code>.</li>
-<li><code>SCTransform</code> models the mean–variance relationship per gene with a regularized negative binomial, which is usually better for <strong>low-count</strong> datasets and more faithful downstream variance. It also replaces the NormalizeData → FindVariableFeatures → ScaleData chain in a single call.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-7-highly-variable-features" class="level2">
-<h2 class="anchored" data-anchor-id="step-7-highly-variable-features">Step 7 — Highly variable features</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">FindVariableFeatures</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  nsclc.seurat.obj,</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">selection.method =</span> <span class="st">&quot;vst&quot;</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">nfeatures =</span> <span class="dv">2000</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>top10 <span class="ot">&lt;-</span> <span class="fu">head</span>(<span class="fu">VariableFeatures</span>(nsclc.seurat.obj), <span class="dv">10</span>)</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>plot1 <span class="ot">&lt;-</span> <span class="fu">VariableFeaturePlot</span>(nsclc.seurat.obj)</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a><span class="fu">LabelPoints</span>(<span class="at">plot =</span> plot1, <span class="at">points =</span> top10, <span class="at">repel =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>Why do we want to focus on <em>variable</em> genes instead of using all genes?</li>
-<li>What happens if you set <code>nfeatures = 500</code>? Or <code>nfeatures = 10000</code>?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>Most genes are housekeeping / ubiquitously expressed and carry little cell-type information. Selecting HVGs raises signal-to-noise for PCA and clustering and speeds everything up.</li>
-<li>Too few (500) risks missing subtle cell-type signals and is brittle to noisy gene choices. Too many (10 000) pulls in low-information genes and dilutes the signal. 1 500–3 000 is a common sweet spot; 2 000 is a good default.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="step-8-scale" class="level2">
-<h2 class="anchored" data-anchor-id="step-8-scale">Step 8 — Scale</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>all.genes <span class="ot">&lt;-</span> <span class="fu">rownames</span>(nsclc.seurat.obj)</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">ScaleData</span>(nsclc.seurat.obj, <span class="at">features =</span> all.genes)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ol type="1">
-<li>What does <code>ScaleData</code> do to each gene numerically?</li>
-<li>Why is scaling necessary <em>before</em> PCA?</li>
-<li>How would you regress out the cell cycle or <code>percent.mt</code> here?</li>
-</ol>
-<details>
-<summary>
-Show answers
-</summary>
-<ol type="1">
-<li>Centers each gene’s expression to mean 0 and scales to unit variance across cells (z-scoring).</li>
-<li>PCA finds directions of maximum variance. Without scaling, highly-expressed genes (which inherently have large raw variance) would dominate PCs, regardless of whether they are biologically informative.</li>
-<li>Pass <code>vars.to.regress = c(&quot;percent.mt&quot;, &quot;S.Score&quot;, &quot;G2M.Score&quot;)</code> (after running <code>CellCycleScoring()</code> for the latter two). ScaleData regresses those out of each gene’s expression before z-scoring.</li>
-</ol>
-</details>
-</div>
-</div>
-</section>
-<section id="save-and-continue-to-tutorial-02" class="level2">
-<h2 class="anchored" data-anchor-id="save-and-continue-to-tutorial-02">Save and continue to Tutorial 02</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(nsclc.seurat.obj, <span class="at">file =</span> <span class="st">&quot;../data/nsclc_preprocessed.rds&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-tip callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Tip
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The saved <code>.rds</code> is the starting point for <strong>Tutorial 02 — Dimensionality reduction &amp; clustering</strong>.</p>
-</div>
-</div>
-</section>
-<section id="credits" class="level2">
-<h2 class="anchored" data-anchor-id="credits">Credits</h2>
+<section id="why-slurm" class="level2">
+<h2 class="anchored" data-anchor-id="why-slurm">1. Why SLURM?</h2>
+<p>Talapas is a shared cluster with thousands of CPU cores, hundreds of GPUs, and many terabytes of RAM. Dozens of users compete for those resources at any given time. <strong>SLURM</strong> (Simple Linux Utility for Resource Management) is the scheduler that decides <em>when</em>, <em>where</em>, and <em>with what resources</em> each job runs.</p>
+<p>At UO, this means:</p>
 <ul>
-<li>Dataset: <a href="https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0">10x Genomics — 20k NSCLC DTC, 3’ v3.1 Multiplex</a></li>
-<li>Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow</li>
-<li>Reference: <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial.html">Seurat PBMC 3k tutorial</a></li>
+<li>You <strong>never</strong> run heavy computation directly on a login node (<code>login.talapas.uoregon.edu</code>). Login nodes are for editing, short commands, and submitting jobs only.</li>
+<li>Instead, you ask SLURM for resources — CPUs, GPUs, memory, time — and SLURM allocates a <strong>compute node</strong> for you.</li>
+<li>Every job at UO must specify an <strong>account</strong> (your PIRG, Principal Investigator Research Group) for correct service charging.</li>
+</ul>
+</section>
+<section id="prerequisites" class="level2">
+<h2 class="anchored" data-anchor-id="prerequisites">2. Prerequisites</h2>
+<p>Before you start:</p>
+<ol type="1">
+<li><p>A Talapas account tied to a PIRG (request one at <a href="https://racs.uoregon.edu/request-access">racs.uoregon.edu/request-access</a>).</p></li>
+<li><p>You have SSH’d into Talapas at least once:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> <span class="op">&lt;</span>yourduckid<span class="op">&gt;</span>@login.talapas.uoregon.edu</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div></li>
+<li><p>You know the name of your PIRG (group). If unsure, run <code>groups</code> after logging in — your PIRG(s) will be listed alongside system groups (which you cannot charge to).</p></li>
+</ol>
+<p>Optionally, set your account once in <code>~/.bash_profile</code> so you don’t type <code>--account=</code> every time:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export SLURM_ACCOUNT=&lt;myPIRG&gt;&#39;</span>  <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export SBATCH_ACCOUNT=&lt;myPIRG&gt;&#39;</span> <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> ~/.bash_profile</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Replace <code>&lt;myPIRG&gt;</code> with your actual PIRG name.</p>
+<hr>
+</section>
+<section id="key-slurm-commands-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="key-slurm-commands-at-a-glance">3. Key SLURM commands at a glance</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 27%">
+<col style="width: 72%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Command</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sinfo</code></td>
+<td>Show partitions and node states.</td>
+</tr>
+<tr class="even">
+<td><code>squeue -u $USER</code></td>
+<td>Show <em>your</em> queued/running jobs.</td>
+</tr>
+<tr class="odd">
+<td><code>sbatch script.sh</code></td>
+<td>Submit a batch job.</td>
+</tr>
+<tr class="even">
+<td><code>srun ... --pty bash</code></td>
+<td>Start an <strong>interactive</strong> session on a compute node.</td>
+</tr>
+<tr class="odd">
+<td><code>scancel &lt;JOBID&gt;</code></td>
+<td>Cancel a queued or running job.</td>
+</tr>
+<tr class="even">
+<td><code>sacct -j &lt;JOBID&gt;</code></td>
+<td>Show accounting info (state, memory, runtime) for past jobs.</td>
+</tr>
+<tr class="odd">
+<td><code>seff &lt;JOBID&gt;</code></td>
+<td>Friendly summary of resources used by a finished job.</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled" title="Key SLURM flags you will use constantly">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Key SLURM flags you will use constantly
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><code>--account=&lt;myPIRG&gt;</code> — PIRG / account for charging (required).</li>
+<li><code>--partition=&lt;name&gt;</code> — queue (e.g. <code>compute</code>, <code>gpu</code>, <code>interactive</code>).</li>
+<li><code>--time=&lt;HH:MM:SS&gt;</code> or <code>--time=&lt;minutes&gt;</code> — wall-clock time limit.</li>
+<li><code>--mem=&lt;size&gt;</code> — total memory per node (e.g. <code>8G</code>, <code>100M</code>).</li>
+<li><code>--mem-per-cpu=&lt;size&gt;</code> — memory per core.</li>
+<li><code>--cpus-per-task=&lt;N&gt;</code> — cores for a multi-threaded task.</li>
+<li><code>--gpus=&lt;N&gt;</code> — request GPUs (paired with <code>--partition=gpu</code>).</li>
+<li><code>--constraint=gpu-10gb</code> / <code>gpu-40gb</code> / <code>gpu-80gb</code> — GPU memory tier.</li>
+</ul>
+</div>
+</div>
+<hr>
+</section>
+<section id="talapas-partitions-queues" class="level2">
+<h2 class="anchored" data-anchor-id="talapas-partitions-queues">4. Talapas partitions (queues)</h2>
+<p>Every job must target a <strong>partition</strong>. Common ones at UO:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 34%">
+<col style="width: 54%">
+<col style="width: 10%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Partition</th>
+<th>What it’s for</th>
+<th>Max time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>compute</code></td>
+<td>Standard CPU jobs.</td>
+<td>1 day</td>
+</tr>
+<tr class="even">
+<td><code>computelong</code></td>
+<td>Long-running CPU jobs.</td>
+<td>14 days</td>
+</tr>
+<tr class="odd">
+<td><code>gpu</code> / <code>gpulong</code></td>
+<td>GPU jobs, short / long.</td>
+<td>1 / 14 d</td>
+</tr>
+<tr class="even">
+<td><code>memory</code> / <code>memorylong</code></td>
+<td>High-memory CPU jobs (up to 4 TB RAM).</td>
+<td>1 / 14 d</td>
+</tr>
+<tr class="odd">
+<td><code>interactive</code> / <code>interactivegpu</code></td>
+<td>Short interactive sessions.</td>
+<td>12 / 8 h</td>
+</tr>
+<tr class="even">
+<td><code>preempt</code></td>
+<td>All nodes; your job may be <strong>preempted</strong> by its owner.</td>
+<td>Variable</td>
+</tr>
+</tbody>
+</table>
+<p>Run <code>sinfo</code> to see the current state of each partition on the cluster.</p>
+<hr>
+</section>
+<section id="interactive-mode-srun" class="level2">
+<h2 class="anchored" data-anchor-id="interactive-mode-srun">5. Interactive mode — <code>srun</code></h2>
+<p>Use an interactive session when you want a shell <strong>on a compute node</strong> — for testing scripts, exploring data, or running applications like RStudio or Python interactively. This is the mode you will use most often during the workshop.</p>
+<section id="a-minimum-interactive-session" class="level3">
+<h3 class="anchored" data-anchor-id="a-minimum-interactive-session">5.1 A minimum interactive session</h3>
+<p>From a Talapas login node, run:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> <span class="dt">\</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">--partition</span><span class="op">=</span>compute <span class="dt">\</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>     <span class="at">--time</span><span class="op">=</span>1:00:00 <span class="dt">\</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>     <span class="at">--mem</span><span class="op">=</span>4G <span class="dt">\</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">--cpus-per-task</span><span class="op">=</span>2 <span class="dt">\</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>     <span class="at">--pty</span> bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>What each flag does:</p>
+<ul>
+<li><code>--account</code> — your PIRG (required on Talapas; omit if you set <code>SLURM_ACCOUNT</code> in your profile).</li>
+<li><code>--partition=compute</code> — standard CPU queue.</li>
+<li><code>--time=1:00:00</code> — 1 hour; after this the session is killed.</li>
+<li><code>--mem=4G</code> — 4 GB of RAM total on that node.</li>
+<li><code>--cpus-per-task=2</code> — two CPU cores.</li>
+<li><code>--pty bash</code> — give me a pseudo-terminal running bash.</li>
+</ul>
+<p>When the resources are available, your prompt will change to show the hostname of a compute node (e.g. <code>n0123</code>). You are now running on a compute node. When you’re done, type <code>exit</code> to release the resources — do not leave idle sessions running.</p>
+</section>
+<section id="using-the-short-interactive-partition" class="level3">
+<h3 class="anchored" data-anchor-id="using-the-short-interactive-partition">5.2 Using the short <code>interactive</code> partition</h3>
+<p>For short, quick sessions the <code>interactive</code> partition is usually faster to start:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> --partition=interactive <span class="at">--time</span><span class="op">=</span>2:00:00 <span class="at">--mem</span><span class="op">=</span>8G <span class="at">--pty</span> bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="interactive-gpu-session" class="level3">
+<h3 class="anchored" data-anchor-id="interactive-gpu-session">5.3 Interactive GPU session</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> <span class="dt">\</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">--partition</span><span class="op">=</span>interactivegpu <span class="dt">\</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>     <span class="at">--time</span><span class="op">=</span>1:00:00 <span class="dt">\</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>     <span class="at">--nodes</span><span class="op">=</span>1 <span class="at">--ntasks</span><span class="op">=</span>1 <span class="at">--cpus-per-task</span><span class="op">=</span>2 <span class="dt">\</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">--mem</span><span class="op">=</span>16G <span class="dt">\</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>     <span class="at">--gpus</span><span class="op">=</span>1 <span class="at">--constraint</span><span class="op">=</span>gpu-10gb <span class="dt">\</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>     <span class="at">--pty</span> bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><code>--constraint=gpu-10gb</code> (or <code>gpu-40gb</code> / <code>gpu-80gb</code>) pins the job to a GPU of that memory tier.</p>
+</section>
+<section id="graphical-interactive-jobs" class="level3">
+<h3 class="anchored" data-anchor-id="graphical-interactive-jobs">5.4 Graphical interactive jobs</h3>
+<p>If you need a GUI (e.g. RStudio, MATLAB), two options:</p>
+<ol type="1">
+<li><p><strong>X11 forwarding</strong> — SSH in with <code>ssh -Y</code> and then:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> --x11 <span class="at">--partition</span><span class="op">=</span>compute <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>     <span class="at">--time</span><span class="op">=</span>2:00:00 <span class="at">--mem</span><span class="op">=</span>4G <span class="at">--pty</span> bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>You need an X server running on your laptop (XQuartz on macOS, VcXsrv on Windows).</p></li>
+<li><p><strong>Open OnDemand</strong> (recommended and simpler) — open <a href="https://ondemand.talapas.uoregon.edu/" class="uri">https://ondemand.talapas.uoregon.edu/</a> in Chrome or Firefox, sign in with your Duck ID, and launch an RStudio, Jupyter, or full desktop session from the web portal. No X server needed.</p></li>
+</ol>
+<div class="callout callout-style-default callout-warning callout-titled" title="Don&#39;t hoard nodes">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Don’t hoard nodes
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Interactive jobs reserve their resources even when you are not actively typing. As soon as you are done, <code>exit</code> the shell so other users can use the node.</p>
+</div>
+</div>
+<hr>
+</section>
+</section>
+<section id="batch-mode-sbatch" class="level2">
+<h2 class="anchored" data-anchor-id="batch-mode-sbatch">6. Batch mode — <code>sbatch</code></h2>
+<p>For longer-running analyses (which is most real workshop work), write a <strong>batch script</strong> and submit it with <code>sbatch</code>. The script runs without an interactive terminal: you can log out and the job keeps running.</p>
+<section id="a-first-batch-script" class="level3">
+<h3 class="anchored" data-anchor-id="a-first-batch-script">6.1 A first batch script</h3>
+<p>Save the following as <code>hostname.sbatch</code>:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --account=&lt;myPIRG&gt;        </span><span class="al">###</span><span class="co"> PIRG / account for charging</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --partition=compute       </span><span class="al">###</span><span class="co"> queue</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --job-name=hello          </span><span class="al">###</span><span class="co"> visible in squeue</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --output=hello_%j.out     </span><span class="al">###</span><span class="co"> %j = job ID</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --error=hello_%j.err</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time=00:05:00           </span><span class="al">###</span><span class="co"> HH:MM:SS</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --nodes=1</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --ntasks-per-node=1</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --cpus-per-task=1</span></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --mem=100M</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&quot;Hello from </span><span class="va">$(</span><span class="fu">hostname</span><span class="va">)</span><span class="st"> at </span><span class="va">$(</span><span class="fu">date</span><span class="va">)</span><span class="st">&quot;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Submit it:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hostname.sbatch</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>SLURM prints a job ID:</p>
+<pre><code>Submitted batch job 123456</code></pre>
+<p>Check its status:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-j</span> 123456</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="co"># or</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>State codes you’ll see: <code>PD</code> (pending), <code>R</code> (running), <code>CG</code> (completing). Once it finishes, two files appear in the directory you submitted from: <code>hello_123456.out</code> (stdout) and <code>hello_123456.err</code> (stderr).</p>
+</section>
+<section id="anatomy-of-sbatch-directives" class="level3">
+<h3 class="anchored" data-anchor-id="anatomy-of-sbatch-directives">6.2 Anatomy of <code>#SBATCH</code> directives</h3>
+<p>All <code>#SBATCH</code> lines must be at the <strong>top</strong> of the script, before any other commands. A few additional flags worth knowing:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --mem-per-cpu=4G          </span><span class="al">###</span><span class="co"> per-core memory (alternative to --mem)</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --mail-type=</span><span class="re">END</span><span class="co">,FAIL      </span><span class="al">###</span><span class="co"> email on end/failure</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --mail-user=you@uoregon.edu</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --array=1-10              </span><span class="al">###</span><span class="co"> job array: 10 independent tasks</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="a-realistic-scrna-seq-job" class="level3">
+<h3 class="anchored" data-anchor-id="a-realistic-scrna-seq-job">6.3 A realistic scRNA-seq job</h3>
+<p>A batch script that loads R and runs a Seurat QC pipeline looks like this:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --account=&lt;myPIRG&gt;</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --partition=compute</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --job-name=seurat_qc</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --output=logs/seurat_qc_%j.out</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --error=logs/seurat_qc_%j.err</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time=04:00:00</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --nodes=1</span></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --ntasks-per-node=1</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --cpus-per-task=8</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --mem=64G</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="bu">set</span> <span class="at">-euo</span> pipefail</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Load environment</span></span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> purge</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> load R/4.3.2</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the pipeline</span></span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /projects/<span class="op">&lt;</span>myPIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>yourduckid<span class="op">&gt;</span>/scrnaseq</span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a><span class="ex">Rscript</span> scripts/01_qc_preprocess.R</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Note how <code>module purge</code> and <code>module load</code> happen <em>inside</em> the script — modules don’t survive from the login node into the job.</p>
+</section>
+<section id="gpu-batch-job" class="level3">
+<h3 class="anchored" data-anchor-id="gpu-batch-job">6.4 GPU batch job</h3>
+<div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co">#!/bin/bash</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --account=&lt;myPIRG&gt;</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --partition=gpu</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --job-name=scvi</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --output=logs/scvi_%j.out</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --error=logs/scvi_%j.err</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time=12:00:00</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --nodes=1</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --ntasks-per-node=1</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --cpus-per-task=8</span></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --mem=64G</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --gpus=1</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --constraint=gpu-40gb</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> purge</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="ex">module</span> load python/3.11</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a><span class="bu">source</span> ~/envs/scvi/bin/activate</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a><span class="ex">python</span> scripts/train_scvi.py</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<hr>
+</section>
+</section>
+<section id="choosing-the-right-resources" class="level2">
+<h2 class="anchored" data-anchor-id="choosing-the-right-resources">7. Choosing the right resources</h2>
+<ul>
+<li><strong>Smaller requests run sooner.</strong> SLURM finds small gaps in the schedule more easily, so over-requesting memory or time will delay your job.</li>
+<li><strong>But specify enough.</strong> If your job exceeds its <code>--mem</code> or <code>--time</code>, SLURM <strong>kills it</strong> (<code>OUT_OF_MEMORY</code> or <code>TIMEOUT</code>). Err slightly on the high side the first time you run a new pipeline.</li>
+<li>The default per-core memory is about <strong>3.7 GB</strong>. Request <code>--mem-per-cpu</code> or <code>--mem</code> explicitly if you need more.</li>
+<li>The <code>compute</code> partition default wall time is <strong>24 hours</strong>; <code>computelong</code> defaults to two weeks. Both cap at those values.</li>
+</ul>
+<p>After a job finishes, check what it actually used:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="ex">seff</span> 123456</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>or:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sacct</span> <span class="at">-j</span> 123456 <span class="at">--format</span><span class="op">=</span>JobID,JobName,ReqMem,MaxRSS,Elapsed,State,ExitCode</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Use <code>MaxRSS</code> (peak memory) and <code>Elapsed</code> (wall time) to right-size future submissions.</p>
+<hr>
+</section>
+<section id="monitoring-cancelling-and-troubleshooting" class="level2">
+<h2 class="anchored" data-anchor-id="monitoring-cancelling-and-troubleshooting">8. Monitoring, cancelling, and troubleshooting</h2>
+<div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># See your jobs</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Watch a specific job</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-j</span> 123456</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Cancel a job</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="ex">scancel</span> 123456</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Cancel all your pending jobs</span></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="ex">scancel</span> <span class="at">-u</span> <span class="va">$USER</span> <span class="at">-t</span> PENDING</span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Summary of a finished job</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="ex">seff</span> 123456</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Detailed accounting (multiple steps)</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a><span class="ex">sacct</span> <span class="at">-j</span> 123456 <span class="at">--format</span><span class="op">=</span>JobID,State,ExitCode,Elapsed,MaxRSS,ReqMem</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>Common reasons a job stays <code>PD</code> (pending):</p>
+<ul>
+<li><p><code>Priority</code> / <code>Resources</code> — normal queueing; too many users ahead of you, or the resources you asked for are not free yet.</p></li>
+<li><p><code>QOSMaxJobsPerUserLimit</code> — you have hit a per-user submission limit; let earlier jobs finish.</p></li>
+<li><p><code>ReqNodeNotAvail, Reserved for maintenance</code> — your <code>--time</code> would run into an upcoming quarterly maintenance window. Shorten <code>--time</code>, or add <code>--time-min=</code> to let SLURM start the job sooner with a reduced limit:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time=0-08:00:00</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time-min=0-01:00:00</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div></li>
+</ul>
+<p>See also the Knowledge Base FAQ <a href="https://uoracs.github.io/talapas2-knowledge-base/docs/faqs/why_is_my_job_not_running/"><em>Why is my SLURM job not running?</em></a>.</p>
+<hr>
+</section>
+<section id="being-a-good-cluster-citizen-at-uo" class="level2">
+<h2 class="anchored" data-anchor-id="being-a-good-cluster-citizen-at-uo">9. Being a good cluster citizen at UO</h2>
+<p>Talapas is shared across all of UO’s research community. Please:</p>
+<ul>
+<li><strong>Never</strong> run intensive work on login nodes; use <code>srun</code> or <code>sbatch</code>.</li>
+<li>Don’t leave idle interactive sessions open. <code>exit</code> when you’re done.</li>
+<li>Don’t request more CPUs, memory, or GPUs than you will actually use.</li>
+<li>Put large output (caches, intermediate files) in <code>/scratch/&lt;PIRG&gt;/</code>, not in <code>/home/</code>.
+<ul>
+<li>Remember that <code>/scratch</code> purges files not accessed in 90 days.</li>
+</ul></li>
+<li><strong>Back up anything you care about.</strong> RACS does not back up Talapas.</li>
+<li>If you have a deadline and need special scheduling, email RACS rather than trying to game the queue.</li>
+</ul>
+<hr>
+</section>
+<section id="where-to-go-next" class="level2">
+<h2 class="anchored" data-anchor-id="where-to-go-next">10. Where to go next</h2>
+<ul>
+<li><a href="https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html">Talapas Quick Start Guide</a> — the official UO source for everything on this page.</li>
+<li><a href="https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html">Talapas Partition List</a> — up-to-date details on hardware per partition.</li>
+<li><a href="https://slurm.schedmd.com/">SLURM Workload Manager documentation</a> — the canonical SLURM reference.</li>
+<li><a href="https://hpcrcf.atlassian.net/servicedesk/customer/portal/1">RACS Service Desk</a> — for tickets (include your job ID, script, and any error output).</li>
+<li><strong>RACS Office Hours</strong> — Knight Campus 1st Floor tables; see the <a href="https://uoracs.github.io/talapas2-knowledge-base/">Talapas Knowledge Base homepage</a> for the current term’s schedule.</li>
 </ul>
 
 

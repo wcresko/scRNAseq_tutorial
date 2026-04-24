@@ -1,0 +1,376 @@
+---
+title: "Tutorial — SLURM Basics on Talapas"
+subtitle: "Interactive sessions and batch scripts on UO's HPC cluster"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+This tutorial covers the **basics of using SLURM** (the job scheduler on the University of Oregon's Talapas HPC cluster) --- both in **interactive mode** and through **batch scripts**. It is aimed at workshop participants who have a Duck ID and Talapas account and are ready to run their first jobs.
+
+All examples are specific to UO and Talapas. If you have not yet logged in to Talapas for the first time, see the [**VS Code & Talapas**](../VSCode.html) appendix first.
+
+Material is adapted from the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and the [How-To articles](https://uoracs.github.io/talapas2-knowledge-base/) in the Talapas Knowledge Base.
+
+::: {.callout-tip title="How to use this page"}
+Read this page top to bottom the first time. Later, treat it as a reference --- the commands here cover ~95% of what you will do in the workshop.
+:::
+
+------------------------------------------------------------------------
+
+## 1. Why SLURM?
+
+Talapas is a shared cluster with thousands of CPU cores, hundreds of GPUs, and many terabytes of RAM. Dozens of users compete for those resources at any given time. **SLURM** (Simple Linux Utility for Resource Management) is the scheduler that decides *when*, *where*, and *with what resources* each job runs.
+
+At UO, this means:
+
+-   You **never** run heavy computation directly on a login node (`login.talapas.uoregon.edu`). Login nodes are for editing, short commands, and submitting jobs only.
+-   Instead, you ask SLURM for resources --- CPUs, GPUs, memory, time --- and SLURM allocates a **compute node** for you.
+-   Every job at UO must specify an **account** (your PIRG, Principal Investigator Research Group) for correct service charging.
+
+## 2. Prerequisites
+
+Before you start:
+
+1.  A Talapas account tied to a PIRG (request one at [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access)).
+2.  You have SSH'd into Talapas at least once:
+
+    ``` bash
+    ssh <yourduckid>@login.talapas.uoregon.edu
+    ```
+
+3.  You know the name of your PIRG (group). If unsure, run `groups` after logging in --- your PIRG(s) will be listed alongside system groups (which you cannot charge to).
+
+Optionally, set your account once in `~/.bash_profile` so you don't type `--account=` every time:
+
+``` bash
+echo 'export SLURM_ACCOUNT=<myPIRG>'  >> ~/.bash_profile
+echo 'export SBATCH_ACCOUNT=<myPIRG>' >> ~/.bash_profile
+source ~/.bash_profile
+```
+
+Replace `<myPIRG>` with your actual PIRG name.
+
+------------------------------------------------------------------------
+
+## 3. Key SLURM commands at a glance
+
+| Command               | Purpose                                                      |
+|-----------------------|--------------------------------------------------------------|
+| `sinfo`               | Show partitions and node states.                             |
+| `squeue -u $USER`     | Show *your* queued/running jobs.                             |
+| `sbatch script.sh`    | Submit a batch job.                                          |
+| `srun ... --pty bash` | Start an **interactive** session on a compute node.          |
+| `scancel <JOBID>`     | Cancel a queued or running job.                              |
+| `sacct -j <JOBID>`    | Show accounting info (state, memory, runtime) for past jobs. |
+| `seff <JOBID>`        | Friendly summary of resources used by a finished job.        |
+
+::: {.callout-note title="Key SLURM flags you will use constantly"}
+-   `--account=<myPIRG>` --- PIRG / account for charging (required).
+-   `--partition=<name>` --- queue (e.g. `compute`, `gpu`, `interactive`).
+-   `--time=<HH:MM:SS>` or `--time=<minutes>` --- wall-clock time limit.
+-   `--mem=<size>` --- total memory per node (e.g. `8G`, `100M`).
+-   `--mem-per-cpu=<size>` --- memory per core.
+-   `--cpus-per-task=<N>` --- cores for a multi-threaded task.
+-   `--gpus=<N>` --- request GPUs (paired with `--partition=gpu`).
+-   `--constraint=gpu-10gb` / `gpu-40gb` / `gpu-80gb` --- GPU memory tier.
+:::
+
+------------------------------------------------------------------------
+
+## 4. Talapas partitions (queues)
+
+Every job must target a **partition**. Common ones at UO:
+
+| Partition                          | What it's for                                          | Max time  |
+|------------------------------------|--------------------------------------------------------|-----------|
+| `compute`                          | Standard CPU jobs.                                     | 1 day     |
+| `computelong`                      | Long-running CPU jobs.                                 | 14 days   |
+| `gpu` / `gpulong`                  | GPU jobs, short / long.                                | 1 / 14 d  |
+| `memory` / `memorylong`            | High-memory CPU jobs (up to 4 TB RAM).                 | 1 / 14 d  |
+| `interactive` / `interactivegpu`   | Short interactive sessions.                            | 12 / 8 h  |
+| `preempt`                          | All nodes; your job may be **preempted** by its owner. | Variable  |
+
+Run `sinfo` to see the current state of each partition on the cluster.
+
+------------------------------------------------------------------------
+
+## 5. Interactive mode --- `srun`
+
+Use an interactive session when you want a shell **on a compute node** --- for testing scripts, exploring data, or running applications like RStudio or Python interactively. This is the mode you will use most often during the workshop.
+
+### 5.1 A minimum interactive session
+
+From a Talapas login node, run:
+
+``` bash
+srun --account=<myPIRG> \
+     --partition=compute \
+     --time=1:00:00 \
+     --mem=4G \
+     --cpus-per-task=2 \
+     --pty bash
+```
+
+What each flag does:
+
+-   `--account` --- your PIRG (required on Talapas; omit if you set `SLURM_ACCOUNT` in your profile).
+-   `--partition=compute` --- standard CPU queue.
+-   `--time=1:00:00` --- 1 hour; after this the session is killed.
+-   `--mem=4G` --- 4 GB of RAM total on that node.
+-   `--cpus-per-task=2` --- two CPU cores.
+-   `--pty bash` --- give me a pseudo-terminal running bash.
+
+When the resources are available, your prompt will change to show the hostname of a compute node (e.g. `n0123`). You are now running on a compute node. When you're done, type `exit` to release the resources --- do not leave idle sessions running.
+
+### 5.2 Using the short `interactive` partition
+
+For short, quick sessions the `interactive` partition is usually faster to start:
+
+``` bash
+srun --account=<myPIRG> --partition=interactive --time=2:00:00 --mem=8G --pty bash
+```
+
+### 5.3 Interactive GPU session
+
+``` bash
+srun --account=<myPIRG> \
+     --partition=interactivegpu \
+     --time=1:00:00 \
+     --nodes=1 --ntasks=1 --cpus-per-task=2 \
+     --mem=16G \
+     --gpus=1 --constraint=gpu-10gb \
+     --pty bash
+```
+
+`--constraint=gpu-10gb` (or `gpu-40gb` / `gpu-80gb`) pins the job to a GPU of that memory tier.
+
+### 5.4 Graphical interactive jobs
+
+If you need a GUI (e.g. RStudio, MATLAB), two options:
+
+1.  **X11 forwarding** --- SSH in with `ssh -Y` and then:
+
+    ``` bash
+    srun --account=<myPIRG> --x11 --partition=compute \
+         --time=2:00:00 --mem=4G --pty bash
+    ```
+
+    You need an X server running on your laptop (XQuartz on macOS, VcXsrv on Windows).
+
+2.  **Open OnDemand** (recommended and simpler) --- open <https://ondemand.talapas.uoregon.edu/> in Chrome or Firefox, sign in with your Duck ID, and launch an RStudio, Jupyter, or full desktop session from the web portal. No X server needed.
+
+::: {.callout-warning title="Don't hoard nodes"}
+Interactive jobs reserve their resources even when you are not actively typing. As soon as you are done, `exit` the shell so other users can use the node.
+:::
+
+------------------------------------------------------------------------
+
+## 6. Batch mode --- `sbatch`
+
+For longer-running analyses (which is most real workshop work), write a **batch script** and submit it with `sbatch`. The script runs without an interactive terminal: you can log out and the job keeps running.
+
+### 6.1 A first batch script
+
+Save the following as `hostname.sbatch`:
+
+``` bash
+#!/bin/bash
+#SBATCH --account=<myPIRG>        ### PIRG / account for charging
+#SBATCH --partition=compute       ### queue
+#SBATCH --job-name=hello          ### visible in squeue
+#SBATCH --output=hello_%j.out     ### %j = job ID
+#SBATCH --error=hello_%j.err
+#SBATCH --time=00:05:00           ### HH:MM:SS
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=100M
+
+echo "Hello from $(hostname) at $(date)"
+```
+
+Submit it:
+
+``` bash
+sbatch hostname.sbatch
+```
+
+SLURM prints a job ID:
+
+```
+Submitted batch job 123456
+```
+
+Check its status:
+
+``` bash
+squeue -j 123456
+# or
+squeue -u $USER
+```
+
+State codes you'll see: `PD` (pending), `R` (running), `CG` (completing). Once it finishes, two files appear in the directory you submitted from: `hello_123456.out` (stdout) and `hello_123456.err` (stderr).
+
+### 6.2 Anatomy of `#SBATCH` directives
+
+All `#SBATCH` lines must be at the **top** of the script, before any other commands. A few additional flags worth knowing:
+
+``` bash
+#SBATCH --mem-per-cpu=4G          ### per-core memory (alternative to --mem)
+#SBATCH --mail-type=END,FAIL      ### email on end/failure
+#SBATCH --mail-user=you@uoregon.edu
+#SBATCH --array=1-10              ### job array: 10 independent tasks
+```
+
+### 6.3 A realistic scRNA-seq job
+
+A batch script that loads R and runs a Seurat QC pipeline looks like this:
+
+``` bash
+#!/bin/bash
+#SBATCH --account=<myPIRG>
+#SBATCH --partition=compute
+#SBATCH --job-name=seurat_qc
+#SBATCH --output=logs/seurat_qc_%j.out
+#SBATCH --error=logs/seurat_qc_%j.err
+#SBATCH --time=04:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+
+set -euo pipefail
+
+# Load environment
+module purge
+module load R/4.3.2
+
+# Run the pipeline
+cd /projects/<myPIRG>/<yourduckid>/scrnaseq
+Rscript scripts/01_qc_preprocess.R
+```
+
+Note how `module purge` and `module load` happen *inside* the script --- modules don't survive from the login node into the job.
+
+### 6.4 GPU batch job
+
+``` bash
+#!/bin/bash
+#SBATCH --account=<myPIRG>
+#SBATCH --partition=gpu
+#SBATCH --job-name=scvi
+#SBATCH --output=logs/scvi_%j.out
+#SBATCH --error=logs/scvi_%j.err
+#SBATCH --time=12:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --gpus=1
+#SBATCH --constraint=gpu-40gb
+
+module purge
+module load python/3.11
+source ~/envs/scvi/bin/activate
+
+python scripts/train_scvi.py
+```
+
+------------------------------------------------------------------------
+
+## 7. Choosing the right resources
+
+-   **Smaller requests run sooner.** SLURM finds small gaps in the schedule more easily, so over-requesting memory or time will delay your job.
+-   **But specify enough.** If your job exceeds its `--mem` or `--time`, SLURM **kills it** (`OUT_OF_MEMORY` or `TIMEOUT`). Err slightly on the high side the first time you run a new pipeline.
+-   The default per-core memory is about **3.7 GB**. Request `--mem-per-cpu` or `--mem` explicitly if you need more.
+-   The `compute` partition default wall time is **24 hours**; `computelong` defaults to two weeks. Both cap at those values.
+
+After a job finishes, check what it actually used:
+
+``` bash
+seff 123456
+```
+
+or:
+
+``` bash
+sacct -j 123456 --format=JobID,JobName,ReqMem,MaxRSS,Elapsed,State,ExitCode
+```
+
+Use `MaxRSS` (peak memory) and `Elapsed` (wall time) to right-size future submissions.
+
+------------------------------------------------------------------------
+
+## 8. Monitoring, cancelling, and troubleshooting
+
+``` bash
+# See your jobs
+squeue -u $USER
+
+# Watch a specific job
+squeue -j 123456
+
+# Cancel a job
+scancel 123456
+
+# Cancel all your pending jobs
+scancel -u $USER -t PENDING
+
+# Summary of a finished job
+seff 123456
+
+# Detailed accounting (multiple steps)
+sacct -j 123456 --format=JobID,State,ExitCode,Elapsed,MaxRSS,ReqMem
+```
+
+Common reasons a job stays `PD` (pending):
+
+-   `Priority` / `Resources` --- normal queueing; too many users ahead of you, or the resources you asked for are not free yet.
+-   `QOSMaxJobsPerUserLimit` --- you have hit a per-user submission limit; let earlier jobs finish.
+-   `ReqNodeNotAvail, Reserved for maintenance` --- your `--time` would run into an upcoming quarterly maintenance window. Shorten `--time`, or add `--time-min=` to let SLURM start the job sooner with a reduced limit:
+
+    ``` bash
+    #SBATCH --time=0-08:00:00
+    #SBATCH --time-min=0-01:00:00
+    ```
+
+See also the Knowledge Base FAQ [*Why is my SLURM job not running?*](https://uoracs.github.io/talapas2-knowledge-base/docs/faqs/why_is_my_job_not_running/).
+
+------------------------------------------------------------------------
+
+## 9. Being a good cluster citizen at UO
+
+Talapas is shared across all of UO's research community. Please:
+
+-   **Never** run intensive work on login nodes; use `srun` or `sbatch`.
+-   Don't leave idle interactive sessions open. `exit` when you're done.
+-   Don't request more CPUs, memory, or GPUs than you will actually use.
+-   Put large output (caches, intermediate files) in `/scratch/<PIRG>/`, not in `/home/`.
+    -   Remember that `/scratch` purges files not accessed in 90 days.
+-   **Back up anything you care about.** RACS does not back up Talapas.
+-   If you have a deadline and need special scheduling, email RACS rather than trying to game the queue.
+
+------------------------------------------------------------------------
+
+## 10. Where to go next
+
+-   [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) --- the official UO source for everything on this page.
+-   [Talapas Partition List](https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html) --- up-to-date details on hardware per partition.
+-   [SLURM Workload Manager documentation](https://slurm.schedmd.com/) --- the canonical SLURM reference.
+-   [RACS Service Desk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) --- for tickets (include your job ID, script, and any error output).
+-   **RACS Office Hours** --- Knight Campus 1st Floor tables; see the [Talapas Knowledge Base homepage](https://uoracs.github.io/talapas2-knowledge-base/) for the current term's schedule.
