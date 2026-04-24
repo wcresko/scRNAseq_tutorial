@@ -1,0 +1,393 @@
+---
+title: "Exercise — scATAC-seq with Signac"
+subtitle: "From peaks matrix to clustered cells (PBMC 10k, 10x)"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this exercise
+
+A parallel to the scRNA-seq tutorial series — but for **chromatin accessibility** (scATAC-seq). The workflow follows the standard **Signac** pipeline from the Stuart Lab, applied to the 10x PBMC 10k scATAC-seq dataset.
+
+-   Reference vignette: [Signac PBMC scATAC-seq vignette](https://stuartlab.org/signac/articles/pbmc_vignette)
+-   Workflow source: Khushbu Patel, single-cell ATAC-seq standard workflow
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it:
+
+1.  [Download the `.qmd` source](Exercise_ATACseq_Signac.qmd) and open it in RStudio.
+2.  Download the three data files listed below into `../data/`.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+::: {.callout-tip title="What's different about ATAC-seq?"}
+ATAC-seq measures **open chromatin** (regions accessible to Tn5), not transcription. The raw unit is a **fragment** (a pair of Tn5 cut sites). The "features" are **peaks** — genomic intervals of accessibility — rather than genes. Most of the Seurat idioms carry over, but the **normalization**, **dimensionality reduction**, and **QC metrics** are ATAC-specific.
+:::
+
+## Dataset — PBMC 10k scATAC-seq (10x Genomics)
+
+**What it is.** Approximately ten-thousand human **peripheral blood mononuclear cells (PBMCs)** from a single healthy donor, run on the 10x Chromium **Single Cell ATAC v1** assay. This is the canonical tutorial dataset used across Signac, ArchR, and EpiScanpy vignettes.
+
+-   Landing page: [10x Genomics — PBMC 10k scATAC-seq](https://www.10xgenomics.com/resources/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-next-gem-v-1-1-1-1-standard-2-0-0)
+-   Reference genome: **hg19 / GRCh37** (hence `EnsDb.Hsapiens.v75` below)
+-   Chemistry: 10x Chromium Single Cell ATAC v1
+-   Cell count: \~8,700 post-filter cells
+
+::: callout-warning
+Only the **v1** release is pinned to hg19. The *Next GEM v1.1* re-release of the same sample is mapped to **hg38** and uses file names prefixed with `atac_v1_pbmc_10k_nextgem_*`. This exercise assumes the original hg19 release.
+:::
+
+## Learning goals
+
+By the end of this exercise you will be able to:
+
+-   Load peak-count and fragment data into a Signac `ChromatinAssay` inside a Seurat object
+-   Compute and interpret ATAC-specific QC metrics (nucleosome signal, TSS enrichment, blacklist ratio, peak-read fraction)
+-   Run TF-IDF normalization and SVD (LSI) on accessibility data
+-   Produce a UMAP and cluster scATAC-seq cells
+
+## Setup
+
+```{r}
+#| label: setup
+#| eval: true
+
+# One-time install:
+# remotes::install_github("stuart-lab/signac", ref = "develop")
+# install.packages("Matrix", type = "source")
+# install.packages("irlba",  type = "source")
+# BiocManager::install("EnsDb.Hsapiens.v75")
+
+library(Signac)
+library(Seurat)
+library(EnsDb.Hsapiens.v75)
+library(tidyverse)
+
+set.seed(2026)
+```
+
+## Data files and data dictionary
+
+You will need three files from the 10x PBMC 10k scATAC-seq release, placed under `../data/`. All three are available under "Output and supplemental files" on the [10x landing page](https://www.10xgenomics.com/resources/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-next-gem-v-1-1-1-1-standard-2-0-0).
+
+| File | Size | Purpose |
+|---|---|---|
+| `atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5` | \~30 MB | peak × barcode counts (sparse, filtered to called cells) |
+| `atac_v1_pbmc_10k_fragments.tsv.gz` + `.tbi` | \~1.8 GB + \~1 MB | per-fragment record (tabix-indexed) |
+| `atac_v1_pbmc_10k_singlecell.csv` | \~20 MB | per-barcode Cell Ranger ATAC summary |
+
+### `filtered_peak_bc_matrix.h5`
+
+| Dimension | Type | Description |
+|---|---|---|
+| rows | character | **Peak coordinates** as `chrom:start-end` strings (e.g. `chr1:10279-10779`). Peaks are fixed-width genomic intervals called by Cell Ranger. |
+| cols | character | **Cell barcodes** (16 bp + `-1` GEM-well suffix). |
+| values | integer | Number of **Tn5 fragments** from that cell whose midpoint falls inside that peak. |
+
+### `fragments.tsv.gz` (bgzipped, tabix-indexed)
+
+Tab-separated, one row per unique fragment. Five columns:
+
+| # | Column | Description |
+|---|---|---|
+| 1 | `chrom` | Chromosome (`chr1` … `chrY`, plus contigs). |
+| 2 | `start` | 0-based start of the fragment (= position of one Tn5 cut). |
+| 3 | `end` | 0-based exclusive end of the fragment (= position of the other Tn5 cut). |
+| 4 | `cell_barcode` | 10x cell barcode (matches column names of the peak matrix). |
+| 5 | `duplicate_count` | Number of PCR-duplicate reads collapsed into this fragment (> 1 means the same fragment was sequenced multiple times). |
+
+### `singlecell.csv` (per-barcode Cell Ranger summary)
+
+One row per barcode. Relevant columns (not exhaustive — 10x produces \~20 columns):
+
+| Column | Description |
+|---|---|
+| `barcode` | 10x barcode string (row names in `read.csv(..., row.names = 1)`). |
+| `is__cell_barcode` | Boolean flag, Cell Ranger's call of "this barcode is a real cell". |
+| `total` | Total read pairs assigned to this barcode. |
+| `passed_filters` | Reads passing all Cell Ranger ATAC QC filters. |
+| `peak_region_fragments` | Fragments falling within a called peak. Numerator for `pct_reads_in_peaks`. |
+| `blacklist_region_fragments` | Fragments falling inside the ENCODE blacklist. Numerator for `blacklist_ratio`. |
+| `TSS_fragments` | Fragments within ± flank of a TSS. |
+| `mitochondrial` | Fragments mapping to chrM. |
+| `duplicate` | PCR-duplicate fragments. |
+
+These columns feed directly into the ATAC QC metrics computed in Step 4.
+
+------------------------------------------------------------------------
+
+## Step 1 — Peek at the fragment file
+
+```{r}
+#| label: peek-fragments
+
+frag.file <- read.delim(
+  "../data/atac_v1_pbmc_10k_fragments.tsv.gz",
+  header = FALSE,
+  nrows  = 10
+)
+head(frag.file)
+```
+
+::: {.callout-important title="Think about it"}
+1.  A fragment file has one line per Tn5 fragment. What are the five columns typically recorded?
+2.  Why do we keep the fragment file around instead of just using the peak-counts matrix?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  `chrom`, `start`, `end`, `cell_barcode`, `duplicate_count` (number of reads collapsed to that fragment).
+2.  Many ATAC analyses (TSS enrichment, nucleosome signal, coverage tracks, motif activity) work at the fragment level, not the peak level. The fragment file is the raw, peak-independent record; peaks can be recomputed later.
+
+</details>
+:::
+
+## Step 2 — Load the peaks matrix and create the object
+
+```{r}
+#| label: load-matrix
+
+counts <- Read10X_h5("../data/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5")
+counts[1:5, 1:5]
+
+chrom_assay <- CreateChromatinAssay(
+  counts       = counts,
+  sep          = c(":", "-"),
+  fragments    = "../data/atac_v1_pbmc_10k_fragments.tsv.gz",
+  min.cells    = 10,
+  min.features = 200
+)
+
+metadata <- read.csv(
+  file      = "../data/atac_v1_pbmc_10k_singlecell.csv",
+  header    = TRUE,
+  row.names = 1
+)
+
+pbmc <- CreateSeuratObject(
+  counts    = chrom_assay,
+  meta.data = metadata,
+  assay     = "ATAC"
+)
+
+pbmc
+```
+
+::: {.callout-important title="Think about it"}
+1.  The row names of an RNA assay are gene symbols. What do row names of a `ChromatinAssay` look like, and why?
+2.  We pass both `counts` and `fragments` when building the ChromatinAssay. Why is that redundant-looking pairing actually useful?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Peak coordinates — strings like `chr1:100234-100734`. Peaks are genomic intervals, not annotated features, so the natural identifier is the interval itself.
+2.  `counts` is the fast aggregated view (peak × cell). `fragments` retains per-fragment, per-base precision for downstream peak recomputation, coverage plots, TSS enrichment, motif accessibility, etc. You want both.
+
+</details>
+:::
+
+## Step 3 — Add gene annotation
+
+```{r}
+#| label: annotation
+
+annotations <- GetGRangesFromEnsDb(ensdb = EnsDb.Hsapiens.v75)
+seqlevels(annotations) <- paste0("chr", seqlevels(annotations))  # UCSC naming
+Annotation(pbmc) <- annotations
+```
+
+::: {.callout-important title="Think about it"}
+1.  The data is mapped to **hg19** (GRCh37). Why `EnsDb.Hsapiens.v75` specifically?
+2.  What would you change for a dataset mapped to hg38 or to mm10?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Ensembl v75 is the last annotation release pinned to GRCh37 / hg19. Using a matching annotation is essential — otherwise TSSs and gene bodies will be in the wrong places.
+2.  hg38: use a current human EnsDb (e.g. `EnsDb.Hsapiens.v86` or newer). mm10: use `EnsDb.Mmusculus.v79` or equivalent. Chromosome-name style also differs (`1` vs `chr1`); convert to match the counts.
+
+</details>
+:::
+
+## Step 4 — Compute ATAC-specific QC metrics
+
+```{r}
+#| label: qc-compute
+
+pbmc <- NucleosomeSignal(pbmc)
+pbmc <- TSSEnrichment(object = pbmc, fast = FALSE)
+
+pbmc$blacklist_ratio    <- pbmc$blacklist_region_fragments / pbmc$peak_region_fragments
+pbmc$pct_reads_in_peaks <- pbmc$peak_region_fragments / pbmc$passed_filters * 100
+
+colnames(pbmc@meta.data)
+```
+
+::: {.callout-important title="Think about it"}
+1.  What does a **high nucleosome signal** indicate?
+2.  Why is **TSS enrichment** a quality metric, not a biology metric?
+3.  What is the ENCODE blacklist, and why exclude it?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  High nucleosome signal means an excess of multi-nucleosome-length fragments (vs sub-nucleosomal). Good ATAC libraries show a clear bias toward sub-nucleosomal fragments in open chromatin. High signal flags over-digested or low-quality cells.
+2.  Because active TSSs are *reliably* open in essentially all cells. Good cells show a sharp accessibility peak at TSSs; low enrichment at TSSs signals poor Tn5 activity or barcode contamination regardless of cell type.
+3.  A curated list of regions with anomalously high signal in *any* experiment (repeats, centromeres, mappability artefacts). Reads falling there are technical noise; a high blacklist ratio indicates a problematic cell or library.
+
+</details>
+:::
+
+## Step 5 — Visualize QC
+
+```{r}
+#| label: qc-viz
+
+a1 <- DensityScatter(pbmc, x = "nCount_ATAC",
+                     y = "TSS.enrichment", log_x = TRUE, quantiles = TRUE)
+a2 <- DensityScatter(pbmc, x = "nucleosome_signal",
+                     y = "TSS.enrichment", log_x = TRUE, quantiles = TRUE)
+a1 | a2
+
+VlnPlot(
+  object   = pbmc,
+  features = c("nCount_ATAC", "nFeature_ATAC", "TSS.enrichment",
+               "nucleosome_signal", "blacklist_ratio", "pct_reads_in_peaks"),
+  pt.size  = 0.1,
+  ncol     = 6
+)
+```
+
+::: {.callout-important title="Think about it"}
+1.  In the `nCount_ATAC` × `TSS.enrichment` density plot, where should *good* cells sit?
+2.  What would a blob at high `nCount_ATAC` and **low** TSS enrichment suggest?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Middle-to-high `nCount_ATAC` with high TSS enrichment — enough reads, concentrated at bona-fide open regions.
+2.  Many reads but they're **not** at TSSs. Classic signature of a bad library, ambient reads, or reads from dead cells — not useful signal.
+
+</details>
+:::
+
+## Step 6 — Filter low-quality cells
+
+```{r}
+#| label: filter
+
+pbmc <- subset(
+  x = pbmc,
+  subset = nCount_ATAC       > 3000  &
+           nCount_ATAC       < 30000 &
+           pct_reads_in_peaks > 15   &
+           blacklist_ratio   < 0.05  &
+           nucleosome_signal < 4     &
+           TSS.enrichment    > 3
+)
+pbmc
+```
+
+::: {.callout-important title="Think about it"}
+1.  These thresholds come from the Signac PBMC vignette. Would you use them as-is on another dataset?
+2.  What's the analogue of `percent.mt` in ATAC, and is it relevant?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  No — ATAC metric distributions shift with tissue, depth, and protocol version. Use the vignette thresholds as a **starting point** and always inspect the violins and density plots first.
+2.  Direct analogue doesn't exist (ATAC doesn't measure RNA). The quality proxies are **TSS enrichment**, **nucleosome signal**, **blacklist ratio**, and **pct_reads_in_peaks** — each captures a different failure mode.
+
+</details>
+:::
+
+## Step 7 — TF-IDF normalization, top features, SVD
+
+```{r}
+#| label: lsi
+
+pbmc <- RunTFIDF(pbmc)
+pbmc <- FindTopFeatures(pbmc, min.cutoff = "q0")
+pbmc <- RunSVD(pbmc)
+
+DepthCor(pbmc)
+```
+
+::: {.callout-important title="Think about it"}
+1.  RNA uses `LogNormalize`. ATAC uses **TF-IDF**. Why the different normalization?
+2.  Why is the **first LSI component often discarded** (see `DepthCor`)?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  ATAC data is **binary-ish** — most peaks are either accessible (1) or not (0) per cell. TF-IDF (term-frequency × inverse document-frequency) weighs peaks by rarity, which is well-suited to sparse binary data. LogNormalize is tuned for count RNA data.
+2.  The first SVD component typically tracks **sequencing depth / library size** rather than biology. `DepthCor` shows correlation of each LSI component with depth; if component 1 is highly correlated, skip it and use dims 2:30 downstream.
+
+</details>
+:::
+
+## Step 8 — Non-linear embedding and clustering
+
+```{r}
+#| label: umap-cluster
+
+pbmc <- RunUMAP(pbmc, reduction = "lsi", dims = 2:30)
+pbmc <- FindNeighbors(pbmc, reduction = "lsi", dims = 2:30)
+pbmc <- FindClusters(pbmc, algorithm = 3)   # SLM
+
+DimPlot(pbmc, label = TRUE) + NoLegend()
+```
+
+::: {.callout-important title="Think about it"}
+1.  Why `dims = 2:30` instead of `1:30`?
+2.  `algorithm = 3` selects the SLM (Smart Local Moving) algorithm. Name one case when you'd use it instead of the default Louvain.
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Because LSI component 1 is the depth-confounded one we saw in `DepthCor`. Starting at `2` keeps only biologically-meaningful dimensions.
+2.  SLM often produces more stable partitions than basic Louvain on large, noisy graphs (e.g. scATAC) because it allows within-cluster re-optimization. Leiden (algorithm 4) is usually the modern default; SLM remains a reasonable alternative.
+
+</details>
+:::
+
+## Save the object
+
+```{r}
+#| label: save
+
+saveRDS(pbmc, file = "../data/pbmc_atac_clustered.rds")
+```
+
+## Stretch goals
+
+-   **Gene activity** — convert peaks to per-gene accessibility scores with `GeneActivity()`, then run a Seurat-style RNA-like analysis on top
+-   **Motif enrichment** — use `chromVAR` or Signac's `RunChromVAR` for TF-motif activity per cell
+-   **Multi-modal integration** — integrate scRNA-seq + scATAC-seq from the same cells (multiome) using `FindTransferAnchors`
+
+## Credits
+
+-   Reference vignette: [Signac PBMC scATAC-seq vignette](https://stuartlab.org/signac/articles/pbmc_vignette)
+-   Workflow source: Khushbu Patel, single-cell ATAC-seq standard workflow
+-   Data: 10x Genomics PBMC 10k scATAC-seq
