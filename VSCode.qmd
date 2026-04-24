@@ -1,0 +1,159 @@
+---
+title: "VS Code & Talapas"
+author: "Shannon N. Snyder"
+date: "2026-04-20"
+---
+
+# Visual Studio Code --- Setup Guide for the Single Cell Workshop
+
+**What is VS Code?** Visual Studio Code (VS Code) is a free, cross-platform editor from Microsoft that lets you browse file systems and edit text documents, including on remote servers such as Talapas. It has a built-in terminal that lets you access the command line, making it convenient for running scripts during the workshop.
+
+## 1. Installation
+
+Download and install VS Code from the official site:
+
+<https://code.visualstudio.com/download>
+
+Once installed, open VS Code. If a permissions pop-up appears, allow the requested access. From the main interface you can browse and open folders on your local computer.
+
+## 2. Connecting to Remote HPC (Talapas)
+
+VS Code can connect directly to the University of Oregon's Talapas HPC cluster via SSH. Follow the steps below.
+
+### Step 1 --- Install Remote Extensions
+
+In the left sidebar, click the **Extensions** tab and search for `ssh`. Install the following extensions:
+
+-   **Remote --- SSH**
+-   **Remote Explorer**
+-   **Remote --- SSH: Editing Configuration Files** (optional but recommended)
+
+### Step 2 --- Add the Talapas SSH Host
+
+Open **Remote Explorer** from the left sidebar. Click the **+** icon next to **SSH** and enter the following command, replacing `[yourduckid]` with your UO Duck ID:
+
+``` bash
+ssh [yourduckid]@login.talapas.uoregon.edu
+```
+
+Press **Enter**, then press **Enter** again to save to the default config file.
+
+### Step 3 --- Connect to Talapas
+
+In the **Remote Explorer** dropdown, expand the **SSH** section. You should see `login.talapas.uoregon.edu`. Click the **→** arrow to start the connection, then:
+
+1.  Enter your Duck ID password when prompted (characters will not appear as you type).
+2.  When asked for Duo confirmation, type `1` and press **Enter** to receive a Duo push.
+3.  Once connected, a blue banner reading **SSH: login.talapas.uoregon.edu** will appear in the bottom-left corner.
+
+Click **Open Folder** to browse directories on Talapas. It is helpful to open the base directory of your current project. You may also want a second window pointed at your home directory:
+
+```
+/home/[yourduckid]/nereus
+```
+
+### Helpful Tips
+
+-   Use the integrated terminal (**Terminal → New Terminal**) to run scripts directly on Talapas without leaving VS Code.
+-   You can have multiple VS Code windows open --- one for each server or project.
+-   The file explorer on the left updates in real time, making it easy to navigate complex directory structures.
+
+------------------------------------------------------------------------
+
+# About Talapas --- UO's HPC Cluster
+
+This section extends the guide above with additional context drawn from the University of Oregon's [Research Advanced Computing Services (RACS)](https://racs.uoregon.edu/) and the [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/). It is here so you have the essentials for working on Talapas in one place.
+
+## What is Talapas?
+
+**Talapas** is UO's flagship high-performance computing (HPC) cluster, managed by Research Advanced Computing Services (RACS). The name comes from the Chinook word for *coyote*, the educator and keeper of knowledge. It combines centrally funded open-use resources with researcher-funded ("condo") resources and, at last count, provides over **14,500 CPU cores, 129 TB of memory, and roughly 89 GPUs** (AMD Milan, Intel Broadwell/Cascadelake/Icelake/Sapphire Rapids CPUs; NVIDIA A40 through H100 GPUs; memory configurations from 128 GB to 6 TB per node).
+
+## Getting an Account
+
+To work on Talapas you need a UO Duck ID and a Talapas account tied to a research group (called a **PIRG** --- Principal Investigator Research Group). If you don't yet have an account, request one at:
+
+<https://racs.uoregon.edu/request-access>
+
+Your Talapas username is your Duck ID (the part of your UO email before `@uoregon.edu`). Your password is the same University-wide credential and can be managed via UO's password reset page.
+
+## Logging In
+
+The Talapas login host is `login.talapas.uoregon.edu`. Connect with SSH:
+
+``` bash
+ssh [yourduckid]@login.talapas.uoregon.edu
+```
+
+-   For security, **no characters are displayed while you type your password**.
+-   SSH logins use **Duo two-factor authentication**. When prompted, type `1` and press Enter to receive a Duo push, or follow the alternate options presented.
+-   UO's VPN is recommended for off-campus logins; with the VPN you can also reach direct login nodes (`login1` ... `login4`) if needed.
+-   Mac and Linux users can set up an **ED25519 SSH key** to avoid typing a password every session (Duo will still prompt when required by policy).
+
+### Open OnDemand (browser-based access)
+
+RACS also provides a web portal at <https://ondemand.talapas.uoregon.edu/> (Chrome or Firefox recommended) that lets you edit files, launch a shell, start Jupyter, or open an interactive X11 desktop (via VNC) without any SSH client. It is the easiest way to run RStudio or Jupyter sessions on Talapas.
+
+## File Systems and Storage
+
+Every Talapas user has access to several directories on the ~3 PB IBM Elastic Storage System (GPFS):
+
+| Directory              | Size    | Purpose                                                                                                 |
+|------------------------|---------|---------------------------------------------------------------------------------------------------------|
+| `/home/<duckid>/`      | 250 GB  | Personal files, scripts, dotfiles. Small software installs.                                             |
+| `/projects/<PIRG>/`    | 2 TB    | Shared project data for your research group.                                                            |
+| `/scratch/<PIRG>/`     | 20 TB   | High-throughput working space. **Files not accessed in the last 90 days are purged** on a rolling basis. |
+
+::: {.callout-warning}
+**You are responsible for backing up your data.** RACS does not back up Talapas file systems. Some snapshotting exists for home and project directories, but it is not a substitute for your own backups.
+:::
+
+File transfer options:
+
+-   `scp` / `sftp` from the terminal.
+-   [Filezilla](https://filezilla-project.org/) (cross-platform GUI for SCP/SFTP).
+-   [**Globus**](https://www.globus.org/) --- RACS's recommended tool for large transfers, especially to/from the Large-Scale Research Storage (LSRS) system.
+
+## Software Modules (Lmod)
+
+Talapas uses [Lmod](https://lmod.readthedocs.io/) to manage centrally installed software. Key commands:
+
+``` bash
+module spider blast        # search for software by name
+module avail               # list modules loadable without switching groups
+module load samtools       # load a module (default version)
+module load samtools/1.17  # load a specific version
+module list                # show currently loaded modules
+module unload samtools     # unload a module
+module purge               # unload all modules
+```
+
+Modules are loaded per-shell --- you will need to `module load` again in every new session (or in every SLURM job script).
+
+## Partitions and the SLURM Scheduler
+
+Talapas uses the [SLURM](https://slurm.schedmd.com/) job scheduler. Jobs are submitted to **partitions** (queues), each with different limits and hardware:
+
+| Partition         | Typical use                                   | Max wall time |
+|-------------------|-----------------------------------------------|---------------|
+| `compute`         | Standard CPU jobs                             | 1 day         |
+| `computelong`     | Long CPU jobs                                 | 14 days       |
+| `gpu` / `gpulong` | GPU jobs (short / long)                       | 1 day / 14 d  |
+| `memory` / `memorylong` | High-memory CPU jobs (up to 4 TB RAM)   | 1 day / 14 d  |
+| `interactive` / `interactivegpu` | Short interactive sessions     | 12 h / 8 h    |
+| `preempt`         | Access to all nodes; jobs may be preempted    | Variable      |
+
+All SLURM jobs **must specify an account** (your PIRG) for correct service charging. You can do this with `--account=<myPIRG>` on every command, or export it once in your `~/.bash_profile`:
+
+``` bash
+export SLURM_ACCOUNT=<myPIRG>
+export SBATCH_ACCOUNT=<myPIRG>
+```
+
+See the separate SLURM tutorial for how to submit batch and interactive jobs. As a first rule: **do not run heavy computations on the login nodes.** Anything that takes more than a few seconds belongs in an interactive session (`srun --pty bash`) or a batch job (`sbatch my_script.sh`).
+
+## Getting Help
+
+-   [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/) --- searchable docs and how-to articles.
+-   [RACS website](https://racs.uoregon.edu/) --- overview of services.
+-   [Talapas Service Desk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) --- submit a ticket (include job IDs, scripts, and error messages).
+-   **RACS Office Hours** --- in-person help at the Knight Campus 1st Floor tables (check the Knowledge Base homepage for the current term's schedule).
