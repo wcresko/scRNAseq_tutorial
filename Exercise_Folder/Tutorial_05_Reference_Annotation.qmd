@@ -1,0 +1,220 @@
+---
+title: "Tutorial 05 — Reference-based Annotation (SingleR + Azimuth)"
+subtitle: "Map cells against a labeled reference for fast, reproducible cell-type calls"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+A short hands-on companion to **[Lecture 04 --- Annotation](../Lecture_Folder/Lecture_04_Annotation.html)**. We start from the **clustered object saved in Tutorial 02** and:
+
+-   Run `SingleR` against a built-in `celldex` reference
+-   Run `Azimuth` against the PBMC reference (workshop default; substitute `pbmcref` with another for your own data)
+-   Compare the two automatic calls against your manual labels from Tutorial 03
+-   Reconcile disagreements and save a final, reference-validated annotation
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it:
+
+1.  [Download the `.qmd` source](Tutorial_05_Reference_Annotation.qmd) and open it in RStudio.
+2.  Make sure you've completed **[Tutorial 02](Tutorial_02_DimReduction_Clustering.html)** and **[Tutorial 03](Tutorial_03_Markers_Annotation.html)** first.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+## Setup
+
+```{r}
+#| label: setup
+library(Seurat)
+library(SingleR)
+library(celldex)
+library(SingleCellExperiment)
+library(tidyverse)
+library(patchwork)
+
+set.seed(2026)
+
+seu <- readRDS("../data/nsclc_annotated.rds")
+DimPlot(seu, group.by = "celltype", label = TRUE) + NoLegend()
+```
+
+## Path 1 --- `SingleR` against a `celldex` reference
+
+`SingleR` correlates each query cell's expression against per-label reference profiles and returns the best-matching label.
+
+### Pick a reference
+
+```{r}
+# Bulk reference covering 37 main cell types from purified human samples
+ref <- celldex::HumanPrimaryCellAtlasData()
+
+# Run SingleR on the (log-)normalized counts
+sce  <- as.SingleCellExperiment(seu)
+pred <- SingleR(test = sce, ref = ref,
+                labels = ref$label.main,
+                assay.type.test = "logcounts",
+                BPPARAM = BiocParallel::SerialParam())
+table(pred$labels)
+```
+
+Attach the calls back to the Seurat object:
+
+```{r}
+seu$singler_label <- pred$labels
+seu$singler_score <- apply(pred$scores, 1, max)
+
+DimPlot(seu, group.by = "singler_label", label = TRUE,
+        repel = TRUE) + NoLegend()
+```
+
+### Score-distribution plot --- a built-in confidence check
+
+```{r}
+plotScoreHeatmap(pred)
+plotDeltaDistribution(pred)
+```
+
+::: {.callout-important title="Think about it"}
+Some cells will get a label like `"Macrophage"` with `delta` close to zero. What does that mean and what should you do about it?
+
+<details>
+
+<summary>Click for answer</summary>
+
+`delta` is the gap between the cell's top-label score and the median score across all labels. A small `delta` means the reference can't decide --- the cell either looks ambiguous (multiple types fit equally well) or is a type the reference doesn't contain.
+
+In practice: prune low-confidence calls (`pruneScores()` from SingleR), and trust your manual marker-based label more for those cells.
+
+</details>
+:::
+
+```{r}
+seu$singler_label_pruned <- ifelse(
+  is.na(SingleR::pruneScores(pred)), NA, pred$labels
+)
+```
+
+## Path 2 --- Azimuth (Seurat reference mapping)
+
+Azimuth wraps Seurat's anchor-based reference mapping with curated atlases. The PBMC reference is the most widely tested.
+
+```{r}
+# install if needed
+# remotes::install_github("satijalab/azimuth")
+library(Azimuth)
+
+# Will download the PBMC reference on first use (~1 GB)
+seu <- RunAzimuth(seu, reference = "pbmcref")
+
+# New columns: predicted.celltype.l1 / l2 / l3 + scores
+head(seu@meta.data[, grep("predicted", colnames(seu@meta.data))])
+
+DimPlot(seu, group.by = "predicted.celltype.l2",
+        label = TRUE, repel = TRUE) + NoLegend()
+```
+
+::: {.callout-important title="Think about it"}
+The PBMC reference is for **peripheral blood**. The workshop dataset is **NSCLC tumor cells**. What does Azimuth do with cells (e.g. epithelial / tumor) that aren't in the reference? How would you spot that?
+
+<details>
+
+<summary>Click for answer</summary>
+
+Azimuth still assigns the best-matching label, but the **mapping score** (`mapping.score`) and per-label **prediction score** drop sharply for cells outside the reference's support. Plot `FeaturePlot(seu, "mapping.score")` --- low-score regions (often corresponding to tumor / non-immune cells) flag clusters where you should *not* trust Azimuth's calls.
+
+For a tumor dataset like this, the right move is to use Azimuth on the immune compartment and rely on manual markers (or a tumor-specific reference) for the rest.
+
+</details>
+:::
+
+## Compare the three annotations
+
+```{r}
+ann <- seu@meta.data |>
+  select(celltype,                         # manual (from Tutorial 03)
+         singler_label_pruned,             # SingleR (pruned)
+         predicted.celltype.l2)            # Azimuth
+
+table(ann$celltype, ann$singler_label_pruned, useNA = "ifany")
+table(ann$celltype, ann$predicted.celltype.l2, useNA = "ifany")
+```
+
+A cleaner cross-tabulation as a heatmap:
+
+```{r}
+ann |>
+  count(celltype, predicted.celltype.l2) |>
+  ggplot(aes(predicted.celltype.l2, celltype, fill = n)) +
+  geom_tile() +
+  scale_fill_viridis_c() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Manual (rows) vs. Azimuth (cols)",
+       x = NULL, y = NULL)
+```
+
+## Reconcile disagreements
+
+A simple "agree-or-flag" rule: keep the manual label if at least one automatic method agrees; otherwise mark for review.
+
+```{r}
+seu$celltype_final <- with(seu@meta.data, dplyr::case_when(
+  celltype == singler_label_pruned     ~ celltype,
+  celltype == predicted.celltype.l2    ~ celltype,
+  TRUE                                 ~ paste0("REVIEW:", celltype)
+))
+
+table(seu$celltype_final)
+```
+
+::: {.callout-important title="Think about it"}
+A reviewer asks you to "use Azimuth labels instead of your manual ones because they're more reproducible". How do you respond?
+
+<details>
+
+<summary>Click for answer</summary>
+
+Reproducibility is necessary but not sufficient. Azimuth is reproducible *and* biased by its reference: any cell type absent from the reference will be silently re-labeled. The right answer is to use both, as the tutorial does, and document where they disagree --- not to pick one because it's mechanical.
+
+</details>
+:::
+
+## Save the final annotated object
+
+```{r}
+saveRDS(seu, "../data/nsclc_annotated_final.rds")
+```
+
+## Wrap-up
+
+You now have:
+
+-   A `SingleR` label per cell (with confidence pruning)
+-   An Azimuth label per cell (with a mapping score)
+-   A reconciled `celltype_final` you can carry into Tutorial 04 (pseudobulk DE) or downstream analyses
+
+::: {.callout-tip title="Going further"}
+-   Try a tissue-appropriate reference: `celldex::BlueprintEncodeData()`, the [Tabula Sapiens](https://tabula-sapiens-portal.ds.czbiohub.org/) atlas, or the [HCA Lung Cell Atlas](https://data.humancellatlas.org/).
+-   Repeat with **CellTypist** (Python) for a third opinion.
+-   For tumour data, look at **TumorDecon** or **ProjecTILs** to handle the tumour/immune mix more carefully.
+:::
+
+## See also
+
+-   [Lecture 04 --- Annotation](../Lecture_Folder/Lecture_04_Annotation.html)
+-   [Glossary --- Cell type annotation](../Resources_Folder/Glossary.html#c)
+-   `SingleR` book: [bioconductor.org/books/release/SingleRBook](https://bioconductor.org/books/release/SingleRBook/)
+-   Azimuth web tool: [azimuth.hubmapconsortium.org](https://azimuth.hubmapconsortium.org/)

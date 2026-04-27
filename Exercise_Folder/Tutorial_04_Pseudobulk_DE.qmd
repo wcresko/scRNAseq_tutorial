@@ -1,0 +1,260 @@
+---
+title: "Tutorial 04 — Pseudobulk DE with DESeq2"
+subtitle: "Aggregate to (sample × cell type), then run a proper bulk-style DE test"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+Part four of the series, paired with **[Lecture 05 --- Downstream analyses](../Lecture_Folder/Lecture_05_Downstream.html)**. We start from the **annotated object saved at the end of Tutorial 03** and learn to:
+
+-   Aggregate single-cell counts to a *(sample × cell type)* pseudobulk matrix
+-   Run a proper, well-calibrated DE test with `DESeq2`, one cell type at a time
+-   Apply LFC shrinkage for ranking and visualize results
+-   Avoid the most common pseudobulk pitfalls
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it:
+
+1.  [Download the `.qmd` source](Tutorial_04_Pseudobulk_DE.qmd) and open it in RStudio.
+2.  Make sure you've completed **[Tutorial 03](Tutorial_03_Markers_Annotation.html)** --- it writes `nsclc_annotated.rds`, which this tutorial loads.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+## Dataset --- resuming from Tutorial 03
+
+| File | Produced by | What it is |
+|---|---|---|
+| `../data/nsclc_annotated.rds` | Tutorial 03 | Seurat object with cluster labels, manual cell-type assignments, and (optionally) `SingleR` predictions in `seu$celltype`. |
+
+### A note on the contrast we'll test
+
+The 20k NSCLC dataset comes from **seven donors**. There is no built-in treatment vs. control contrast, so for teaching purposes we'll define a **synthetic contrast** by splitting donors into two groups. *In your own work this will be your real biological covariate (treatment / genotype / time-point).*
+
+## Setup
+
+```{r}
+#| label: setup
+library(Seurat)
+library(DESeq2)
+library(tidyverse)
+library(patchwork)
+
+set.seed(2026)
+
+seu <- readRDS("../data/nsclc_annotated.rds")
+seu
+```
+
+Inspect the relevant metadata before going further:
+
+```{r}
+table(seu$celltype, seu$sample_id)
+```
+
+If your column names are different, adjust the rest of the tutorial accordingly. The two columns we need are:
+
+-   `seu$celltype` --- the per-cell label from Tutorial 03
+-   `seu$sample_id` --- the donor / library / sample of origin (this is what makes pseudobulk **biologically replicated**)
+
+## Step 1 --- assign a synthetic condition
+
+Split the seven donors into a "groupA" / "groupB" assignment so we have a two-level contrast.
+
+```{r}
+sample_meta <- tibble(
+  sample_id = unique(seu$sample_id),
+  condition = rep(c("groupA","groupB"), length.out = length(unique(seu$sample_id)))
+)
+seu$condition <- sample_meta$condition[match(seu$sample_id, sample_meta$sample_id)]
+table(seu$condition, seu$sample_id)
+```
+
+::: {.callout-important title="Think about it"}
+Why is it not enough to just run `FindMarkers(seu, ident.1 = "groupA", ident.2 = "groupB")` on the per-cell expression matrix?
+
+<details>
+
+<summary>Click for answer</summary>
+
+Because cells from one donor are **not statistically independent**. Running a per-cell test treats every cell as a separate replicate, which inflates the effective sample size and produces anti-conservative p-values. The number of independent biological replicates is the **number of donors**, not the number of cells. Pseudobulk fixes this by aggregating to one observation per (sample × cell type).
+
+</details>
+:::
+
+## Step 2 --- aggregate to pseudobulk
+
+```{r}
+pb <- AggregateExpression(
+  seu,
+  assays    = "RNA",
+  slot      = "counts",
+  group.by  = c("sample_id", "celltype"),
+  return.seurat = FALSE
+)$RNA
+
+dim(pb)               # genes × (sample × celltype) replicates
+head(colnames(pb), 10)
+```
+
+The column names look like `<sample_id>_<celltype>`. Build the matching `colData`:
+
+```{r}
+meta_pb <- tibble(
+  group_id  = colnames(pb),
+  sample_id = sub("_.*",  "", colnames(pb)),
+  celltype  = sub("^[^_]+_", "", colnames(pb))
+) |>
+  left_join(sample_meta, by = "sample_id")
+
+head(meta_pb)
+```
+
+## Step 3 --- filter low-count groups
+
+A pseudobulk column built from very few cells is noise. Drop them.
+
+```{r}
+# Count cells in each (sample × celltype) combo
+cells_per_group <- seu@meta.data |>
+  count(sample_id, celltype) |>
+  unite(group_id, sample_id, celltype, sep = "_")
+
+meta_pb <- meta_pb |>
+  left_join(cells_per_group, by = "group_id") |>
+  rename(n_cells = n)
+
+# Keep groups with at least 10 cells
+keep <- meta_pb$n_cells >= 10
+pb       <- pb[, keep]
+meta_pb  <- meta_pb[keep, ]
+
+table(meta_pb$celltype)
+```
+
+::: {.callout-important title="Think about it"}
+Why is `n_cells >= 10` reasonable? Why might you raise or lower it?
+
+<details>
+
+<summary>Click for answer</summary>
+
+The threshold balances signal against noise: pseudobulk built from 1--2 cells is dominated by stochastic dropout and is unlikely to represent the cell type. A floor of \~10 cells is the de-facto default in the field (see Squair et al. 2021 and Crowell et al. 2020). Raise it (e.g. 20--50) for very sparse cell types or shallow libraries; lower it only if you also lower your statistical-significance expectations.
+
+</details>
+:::
+
+## Step 4 --- run DESeq2 per cell type
+
+Wrap the test in a function and `map_dfr` over cell types:
+
+```{r}
+run_de <- function(ct) {
+  keep <- meta_pb$celltype == ct
+  if (sum(keep) < 4 || length(unique(meta_pb$condition[keep])) < 2) {
+    return(NULL)   # not enough replicates for a contrast
+  }
+  dds <- DESeqDataSetFromMatrix(
+    countData = pb[, keep],
+    colData   = meta_pb[keep, ],
+    design    = ~ condition
+  )
+  dds <- DESeq(dds, quiet = TRUE)
+  res <- results(dds, contrast = c("condition","groupB","groupA"))
+  res <- lfcShrink(dds, coef = "condition_groupB_vs_groupA",
+                   res = res, type = "apeglm")
+  as.data.frame(res) |>
+    rownames_to_column("gene") |>
+    mutate(celltype = ct)
+}
+
+de_all <- map_dfr(unique(meta_pb$celltype), run_de) |>
+  filter(!is.na(padj))
+glimpse(de_all)
+```
+
+## Step 5 --- inspect the top hits
+
+```{r}
+de_top <- de_all |>
+  group_by(celltype) |>
+  slice_min(padj, n = 10) |>
+  ungroup()
+de_top
+```
+
+## Step 6 --- visualize
+
+A simple per-cell-type volcano plot:
+
+```{r}
+de_all |>
+  filter(celltype %in% c("T_CD4","B_cell","Macrophage")) |>   # adjust to your labels
+  ggplot(aes(log2FoldChange, -log10(padj))) +
+  geom_point(alpha = 0.4, size = 1) +
+  geom_hline(yintercept = -log10(0.05), linetype = 2) +
+  facet_wrap(~ celltype) +
+  labs(title = "Pseudobulk DE: groupB vs groupA",
+       x = "log2 FC (shrunken)", y = "-log10(padj)")
+```
+
+::: {.callout-important title="Think about it"}
+Some cell types will show many DE genes; others almost none. What can drive this pattern *that has nothing to do with biology*?
+
+<details>
+
+<summary>Click for answer</summary>
+
+Three usual suspects:
+
+1.  **Cell counts per group.** Cell types that are abundant in every donor have well-estimated dispersions; rare types do not.
+2.  **Sample size.** With 7 donors split 4-vs-3, you have very little power even on a clean signal --- and almost none if a cell type is missing in 1--2 donors.
+3.  **Library composition.** A cell type whose library is dominated by a few hyper-expressed genes will have noisier dispersion estimates and fewer detected hits.
+
+Always inspect `n_cells` per group and the dispersion plot before reporting "X genes are significantly DE".
+
+</details>
+:::
+
+## Step 7 --- save results
+
+```{r}
+write_csv(de_all,  "../data/nsclc_pseudobulk_de.csv")
+write_csv(de_top,  "../data/nsclc_pseudobulk_de_top.csv")
+```
+
+## Wrap-up
+
+You now have:
+
+-   A pseudobulk matrix per *(sample, cell type)*.
+-   Per-cell-type DE results from `DESeq2` with shrunken LFCs.
+-   A workflow you can re-point at *any* real biological contrast in your own data.
+
+::: {.callout-tip title="Going further"}
+-   Add covariates (batch, sex, age) to the design: `~ batch + condition`.
+-   Use `IHW` or `ashr` for adaptive multiple-testing.
+-   Hand the gene lists to `clusterProfiler::compareCluster` for cross-cell-type enrichment.
+-   Compare against `muscat::pbDS` (formal pseudobulk wrapper) and `glmGamPoi`.
+:::
+
+## See also
+
+-   [Lecture 05 --- Downstream analyses](../Lecture_Folder/Lecture_05_Downstream.html)
+-   [Lecture (Extra) --- Pseudobulk DE deep dive](../Lecture_Folder/Lecture_Extra_Pseudobulk.html)
+-   Squair et al. 2021 --- the paper that made pseudobulk the default ([doi](https://doi.org/10.1038/s41467-021-25960-2))
+-   Crowell et al. 2020 --- `muscat` package paper ([doi](https://doi.org/10.1038/s41467-020-19894-4))

@@ -2,58 +2,104 @@
 title: "Software"
 ---
 
-## Software tools to install
+This page lists every tool the workshop assumes is installed on your laptop. If you'd rather run a single copy-pasteable installation script that does it all in one go, jump to **[Setup](Setup.qmd)**.
 
--   Current version of R
--   Current version of RStudio
--   A terminal that allows `ssh` (for cluster access, if applicable)
--   Git, and a GitHub account for version control
+## Required tools
 
-## R and RStudio
+-   **R ≥ 4.4** --- [download](https://www.r-project.org)
+-   **RStudio Desktop** (current release) --- [download](https://posit.co/download/rstudio-desktop/)
+-   **A terminal that supports `ssh`** (for Talapas; see below for Windows users)
+-   **Git ≥ 2.30** --- [download](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+-   **A GitHub account** --- [sign up](https://github.com/signup)
+-   *(Optional but recommended)* **VS Code** for editing files on Talapas via SSH --- see the [VS Code & Talapas](Resources_Folder/VSCode_Talapas.html) reference
 
--   Current version of R ([install here](https://www.r-project.org))
--   Current version of RStudio ([install here](https://www.rstudio.org))
+## Required R / Bioconductor packages
 
-## R / Bioconductor packages commonly used for scRNA-seq
-
-*Install the packages the workshop will use in a single setup session. Example:*
+The full set used across the lectures, tutorials, and bonus exercise. Install everything in one session.
 
 ``` r
-# CRAN
-install.packages(c("tidyverse", "Seurat", "remotes"))
+# 1. CRAN
+install.packages(c(
+  "tidyverse",     # dplyr, ggplot2, tidyr, readr, purrr, tibble, stringr, forcats
+  "Seurat",        # core scRNA-seq workflow (workshop default)
+  "remotes",       # GitHub installs
+  "BiocManager",   # Bioconductor installer
+  "patchwork",     # combining ggplots
+  "presto",        # fast Wilcoxon for FindMarkers (recommended)
+  "harmony",       # batch integration
+  "clustree",      # picking clustering resolution
+  "ggrepel"        # readable labels on UMAPs
+))
 
-# Bioconductor
+# 2. Bioconductor
 if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
 BiocManager::install(c(
   "SingleCellExperiment",
   "scran",
   "scater",
-  "DropletUtils"
+  "scuttle",
+  "DropletUtils",      # EmptyDrops, knee-point cell calling
+  "scDblFinder",       # doublet detection
+  "DESeq2",            # pseudobulk DE
+  "edgeR",             # alt. pseudobulk DE
+  "limma",             # alt. pseudobulk DE
+  "fgsea",             # rank-based gene-set enrichment
+  "clusterProfiler",   # over-representation + GSEA
+  "SingleR",           # automatic annotation
+  "celldex",           # reference datasets for SingleR
+  "Signac",            # scATAC-seq (bonus exercise)
+  "EnsDb.Hsapiens.v86" # genome annotation for Signac
 ))
+
+# 3. GitHub (one common dependency)
+remotes::install_github("satijalab/seurat-data", quiet = TRUE)
 ```
+
+::: callout-note
+The first install will take 20–60 minutes depending on your machine and whether your platform is building from source. Run it before the workshop, not the morning of.
+:::
+
+## Verify your install
+
+After installation, run this once to confirm everything loads. If any line errors, re-install just that package.
+
+``` r
+pkgs <- c("Seurat","SingleCellExperiment","scran","scater","DropletUtils",
+          "scDblFinder","harmony","DESeq2","fgsea","clusterProfiler",
+          "SingleR","celldex","Signac","tidyverse","clustree","presto")
+ok <- vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)
+cat("Loaded:\n"); print(ok)
+sessionInfo()
+```
+
+A clean `sessionInfo()` plus all `TRUE` values means you're set.
 
 ## Accessing the shell via a terminal application
 
-### *Mac or Linux users*
+### Mac or Linux
 
--   Open the native "Terminal" app on Mac or Linux
--   Or install another terminal like "iTerm2"
+-   Use the built-in **Terminal** app, or install [iTerm2](https://iterm2.com/) (Mac) for a nicer experience.
 
-### *Windows users*
+### Windows --- install WSL2 + Ubuntu
 
--   Guide: <https://ubuntu.com/tutorials/install-ubuntu-on-wsl2-on-windows-10#1-overview>
--   Run Windows PowerShell as administrator
--   Install WSL2 by typing `wsl --install`
--   Restart your computer
--   Search for and install Ubuntu from the Microsoft Store
--   ***OR*** type `wsl --install -d ubuntu` on PowerShell to do both at once
+The workshop assumes a POSIX shell. The simplest path on Windows is WSL2.
 
-### *Accessing the shell on Windows*
+1.  Run **PowerShell as Administrator**.
+2.  Type `wsl --install -d ubuntu` and press Enter. Restart when prompted.
+3.  Launch **Ubuntu** from the Start menu, set a username and password (does not need to match your Windows login).
+4.  Run:
 
--   Open Ubuntu and set up a username and password (does not have to match your Windows login)
--   Run `sudo apt update` then `sudo apt upgrade` to ensure everything is up to date
+    ``` bash
+    sudo apt update && sudo apt upgrade -y
+    sudo apt install -y openssh-client git
+    ```
 
-## Git and GitHub
+Full Microsoft guide: <https://learn.microsoft.com/en-us/windows/wsl/install>
 
--   Current version of Git ([install here](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git))
--   A GitHub account ([information here](https://github.com/signup))
+## Talapas (UO HPC) account --- optional
+
+Required only if you intend to run anything on the cluster. Request an account at <https://racs.uoregon.edu/request-access>; once you have one, follow the [VS Code & Talapas](Resources_Folder/VSCode_Talapas.html) reference and the [SLURM Basics tutorial](Exercise_Folder/Tutorial_SLURM_Basics.html).
+
+## Trouble with installs?
+
+Check the [FAQ](FAQ.qmd) first. Common issues (Mac compiler errors, Bioconductor mirror, RStudio cache) are documented there.

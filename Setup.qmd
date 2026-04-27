@@ -1,0 +1,137 @@
+---
+title: "Setup --- one-button workshop install"
+---
+
+This page gives you a **single, copy-pasteable workflow** that gets you from a fresh laptop to "ready to run Tutorial 01". Run it once, before the workshop. Re-run it any time you suspect something is broken.
+
+::: callout-tip
+**What you'll have at the end:**
+
+1.  All required R/Bioconductor packages installed.
+2.  The 20k NSCLC scRNA-seq dataset downloaded into `data/`.
+3.  A clean `sessionInfo()` confirming the environment.
+4.  An optional `renv` lockfile for full reproducibility.
+:::
+
+## Step 0 --- prerequisites
+
+Make sure you already have:
+
+-   **R ≥ 4.4** and **RStudio** (see [Software](Software.qmd)).
+-   **\~6 GB of free disk space** (most of it for the dataset).
+-   A working internet connection.
+
+## Step 1 --- create a workshop project
+
+In **RStudio**: *File → New Project → New Directory → New Project*. Name it `scrnaseq_workshop`. Inside that directory create a `data/` folder. The expected layout is:
+
+```
+scrnaseq_workshop/
+├── scrnaseq_workshop.Rproj
+├── data/                    # ← raw 10x output goes here (Step 3)
+└── tutorials/               # ← downloaded tutorial .qmd files
+```
+
+## Step 2 --- install all packages
+
+Paste the entire block into your R console. It will take 20--60 minutes the first time.
+
+``` r
+# CRAN
+cran_pkgs <- c(
+  "tidyverse", "Seurat", "remotes", "BiocManager", "patchwork",
+  "presto", "harmony", "clustree", "ggrepel"
+)
+install.packages(setdiff(cran_pkgs, rownames(installed.packages())))
+
+# Bioconductor
+if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+bioc_pkgs <- c(
+  "SingleCellExperiment", "scran", "scater", "scuttle", "DropletUtils",
+  "scDblFinder", "DESeq2", "edgeR", "limma",
+  "fgsea", "clusterProfiler",
+  "SingleR", "celldex",
+  "Signac", "EnsDb.Hsapiens.v86"
+)
+BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
+                     update = FALSE, ask = FALSE)
+
+# GitHub
+remotes::install_github("satijalab/seurat-data", quiet = TRUE,
+                       upgrade = "never")
+```
+
+## Step 3 --- download the workshop dataset
+
+The primary dataset is the public **10x Genomics 20k NSCLC DTC, 3' v3.1 Multiplex** release. Run this from a **terminal** (Mac/Linux/WSL), inside the project directory:
+
+``` bash
+# from inside scrnaseq_workshop/
+mkdir -p data && cd data
+
+# Filtered feature × barcode matrix (the file the tutorials read)
+curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+
+tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+```
+
+You should end up with `data/filtered_feature_bc_matrix/` containing `barcodes.tsv.gz`, `features.tsv.gz`, and `matrix.mtx.gz`.
+
+The bonus scATAC-seq tutorial uses a separate dataset:
+
+``` bash
+# Optional: PBMC 10k scATAC-seq v1.1 (only for the ATAC bonus)
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_filtered_peak_bc_matrix.tar.gz
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_fragments.tsv.gz
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_fragments.tsv.gz.tbi
+tar -xzf atac_pbmc_10k_nextgem_filtered_peak_bc_matrix.tar.gz
+```
+
+## Step 4 --- verify your environment
+
+Open a **fresh** R session in the project (so `renv` and your working directory are right) and paste:
+
+``` r
+pkgs <- c("Seurat","SingleCellExperiment","scran","scater","DropletUtils",
+          "scDblFinder","harmony","DESeq2","fgsea","clusterProfiler",
+          "SingleR","celldex","Signac","tidyverse","clustree","presto")
+ok <- vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)
+
+cat("Package check:\n"); print(ok)
+stopifnot(all(ok))
+
+# Read the workshop dataset
+counts <- Seurat::Read10X(data.dir = "data/filtered_feature_bc_matrix")
+seu    <- Seurat::CreateSeuratObject(counts = counts, project = "setup-check",
+                                     min.cells = 3, min.features = 200)
+cat("\nSeurat object:\n"); print(seu)
+
+cat("\nsessionInfo():\n")
+sessionInfo()
+```
+
+If you see a Seurat object with \>10,000 cells, you're done.
+
+## Step 5 (optional) --- pin your environment with `renv`
+
+For full reproducibility (and to avoid "it worked yesterday" headaches), you can pin the exact package versions:
+
+``` r
+install.packages("renv")
+renv::init()      # one time, in the project root
+renv::snapshot()  # writes renv.lock — commit this with your code
+```
+
+Anyone who clones the project can then `renv::restore()` to recreate the same environment.
+
+## Talapas users only
+
+If you'll be running on UO's HPC instead of your laptop, see:
+
+-   [VS Code & Talapas](Resources_Folder/VSCode_Talapas.html) --- account, login, modules, storage.
+-   [SLURM Basics tutorial](Exercise_Folder/Tutorial_SLURM_Basics.html) --- interactive sessions and batch jobs.
+-   [Compute Environments](Compute_Environments.qmd) --- Docker/Apptainer image and `renv` lockfile.
+
+## Something didn't work?
+
+See the [FAQ](FAQ.qmd) for the issues that come up most often (Mac compiler errors, `BiocManager` mirror selection, RStudio caching old library paths, "permission denied" on Talapas, etc.).
