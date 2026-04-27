@@ -1,9 +1,9 @@
 ---
-title: "Lecture 01 — Bulk vs. Single-Cell RNA-seq: Overview of the Pipeline"
+title: "Lecture 01 — Bulk vs. Single-Cell RNA-seq: What & How"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop
+    footer: Single Cell RNA-seq Workshop · Lecture 01 of 6
     transition: fade
     transition-speed: slow
     theme: default
@@ -27,28 +27,32 @@ editor: visual
 
 library(tidyverse)
 library(knitr)
-
-# scRNA-seq packages referenced in this lecture (not evaluated here)
-# library(Seurat)
-# library(SingleCellExperiment)
-# library(scran)
-# library(scater)
-# library(harmony)
-# library(SingleR)
-
 theme_set(theme_minimal(base_size = 14))
 set.seed(2026)
 ```
 
 # Lecture 01: Bulk vs. Single-Cell RNA-seq {background-color="#2c3e50"}
 
+## Where this lecture fits
+
+::: incremental
+-   **You are here:** Lecture 01 — *the why and how of scRNA-seq data*
+-   Up next:
+    -   Lec 02 — Pre-processing (QC, doublets, normalization, HVGs)
+    -   Lec 03 — Dim reduction, integration, clustering
+    -   Lec 04 — Annotation
+    -   Lec 05 — Downstream analyses (DE, enrichment, WGCNA, trajectory, CCC)
+    -   Lec 06 — Beyond scRNA-seq (spatial, ATAC, multi-omics)
+-   **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
+:::
+
 ## Goals of this lecture
 
 ::: incremental
 -   Understand what **bulk RNA-seq** measures vs. what **single-cell RNA-seq (scRNA-seq)** measures
--   Walk the full scRNA-seq pipeline end-to-end at a conceptual level
--   Meet the common tools at each step, with a **Seurat** focus and **scanpy** alternatives
--   Preview key downstream analyses: annotation, DE, enrichment, WGCNA, pseudobulk, trajectory, cell-cell communication
+-   See how a 10x Chromium-style experiment generates the data
+-   Trace **reads → count matrix** end to end
+-   Meet the data structure (cell × gene matrix) every downstream step assumes
 :::
 
 ::: callout-note
@@ -70,10 +74,10 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 ## What bulk cannot tell you
 
 ::: incremental
--   How many **cell types** are in the tissue, and in what proportions
+-   How many **[cell types](../Resources_Folder/Glossary.html#c)** are in the tissue, and in what proportions
 -   Whether a gene is "up" because it changed within a cell type, or because the cell-type **composition** shifted
 -   Rare populations, transitional states, developmental trajectories
--   Cell-cell communication in situ
+-   Cell–cell communication in situ
 :::
 
 ## Bulk vs. single-cell — the picture
@@ -87,14 +91,14 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 
 ::: incremental
 -   Same core measurement: **count of reads/UMIs per gene**
--   Same statistical concerns: normalization, batch effects, multiple testing, replication
+-   Same statistical concerns: normalization, **[batch effects](../Resources_Folder/Glossary.html#b)**, multiple testing, replication
 -   Many downstream questions (DE, enrichment, co-expression) are the **same questions at a new resolution**
 :::
 
 ## What is genuinely new
 
 ::: incremental
--   **Sparsity**: \~90–95% zeros in typical droplet data (not all real biology — technical dropout too)
+-   **[Sparsity](../Resources_Folder/Glossary.html#s)**: \~90–95% zeros in typical droplet data (not all real biology — technical **[dropout](../Resources_Folder/Glossary.html#d)** too)
 -   **Cells are not replicates**: cells from one subject are not statistically independent
 -   **Cell type is a latent variable** you have to recover from the data
 -   **Integration** across samples is a first-class problem, not an afterthought
@@ -142,9 +146,9 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 
 ![](images/lec01_droplet_barcoding.svg){fig-align="center" width="90%"}
 
--   **Cell barcode** identifies which cell a read came from
--   **UMI** identifies the original mRNA molecule (collapses PCR duplicates)
--   Reads are pooled and demultiplexed computationally
+-   **[Cell barcode](../Resources_Folder/Glossary.html#b)** identifies which cell a read came from
+-   **[UMI](../Resources_Folder/Glossary.html#u)** identifies the original mRNA molecule (collapses PCR duplicates)
+-   Reads are pooled and **[demultiplexed](../Resources_Folder/Glossary.html#d)** computationally
 
 ## UMIs in detail — amplification, sequencing, dedup
 
@@ -152,12 +156,12 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 
 -   Each mRNA is tagged with a unique UMI **before** PCR
 -   After sequencing, reads sharing a cell barcode **and** UMI collapse to one molecule
--   UMIs also help detect **nucleotide substitutions** during PCR/sequencing and resolve **multi-mapping** reads
+-   UMIs help detect **nucleotide substitutions** during PCR/sequencing and resolve **multi-mapping** reads
 
 ## From reads to a count matrix
 
 ::: incremental
--   Input: raw FASTQ files (R1 = cell BC + UMI, R2 = transcript)
+-   Input: raw **[FASTQ](../Resources_Folder/Glossary.html#f)** files (R1 = cell BC + UMI, R2 = transcript)
 -   Output: **cells × genes** count matrix (integer UMI counts)
 -   Common tools:
     -   **Cell Ranger** (10x, official)
@@ -191,7 +195,7 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 
 ## The data structure you analyze
 
--   **Sparse matrix**: rows = genes, columns = cells (or transposed in Python)
+-   **[Sparse matrix](../Resources_Folder/Glossary.html#s)**: rows = genes, columns = cells (or transposed in Python)
 -   Paired with per-cell metadata (sample, batch, QC metrics) and per-gene metadata
 
 ::: panel-tabset
@@ -216,495 +220,24 @@ adata
 ```
 :::
 
-# Part 3 — The full analysis workflow {background-color="#2c3e50"}
+# Recap & what's next {background-color="#2c3e50"}
 
-## Bulk RNA-seq workflow (for comparison)
-
-![](images/lec01_bulk_workflow.svg){fig-align="center" width="98%"}
-
-## scRNA-seq pipeline at a glance
-
-![](images/lec01_scrnaseq_workflow.svg){fig-align="center" width="98%"}
-
-## Workflow with integration — alternate view
-
-![](images/lec01_use_workflow_integration.svg){fig-align="center" width="85%"}
-
--   QC sits on the main path; **integration** is a parallel branch that feeds back into clustering
--   Clustering ↔ marker identification is iterative (resolution tuning, subclustering)
--   Three downstream lanes: **trajectory**, **DE between sample groups**, **custom analyses**
-
-## Same data, two complementary analysis chains
-
-![](images/lec01_bulk_vs_sc_toolchain.svg){fig-align="center" width="95%"}
-
--   Bulk path: **DE + WGCNA → markers related to conditions → enrichment / networks**
--   scRNA-seq path: **clustering + annotation → markers per cluster → enrichment**
--   You can (and often do) run **both** on the same data — for scRNA-seq, the bulk path runs on the pseudobulk matrix
-
-## Bulk vs. scRNA-seq tools — alternate view
-
-![](images/lec01_use_bulk_vs_sc_tools.svg){fig-align="center" width="95%"}
-
--   One data input, two downstream tool families
--   Bulk side: **DE analysis** + **WGCNA** → condition-level markers → enrichment / networks
--   scRNA-seq side: **clustering & annotation** → per-cluster markers → enrichment
-
-## The Seurat workflow in eight steps
-
-![](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="97%"}
-
-## The eight steps — expanded block diagram
-
-![](images/lec01_use_seurat_8step.svg){fig-align="center" width="98%"}
-
--   Each coloured column is one of the eight steps with its Seurat function calls
--   Arrows indicate the canonical forward flow; in practice most steps iterate (esp. QC ↔ clustering)
-
-## The eight steps, in words
-
-::: incremental
-1.  **QC & Filter** — create the Seurat object, drop low-quality cells and low-expression genes
-2.  **Normalization & Scaling** — `LogNormalize` then `ScaleData`, optionally regressing out `percent.mt`, cell-cycle, etc.
-3.  **Feature Extraction** — `FindVariableFeatures` (VST) → \~2000 highly variable genes
-4.  **Dimension Reduction** — `RunPCA`, then `ElbowPlot` / `JackStraw` to pick N PCs
-5.  **Cell Clustering** — `FindNeighbors` → `FindClusters`; use **clustree** to pick a resolution; then `RunUMAP` / `RunTSNE`
-6.  **Marker Identification** — `FindAllMarkers` + visualizations; gene-set enrichment on the markers
-7.  **Trajectory Inference** — Monocle / Slingshot / PAGA / scVelo for continuous processes
-8.  **Cell-type Annotation** — `RenameIdents` from markers + `SingleR` / `Azimuth` / `CellTypist` for automation
-:::
-
-## Same shape, different resolution
-
-::: incremental
--   Same three big lanes: **wet lab → preprocessing → analysis**
--   Bulk stops at a *sample* counts matrix; scRNA-seq starts with a *cell* counts matrix and gains integration, clustering, annotation before "classical" DE
--   Many classical downstream steps (enrichment, WGCNA) work on **pseudobulk** derived from scRNA-seq, so the bulk skills transfer directly
-:::
-
-## Step 1 — Per-cell QC
-
-![](images/lec01_qc_metrics.svg){fig-align="center" width="85%"}
-
--   `nFeature_RNA`: genes detected per cell
--   `nCount_RNA`: total UMI counts per cell
--   `percent.mt`: % reads mapping to mitochondrial genes (stress/dying cells)
-
-## Common QC metrics — what they catch
-
-![](images/lec01_use_common_qc_metrics.svg){fig-align="center" width="85%"}
-
--   **Low** gene / molecule counts → dying or poorly captured cells
--   **Very high** gene counts for the tissue → likely **doublets / multiplets**
--   **High mitochondrial %** → cells that were dying when loaded
-
-## What QC actually removes — the cell view
-
-![](images/lec01_use_quality_control_overview.svg){fig-align="center" width="95%"}
-
--   Before QC: empty droplets, dying cells, doublets, ambient-RNA contamination, true cells — all mixed
--   After QC: a clean set of cell-containing droplets with real transcriptomes
-
-## QC in practice
-
-::: panel-tabset
-### Seurat
-
-``` r
-seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
-VlnPlot(seu, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-seu <- subset(seu, nFeature_RNA > 200 & nFeature_RNA < 6000 & percent.mt < 15)
-```
-
-### scanpy
-
-``` python
-adata.var["mt"] = adata.var_names.str.startswith("MT-")
-sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], inplace=True, percent_top=None)
-adata = adata[(adata.obs.n_genes_by_counts > 200) &
-              (adata.obs.n_genes_by_counts < 6000) &
-              (adata.obs.pct_counts_mt < 15)].copy()
-```
-:::
-
-::: callout-warning
-Thresholds are dataset-specific. Always look at the distributions first.
-:::
-
-## Droplets can also be empty — or contaminated
-
-![](images/lec01_ambient_rna.svg){fig-align="center" width="92%"}
-
--   Many barcodes correspond to **empty droplets** with only ambient RNA — filter with `EmptyDrops` or the Cell Ranger knee-point
--   Even real cells are contaminated by **ambient RNA soup**; estimate and subtract with `SoupX`, `DecontX`, or `CellBender`
-
-## Ambient mRNA — before and after lysis
-
-![](images/lec01_use_ambient_rna.svg){fig-align="center" width="95%"}
-
--   Before lysis: each droplet contains (ideally) one cell + one barcoded bead, plus trace **ambient mRNA**
--   After lysis: the bead captures its cell's mRNA *and* any ambient mRNA floating in the droplet → **cross-cell contamination** in the final counts
-
-## Step 2 — Doublet detection
-
--   Droplets sometimes capture **two cells** → artificial "hybrid" profiles
--   Run doublet detection on each sample **before** integration
-
-![](images/lec01_doublet_detection.svg){fig-align="center" width="95%"}
-
-| Tool            | Ecosystem | Notes                          |
-|-----------------|-----------|--------------------------------|
-| `scDblFinder`   | R / Bioc  | Fast, recommended default      |
-| `DoubletFinder` | R         | Widely cited, parameter tuning |
-| `Scrublet`      | Python    | Classic choice in scanpy flows |
-
-## Doublet detection — how it actually works
-
-![](images/lec01_use_doublet_detection.svg){fig-align="center" width="98%"}
-
--   **Simulate** artificial doublets by averaging random pairs of real cells
--   Project real + simulated cells together in **reduced dimensions**
--   Real cells that sit close to many simulated doublets are **flagged** as likely doublets
-
-## Step 3 — Normalization
-
--   **Goal:** put cells on a comparable scale before downstream math
--   Two dominant approaches:
-    -   **Log-normalization** (`NormalizeData` / `sc.pp.normalize_total` + `log1p`): fast, simple
-    -   **Variance-stabilizing** (`SCTransform` in Seurat, `scran::sctransform`): models mean-variance, often better for low-count cells
-
-``` r
-# Seurat
-seu <- NormalizeData(seu) |>
-  FindVariableFeatures(nfeatures = 2000) |>
-  ScaleData()
-
-# Alternative
-seu <- SCTransform(seu, verbose = FALSE)
-```
-
-``` python
-# scanpy
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
-sc.pp.highly_variable_genes(adata, n_top_genes=2000)
-```
-
-## Step 4 — Feature selection (HVGs)
-
--   Use the \~1,000–3,000 most variable genes for downstream geometry
--   Dramatically reduces noise from ubiquitously-expressed housekeeping genes
--   Seurat: `FindVariableFeatures()`; scanpy: `sc.pp.highly_variable_genes()`
-
-## Step 5 — Linear dimensionality reduction (PCA)
-
--   PCA on scaled HVG expression gives a **low-dimensional, denoised representation**
--   Typical: first 20–50 PCs used for all downstream neighbor-graph steps
--   Choose the number of PCs with an `ElbowPlot()` or `JackStraw()` / variance explained curve
-
-``` r
-seu <- RunPCA(seu, npcs = 50)
-ElbowPlot(seu, ndims = 50)
-```
-
-## Dimensionality reduction — the intuition
-
-![](images/lec01_use_dimensionality_reduction.svg){fig-align="center" width="95%"}
-
--   Cells live in a very high-dimensional space (thousands of genes)
--   Dimensionality reduction **projects** them into 2–50 dimensions while preserving the main structure
--   Different projections emphasize different axes — the full signal isn't visible in any single 2D view
-
-## Step 6 — Integration / batch correction
-
-![](images/lec01_batch_integration.svg){fig-align="center" width="88%"}
-
-## Integration tools
-
-| Tool                  | Ecosystem | Approach                              |
-|-----------------------|-----------|---------------------------------------|
-| **Harmony**           | R / Py    | Iterative soft-clustering in PC space |
-| **Seurat CCA / RPCA** | R         | Anchor-based cross-sample matching    |
-| **scVI / scANVI**     | Python    | Variational autoencoder               |
-| **BBKNN**             | Python    | Batch-balanced k-NN graph             |
-| **MNN / fastMNN**     | R / Py    | Mutual nearest neighbors              |
-
-::: callout-tip
-**Rule of thumb:** try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases.
-:::
-
-## Integration strategies — visual guide
-
-![](images/lec01_use_integration_overview.svg){fig-align="center" width="98%"}
-
--   **Global models** (e.g. ComBat, `sc.tl.regress_out`) fit a regression with batch as a covariate
--   **Linear embedding / MNN** (MNN, FastMNN, Seurat v3, Scanorama) find mutual nearest neighbours across batches and correct
--   **Graph-based / deep learning** (BBKNN, Conos, scVI, trVAE, SAUCIE) enforce cross-batch connectivity, or add batch as a node in an autoencoder
-
-## Step 7 — Neighborhood graph, clustering, embedding
-
--   Build a **shared nearest-neighbor (SNN)** graph from the integrated PCs
--   Cluster with **Louvain** or (preferred today) **Leiden** at a chosen resolution
--   Embed for visualization with **UMAP** or **t-SNE**
-
-``` r
-seu <- FindNeighbors(seu, dims = 1:30) |>
-  FindClusters(resolution = 0.5, algorithm = 4) |> # 4 = Leiden
-  RunUMAP(dims = 1:30)
-DimPlot(seu, reduction = "umap", label = TRUE)
-```
-
-``` python
-sc.pp.neighbors(adata, n_pcs=30)
-sc.tl.leiden(adata, resolution=0.5)
-sc.tl.umap(adata)
-sc.pl.umap(adata, color="leiden", legend_loc="on data")
-```
-
-::: callout-warning
-UMAP distances between clusters are **not quantitative**. Use for visualization, not inference.
-:::
-
-## Leiden clustering — step by step
-
-![](images/lec01_use_leiden_clustering.svg){fig-align="center" width="98%"}
-
--   Start with the **KNN graph** over cells in PCA space
--   **Find communities** → initial partition; **refine** merges/splits based on modularity
--   **Aggregate** the network, refine again → **final partition** (better-connected communities than Louvain)
-
-# Part 4 — Annotation {background-color="#2c3e50"}
-
-## Two paths, use both
-
-![](images/lec01_annotation_workflow.svg){fig-align="center" width="92%"}
-
-## Manual annotation — marker-driven
-
-1.  Find cluster markers
-
-``` r
-markers <- FindAllMarkers(seu, only.pos = TRUE, min.pct = 0.25,
-                          logfc.threshold = 0.25)
-markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
-```
-
-2.  Compare to canonical markers for the tissue
-    -   **CellMarker 2.0**, **PanglaoDB**, tissue-specific references
-3.  Assign labels; `RenameIdents()` / `seu$celltype <- ...`
-
-## Automatic annotation — reference-driven
-
--   Fast, reproducible, reduces personal bias
--   Always **sanity-check** against markers
-
-| Tool           | Reference / mechanism                         |
-|----------------|-----------------------------------------------|
-| **SingleR**    | Bulk/sc references, correlation-based         |
-| **Azimuth**    | Seurat v4 reference mapping (human refs)      |
-| **CellTypist** | Logistic regression models, many tissues (py) |
-| **scType**     | Marker-list–based scoring                     |
-| **ProjecTILs** | T-cell / TME specialized                      |
-
-::: callout-tip
-Best practice: run an automatic method **and** confirm with manual marker inspection. Disagreements often flag interesting biology.
-:::
-
-# Part 5 — Downstream analyses {background-color="#2c3e50"}
-
-## The annotated object is a launchpad
-
-![](images/lec01_downstream_hub.svg){fig-align="center" width="95%"}
-
-## DE between conditions
-
--   Question: within a given cell type, which genes change with treatment / genotype / time?
--   **Do NOT** treat cells as biological replicates — they are not independent
--   Preferred approach: **pseudobulk** (covered in its own lecture)
--   Within-cell methods still useful for *exploratory* cluster markers: `FindMarkers`, MAST, `rank_genes_groups`
-
-## Enrichment / pathway analysis
-
--   Summarize gene lists into interpretable biology
--   Main flavors:
-    -   **Over-representation** (hypergeometric): enrichR, clusterProfiler
-    -   **Rank-based GSEA**: fgsea, clusterProfiler's `gseGO`/`gseKEGG`
-    -   **Per-cell scoring**: decoupleR, AUCell, GSVA, `AddModuleScore`
-
-``` r
-# per-cell pathway activity (module scoring)
-seu <- AddModuleScore(seu, features = list(interferon_genes), name = "IFN")
-FeaturePlot(seu, "IFN1")
-```
-
-## Co-expression modules (WGCNA)
-
-![](images/lec01_wgcna_concept.svg){fig-align="center" width="95%"}
-
--   **hdWGCNA** (Morabito et al.) adapts WGCNA to sparse single-cell data using metacells
--   Alternative: build pseudobulk matrices per cell type, then run classic `WGCNA`
--   Output: gene **modules**, module eigengenes, module-trait correlations, hub genes
-
-## Trajectory / pseudotime
-
--   For continuous processes (development, differentiation, activation)
--   Tools: **Monocle3**, **Slingshot**, **PAGA**, **scVelo** (RNA velocity)
--   Requires biological justification — not every dataset has a trajectory
-
-## Cell–cell communication
-
--   Infer signaling between cell types from ligand-receptor expression
--   Tools: **CellChat**, **LIANA** (meta-resource), **NicheNet**, **CellPhoneDB**
-
-## Compositional analysis — *who* is there, in what proportion
-
-![](images/lec01_use_compositional_analysis.svg){fig-align="center" width="97%"}
-
--   Take two conditions (e.g. healthy vs. inflamed), sequence both, cluster and annotate
--   Compare **cell-type proportions** and test whether the shift is real
--   Tools: **scCODA**, **propeller**, **milo**, **tascCODA** (compositional methods handle the constrained-sum nature of proportions)
-
-# Part 5b — Pseudobulk analysis {background-color="#2c3e50"}
-
-## Why pseudobulk?
-
-::: incremental
--   Cells from the same sample are **not independent** replicates
--   Using cells as "n" inflates degrees of freedom and produces **anti-conservative p-values** in condition-level DE
--   Pseudobulk sidesteps this by aggregating first, testing on real biological samples
-:::
-
-## What pseudobulk does
-
-![](images/lec01_pseudobulk_concept.svg){fig-align="center" width="95%"}
-
--   **Aggregate** (sum) UMI counts per *(sample, cell type)* → a classic bulk-looking matrix
--   One row per gene, one column per (sample × cell type) replicate
--   Run a separate DE test **per cell type**
-
-## DESeq2 on pseudobulk in R
-
-``` r
-library(Seurat); library(DESeq2)
-
-# Aggregate counts per sample × cell type (requires Seurat v5)
-pb <- AggregateExpression(seu,
-                          assays = "RNA",
-                          group.by = c("sample_id", "celltype"),
-                          return.seurat = FALSE)$RNA
-
-# Build colData from the pseudobulk column names
-meta <- data.frame(
-  sample_id = sub("_.*", "", colnames(pb)),
-  celltype  = sub("^[^_]+_", "", colnames(pb))
-) |>
-  dplyr::left_join(sample_meta, by = "sample_id")   # condition, etc.
-
-# One DESeq2 run per cell type
-run_de <- function(ct) {
-  keep <- meta$celltype == ct
-  dds  <- DESeqDataSetFromMatrix(countData = pb[, keep],
-                                 colData   = meta[keep, ],
-                                 design    = ~ condition)
-  dds  <- DESeq(dds)
-  results(dds, contrast = c("condition", "treated", "control")) |>
-    as.data.frame() |> tibble::rownames_to_column("gene") |> dplyr::mutate(celltype = ct)
-}
-
-de_all <- purrr::map_dfr(unique(meta$celltype), run_de)
-```
-
-## DESeq2 on pseudobulk in Python
-
-``` python
-import decoupler as dc
-import pydeseq2.dds as dds_mod
-from pydeseq2.ds import DeseqStats
-
-# Aggregate per sample × cell type
-pdata = dc.get_pseudobulk(
-    adata, sample_col="sample_id", groups_col="celltype",
-    layer="counts", mode="sum", min_cells=10, min_counts=1000,
-)
-
-# Subset to one cell type at a time
-ct = "T_CD4"
-mask = pdata.obs["celltype"] == ct
-dds = dds_mod.DeseqDataSet(
-    counts = pdata.layers["counts"][mask].T,
-    metadata = pdata.obs[mask],
-    design_factors = "condition",
-)
-dds.deseq2()
-stats = DeseqStats(dds, contrast=["condition", "treated", "control"])
-stats.summary()
-```
-
-## Gotchas & good practice
-
-::: incremental
--   **Filter low-cell groups** — drop (sample × cell type) combos with few cells (e.g. `< 10`) before DE
--   **Include covariates** in the design (batch, sex, age) just like bulk RNA-seq
--   Prefer **shrinkage LFCs** (`lfcShrink()` in DESeq2, `apeglm` or `ashr`) for ranking
--   Use **BH / IHW** for multiple testing **within** each cell-type run, not across all results naïvely
-:::
-
-## When *not* to use pseudobulk
-
--   Questions about **within-cell-type heterogeneity** (subpopulations defined by a marker)
--   Samples with only one or two biological replicates per condition — no test will save you
--   Rare cell types with too few cells per sample to aggregate meaningfully
-
-# Part 6 — Beyond dissociated scRNA-seq {background-color="#2c3e50"}
-
-## The landscape is wider than scRNA-seq alone
-
-![](images/lec01_spatial_preview.svg){fig-align="center" width="95%"}
-
-## Why spatial matters
-
-::: incremental
--   **Dissociation discards tissue architecture.** scRNA-seq tells you *what* cells are present, not *where* they are
--   Spatial transcriptomics recovers tissue context at varying resolutions (spot → subcellular)
--   Same downstream concepts apply: QC, normalization, clustering, annotation — plus new ones (cell2location, neighborhood enrichment)
--   Often used in combination: scRNA-seq as a **reference** for deconvolving lower-resolution spatial data
-:::
-
-## Gene regulation — the layers single-cell can see
-
-![](images/lec01_use_gene_regulation_mechanisms.svg){fig-align="center" width="90%"}
-
-::: incremental
--   **Chromatin scaffolding** packages DNA into nucleosomes → scATAC-seq reads out accessible regions
--   **Chromatin remodeling** exposes DNA for transcription
--   **Histone modifications** (active / repressive marks) → single-cell CUT&Tag, CUT&RUN
--   **Transcription factor binding** at promoters / enhancers → accessibility + motif enrichment
--   **DNA methylation** — scBS-seq and derivatives
-:::
-
-## scATAC-seq — tool landscape
-
-![](images/lec01_use_atac_tools_comparison.svg){fig-align="center" width="95%"}
-
--   Python ecosystem: **Muon**, **snapATAC2**, **pyCisTopic** — tight coupling with AnnData / scverse
--   R ecosystem: **Signac** (Seurat-compatible), **ArchR** — strong visualization and motif tooling
--   Alternatives for specific tasks: **Amulet / scDblFinder** (doublets), **PeakVI / PoissonVAE** (dim-reduction), **sciGLUE** (RNA↔ATAC integration)
-
-# Part 7 — Takeaways {background-color="#2c3e50"}
-
-## What to remember
+## What to remember from Lecture 01
 
 ::: incremental
 -   scRNA-seq is the **same measurement at higher resolution** — count-based, but per cell
--   Sparsity + lack of cell-level independence change the statistics
--   The canonical pipeline: **QC → normalize → HVGs → PCA → integrate → cluster → annotate → downstream**
--   **Seurat** in R and **scanpy** in Python cover the same steps with different idioms — pick one, learn it well, be fluent enough to read the other
--   For condition-level DE, default to **pseudobulk**
+-   The chemistry (UMIs + cell barcodes + GEMs) is *what makes it possible* to recover per-cell counts after pooled sequencing
+-   The output is always the same shape: a **cell × gene** sparse matrix with metadata
+-   Sparsity + cell-level non-independence change the statistics — that's the next five lectures
 :::
+
+## Coming up next
+
+-   **Lec 02** — [Pre-processing](Lecture_02_Preprocessing.html): QC, ambient RNA, doublets, normalization, HVGs
+-   **Hands-on:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
 
 ## Further reading
 
--   Heumos *et al.* 2023, *Nature Reviews Genetics* — "Best practices for single-cell analysis across modalities"
--   Luecken & Theis 2019, *Molecular Systems Biology* — "Current best practices in single-cell RNA-seq analysis"
--   Amezquita *et al.* 2020 — [Orchestrating Single-Cell Analysis with Bioconductor (OSCA)](https://bioconductor.org/books/release/OSCA/)
--   [Seurat tutorials](https://satijalab.org/seurat/) · [Scanpy tutorials](https://scanpy.readthedocs.io/) · [sc-best-practices book](https://www.sc-best-practices.org/)
+-   [sc-best-practices](https://www.sc-best-practices.org/) — Heumos *et al.* (the workshop's primary external reference)
+-   [10x Genomics Chromium overview](https://www.10xgenomics.com/instruments/chromium-x-series)
+-   [Workshop Glossary](../Resources_Folder/Glossary.html)

@@ -1,0 +1,127 @@
+---
+title: "Compute Environments"
+---
+
+This page documents the reproducible environments for the workshop. Use them when you want to skip the install dance entirely (Docker / Apptainer), pin exact package versions (`renv`), or work on Talapas (`module load + apptainer run`).
+
+## Why bother?
+
+If you ever want to:
+
+-   Reproduce a tutorial output exactly six months from now.
+-   Get the same Seurat version a co-author was running.
+-   Avoid two days of `BiocManager::install()` debugging on Talapas.
+
+…you need a pinned environment. The two layers below cover most cases.
+
+## Layer 1 --- `renv` lockfile (R level)
+
+`renv` records the exact version of every R package used in a project. The workshop ships an `renv.lock` at the repository root.
+
+### First-time setup
+
+In a fresh clone:
+
+``` r
+install.packages("renv")
+renv::restore()       # reads renv.lock and installs the pinned versions
+```
+
+That's it --- subsequent R sessions in the project will use the pinned library automatically.
+
+### Updating the lockfile (instructors)
+
+After upgrading a package:
+
+``` r
+renv::snapshot()      # rewrite renv.lock from the currently loaded versions
+```
+
+Commit `renv.lock` (and only the lockfile, not the entire `renv/library/` cache).
+
+## Layer 2 --- Docker / Apptainer image
+
+For a fully self-contained environment (R + Bioconductor + system dependencies + the dataset paths), use the workshop image.
+
+### Docker (laptop)
+
+``` bash
+# pull the workshop image
+docker pull ghcr.io/wcresko/scrnaseq_tutorial:latest
+
+# run RStudio Server, mounting your data folder
+docker run --rm -p 8787:8787 \
+  -e PASSWORD=workshop \
+  -v "$PWD/data:/home/rstudio/data" \
+  -v "$PWD:/home/rstudio/scrnaseq_workshop" \
+  ghcr.io/wcresko/scrnaseq_tutorial:latest
+```
+
+Then open <http://localhost:8787> in a browser and log in as `rstudio` / `workshop`.
+
+### Apptainer (Talapas)
+
+Talapas does not run Docker, but it does run [Apptainer](https://apptainer.org/) (formerly Singularity). Convert and run the same image with:
+
+``` bash
+# on a Talapas login node, request an interactive node first
+srun --account=<myPIRG> --partition=interactive --time=2:00:00 \
+     --mem=16G --pty bash
+
+# pull the image (one-time)
+module load apptainer
+apptainer pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest
+
+# run an interactive R session inside the container
+apptainer exec scrnaseq_tutorial_latest.sif R
+```
+
+For batch jobs, the relevant `sbatch` line becomes:
+
+``` bash
+apptainer exec /path/to/scrnaseq_tutorial_latest.sif Rscript scripts/01_qc_preprocess.R
+```
+
+::: callout-note
+The image is rebuilt nightly from the project's `Dockerfile` against the latest Bioconductor release; check the [GitHub releases](https://github.com/wcresko/scrnaseq_tutorial/releases) page for the SHA of the version used in any given workshop session.
+:::
+
+## Layer 3 --- Talapas modules (no container)
+
+If you'd rather use Talapas's centrally installed software, the modules used by the workshop are:
+
+``` bash
+module purge
+module load R/4.4.1            # matches the workshop's renv.lock R version
+module load gcc/13.2.0         # for source builds
+module load hdf5/1.14.2        # for HDF5 files (rare, but used in some Bioconductor pkgs)
+module load apptainer          # only if you'll use the container layer
+```
+
+Add these to your `~/.bash_profile` or load them in every job script. For a per-user R library that survives upgrades:
+
+``` bash
+mkdir -p $HOME/Rlibs
+echo 'R_LIBS_USER=$HOME/Rlibs' >> $HOME/.Renviron
+```
+
+Then `install.packages()` and `BiocManager::install()` will write into `$HOME/Rlibs` instead of the system library.
+
+## Files in the repository
+
+| File | Purpose |
+|---|---|
+| `renv.lock` | Layer 1 --- pinned R-package versions |
+| `Dockerfile` | Layer 2 --- recipe for the workshop image |
+| `.github/workflows/build-image.yml` | CI that rebuilds the image on a schedule |
+| `Resources_Folder/Appendix_F_HPC_Talapas.html` | Layer 3 --- broader Talapas reference |
+
+## What if I just want one of these?
+
+| Goal | Use |
+|---|---|
+| "Match the slides exactly on my laptop" | `renv::restore()` (Layer 1) |
+| "Skip installing anything" | Docker image (Layer 2) |
+| "Run the tutorials on Talapas" | Apptainer + `renv::restore()` (Layers 2 + 1) or `module load` (Layer 3) |
+
+If something doesn't work, the [FAQ](FAQ.qmd) covers the common pitfalls.

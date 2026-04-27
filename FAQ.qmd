@@ -1,0 +1,156 @@
+---
+title: "FAQ --- Common Workshop Issues"
+---
+
+The questions that come up every workshop. If yours isn't here, ask on the workshop's chat channel (see [About](about.qmd)) and we'll add it.
+
+## Setup & installs
+
+### `BiocManager::install()` is taking forever / hanging on a single package
+
+The most common cause is a slow Bioconductor mirror. Pick a closer one:
+
+``` r
+chooseBioCmirror()        # interactive; pick a US mirror if you're in the US
+options(BioC_mirror = "https://bioconductor.org")
+```
+
+Then re-run `BiocManager::install()`.
+
+### Mac: "compilation failed" / clang errors during install
+
+You're missing the Xcode command-line tools. In a terminal:
+
+``` bash
+xcode-select --install
+```
+
+Re-launch RStudio after it finishes. If you also see `gfortran not found`, install [gfortran for macOS](https://mac.r-project.org/tools/) and retry.
+
+### Windows / WSL: R can't see the project files
+
+Don't keep your project on the Windows side (`/mnt/c/Users/...`) and run R from WSL --- file I/O is dramatically slower and case-sensitivity differs. Either:
+
+-   Run R + RStudio **inside** WSL (recommended for advanced users), with the project under `~/`, or
+-   Run **RStudio for Windows** with the project on the Windows side.
+
+Pick one and stick with it.
+
+### "RStudio can't find my newly installed packages"
+
+Almost always a stale R session. Restart R: *Session → Restart R* (or `Ctrl/Cmd + Shift + F10`). If a package was installed from a different R version, run:
+
+``` r
+.libPaths()                       # which library is being used?
+installed.packages()[, "Package"] # what's actually installed there?
+```
+
+If the version doesn't match, point RStudio at the correct R install: *Tools → Global Options → General → R version*.
+
+### `Seurat` install fails with a Matrix / SeuratObject version mismatch
+
+Reinstall the trio together, in this order:
+
+``` r
+install.packages(c("Matrix", "SeuratObject", "Seurat"))
+```
+
+Then restart R.
+
+## Datasets
+
+### `Read10X()` says "Barcode file missing" or "matrix file missing"
+
+You almost certainly pointed at the wrong directory. The argument should be the **folder** containing `barcodes.tsv.gz`, `features.tsv.gz`, and `matrix.mtx.gz`, **not** any of those files. Run:
+
+``` r
+list.files("data/filtered_feature_bc_matrix")
+```
+
+You should see exactly those three filenames.
+
+### Tutorial says `../data/...` but my data is in `data/`
+
+The tutorials assume each `.qmd` lives one level deep (e.g. `tutorials/Tutorial_01.qmd`) so `../data/` resolves to a sibling `data/`. If you're running from the repo root, change the paths to `data/...` --- or move the tutorial into a subfolder.
+
+### Download from 10x stalls or errors out
+
+10x Genomics requires a click-through accept on each public dataset. Open the landing page in a browser, click *Download*, accept terms, and use the resulting URL. See [Datasets](Datasets.qmd).
+
+## Running the analysis
+
+### My UMAP doesn't match the slide / handout exactly
+
+Expected. UMAP and clustering both depend on a random seed. The cluster identities and overall topology should match; rotation/reflection of the embedding will not. To reproduce exactly, set:
+
+``` r
+set.seed(2026)
+seu <- RunUMAP(seu, dims = 1:30, seed.use = 2026)
+seu <- FindClusters(seu, random.seed = 2026)
+```
+
+### `FindMarkers` is slow
+
+Install [`presto`](https://github.com/immunogenomics/presto) (it's in the install script). Seurat will detect it automatically and use a much faster Wilcoxon implementation.
+
+### I get warnings about future / parallelization
+
+Most are safe to ignore. To silence and pick a sensible default, add at the top of your script:
+
+``` r
+options(future.globals.maxSize = 8 * 1024^3)   # 8 GB
+future::plan("multicore", workers = 4)         # or "multisession" on Windows
+```
+
+### "Cannot allocate vector of size XX Gb"
+
+You've run out of RAM. Options, in increasing order of effort:
+
+1.  Restart R and only load the objects you need.
+2.  Subset cells (`subset(seu, downsample = 5000)` for an exploration session).
+3.  Use sparse-matrix operations (`Seurat` does by default; check that you haven't accidentally turned the assay into a dense matrix).
+4.  Move to Talapas: a `--mem=64G` interactive job is plenty for most tutorials.
+
+## Talapas / HPC
+
+### "Permission denied (publickey, password)"
+
+You either typed the password wrong, or your account isn't active yet. Reset at [https://duckid.uoregon.edu/](https://duckid.uoregon.edu/) and verify you can log in to a UO web service first. Email RACS if it persists.
+
+### Duo prompt never arrives
+
+Make sure the Duo Mobile app is open and your phone has data/Wi-Fi. If pushes don't work, type `2` instead of `1` at the Duo prompt to get a phone-call code, or `3` for a passcode.
+
+### `srun` says "Invalid account or account/partition combination"
+
+You forgot `--account=<myPIRG>` or your `SLURM_ACCOUNT` env-var isn't set. See the [SLURM Basics tutorial](Exercise_Folder/Tutorial_SLURM_Basics.html) §2.
+
+### My job is `PD` (pending) forever
+
+Run `squeue -j <jobid> --start` --- the *REASON* column tells you why. Common ones:
+
+-   `Resources` --- you asked for more than the cluster currently has free; let earlier jobs drain.
+-   `Priority` --- normal queueing; you'll run when it's your turn.
+-   `ReqNodeNotAvail, Reserved for maintenance` --- your wall time runs into a maintenance window. Shorten `--time` or add `--time-min`.
+
+### `scratch/` looks empty after a few months
+
+`/scratch/<PIRG>/` purges files not accessed in **90 days**. Move important outputs to `/projects/<PIRG>/` or to LSRS for long-term storage. RACS does not back up Talapas.
+
+## Workshop logistics
+
+### Where do I download the tutorials?
+
+[Exercises](Exercises.qmd) page → *Download* column. Each link is a raw `.qmd` file you open in RStudio.
+
+### Can I work in Python / `scanpy` instead of R / Seurat?
+
+Yes --- the lectures are framework-agnostic, and most tutorials include a Python equivalent in a `panel-tabset` block. The graded tutorials assume Seurat by default, but if you submit a working `scanpy` notebook that produces equivalent output, that's fine.
+
+### I don't have a Talapas account --- can I still attend?
+
+Yes. Everything except the **SLURM Basics** tutorial runs on a laptop. Talapas is recommended for the integration / large-dataset stretch goals but isn't required.
+
+### Are recordings available?
+
+See [About](about.qmd) for the recording policy and link.
