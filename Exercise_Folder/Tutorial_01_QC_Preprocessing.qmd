@@ -37,18 +37,27 @@ The rendered HTML shows the code but does **not** execute it (chunks default to 
 
 **What it is.** Twenty-thousand dissociated tumor cells (DTCs) pooled from **seven non-small-cell lung cancer (NSCLC) donors**, run on the 10x Chromium **3' v3.1** assay with **CellPlex multiplexing** (CMO hashing) so that every cell carries both a gene-expression profile and a sample-of-origin barcode.
 
--   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
+-   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
 -   Reference genome: GRCh38 (human)
 -   Chemistry: 10x Chromium Single Cell 3' v3.1 (dual index, Next GEM), CellPlex multiplexing
 -   Cell count (target recovery): \~20,000 post-filter cells across 7 donors
 
-### Files used in this tutorial
+### File used in this tutorial
 
 | File | Size (approx.) | What it is |
 |---|---|---|
-| `20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5` | \~1.5 GB | HDF5 sparse matrix of **raw** UMI counts: `features × barcodes`. Contains both `Gene Expression` and `Multiplexing Capture` assays in one file. |
+| `20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz` | \~250 MB | Bundle of three files (`barcodes.tsv.gz`, `features.tsv.gz`, `matrix.mtx.gz`). UMI counts for cells that passed Cell Ranger's EmptyDrops-style filter. Contains both `Gene Expression` and `Multiplexing Capture` features. |
 
-Download from the 10x landing page (the file sits under *Output and supplemental files → Feature / cell matrix HDF5 (raw)*), then place it at `../data/`. This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R).
+This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R) — but we use the smaller **filtered** matrix instead of the 1.5 GB raw matrix because Cell Ranger has already trimmed the empty-droplet barcodes for you.
+
+::: {.callout-warning title="10x downloads are gated — read this before you `wget`"}
+The 10x CDN serves files at `https://cf.10xgenomics.com/...`, but a direct `wget`/`curl` from a fresh machine returns **HTTP 403** until you've accepted 10x's terms-of-use click-through at least once. To unlock the URL:
+
+1.  Open the [landing page](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0) in a regular web browser.
+2.  Scroll to the **Output and supplemental files** section and click **Download** on the row labelled *Feature / cell matrix (filtered)* — the `.tar.gz`.
+3.  Accept the *Sign in or share data with us* / TOS pop-up. Save the file (or cancel — you only need to trigger the accept).
+4.  After that one accept, the same `cf.10xgenomics.com` URL works in `wget` / `curl` from the same network for the rest of the session — copy the URL from your browser's downloads list and reuse it from the terminal / on a remote machine.
+:::
 
 #### Direct download with `wget` or `curl`
 
@@ -56,37 +65,45 @@ With `wget`:
 
 ```bash
 mkdir -p ../data && cd ../data
-wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
+
+wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+
+tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+ls filtered_feature_bc_matrix/
+# barcodes.tsv.gz  features.tsv.gz  matrix.mtx.gz
 ```
 
 With `curl`:
 
 ```bash
 mkdir -p ../data && cd ../data
-curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
+
+curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+
+tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
 ```
 
 ::: callout-tip
-The filtered feature/cell matrix (smaller, \~250 MB compressed) is also available — swap `raw_feature_bc_matrix.h5` for `filtered_feature_bc_matrix.tar.gz` in the URL above. Filtered means Cell Ranger has already applied an EmptyDrops-style cut at the knee of the barcode-rank curve.
+If `wget`/`curl` returns **403**, you haven't done the browser click-through yet (see warning above). The full **raw** matrix (`raw_feature_bc_matrix.h5`, \~1.5 GB) is also available on the landing page if you want to practice running EmptyDrops yourself — just swap `filtered_feature_bc_matrix.tar.gz` for `raw_feature_bc_matrix.h5` in the URL.
 :::
 
-### Data dictionary — `Read10X_h5()` return value
+### Data dictionary — `Read10X()` return value
 
-`Read10X_h5()` on this multiplex file returns a **named list** of sparse matrices (one per assay). Each sparse matrix has:
+`Read10X()` on this multi-feature directory returns a **named list** of sparse matrices (one per feature type). Each sparse matrix has:
 
 | Slot | Type | Description |
 |---|---|---|
-| `dimnames[[1]]` (rows) | character | Gene **symbols** (e.g. `MT-ND1`, `CD3D`, `KRT8`). Feature-level metadata (Ensembl IDs, biotype) lives in `features/` inside the HDF5 and is not returned by `Read10X_h5()`. |
+| `dimnames[[1]]` (rows) | character | Gene **symbols** (e.g. `MT-ND1`, `CD3D`, `KRT8`). |
 | `dimnames[[2]]` (cols) | character | 16-bp 10x **cell barcodes** (e.g. `AAACCTGAGAAACCAT-1`). The `-1` suffix is the GEM-well index. |
-| values | integer | **UMI counts** — the number of unique transcript molecules observed for that (gene, cell) pair. Raw counts, no normalization. |
+| values | integer | **UMI counts** — number of unique transcript molecules observed for that (gene, cell) pair. |
 
 | Named slot in the returned list | Matrix shape | Meaning |
 |---|---|---|
-| `$\`Gene Expression\`` | \~36,600 genes × \~725,000 barcodes | The gene-expression counts. This is what the tutorial uses. |
-| `$\`Multiplexing Capture\`` | \~12 CMOs × \~725,000 barcodes | Per-barcode CellPlex hashtag counts, used to demultiplex donors. Not used in this tutorial. |
+| `$\`Gene Expression\`` | \~36,600 genes × \~42,000 barcodes | The gene-expression counts. **This is what the tutorial uses.** |
+| `$\`Multiplexing Capture\`` | \~12 CMOs × \~42,000 barcodes | Per-barcode CellPlex hashtag counts, used to demultiplex donors. Not used here. |
 
 ::: callout-note
-The matrix is **raw** (all barcodes, including empty droplets). `min.cells = 3` and `min.features = 200` in `CreateSeuratObject()` apply the first-pass filters.
+The matrix is already **filtered** (Cell Ranger has dropped empty-droplet barcodes). The `min.cells = 3` and `min.features = 200` arguments below are still useful — they apply per-feature and per-cell sanity filters on top, removing very-low-information genes and any borderline cells that survived Cell Ranger's filter.
 :::
 
 ## Learning goals
@@ -111,31 +128,45 @@ set.seed(2026)
 
 ------------------------------------------------------------------------
 
-## Step 1 — Read the 10x `.h5`
+## Step 1 — Read the 10x filtered matrix
 
 ```{r}
 #| label: load
 
-nsclc.sparse.m <- Read10X_h5(filename = "../data/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5")
+# After untarring, ../data/filtered_feature_bc_matrix/ contains
+#   barcodes.tsv.gz, features.tsv.gz, matrix.mtx.gz
+nsclc.sparse.m <- Read10X(data.dir = "../data/filtered_feature_bc_matrix/")
 
-# 10x multi-modal h5 files return a list; keep the Gene Expression slice
+# 10x multi-feature outputs return a NAMED LIST — keep the Gene Expression slice
 str(nsclc.sparse.m)
 cts <- nsclc.sparse.m$`Gene Expression`
 dim(cts)
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  Why does `Read10X_h5` sometimes return a **list** instead of a matrix?
+1.  Why does `Read10X` sometimes return a **list** instead of a matrix?
 2.  What does each dimension of `cts` represent?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  10x Multiplex / CellPlex / CITE-seq / multiome runs produce multiple measurement types in one file (e.g. `Gene Expression`, `Antibody Capture`, `Peaks`). The reader returns a named list so you can pull the slice you want.
+1.  10x Multiplex / CellPlex / CITE-seq / multiome runs produce multiple measurement types in one Cell Ranger output (e.g. `Gene Expression`, `Antibody Capture`, `Peaks`, `Multiplexing Capture`). The reader returns a named list so you can pull the slice you want.
 2.  Rows = genes (features), columns = cell barcodes. `dim(cts)[1]` is the gene count, `dim(cts)[2]` is the cell count.
 
 </details>
+:::
+
+::: callout-tip
+**Equivalent for the HDF5 input.** If you downloaded the `.h5` (raw or filtered) instead of the `.tar.gz`, swap the loader:
+
+```r
+nsclc.sparse.m <- Read10X_h5(
+  filename = "../data/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.h5"
+)
+```
+
+Same return shape — a named list keyed by feature type.
 :::
 
 ## Step 2 — Create the Seurat object
@@ -341,6 +372,6 @@ The saved `.rds` is the starting point for **Tutorial 02 — Dimensionality redu
 
 ## Credits
 
--   Dataset: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
+-   Dataset: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
 -   Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow
 -   Reference: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)

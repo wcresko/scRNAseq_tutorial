@@ -14,36 +14,56 @@ scrnaseq_workshop/
 │   ├── Tutorial_01_QC_Preprocessing.qmd
 │   └── ...
 └── data/
-    ├── 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5   # scRNA (Tut 01-05)
-    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5                          # scATAC (Tut 06)
-    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)                           # scATAC (Tut 06)
-    ├── atac_v1_pbmc_10k_singlecell.csv                                      # scATAC (Tut 06)
-    └── GSE152418_p20047_Study1_RawCounts.txt                                # WGCNA (Tut 07)
+    ├── filtered_feature_bc_matrix/                # scRNA (Tut 01-05)
+    │   ├── barcodes.tsv.gz
+    │   ├── features.tsv.gz
+    │   └── matrix.mtx.gz
+    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5  # scATAC (Tut 06)
+    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 06)
+    ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 06)
+    └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 07)
 ```
 
 If your layout differs, adjust the file paths inside each tutorial.
+
+## Getting through 10x Genomics' click-through TOS
+
+The 10x CDN at `cf.10xgenomics.com` serves dataset files **but returns HTTP 403** to a fresh `wget`/`curl` until you've accepted 10x's terms-of-use click-through at least once from a browser on the same network.
+
+The first time you hit any 10x dataset, do this:
+
+1.  Open the dataset's landing page in a normal web browser (links below).
+2.  Scroll to the **Output and supplemental files** section. Click **Download** on any file you want.
+3.  10x will pop up a *Sign in or share data with us* dialog — accept it. The download starts.
+4.  You can cancel that download — the click-through has unlocked the CDN for your session. Now `wget`/`curl` against the same URL works from your terminal, including over SSH from a cluster login node (the gating is per network / IP, not per browser).
+
+If you're operating from a fresh cluster account where no browser is available, the easiest workaround is to download once on your laptop, then `scp` or `rsync` the file to the cluster.
+
+::: callout-tip
+**Verification.** A working URL responds with `200 OK` and a content-length matching the file size. A blocked URL responds with `403` and a tiny body (\~21 bytes). Use `curl -sI <url>` to check.
+:::
 
 ## Tutorials 01–05 — 20k NSCLC DTC (10x 3' v3.1 Multiplex)
 
 **What it is.** Twenty-thousand dissociated tumor cells (DTCs) pooled from **seven non-small-cell lung cancer (NSCLC) donors**, run on the 10x Chromium **3' v3.1** assay with **CellPlex multiplexing** (CMO hashing). Every cell carries a gene-expression profile *and* a sample-of-origin barcode --- so downstream you get both heterogeneity and donor-level structure to integrate.
 
-This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R).
+This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R) — but we use the smaller **filtered** matrix (\~250 MB) instead of the 1.5 GB raw matrix because Cell Ranger has already trimmed empty-droplet barcodes for you.
 
--   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
+-   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0) (do the click-through here first — see section above)
 -   Used in: Tutorials 01–05
 
-### Download
+### Download — filtered matrix (default, \~250 MB)
 
 With `wget`:
 
 ```bash
 mkdir -p data && cd data
 
-wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
-
-# Optionally also pull the smaller pre-filtered counts
 wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+
 tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+ls filtered_feature_bc_matrix/
+# barcodes.tsv.gz  features.tsv.gz  matrix.mtx.gz
 ```
 
 With `curl`:
@@ -51,11 +71,18 @@ With `curl`:
 ```bash
 mkdir -p data && cd data
 
-curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
-
 curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+
 tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
 ```
+
+::: callout-tip
+**Optional — raw matrix (\~1.5 GB).** If you want to practice running EmptyDrops yourself, also pull the raw HDF5:
+
+```bash
+wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
+```
+:::
 
 ## Tutorial 04 Primer — `airway` (Bioconductor)
 
@@ -73,7 +100,7 @@ library(airway); data(airway)
 
 Used for the scATAC-seq tutorial. **Same dataset as Patel's** [`scATACSeq_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R) and the [Signac PBMC vignette](https://stuartlab.org/signac/articles/pbmc_vignette).
 
--   Landing page: [10x Genomics — PBMC 10k scATAC-seq v1 (hg19)](https://www.10xgenomics.com/resources/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0)
+-   Landing page: [10x Genomics — PBMC 10k scATAC-seq v1 (hg19)](https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0) (do the [click-through](#getting-through-10x-genomics-click-through-tos) here first if you haven't already)
 
 With `wget`:
 
@@ -144,17 +171,21 @@ These are loaded automatically by the relevant R packages on first use --- you d
 
 | Dataset | Compressed | Extracted |
 |---|---|---|
-| 20k NSCLC DTC (filtered counts) | \~250 MB | \~700 MB |
-| 20k NSCLC DTC (raw `.h5`) | \~1.5 GB | \~1.5 GB (single file) |
+| 20k NSCLC DTC (filtered, default) | \~250 MB | \~700 MB |
+| 20k NSCLC DTC (raw `.h5`, optional) | \~1.5 GB | \~1.5 GB (single file) |
 | `airway` | \~3 MB | (loaded in-package) |
 | PBMC 10k scATAC-seq | \~2.5 GB | \~5 GB |
 | GSE152418 raw counts | \~7 MB | \~80 MB |
 | Reference data (cached) | --- | \~500 MB |
 
-Plan for **\~6–8 GB total** if you're doing the full series.
+Plan for **\~3–4 GB total** if you stick to the filtered NSCLC matrix; **\~6–8 GB total** if you also pull the raw NSCLC `.h5`.
 
-## "I can't download from 10x"
+## "I still can't download from 10x"
 
-10x Genomics public datasets are free but require accepting a terms-of-use click-through. If `curl` / `wget` fails with HTTP 403, open the landing-page link in a browser, click *Download*, accept the terms, and the same URL will work afterward.
+If `curl` / `wget` returns HTTP 403 even after the click-through, the most common causes are:
+
+-   You're on a different network than the one where you accepted the click-through (the gating is per IP / network).
+-   You're trying to pull a file from the *wrong* dataset variant — there are two NSCLC datasets with similar names; make sure your URL slug contains `multiplex-3-1-standard-6-0-0` and not `with-intronic-reads`.
+-   Your URL has a typo. Double-check by `curl -sI <url>`: a real file responds with `200` and a `content-length` matching GB-sized data; a typo'd URL responds with `403` and a 21-byte body.
 
 If you're behind a restrictive network, all of the files above are also mirrored on the workshop's Talapas project directory `/projects/<PIRG>/scrnaseq_workshop/data/` once your account is set up --- copy from there with `scp` or work directly on the cluster.
