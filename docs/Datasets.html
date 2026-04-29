@@ -4089,16 +4089,17 @@ vertical-align: -.125em;
    
   <ul>
   <li><a href="#expected-directory-layout" id="toc-expected-directory-layout" class="nav-link active" data-scroll-target="#expected-directory-layout">Expected directory layout</a></li>
+  <li><a href="#getting-through-10x-genomics-click-through-tos" id="toc-getting-through-10x-genomics-click-through-tos" class="nav-link" data-scroll-target="#getting-through-10x-genomics-click-through-tos">Getting through 10x Genomics’ click-through TOS</a></li>
   <li><a href="#tutorials-0105-20k-nsclc-dtc-10x-3-v3.1-multiplex" id="toc-tutorials-0105-20k-nsclc-dtc-10x-3-v3.1-multiplex" class="nav-link" data-scroll-target="#tutorials-0105-20k-nsclc-dtc-10x-3-v3.1-multiplex">Tutorials 01–05 — 20k NSCLC DTC (10x 3’ v3.1 Multiplex)</a>
   <ul class="collapse">
-  <li><a href="#download" id="toc-download" class="nav-link" data-scroll-target="#download">Download</a></li>
+  <li><a href="#download-filtered-matrix-default-250-mb" id="toc-download-filtered-matrix-default-250-mb" class="nav-link" data-scroll-target="#download-filtered-matrix-default-250-mb">Download — filtered matrix (default, ~250 MB)</a></li>
   </ul></li>
   <li><a href="#tutorial-04-primer-airway-bioconductor" id="toc-tutorial-04-primer-airway-bioconductor" class="nav-link" data-scroll-target="#tutorial-04-primer-airway-bioconductor">Tutorial 04 Primer — <code>airway</code> (Bioconductor)</a></li>
   <li><a href="#tutorial-06-pbmc-10k-scatac-seq-v1-10x-hg19" id="toc-tutorial-06-pbmc-10k-scatac-seq-v1-10x-hg19" class="nav-link" data-scroll-target="#tutorial-06-pbmc-10k-scatac-seq-v1-10x-hg19">Tutorial 06 — PBMC 10k scATAC-seq v1 (10x, hg19)</a></li>
   <li><a href="#tutorial-07-gse152418-covid-19-pbmc-bulk-rna-seq" id="toc-tutorial-07-gse152418-covid-19-pbmc-bulk-rna-seq" class="nav-link" data-scroll-target="#tutorial-07-gse152418-covid-19-pbmc-bulk-rna-seq">Tutorial 07 — GSE152418 (COVID-19 PBMC bulk RNA-seq)</a></li>
   <li><a href="#reference-annotation-datasets-no-manual-download" id="toc-reference-annotation-datasets-no-manual-download" class="nav-link" data-scroll-target="#reference-annotation-datasets-no-manual-download">Reference / annotation datasets (no manual download)</a></li>
   <li><a href="#disk-space-budget" id="toc-disk-space-budget" class="nav-link" data-scroll-target="#disk-space-budget">Disk-space budget</a></li>
-  <li><a href="#i-cant-download-from-10x" id="toc-i-cant-download-from-10x" class="nav-link" data-scroll-target="#i-cant-download-from-10x">“I can’t download from 10x”</a></li>
+  <li><a href="#i-still-cant-download-from-10x" id="toc-i-still-cant-download-from-10x" class="nav-link" data-scroll-target="#i-still-cant-download-from-10x">“I still can’t download from 10x”</a></li>
   </ul>
 </nav>
 </nav>
@@ -4138,38 +4139,79 @@ vertical-align: -.125em;
 │   ├── Tutorial_01_QC_Preprocessing.qmd
 │   └── ...
 └── data/
-    ├── 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5   # scRNA (Tut 01-05)
-    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5                          # scATAC (Tut 06)
-    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)                           # scATAC (Tut 06)
-    ├── atac_v1_pbmc_10k_singlecell.csv                                      # scATAC (Tut 06)
-    └── GSE152418_p20047_Study1_RawCounts.txt                                # WGCNA (Tut 07)</code></pre>
+    ├── filtered_feature_bc_matrix/                # scRNA (Tut 01-05)
+    │   ├── barcodes.tsv.gz
+    │   ├── features.tsv.gz
+    │   └── matrix.mtx.gz
+    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5  # scATAC (Tut 06)
+    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 06)
+    ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 06)
+    └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 07)</code></pre>
 <p>If your layout differs, adjust the file paths inside each tutorial.</p>
+</section>
+<section id="getting-through-10x-genomics-click-through-tos" class="level2">
+<h2 class="anchored" data-anchor-id="getting-through-10x-genomics-click-through-tos">Getting through 10x Genomics’ click-through TOS</h2>
+<p>The 10x CDN at <code>cf.10xgenomics.com</code> serves dataset files <strong>but returns HTTP 403</strong> to a fresh <code>wget</code>/<code>curl</code> until you’ve accepted 10x’s terms-of-use click-through at least once from a browser on the same network.</p>
+<p>The first time you hit any 10x dataset, do this:</p>
+<ol type="1">
+<li>Open the dataset’s landing page in a normal web browser (links below).</li>
+<li>Scroll to the <strong>Output and supplemental files</strong> section. Click <strong>Download</strong> on any file you want.</li>
+<li>10x will pop up a <em>Sign in or share data with us</em> dialog — accept it. The download starts.</li>
+<li>You can cancel that download — the click-through has unlocked the CDN for your session. Now <code>wget</code>/<code>curl</code> against the same URL works from your terminal, including over SSH from a cluster login node (the gating is per network / IP, not per browser).</li>
+</ol>
+<p>If you’re operating from a fresh cluster account where no browser is available, the easiest workaround is to download once on your laptop, then <code>scp</code> or <code>rsync</code> the file to the cluster.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Verification.</strong> A working URL responds with <code>200 OK</code> and a content-length matching the file size. A blocked URL responds with <code>403</code> and a tiny body (~21 bytes). Use <code>curl -sI &lt;url&gt;</code> to check.</p>
+</div>
+</div>
 </section>
 <section id="tutorials-0105-20k-nsclc-dtc-10x-3-v3.1-multiplex" class="level2">
 <h2 class="anchored" data-anchor-id="tutorials-0105-20k-nsclc-dtc-10x-3-v3.1-multiplex">Tutorials 01–05 — 20k NSCLC DTC (10x 3’ v3.1 Multiplex)</h2>
 <p><strong>What it is.</strong> Twenty-thousand dissociated tumor cells (DTCs) pooled from <strong>seven non-small-cell lung cancer (NSCLC) donors</strong>, run on the 10x Chromium <strong>3’ v3.1</strong> assay with <strong>CellPlex multiplexing</strong> (CMO hashing). Every cell carries a gene-expression profile <em>and</em> a sample-of-origin barcode — so downstream you get both heterogeneity and donor-level structure to integrate.</p>
-<p>This is the <strong>same dataset Patel uses</strong> in <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R"><code>singleCell_standard_workflow.R</code></a>.</p>
+<p>This is the <strong>same dataset Patel uses</strong> in <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R"><code>singleCell_standard_workflow.R</code></a> — but we use the smaller <strong>filtered</strong> matrix (~250 MB) instead of the 1.5 GB raw matrix because Cell Ranger has already trimmed empty-droplet barcodes for you.</p>
 <ul>
-<li>Landing page: <a href="https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0">10x Genomics — 20k NSCLC DTC, 3’ v3.1 Multiplex</a></li>
+<li>Landing page: <a href="https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0">10x Genomics — 20k NSCLC DTC, 3’ v3.1 Multiplex</a> (do the click-through here first — see section above)</li>
 <li>Used in: Tutorials 01–05</li>
 </ul>
-<section id="download" class="level3">
-<h3 class="anchored" data-anchor-id="download">Download</h3>
+<section id="download-filtered-matrix-default-250-mb" class="level3">
+<h3 class="anchored" data-anchor-id="download-filtered-matrix-default-250-mb">Download — filtered matrix (default, ~250 MB)</h3>
 <p>With <code>wget</code>:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> data</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Optionally also pull the smaller pre-filtered counts</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> filtered_feature_bc_matrix/</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># barcodes.tsv.gz  features.tsv.gz  matrix.mtx.gz</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>With <code>curl</code>:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> data</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">tar</span> <span class="at">-xzf</span> 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Optional — raw matrix (~1.5 GB).</strong> If you want to practice running EmptyDrops yourself, also pull the raw HDF5:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
 </section>
 </section>
 <section id="tutorial-04-primer-airway-bioconductor" class="level2">
@@ -4179,29 +4221,29 @@ vertical-align: -.125em;
 <li>Bioconductor landing page: <a href="https://bioconductor.org/packages/airway/" class="uri">https://bioconductor.org/packages/airway/</a></li>
 <li>No manual download — the package ships with the data:</li>
 </ul>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>BiocManager<span class="sc">::</span><span class="fu">install</span>(<span class="st">&quot;airway&quot;</span>)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(airway); <span class="fu">data</span>(airway)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>BiocManager<span class="sc">::</span><span class="fu">install</span>(<span class="st">&quot;airway&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(airway); <span class="fu">data</span>(airway)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="tutorial-06-pbmc-10k-scatac-seq-v1-10x-hg19" class="level2">
 <h2 class="anchored" data-anchor-id="tutorial-06-pbmc-10k-scatac-seq-v1-10x-hg19">Tutorial 06 — PBMC 10k scATAC-seq v1 (10x, hg19)</h2>
 <p>Used for the scATAC-seq tutorial. <strong>Same dataset as Patel’s</strong> <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R"><code>scATACSeq_standard_workflow.R</code></a> and the <a href="https://stuartlab.org/signac/articles/pbmc_vignette">Signac PBMC vignette</a>.</p>
 <ul>
-<li>Landing page: <a href="https://www.10xgenomics.com/resources/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0">10x Genomics — PBMC 10k scATAC-seq v1 (hg19)</a></li>
+<li>Landing page: <a href="https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0">10x Genomics — PBMC 10k scATAC-seq v1 (hg19)</a> (do the <a href="#getting-through-10x-genomics-click-through-tos">click-through</a> here first if you haven’t already)</li>
 </ul>
 <p>With <code>wget</code>:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> data</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>With <code>curl</code>:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> data</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>With <code>curl</code>:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> data</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -4223,16 +4265,16 @@ Warning
 <li>GEO landing page: <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418" class="uri">https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418</a></li>
 </ul>
 <p>With <code>wget</code>:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> data</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">gunzip</span> GSE152418_p20047_Study1_RawCounts.txt.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>With <code>curl</code>:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> data</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">gunzip</span> GSE152418_p20047_Study1_RawCounts.txt.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>With <code>curl</code>:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> data</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="fu">gunzip</span> GSE152418_p20047_Study1_RawCounts.txt.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <p>From R via <code>GEOquery</code>:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(GEOquery)</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">getGEOSuppFiles</span>(<span class="st">&quot;GSE152418&quot;</span>, <span class="at">baseDir =</span> <span class="st">&quot;data&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(GEOquery)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">getGEOSuppFiles</span>(<span class="st">&quot;GSE152418&quot;</span>, <span class="at">baseDir =</span> <span class="st">&quot;data&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </section>
 <section id="reference-annotation-datasets-no-manual-download" class="level2">
 <h2 class="anchored" data-anchor-id="reference-annotation-datasets-no-manual-download">Reference / annotation datasets (no manual download)</h2>
@@ -4272,6 +4314,11 @@ Warning
 <section id="disk-space-budget" class="level2">
 <h2 class="anchored" data-anchor-id="disk-space-budget">Disk-space budget</h2>
 <table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
 <thead>
 <tr class="header">
 <th>Dataset</th>
@@ -4281,12 +4328,12 @@ Warning
 </thead>
 <tbody>
 <tr class="odd">
-<td>20k NSCLC DTC (filtered counts)</td>
+<td>20k NSCLC DTC (filtered, default)</td>
 <td>~250 MB</td>
 <td>~700 MB</td>
 </tr>
 <tr class="even">
-<td>20k NSCLC DTC (raw <code>.h5</code>)</td>
+<td>20k NSCLC DTC (raw <code>.h5</code>, optional)</td>
 <td>~1.5 GB</td>
 <td>~1.5 GB (single file)</td>
 </tr>
@@ -4312,11 +4359,16 @@ Warning
 </tr>
 </tbody>
 </table>
-<p>Plan for <strong>~6–8 GB total</strong> if you’re doing the full series.</p>
+<p>Plan for <strong>~3–4 GB total</strong> if you stick to the filtered NSCLC matrix; <strong>~6–8 GB total</strong> if you also pull the raw NSCLC <code>.h5</code>.</p>
 </section>
-<section id="i-cant-download-from-10x" class="level2">
-<h2 class="anchored" data-anchor-id="i-cant-download-from-10x">“I can’t download from 10x”</h2>
-<p>10x Genomics public datasets are free but require accepting a terms-of-use click-through. If <code>curl</code> / <code>wget</code> fails with HTTP 403, open the landing-page link in a browser, click <em>Download</em>, accept the terms, and the same URL will work afterward.</p>
+<section id="i-still-cant-download-from-10x" class="level2">
+<h2 class="anchored" data-anchor-id="i-still-cant-download-from-10x">“I still can’t download from 10x”</h2>
+<p>If <code>curl</code> / <code>wget</code> returns HTTP 403 even after the click-through, the most common causes are:</p>
+<ul>
+<li>You’re on a different network than the one where you accepted the click-through (the gating is per IP / network).</li>
+<li>You’re trying to pull a file from the <em>wrong</em> dataset variant — there are two NSCLC datasets with similar names; make sure your URL slug contains <code>multiplex-3-1-standard-6-0-0</code> and not <code>with-intronic-reads</code>.</li>
+<li>Your URL has a typo. Double-check by <code>curl -sI &lt;url&gt;</code>: a real file responds with <code>200</code> and a <code>content-length</code> matching GB-sized data; a typo’d URL responds with <code>403</code> and a 21-byte body.</li>
+</ul>
 <p>If you’re behind a restrictive network, all of the files above are also mirrored on the workshop’s Talapas project directory <code>/projects/&lt;PIRG&gt;/scrnaseq_workshop/data/</code> once your account is set up — copy from there with <code>scp</code> or work directly on the cluster.</p>
 
 
