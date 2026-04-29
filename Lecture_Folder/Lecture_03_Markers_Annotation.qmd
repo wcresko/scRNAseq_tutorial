@@ -1,0 +1,165 @@
+---
+title: "Lecture 03 — Markers & Manual Cell-Type Annotation"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: Single Cell RNA-seq Workshop · Lecture 03 of 7
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse); library(knitr)
+theme_set(theme_minimal(base_size = 14)); set.seed(2026)
+```
+
+# Lecture 03: Markers & Manual Annotation {background-color="#2c3e50"}
+
+## Where this lecture fits
+
+-   Previous: [Lec 02 — Dim reduction, integration, clustering](Lecture_02_DimRed_Integration_Clustering.html)
+-   **You are here:** Lec 03 — *finding markers and turning clusters into named cell types by hand*
+-   Next: [Lec 04 — Pseudobulk DE & DESeq2](Lecture_04_Pseudobulk_DE.html)
+-   Reference-based annotation (SingleR / Azimuth) lives in [Lec 05](Lecture_05_Reference_Annotation.html)
+-   **Companion tutorial:** [Tutorial 03 — Markers & Manual Annotation](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)
+
+## Goals of this lecture
+
+::: incremental
+-   Distinguish **clusters** (a graph property) from **cell types** (a biological label)
+-   Find robust cluster markers with `FindAllMarkers` / `FindConservedMarkers`
+-   Read DotPlots / FeaturePlots like a clinician
+-   Assign labels you can defend with literature
+:::
+
+::: callout-note
+**Why this matters.** A cluster is a partition of a graph. A *cell type* is a biological claim. Going from one to the other is the most subjective step in the entire workflow — and the one reviewers will scrutinize most.
+:::
+
+# Clusters are not cell types {background-color="#2c3e50"}
+
+## The annotation workflow
+
+![](images/lec01_annotation_workflow.svg){fig-align="center" width="92%"}
+
+-   **Manual** (this lecture) — interpretable but biased by the annotator
+-   **Automatic** (Lec 05) — fast and reproducible but biased by the reference
+-   Best practice: run both, reconcile disagreements, document choices
+
+# Finding markers {background-color="#2c3e50"}
+
+## `FindAllMarkers` — every cluster vs. all others
+
+``` r
+markers <- FindAllMarkers(seu,
+                          only.pos        = TRUE,
+                          min.pct         = 0.25,
+                          logfc.threshold = 0.25)
+
+markers |>
+  group_by(cluster) |>
+  slice_max(avg_log2FC, n = 10)
+```
+
+-   `only.pos = TRUE` keeps just the up-regulated markers (what you'd actually use to *name* a cluster)
+-   `min.pct = 0.25` requires the gene be detected in at least 25% of cells in either group
+-   Default test is the Wilcoxon rank-sum
+
+::: callout-tip
+**Defaults that work for most 10x datasets.** `min.pct = 0.25`, `logfc.threshold = 0.25`. Loosen them for very small clusters, tighten them only if results are overwhelming.
+:::
+
+## `FindConservedMarkers` — markers that hold across conditions
+
+When your dataset has multiple conditions (e.g. stimulated vs. control PBMCs in Patel's `ifnb` example), you usually want markers that define a cluster **regardless of condition**:
+
+``` r
+DefaultAssay(seu) <- "RNA"
+cluster3_markers <- FindConservedMarkers(seu,
+                                         ident.1       = 3,
+                                         grouping.var  = "stim")
+head(cluster3_markers)
+```
+
+This runs the marker test **inside each condition** and reports genes that come up in both — protecting you from labelling a cluster by a treatment-induced gene rather than its lineage marker.
+
+::: callout-warning
+**Don't skip this step in case-control designs.** Naïve `FindAllMarkers` on a stim-vs-ctrl dataset will surface treatment-response genes as "cluster markers", and you'll mis-label populations.
+:::
+
+# Reading marker plots well {background-color="#2c3e50"}
+
+## What a "good" marker looks like
+
+::: incremental
+-   **Specific** — high in the cluster, low elsewhere (DotPlot's dot *intensity*)
+-   **Pervasive** — expressed in most cells of the cluster (DotPlot's dot *size*)
+-   **Backed by literature** — appears in canonical lineage panels for the tissue
+:::
+
+## Useful Seurat plots
+
+| Plot | What it shows | When to use it |
+|----|----|----|
+| `DotPlot` | mean expr × % positive, per cluster × gene | Confirming a marker panel across many clusters |
+| `FeaturePlot` | one gene, every cell, on UMAP | Eyeballing where a single gene "lives" |
+| `VlnPlot` | distribution per cluster | Confirming bimodality / outliers |
+| `RidgePlot` | density per cluster | Comparing graded expression |
+
+::: callout-warning
+Genes that are merely *enriched* on a Wilcoxon test are not always **markers** in the canonical sense. Cross-check at least two genes per cluster, and prefer ones that appear in published lineage panels (CellMarker 2.0, PanglaoDB).
+:::
+
+# Assigning labels {background-color="#2c3e50"}
+
+## The decision loop
+
+1.  Look at top 10 markers per cluster (`slice_max`)
+2.  Cross-reference against **CellMarker 2.0**, **PanglaoDB**, or a tissue-specific atlas
+3.  Confirm with `FeaturePlot` / `DotPlot` of the canonical 2–3 markers
+4.  Assign — and **write down why** in your notebook
+
+``` r
+new_ids <- c("0" = "CD4 T", "1" = "CD14 Mono", "2" = "B",
+             "3" = "CD8 T", "4" = "NK",  "5" = "DC")
+seu <- RenameIdents(seu, new_ids)
+seu$celltype <- Idents(seu)
+```
+
+::: callout-tip
+**Reference panels worth bookmarking:**
+-   [CellMarker 2.0](http://117.50.127.228/CellMarker/) — curated, searchable by tissue/disease
+-   [PanglaoDB](https://panglaodb.se/) — large, scRNA-derived
+-   [The Human Protein Atlas — Cell types](https://www.proteinatlas.org/humanproteome/celltype) — expression-supported markers
+:::
+
+# Recap & what's next {background-color="#2c3e50"}
+
+## What to remember from Lecture 03
+
+::: incremental
+-   Clusters ≠ cell types. The biology is in the labels you give the clusters.
+-   `FindAllMarkers` finds *enriched* genes; `FindConservedMarkers` finds *condition-robust* ones — use the latter in case-control designs.
+-   Document why you assigned each label — future-you (and reviewers) will thank you
+-   Manual + automatic (Lec 05) annotation are *complementary*, not redundant
+:::
+
+## Coming up next
+
+-   **Lec 04** — [Pseudobulk DE & DESeq2](Lecture_04_Pseudobulk_DE.html): the right way to do condition-level DE
+-   **Hands-on:** [Tutorial 03 — Markers & Manual Annotation](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)

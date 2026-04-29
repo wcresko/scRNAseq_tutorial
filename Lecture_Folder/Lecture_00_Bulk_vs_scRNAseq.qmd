@@ -1,9 +1,9 @@
 ---
-title: "Lecture 01 — Bulk vs. Single-Cell RNA-seq: What & How"
+title: "Lecture 00 — Bulk vs. Single-Cell RNA-seq: What & How"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 01 of 6
+    footer: Single Cell RNA-seq Workshop · Lecture 00 of 7
     transition: fade
     transition-speed: slow
     theme: default
@@ -31,20 +31,20 @@ theme_set(theme_minimal(base_size = 14))
 set.seed(2026)
 ```
 
-# Lecture 01: Bulk vs. Single-Cell RNA-seq {background-color="#2c3e50"}
+# Lecture 00: Bulk vs. Single-Cell RNA-seq {background-color="#2c3e50"}
 
 ## Where this lecture fits
 
-::: incremental
--   **You are here:** Lecture 01 — *the why and how of scRNA-seq data*
--   Up next:
-    -   Lec 02 — Pre-processing (QC, doublets, normalization, HVGs)
-    -   Lec 03 — Dim reduction, integration, clustering
-    -   Lec 04 — Annotation
-    -   Lec 05 — Downstream analyses (DE, enrichment, WGCNA, trajectory, CCC)
-    -   Lec 06 — Beyond scRNA-seq (spatial, ATAC, multi-omics)
+-   **You are here:** Lecture 00 — *the why and how of scRNA-seq data*
+-   The numbered lectures from here on each pair with a tutorial of the same number:
+    -   Lec 01 ↔ Tutorial 01 — Pre-processing
+    -   Lec 02 ↔ Tutorial 02 — Dim reduction & clustering
+    -   Lec 03 ↔ Tutorial 03 — Markers & manual annotation
+    -   Lec 04 ↔ Tutorial 04 — Pseudobulk DE & DESeq2
+    -   Lec 05 ↔ Tutorial 05 — Reference-based annotation
+    -   Lec 06 ↔ Tutorial 06 — Bulk + scATAC-seq
+    -   Lec 07 ↔ Tutorial 07 — WGCNA
 -   **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
-:::
 
 ## Goals of this lecture
 
@@ -56,7 +56,7 @@ set.seed(2026)
 :::
 
 ::: callout-note
-**Theme for the workshop:** what is the same vs. what is new when we measure expression per cell instead of per tissue.
+**Theme for the workshop:** what is the same vs. what is new when we measure expression per cell instead of per tissue. Almost every step you already know from bulk RNA-seq has a single-cell analogue — but the analogues have new failure modes.
 :::
 
 # Part 1 — Why single-cell? {background-color="#2c3e50"}
@@ -64,11 +64,11 @@ set.seed(2026)
 ## Bulk RNA-seq measures the *average*
 
 -   mRNA from many cells is pooled, reverse-transcribed, sequenced
--   You get **one expression profile per sample** (usually \~20,000 genes × N samples)
+-   You get **one expression profile per sample** (typically \~20,000 genes × N samples)
 -   Excellent for: comparing tissues / treatments / genotypes in **well-controlled designs with biological replicates**
 
 ::: callout-tip
-Bulk is cheap, mature, and statistically well-understood. It remains the right tool for many questions.
+Bulk is cheap, mature, and statistically well-understood. If your question is "does gene X change with treatment, averaged over the tissue?" — bulk is still the right tool.
 :::
 
 ## What bulk cannot tell you
@@ -87,21 +87,25 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 -   Bulk: one profile per sample
 -   Single-cell: one profile per cell — heterogeneity becomes *visible*
 
-## Commonalities you can carry over
+## What carries over from bulk
 
 ::: incremental
--   Same core measurement: **count of reads/UMIs per gene**
+-   Same core measurement: **count of reads / UMIs per gene**
 -   Same statistical concerns: normalization, **[batch effects](../Resources_Folder/Glossary.html#b)**, multiple testing, replication
--   Many downstream questions (DE, enrichment, co-expression) are the **same questions at a new resolution**
+-   Many downstream questions (DE, enrichment, co-expression) are the **same questions at a new resolution** — and reuse bulk tools (DESeq2, limma, WGCNA) after **pseudobulk aggregation** (Lecture 04)
 :::
 
 ## What is genuinely new
 
 ::: incremental
--   **[Sparsity](../Resources_Folder/Glossary.html#s)**: \~90–95% zeros in typical droplet data (not all real biology — technical **[dropout](../Resources_Folder/Glossary.html#d)** too)
--   **Cells are not replicates**: cells from one subject are not statistically independent
+-   **[Sparsity](../Resources_Folder/Glossary.html#s)**: \~90–95% zeros in typical droplet data — partly real biology, partly technical **[dropout](../Resources_Folder/Glossary.html#d)**
+-   **Cells are not replicates**: cells from one subject are not statistically independent — using `n = cells` is the most common mistake in the field
 -   **Cell type is a latent variable** you have to recover from the data
 -   **Integration** across samples is a first-class problem, not an afterthought
+:::
+
+::: callout-warning
+The single biggest analytical pitfall in scRNA-seq is treating cells as biological replicates. We come back to this in Lecture 04 (pseudobulk DE).
 :::
 
 # Part 2 — How the data are generated {background-color="#2c3e50"}
@@ -116,7 +120,7 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 | **Nuclei (snRNA-seq)** | 10x Nuclei | Works on frozen / difficult tissues | Fewer transcripts, no cytoplasmic RNA |
 
 ::: callout-note
-**10x Chromium 3'** is the workshop default. Most conceptual ideas generalize.
+**10x Chromium 3'** is the workshop default — the assay used by both the workshop dataset (20k NSCLC DTC) and Patel's [YouTube tutorials](https://github.com/kpatel427/YouTubeTutorials). Most conceptual ideas generalize.
 :::
 
 ## How we got here — a short timeline
@@ -124,7 +128,7 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 ![](images/lec01_tech_timeline.svg){fig-align="center" width="98%"}
 
 -   Throughput went from **one cell** (Tang 2009) to **millions of cells** in a decade
--   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** and **spatial** measurements
+-   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** and **spatial** measurements (we revisit this in Lecture 06)
 
 ## Droplet generation on the Chromium
 
@@ -158,6 +162,10 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 -   After sequencing, reads sharing a cell barcode **and** UMI collapse to one molecule
 -   UMIs help detect **nucleotide substitutions** during PCR/sequencing and resolve **multi-mapping** reads
 
+::: callout-tip
+**Rule of thumb on capture:** typical 10x 3' v3 captures \~5–20% of mRNA molecules per cell. That's *why* the count matrix is sparse even when biology isn't.
+:::
+
 ## From reads to a count matrix
 
 ::: incremental
@@ -175,23 +183,15 @@ Bulk is cheap, mature, and statistically well-understood. It remains the right t
 ![](images/lec01_use_raw_data_processing.svg){fig-align="center" width="96%"}
 
 -   **Signal processing** turns sequencer BCL files into FASTQ reads (with a first QC step)
--   **Alignment** (spliced to genome *or* lightweight mapping to transcriptome) feeds **quantification**: CB correction → UMI resolution → count assignment
+-   **Alignment** feeds **quantification**: CB correction → UMI resolution → count assignment
 -   Final product: a **cell × gene count matrix**, QC'd before downstream work begins
 
-## Primary-processing pipelines side-by-side
+## Pipelines side-by-side
 
 ![](images/lec01_data_processing_pipelines.svg){fig-align="center" width="96%"}
 
 -   Three common entry points: **10x Chromium**, **Drop-seq / inDrops**, **bulk or SMART-based**
--   Different stacks of tools, **same destination**: a counts matrix that Seurat / scanpy can read
-
-## Data-processing pipelines — an alternate view
-
-![](images/lec01_use_data_processing_pipelines.svg){fig-align="center" width="96%"}
-
--   Same three entry points shown with platform-specific tool stacks
--   10X → **Cell Ranger count**; Drop-seq/inDrop → **dropEst**; Bulk/SMART → **STAR+RSEM**
--   All three funnel into the same kind of cell × gene count matrix
+-   Different stacks of tools, **same destination**: a counts matrix Seurat / scanpy can read
 
 ## The data structure you analyze
 
@@ -220,24 +220,29 @@ adata
 ```
 :::
 
+::: callout-note
+**`min.cells = 3` and `min.features = 200`** are *defaults*, not gospel. They drop genes seen in fewer than 3 cells and droplets with fewer than 200 detected genes — sensible for whole-tissue 10x data, sometimes too aggressive for very rare cell types or shallow protocols.
+:::
+
 # Recap & what's next {background-color="#2c3e50"}
 
-## What to remember from Lecture 01
+## What to remember from Lecture 00
 
 ::: incremental
 -   scRNA-seq is the **same measurement at higher resolution** — count-based, but per cell
 -   The chemistry (UMIs + cell barcodes + GEMs) is *what makes it possible* to recover per-cell counts after pooled sequencing
 -   The output is always the same shape: a **cell × gene** sparse matrix with metadata
--   Sparsity + cell-level non-independence change the statistics — that's the next five lectures
+-   Sparsity + cell-level non-independence change the statistics — that's the next seven lectures
 :::
 
 ## Coming up next
 
--   **Lec 02** — [Pre-processing](Lecture_02_Preprocessing.html): QC, ambient RNA, doublets, normalization, HVGs
+-   **Lec 01** — [Pre-processing](Lecture_01_Preprocessing.html): QC, ambient RNA, doublets, normalization, HVGs
 -   **Hands-on:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
 
 ## Further reading
 
 -   [sc-best-practices](https://www.sc-best-practices.org/) — Heumos *et al.* (the workshop's primary external reference)
 -   [10x Genomics Chromium overview](https://www.10xgenomics.com/instruments/chromium-x-series)
+-   [Patel's YouTube Tutorials repo](https://github.com/kpatel427/YouTubeTutorials) — companion video walkthroughs of many of these workflows
 -   [Workshop Glossary](../Resources_Folder/Glossary.html)

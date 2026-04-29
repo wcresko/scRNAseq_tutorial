@@ -1,9 +1,9 @@
 ---
-title: "Lecture 03 — Dim Reduction, Integration & Clustering"
+title: "Lecture 02 — Dim Reduction, Integration & Clustering"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 03 of 6
+    footer: Single Cell RNA-seq Workshop · Lecture 02 of 7
     transition: fade
     transition-speed: slow
     theme: default
@@ -28,13 +28,13 @@ library(tidyverse); library(knitr)
 theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ```
 
-# Lecture 03: Dim Reduction, Integration & Clustering {background-color="#2c3e50"}
+# Lecture 02: Dim Reduction, Integration & Clustering {background-color="#2c3e50"}
 
 ## Where this lecture fits
 
--   Previous: [Lec 02 — Pre-processing](Lecture_02_Preprocessing.html)
--   **You are here:** Lec 03 — *PCA, batch correction, neighbour graph, Leiden, UMAP*
--   Next: [Lec 04 — Annotation](Lecture_04_Annotation.html)
+-   Previous: [Lec 01 — Pre-processing](Lecture_01_Preprocessing.html)
+-   **You are here:** Lec 02 — *PCA, batch correction, neighbour graph, Leiden, UMAP*
+-   Next: [Lec 03 — Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
 -   **Companion tutorial:** [Tutorial 02 — Dim Reduction & Clustering](../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html)
 
 ## Goals of this lecture
@@ -46,13 +46,17 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 -   Read a UMAP without over-interpreting it
 :::
 
-# Step 5 — Linear dimensionality reduction (PCA) {background-color="#2c3e50"}
+::: callout-note
+**Mental model.** Cells live in a \~20,000-D gene-expression space. PCA collapses that to 20–50 *signal* dimensions; the neighbour graph translates those distances into "who is similar to whom"; clustering carves the graph into groups; UMAP makes a 2D picture of all of it. Every step compresses information — get any of them wrong and you can't see what's there.
+:::
+
+# Step 5 — Linear dim reduction (PCA) {background-color="#2c3e50"}
 
 ## PCA in one slide
 
--   **[PCA](../Resources_Folder/Glossary.html#p)** on scaled HVG expression gives a **low-dimensional, denoised representation**
--   Typical: first 20–50 PCs used for all downstream neighbor-graph steps
--   Choose the number of PCs with an `ElbowPlot()` or `JackStraw()` / variance explained curve
+-   **[PCA](../Resources_Folder/Glossary.html#p)** on scaled HVG expression gives a low-dimensional, denoised representation
+-   First 20–50 PCs are the substrate for **all** downstream neighbour-graph steps
+-   Choose the number of PCs with `ElbowPlot()` (visual) or `JackStraw()` / variance-explained curve (statistical)
 
 ``` r
 seu <- RunPCA(seu, npcs = 50)
@@ -67,6 +71,10 @@ ElbowPlot(seu, ndims = 50)
 -   Dimensionality reduction **projects** them into 2–50 dimensions while preserving the main structure
 -   Different projections emphasize different axes — the full signal isn't visible in any single 2D view
 
+::: callout-tip
+**Picking npcs.** Look at the elbow plot: the elbow is where additional PCs stop adding meaningful variance. For most 10x datasets it sits around 15–30. Using too few PCs collapses subtle cell types; too many lets technical noise back in.
+:::
+
 # Step 6 — Integration / batch correction {background-color="#2c3e50"}
 
 ## When to integrate
@@ -75,6 +83,7 @@ ElbowPlot(seu, ndims = 50)
 
 -   Multiple samples / batches / donors → the same cell type can split into per-sample clusters
 -   Integration aligns shared cell types while preserving real biological differences
+-   **Diagnostic:** color a UMAP by sample. If cell types co-cluster across samples, you don't need integration. If each sample forms its own island, you do.
 
 ## Integration tools
 
@@ -87,7 +96,11 @@ ElbowPlot(seu, ndims = 50)
 | **MNN / fastMNN**     | R / Py    | Mutual nearest neighbors              |
 
 ::: callout-tip
-**Rule of thumb:** try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases.
+**Rule of thumb:** try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases. Patel's `singleCell_integrate_harmony.R` is a good worked example on the `ifnb` dataset.
+:::
+
+::: callout-warning
+**Over-integration is real.** If you push integration too hard, real biological differences (e.g. tumor vs. normal) get squashed away with the batch effect. Always plot *both* batch and a known biological covariate after integration to confirm only the unwanted axis was removed.
 :::
 
 ## Integration strategies — visual guide
@@ -95,10 +108,10 @@ ElbowPlot(seu, ndims = 50)
 ![](images/lec01_use_integration_overview.svg){fig-align="center" width="98%"}
 
 -   **Global models** (e.g. ComBat, `sc.tl.regress_out`) fit a regression with batch as a covariate
--   **Linear embedding / MNN** (MNN, FastMNN, Seurat v3, Scanorama) find mutual nearest neighbours across batches and correct
--   **Graph-based / deep learning** (BBKNN, Conos, scVI, trVAE, SAUCIE) enforce cross-batch connectivity, or add batch as a node in an autoencoder
+-   **Linear / MNN** (MNN, FastMNN, Seurat v3, Scanorama) find mutual nearest neighbours across batches and correct
+-   **Graph / deep learning** (BBKNN, Conos, scVI, trVAE, SAUCIE) enforce cross-batch connectivity, or add batch as a node in an autoencoder
 
-# Step 7 — Neighborhood graph, clustering, embedding {background-color="#2c3e50"}
+# Step 7 — Neighbourhood graph, clustering, embedding {background-color="#2c3e50"}
 
 ## SNN graph → Leiden → UMAP
 
@@ -121,7 +134,7 @@ sc.pl.umap(adata, color="leiden", legend_loc="on data")
 ```
 
 ::: callout-warning
-UMAP distances between clusters are **not quantitative**. Use for visualization, not inference.
+**UMAP distances are not quantitative.** Two clusters drawn far apart on a UMAP are *not* necessarily more dissimilar than two clusters drawn close. Use UMAPs for *looking*, never for inference about distance, density, or trajectory direction.
 :::
 
 ## Leiden clustering — step by step
@@ -136,22 +149,27 @@ UMAP distances between clusters are **not quantitative**. Use for visualization,
 
 ::: incremental
 -   No single "right" resolution exists — the question is *what cell types you want to resolve*
--   Use **`clustree`** to visualize cluster stability across a range of resolutions
+-   Typical starting range: **0.4 – 1.2** for Leiden on a 10–30k cell dataset
+-   Use **`clustree`** to visualize cluster stability across a sweep of resolutions
 -   Cross-check by inspecting markers of merged vs. split clusters
+:::
+
+::: callout-tip
+**Workflow.** Sweep resolutions, pick one where (a) `clustree` shows stable splits, (b) every cluster has at least a few defensible markers, (c) you can name biology for each. If you can't name a cluster, it's probably noise or technical.
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
 
-## What to remember from Lecture 03
+## What to remember from Lecture 02
 
 ::: incremental
 -   PCA on HVGs is the substrate every downstream step builds on
--   Integration is *always* an editorial choice — pick the simplest method that works
+-   Integration is *always* an editorial choice — pick the simplest method that works, then check you didn't over-correct
 -   Cluster on the **integrated** PCs, never the raw ones
 -   UMAP is for *looking*, not for *measuring*
 :::
 
 ## Coming up next
 
--   **Lec 04** — [Annotation](Lecture_04_Annotation.html)
+-   **Lec 03** — [Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
 -   **Hands-on:** [Tutorial 02 — Dim Reduction & Clustering](../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html)

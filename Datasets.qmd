@@ -2,7 +2,7 @@
 title: "Workshop Datasets"
 ---
 
-This page describes the datasets the workshop uses, where to download them, and where to put them so the tutorials can find them.
+This page describes the datasets the workshop uses, where to download them, and where to put them so the tutorials can find them. Where possible, we use the **same datasets as Khushbu Patel's [YouTube Tutorials](https://github.com/kpatel427/YouTubeTutorials)** so that her video walkthroughs serve as supplementary material.
 
 ## Expected directory layout
 
@@ -14,81 +14,159 @@ scrnaseq_workshop/
 │   ├── Tutorial_01_QC_Preprocessing.qmd
 │   └── ...
 └── data/
-    ├── filtered_feature_bc_matrix/                  # primary scRNA-seq
-    │   ├── barcodes.tsv.gz
-    │   ├── features.tsv.gz
-    │   └── matrix.mtx.gz
-    └── atac_pbmc_10k_nextgem/                       # bonus scATAC-seq (optional)
-        ├── filtered_peak_bc_matrix/
-        │   ├── barcodes.tsv
-        │   ├── matrix.mtx
-        │   └── peaks.bed
-        └── fragments.tsv.gz (+ .tbi)
+    ├── 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5   # scRNA (Tut 01-05)
+    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5                          # scATAC (Tut 06)
+    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)                           # scATAC (Tut 06)
+    ├── atac_v1_pbmc_10k_singlecell.csv                                      # scATAC (Tut 06)
+    └── GSE152418_p20047_Study1_RawCounts.txt                                # WGCNA (Tut 07)
 ```
 
-If your layout differs, adjust the `data.dir` argument in the `Read10X*()` calls inside each tutorial.
+If your layout differs, adjust the file paths inside each tutorial.
 
-## Primary dataset --- 20k NSCLC DTC (10x 3' v3.1 Multiplex)
+## Tutorials 01–05 — 20k NSCLC DTC (10x 3' v3.1 Multiplex)
 
 **What it is.** Twenty-thousand dissociated tumor cells (DTCs) pooled from **seven non-small-cell lung cancer (NSCLC) donors**, run on the 10x Chromium **3' v3.1** assay with **CellPlex multiplexing** (CMO hashing). Every cell carries a gene-expression profile *and* a sample-of-origin barcode --- so downstream you get both heterogeneity and donor-level structure to integrate.
 
--   Landing page: [10x Genomics --- 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
--   Used in: Tutorials 01--04, plus most lecture examples.
+This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R).
+
+-   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/resources/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
+-   Used in: Tutorials 01–05
 
 ### Download
 
-``` bash
-# from your project root
+::: {.panel-tabset}
+
+#### `wget`
+
+```bash
 mkdir -p data && cd data
 
-curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
 
+# Optionally also pull the smaller pre-filtered counts
+wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
 tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
-
-# Sanity check — should print three .gz files
-ls filtered_feature_bc_matrix/
 ```
 
-## Bonus dataset --- PBMC 10k scATAC-seq v1.1
+#### `curl`
 
-Used only for the **scATAC-seq with Signac** bonus exercise.
+```bash
+mkdir -p data && cd data
 
--   Landing page: [10x Genomics --- PBMC 10k scATAC-seq v1.1](https://www.10xgenomics.com/resources/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-next-gem-v-1-1-1-1-standard-2-0-0)
+curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_raw_feature_bc_matrix.h5
 
-``` bash
-# from your project root, into data/
+curl -L -O https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_Multiplex/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
+```
+
+:::
+
+## Tutorial 04 Primer — `airway` (Bioconductor)
+
+**What it is.** Bulk RNA-seq of four primary human airway smooth muscle cell lines, treated **untreated** vs. **dexamethasone**, two technical replicates each → eight samples (Himes et al. 2014, *PLoS ONE*). Standard reference dataset for teaching DESeq2; the same data Patel uses in [`runDESeq2.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R).
+
+-   Bioconductor landing page: <https://bioconductor.org/packages/airway/>
+-   No manual download — the package ships with the data:
+
+```r
+BiocManager::install("airway")
+library(airway); data(airway)
+```
+
+## Tutorial 06 — PBMC 10k scATAC-seq v1 (10x, hg19)
+
+Used for the scATAC-seq tutorial. **Same dataset as Patel's** [`scATACSeq_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R) and the [Signac PBMC vignette](https://stuartlab.org/signac/articles/pbmc_vignette).
+
+-   Landing page: [10x Genomics — PBMC 10k scATAC-seq v1 (hg19)](https://www.10xgenomics.com/resources/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0)
+
+::: {.panel-tabset}
+
+### `wget`
+
+```bash
 cd data
 
-curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_filtered_peak_bc_matrix.tar.gz
-curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_fragments.tsv.gz
-curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_fragments.tsv.gz.tbi
-curl -L -O https://cf.10xgenomics.com/samples/cell-atac/2.0.0/atac_pbmc_10k_nextgem/atac_pbmc_10k_nextgem_singlecell.csv
-
-tar -xzf atac_pbmc_10k_nextgem_filtered_peak_bc_matrix.tar.gz
+wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5
+wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv
+wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz
+wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi
 ```
 
-## Reference / annotation datasets
+### `curl`
+
+```bash
+cd data
+
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz
+curl -L -O https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi
+```
+
+:::
+
+::: callout-warning
+The earlier "Next GEM v1.1" re-release of this sample is mapped to **hg38** (filenames prefixed `atac_v1_pbmc_10k_nextgem_*`). The tutorial assumes the **v1 / hg19** release because it pairs with `EnsDb.Hsapiens.v75`.
+:::
+
+## Tutorial 07 — GSE152418 (COVID-19 PBMC bulk RNA-seq)
+
+**What it is.** PBMC bulk RNA-seq from a published cross-sectional study of COVID-19 patients (Arunachalam et al. 2020, *Science*). Severity gradient from healthy to ICU. Same dataset as Patel's [`WGCNA.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R).
+
+-   GEO landing page: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418>
+
+::: {.panel-tabset}
+
+### `wget`
+
+```bash
+cd data
+wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
+gunzip GSE152418_p20047_Study1_RawCounts.txt.gz
+```
+
+### `curl`
+
+```bash
+cd data
+curl -L -O https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
+gunzip GSE152418_p20047_Study1_RawCounts.txt.gz
+```
+
+### From R via `GEOquery`
+
+```r
+library(GEOquery)
+getGEOSuppFiles("GSE152418", baseDir = "data")
+```
+
+:::
+
+## Reference / annotation datasets (no manual download)
 
 These are loaded automatically by the relevant R packages on first use --- you don't need to download them manually, but they do need an internet connection the first time.
 
 | Reference | Loaded by | Used in |
 |---|---|---|
-| `HumanPrimaryCellAtlasData()` | `celldex` | Tutorial 05 (SingleR annotation) |
+| `HumanPrimaryCellAtlasData()` | `celldex` | Tutorial 05 (SingleR) |
 | Azimuth `pbmcref` (or NSCLC ref) | `Azimuth` / `SeuratData` | Tutorial 05 |
-| `EnsDb.Hsapiens.v86` | Bioconductor | scATAC-seq bonus |
+| `EnsDb.Hsapiens.v75` | Bioconductor | Tutorial 06 (scATAC) |
 
 ## Disk-space budget
 
 | Dataset | Compressed | Extracted |
 |---|---|---|
 | 20k NSCLC DTC (filtered counts) | \~250 MB | \~700 MB |
+| 20k NSCLC DTC (raw `.h5`) | \~1.5 GB | \~1.5 GB (single file) |
+| `airway` | \~3 MB | (loaded in-package) |
 | PBMC 10k scATAC-seq | \~2.5 GB | \~5 GB |
+| GSE152418 raw counts | \~7 MB | \~80 MB |
 | Reference data (cached) | --- | \~500 MB |
 
-Plan for **\~6 GB total** if you're doing both scRNA and scATAC.
+Plan for **\~6–8 GB total** if you're doing the full series.
 
 ## "I can't download from 10x"
 
-10x Genomics public datasets are free but require accepting a terms-of-use click-through. If `curl` fails, open the landing-page link in a browser, click *Download*, accept the terms, and you'll get a direct URL you can `wget`/`curl` from then on.
+10x Genomics public datasets are free but require accepting a terms-of-use click-through. If `curl` / `wget` fails with HTTP 403, open the landing-page link in a browser, click *Download*, accept the terms, and the same URL will work afterward.
 
 If you're behind a restrictive network, all of the files above are also mirrored on the workshop's Talapas project directory `/projects/<PIRG>/scrnaseq_workshop/data/` once your account is set up --- copy from there with `scp` or work directly on the cluster.

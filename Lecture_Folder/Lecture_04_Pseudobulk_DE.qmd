@@ -1,0 +1,256 @@
+---
+title: "Lecture 04 — Pseudobulk DE & DESeq2"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: Single Cell RNA-seq Workshop · Lecture 04 of 7
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse); library(knitr)
+theme_set(theme_minimal(base_size = 14)); set.seed(2026)
+```
+
+# Lecture 04: Pseudobulk DE & DESeq2 {background-color="#2c3e50"}
+
+## Where this lecture fits
+
+-   Previous: [Lec 03 — Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
+-   **You are here:** Lec 04 — *the right way to do condition-level differential expression*
+-   Next: [Lec 05 — Reference-based Annotation](Lecture_05_Reference_Annotation.html)
+-   **Companion tutorials:**
+    -   [Tutorial 04 Primer — DESeq2 Basics on `airway`](../Exercise_Folder/Tutorial_04_Primer_DESeq2_Basics.html) (do this first if you've never run DESeq2)
+    -   [Tutorial 04 — Pseudobulk DE](../Exercise_Folder/Tutorial_04_Pseudobulk_DE.html)
+
+## Goals of this lecture
+
+::: incremental
+-   Understand the **DESeq2 model** in plain terms
+-   See why per-cell DE between **conditions** is statistically wrong
+-   Run a **pseudobulk** workflow that uses DESeq2 correctly
+-   Know when pseudobulk is and is not the right tool
+:::
+
+::: callout-important
+**The cardinal sin of scRNA-seq:** treating cells from one donor as independent biological replicates. We spend the whole lecture on the right alternative.
+:::
+
+# Part 1 — DESeq2 fundamentals {background-color="#2c3e50"}
+
+## What DESeq2 actually does
+
+::: incremental
+-   Models **integer counts** per gene with a **negative binomial** distribution
+-   Estimates a **size factor** per sample (depth normalization), independent of the design
+-   **Shrinks** per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)
+-   Tests each gene's coefficient with a **Wald test** (default) or LRT
+:::
+
+::: callout-note
+**Why negative binomial, not Poisson?** RNA-seq counts are **over-dispersed**: variance \> mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.
+:::
+
+## A canonical bulk DESeq2 run (Patel-style, `airway` data)
+
+``` r
+library(DESeq2); library(airway)
+data(airway)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = assay(airway),
+  colData   = colData(airway),
+  design    = ~ cell + dex)        # cell line as covariate, dex as test factor
+
+# Pre-filter: drop genes with < 10 total reads (speed only — does not affect FDR)
+dds <- dds[ rowSums(counts(dds)) >= 10, ]
+
+# Set the reference level so log2FC sign is interpretable
+dds$dex <- relevel(dds$dex, ref = "untrt")
+
+dds <- DESeq(dds)
+res <- results(dds, contrast = c("dex", "trt", "untrt"))
+summary(res)
+```
+
+::: callout-tip
+**`relevel()` matters.** The reference level becomes the *denominator* in `log2FoldChange`. If you forget, your "up-regulated" and "down-regulated" labels can be backwards.
+:::
+
+## Reading DESeq2 output
+
+| Column | What it is | Watch-out |
+|----|----|----|
+| `baseMean` | mean of normalized counts across all samples | Very low values = unstable estimates |
+| `log2FoldChange` | effect size on log~2~ scale | Use **shrunk** values for ranking |
+| `lfcSE` | standard error of the LFC | |
+| `stat` | Wald statistic | |
+| `pvalue` | raw p-value | Don't filter on this directly |
+| `padj` | BH-adjusted p-value | This is your FDR — filter on `padj < 0.05` |
+
+::: callout-warning
+**`NA` in `padj`?** DESeq2 sets `padj = NA` for genes filtered by independent filtering or with extreme outliers (Cook's distance). That's intentional, not a bug.
+:::
+
+## Always shrink LFCs before ranking
+
+``` r
+res_shrunk <- lfcShrink(dds,
+                        coef = "dex_trt_vs_untrt",
+                        type = "apeglm")
+```
+
+::: callout-tip
+**Why shrink?** Genes with low counts have huge raw LFCs from sampling noise. Shrinkage (`apeglm` / `ashr`) pulls those down toward zero so a "top hits" list isn't dominated by junk genes with `baseMean = 2`.
+:::
+
+# Part 2 — Why per-cell DE goes wrong {background-color="#2c3e50"}
+
+## The scientific question
+
+> In *cell type X*, which genes differ between **treated** and **control** subjects?
+
+## Why naïve per-cell tests fail
+
+::: incremental
+-   Cells from one subject share genetics, library prep, batch, treatment — they are **not independent**
+-   Treating each cell as an independent replicate inflates the effective N by 100×–10,000×
+-   Result: **anti-conservative p-values** — thousands of spurious "significant" genes
+-   Documented in benchmarks: Squair et al. 2021 (*Nat Commun*), Zimmerman et al. 2021
+:::
+
+::: callout-important
+If your experimental unit is the **subject**, your statistical unit should be the **subject**. Within-cell methods (`FindMarkers`, `wilcox`, MAST) are fine for *exploratory marker discovery*; they are **not** condition-level DE.
+:::
+
+# Part 3 — Pseudobulk in practice {background-color="#2c3e50"}
+
+## What pseudobulk does
+
+![](images/lec01_pseudobulk_concept.svg){fig-align="center" width="95%"}
+
+-   **Aggregate** (sum) UMI counts per *(sample, cell type)* → a classic bulk-looking matrix
+-   One column per (sample × cell type) replicate, one row per gene
+-   Run a separate DE test **per cell type** with DESeq2 / edgeR / limma-voom
+
+## DESeq2 on pseudobulk in R
+
+``` r
+library(Seurat); library(DESeq2)
+
+pb <- AggregateExpression(seu, assays = "RNA",
+                          group.by = c("sample_id", "celltype"),
+                          return.seurat = FALSE)$RNA
+
+meta <- data.frame(
+  sample_id = sub("_.*", "", colnames(pb)),
+  celltype  = sub("^[^_]+_", "", colnames(pb))
+) |>
+  dplyr::left_join(sample_meta, by = "sample_id")
+
+run_de <- function(ct) {
+  keep <- meta$celltype == ct
+  dds  <- DESeqDataSetFromMatrix(countData = pb[, keep],
+                                 colData   = meta[keep, ],
+                                 design    = ~ condition)
+  dds  <- DESeq(dds)
+  results(dds, contrast = c("condition", "treated", "control")) |>
+    as.data.frame() |> tibble::rownames_to_column("gene") |>
+    dplyr::mutate(celltype = ct)
+}
+
+de_all <- purrr::map_dfr(unique(meta$celltype), run_de)
+```
+
+## DESeq2 on pseudobulk in Python
+
+``` python
+import decoupler as dc
+import pydeseq2.dds as dds_mod
+from pydeseq2.ds import DeseqStats
+
+pdata = dc.get_pseudobulk(adata, sample_col="sample_id",
+                          groups_col="celltype",
+                          layer="counts", mode="sum",
+                          min_cells=10, min_counts=1000)
+
+ct = "T_CD4"
+mask = pdata.obs["celltype"] == ct
+dds = dds_mod.DeseqDataSet(
+    counts = pdata.layers["counts"][mask].T,
+    metadata = pdata.obs[mask],
+    design_factors = "condition")
+dds.deseq2()
+DeseqStats(dds, contrast=["condition", "treated", "control"]).summary()
+```
+
+## Gotchas & good practice
+
+::: callout-warning
+**Common pitfalls.**
+
+-   **Filter low-cell groups** — drop (sample × cell type) combos with `< 10` cells before DE; the pseudobulk profile is too noisy.
+-   **Include covariates** in the design (batch, sex, age) just like bulk RNA-seq.
+-   **Need ≥ 3 samples per condition.** With 1–2 samples per group, no test is honest — say so in the paper.
+-   Prefer **shrinkage LFCs** (`lfcShrink()` with `apeglm`) for ranking.
+-   Apply BH / IHW **within** each cell-type run, not across all results pooled — the null distributions differ.
+:::
+
+## When *not* to use pseudobulk
+
+-   Questions about **within-cell-type heterogeneity** (subpopulations defined by a marker)
+-   Samples with only one or two biological replicates per condition — no test will save you
+-   Rare cell types with too few cells per sample to aggregate meaningfully
+
+# Part 4 — Where DE lands in the bigger picture {background-color="#2c3e50"}
+
+## The annotated object as a launchpad
+
+![](images/lec01_downstream_hub.svg){fig-align="center" width="95%"}
+
+-   **Within-cluster:** marker genes, signatures, module scores
+-   **Between conditions:** pseudobulk DE per cell type *(this lecture)*
+-   **Across cells:** gene modules → Lec 07 (WGCNA), trajectory inference, ligand-receptor
+-   **Across samples:** composition shifts (scCODA, propeller, milo)
+
+## Pathway / enrichment follow-up
+
+After DE, summarize gene lists into pathways:
+
+-   **Over-representation** (hypergeometric): `enrichR`, `clusterProfiler`
+-   **Rank-based GSEA**: `fgsea`, `clusterProfiler::gseGO`
+-   **Per-cell scoring** (alternative to gene lists): `decoupleR`, `AUCell`, `AddModuleScore`
+
+# Recap & what's next {background-color="#2c3e50"}
+
+## What to remember from Lecture 04
+
+::: incremental
+-   DESeq2 models **negative-binomial counts**, **shrinks** dispersions, and gives you a **shrunk LFC** to rank by
+-   For **condition-level DE**, default to **pseudobulk** + DESeq2 / edgeR / limma-voom
+-   For **per-cell** signatures, use module scoring or AUCell — never claim DE from these
+-   You need real biological replicates (≥ 3 per group) — there is no shortcut
+:::
+
+## Coming up next
+
+-   **Lec 05** — [Reference-based Annotation](Lecture_05_Reference_Annotation.html)
+-   **Hands-on:**
+    -   [Tutorial 04 Primer — DESeq2 on `airway`](../Exercise_Folder/Tutorial_04_Primer_DESeq2_Basics.html)
+    -   [Tutorial 04 — Pseudobulk DE](../Exercise_Folder/Tutorial_04_Pseudobulk_DE.html)
