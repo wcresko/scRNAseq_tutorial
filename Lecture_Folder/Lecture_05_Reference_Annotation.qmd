@@ -1,0 +1,169 @@
+---
+title: "Lecture 05 — Reference-based Annotation: SingleR & Azimuth"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: Single Cell RNA-seq Workshop · Lecture 05 of 7
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse); library(knitr)
+theme_set(theme_minimal(base_size = 14)); set.seed(2026)
+```
+
+# Lecture 05: Reference-based Annotation {background-color="#2c3e50"}
+
+## Where this lecture fits
+
+-   Previous: [Lec 04 — Pseudobulk DE & DESeq2](Lecture_04_Pseudobulk_DE.html)
+-   **You are here:** Lec 05 — *automated cell-type labelling using a reference*
+-   Next: [Lec 06 — Bulk + scATAC-seq](Lecture_06_ATACseq.html)
+-   **Companion tutorial:** [Tutorial 05 — Reference-based Annotation](../Exercise_Folder/Tutorial_05_Reference_Annotation.html)
+
+## Goals of this lecture
+
+::: incremental
+-   See what an **annotated reference** is and how it's used
+-   Understand the two big paradigms — **correlation** (SingleR) and **mapping** (Azimuth)
+-   Read confidence scores so you know when *not* to trust the label
+-   Reconcile reference labels against the manual labels from Lec 03
+:::
+
+::: callout-note
+**Why a second annotation method?** Manual annotation (Lec 03) is interpretable but biased by the annotator's experience. Reference-based annotation is reproducible but biased by the reference's coverage. Running both and reconciling is the modern best practice.
+:::
+
+# Two paradigms {background-color="#2c3e50"}
+
+## SingleR — correlation against a reference
+
+::: incremental
+-   For each query cell, compute its **Spearman correlation** with each reference profile
+-   Iteratively prune low-confidence labels (Aran et al. 2019)
+-   Works on **bulk references** (e.g. `HumanPrimaryCellAtlasData`) *and* sc references
+-   No batch correction needed — operates on rank-transformed expression
+:::
+
+``` r
+library(SingleR); library(celldex)
+ref <- HumanPrimaryCellAtlasData()
+pred <- SingleR(test = as.SingleCellExperiment(seu),
+                ref = ref, labels = ref$label.main)
+seu$singleR <- pred$labels
+```
+
+## Azimuth — anchor-based reference mapping
+
+::: incremental
+-   Built on Seurat's **anchor finding** + supervised classification on a published reference
+-   Best for tissues with a **curated Azimuth reference** (PBMC, lung, kidney, BMC, ...)
+-   Returns labels at multiple **resolutions** (l1 broad → l3 fine) plus a per-cell mapping score
+-   Performs **integration** with the reference under the hood
+:::
+
+``` r
+library(Azimuth)
+seu <- RunAzimuth(seu, reference = "pbmcref")
+DimPlot(seu, group.by = "predicted.celltype.l2", label = TRUE)
+```
+
+## CellTypist — pre-trained logistic regression (Python)
+
+-   `scanpy` ecosystem; many tissues, including a flagship Immune All-Low / All-High model
+-   Returns a probability per class; thresholds on `majority_voting` are easy to interpret
+-   Often the fastest option for atlas-scale data
+
+# Confidence — how to read the scores {background-color="#2c3e50"}
+
+## SingleR diagnostics
+
+``` r
+plotScoreHeatmap(pred)         # per-label score per cell
+plotDeltaDistribution(pred)    # margin between top and runner-up label
+```
+
+::: callout-tip
+**Rule of thumb.** A **delta** (score margin) below \~0.05 means the cell could plausibly be either of two labels — flag those cells as "uncertain" rather than forcing a call.
+:::
+
+## Azimuth diagnostics
+
+| Column | Meaning | Threshold |
+|----|----|----|
+| `predicted.celltype.l2` | the label | — |
+| `predicted.celltype.l2.score` | classification confidence | \> 0.7 = strong |
+| `mapping.score` | how well the cell projects onto the reference manifold | \> 0.7 = mappable; lower = novel state |
+
+::: callout-warning
+**Low mapping score = the reference doesn't cover this cell type.** Don't take the label at face value — your data may contain a population the reference doesn't know about (a tumour-specific state, a perturbed phenotype, a developmental intermediate).
+:::
+
+# Reconciling manual + reference labels {background-color="#2c3e50"}
+
+## What disagreements tell you
+
+::: incremental
+-   **Reference doesn't include this cell type** → trust manual labels for that cluster (low mapping score is the tell)
+-   **Marker plot is ambiguous** → trust the automatic mapping (especially Azimuth at l2 / l3)
+-   **Both confident, but different** → look at the score distribution; you may have a *transitional* state, or the manual marker was hijacked by a treatment effect (re-run `FindConservedMarkers`)
+:::
+
+## A workable reconciliation workflow
+
+1.  Cluster + name manually (Lec 03)
+2.  Run SingleR + Azimuth, store both as metadata columns
+3.  Cross-tabulate: `table(seu$manual, seu$predicted.celltype.l2)`
+4.  For each cluster, accept the agreement; investigate the disagreements
+5.  Persist a **`celltype_final`** column with the resolved label and a **`celltype_method`** column ("manual" / "azimuth" / "consensus")
+
+::: callout-tip
+**Document the conflicts.** A line in your methods like *"Cluster 7 was labelled NK by manual marker inspection but Azimuth predicted ILC; mapping score 0.62 — we kept NK based on KLRD1+/NCAM1+ pattern"* is exactly what reviewers want to see.
+:::
+
+# Pitfalls of automated annotation {background-color="#2c3e50"}
+
+## Things that bite
+
+::: incremental
+-   **Reference / query species mismatch** (mouse data vs. human reference) — use orthologous gene names or species-matched refs
+-   **Tissue mismatch** — a PBMC reference will gleefully assign "B cell" labels to anything in your tumour sample
+-   **Sub-cell-type resolution exceeds reference resolution** — fine subsets (e.g. CD4 Tfh) may collapse to a parent label
+-   **Treatment-induced states** are usually absent from references — they show up as low mapping score, not as a wrong label
+:::
+
+::: callout-warning
+**Never publish reference-only labels without spot-checking markers.** A two-line `DotPlot` of canonical markers per predicted label is the minimum due diligence.
+:::
+
+# Recap & what's next {background-color="#2c3e50"}
+
+## What to remember from Lecture 05
+
+::: incremental
+-   **SingleR** = correlation, light-touch, works on bulk refs
+-   **Azimuth** = anchor mapping + supervised classifier, best when a curated ref exists for your tissue
+-   **Always read confidence scores** — they tell you when the reference doesn't cover your biology
+-   The output of an annotation pass is *a label plus a confidence flag*, not just a label
+:::
+
+## Coming up next
+
+-   **Lec 06** — [Bulk + scATAC-seq](Lecture_06_ATACseq.html): the chromatin counterpart
+-   **Hands-on:** [Tutorial 05 — Reference-based Annotation](../Exercise_Folder/Tutorial_05_Reference_Annotation.html)

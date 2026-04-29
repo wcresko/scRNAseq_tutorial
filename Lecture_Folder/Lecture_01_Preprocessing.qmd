@@ -1,0 +1,250 @@
+---
+title: "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: Single Cell RNA-seq Workshop · Lecture 01 of 7
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+theme_set(theme_minimal(base_size = 14))
+set.seed(2026)
+```
+
+# Lecture 01: Pre-processing {background-color="#2c3e50"}
+
+## Where this lecture fits
+
+-   Previous: [Lec 00 — Bulk vs. scRNA-seq + how data are generated](Lecture_00_Bulk_vs_scRNAseq.html)
+-   **You are here:** Lec 01 — *turning a raw count matrix into a clean, normalized object*
+-   Next: [Lec 02 — Dim reduction, integration, clustering](Lecture_02_DimRed_Integration_Clustering.html)
+-   **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
+
+## Goals of this lecture
+
+::: incremental
+-   See where pre-processing sits in the canonical pipeline
+-   Learn the three core QC metrics, **what they mean**, and **what counts as normal**
+-   Recognize ambient-RNA contamination and droplet doublets — and how to handle each
+-   Pick a normalization + feature-selection strategy that fits your data
+:::
+
+::: callout-note
+**Why this matters.** Every downstream geometric step (PCA, clustering, UMAP) treats the post-QC matrix as ground truth. Garbage in → confidently-wrong clusters out. There is no "fix the clustering" — you have to fix the QC.
+:::
+
+# The full picture {background-color="#2c3e50"}
+
+## scRNA-seq pipeline at a glance
+
+![](images/lec01_scrnaseq_workflow.svg){fig-align="center" width="98%"}
+
+## The Seurat workflow in eight steps
+
+![](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="97%"}
+
+-   This lecture covers steps **1–4**: QC, normalization, scaling, feature extraction
+-   Steps 5–8 come in Lec 02–04
+
+# Step 1 — Per-cell QC {background-color="#2c3e50"}
+
+## Why QC, in one sentence
+
+A droplet that "looks like a cell" in your matrix may actually be **(a)** an empty droplet with ambient soup, **(b)** a dying cell leaking cytoplasm, **(c)** two cells in one droplet, or **(d)** a real cell. QC is how we triage them.
+
+## Three core metrics
+
+![](images/lec01_qc_metrics.svg){fig-align="center" width="85%"}
+
+-   `nFeature_RNA`: **genes detected per cell** — proxy for capture quality
+-   `nCount_RNA`: **total UMI counts per cell** — proxy for sequencing depth in that cell
+-   `percent.mt`: **% reads mapping to mitochondrial genes** — proxy for stress / dying cells (cytoplasmic mRNA leaks before mitochondrial mRNA)
+
+## What each metric catches
+
+![](images/lec01_use_common_qc_metrics.svg){fig-align="center" width="85%"}
+
+-   **Low** gene / molecule counts → empty / dying / poorly captured cells
+-   **Very high** gene counts for the tissue → likely **[doublets / multiplets](../Resources_Folder/Glossary.html#d)**
+-   **High mitochondrial %** → cells that were dying when loaded
+
+## Normal ranges — a starting cheat sheet
+
+::: callout-note
+**Typical "healthy" thresholds for 10x 3' v3 on dissociated tissue.** These are starting points, not rules — *always look at the distributions first.*
+
+| Metric | Typical lower | Typical upper | Notes |
+|----|----|----|----|
+| `nFeature_RNA` (genes/cell) | 200–500 | 2,500–6,000 | Upper bound is dataset-specific; doublets push past it |
+| `nCount_RNA` (UMIs/cell) | 500–1,000 | \~50,000 | Very high counts often = doublets, very low = empty |
+| `percent.mt` | — | 5–10% (PBMC), 15–20% (tumor / fragile tissue) | Nuclei (snRNA) should be \< \~1–2% |
+:::
+
+::: callout-warning
+**Watch-outs.**
+-   Brain / muscle / cardiomyocytes naturally have **high mitochondrial content** — a 5% threshold will throw away your biology.
+-   **snRNA-seq** should have almost no mitochondrial reads; if it does, your nuclei prep contaminated cytoplasm.
+-   A **bimodal `nCount_RNA`** distribution often means two cell sizes (e.g., lymphocytes + neutrophils), *not* doublets — don't gate it away.
+:::
+
+## QC in practice
+
+::: panel-tabset
+### Seurat
+
+``` r
+seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
+VlnPlot(seu, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
+
+# Inspect distributions BEFORE choosing thresholds
+seu <- subset(seu,
+              nFeature_RNA > 200 & nFeature_RNA < 2500 &
+              percent.mt   < 5)
+```
+
+### scanpy
+
+``` python
+adata.var["mt"] = adata.var_names.str.startswith("MT-")
+sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"],
+                           inplace=True, percent_top=None)
+adata = adata[(adata.obs.n_genes_by_counts > 200) &
+              (adata.obs.n_genes_by_counts < 2500) &
+              (adata.obs.pct_counts_mt < 5)].copy()
+```
+:::
+
+::: callout-tip
+**Pattern for the mitochondrial regex:** human = `^MT-`, mouse = `^mt-`. Get this wrong silently and `percent.mt` will be all zeros.
+:::
+
+## Droplets can also be empty — or contaminated
+
+![](images/lec01_ambient_rna.svg){fig-align="center" width="92%"}
+
+-   Many barcodes correspond to **empty droplets** with only ambient RNA — filter with `EmptyDrops` or the Cell Ranger knee-point
+-   Even real cells are contaminated by **ambient RNA soup**; estimate and subtract with `SoupX`, `DecontX`, or `CellBender`
+
+## Ambient mRNA — before and after lysis
+
+![](images/lec01_use_ambient_rna.svg){fig-align="center" width="95%"}
+
+-   Before lysis: each droplet contains (ideally) one cell + one bead, plus trace **ambient mRNA**
+-   After lysis: the bead captures its cell's mRNA *and* any ambient mRNA → **cross-cell contamination** in the final counts
+
+::: callout-tip
+**When ambient correction matters most:** highly hemorrhagic samples (lots of free hemoglobin), cells dissociated from frozen tissue, or any time you see a marker gene "expressed" in clusters where it shouldn't be (a classic SoupX trigger).
+:::
+
+# Step 2 — Doublet detection {background-color="#2c3e50"}
+
+## Doublets in one slide
+
+-   Droplets sometimes capture **two cells** → artificial "hybrid" profiles
+-   Run doublet detection on each sample **before** integration
+-   Expected doublet rate scales with loading: \~0.8% per 1,000 cells loaded on 10x Chromium → \~8% at 10k cells, \~16% at 20k
+
+![](images/lec01_doublet_detection.svg){fig-align="center" width="95%"}
+
+| Tool            | Ecosystem | Notes                          |
+|-----------------|-----------|--------------------------------|
+| `scDblFinder`   | R / Bioc  | Fast, recommended default      |
+| `DoubletFinder` | R         | Used in Patel's tutorial; needs pK sweep |
+| `Scrublet`      | Python    | Classic choice in scanpy flows |
+
+## Doublet detection — how it actually works
+
+![](images/lec01_use_doublet_detection.svg){fig-align="center" width="98%"}
+
+-   **Simulate** artificial doublets by averaging random pairs of real cells
+-   Project real + simulated cells together in **reduced dimensions**
+-   Real cells that sit close to many simulated doublets are **flagged** as likely doublets
+
+::: callout-warning
+**Doublet detection runs *per sample*, not on a merged object.** Inter-sample mixtures are not doublets — they're integration noise, and pretending they are will silently drop real cells.
+:::
+
+# Step 3 — Normalization {background-color="#2c3e50"}
+
+## Why normalize?
+
+Cells are sequenced to wildly different depths (factor-of-10 spread is common). Without correction, a "highly expressed" gene in a deeply sequenced cell looks the same as a moderately expressed one in a shallow cell. Normalization puts cells on a comparable scale before downstream math.
+
+## Two dominant approaches
+
+-   **Log-normalization** (`NormalizeData` / `sc.pp.normalize_total` + `log1p`) — fast, simple, the default in most tutorials
+-   **Variance-stabilizing** (`SCTransform` in Seurat) — models the negative-binomial mean–variance relationship; often better for low-count cells; slower
+
+``` r
+# Seurat — log-normalization
+seu <- NormalizeData(seu) |>
+  FindVariableFeatures(nfeatures = 2000) |>
+  ScaleData()
+
+# Seurat — SCTransform (alternative, replaces the three calls above)
+seu <- SCTransform(seu, verbose = FALSE)
+```
+
+::: callout-tip
+**When to reach for SCTransform:** noisy or very low-depth data (\~3,000 UMIs/cell median), or when you can see depth artefacts in your UMAP. For typical 10x v3 data, log-normalization is fine.
+:::
+
+::: callout-warning
+**Don't normalize twice.** SCTransform replaces `NormalizeData` + `ScaleData`. Running both on the same object stacks transforms and breaks downstream assumptions.
+:::
+
+# Step 4 — Feature selection (HVGs) {background-color="#2c3e50"}
+
+## Why HVGs?
+
+-   Use the \~1,000–3,000 most variable genes for downstream geometry
+-   Dramatically reduces noise from ubiquitously-expressed housekeeping genes
+-   Seurat: `FindVariableFeatures()`; scanpy: `sc.pp.highly_variable_genes()`
+
+::: callout-note
+**Typical settings:** `nfeatures = 2000` is the Seurat default and a defensible choice for most datasets. Bump to 3,000–5,000 for atlas-scale or highly heterogeneous data; drop to 1,000 only if your dataset is small and unimodal.
+:::
+
+::: callout-warning
+**Pitfalls in HVG selection.**
+-   Including **mitochondrial / ribosomal genes** as HVGs lets technical variation drive your PCs — many pipelines exclude these patterns by default.
+-   If you regress out cell-cycle scores, do it *before* HVG selection, otherwise cycling genes dominate the variable list.
+:::
+
+# Recap & what's next {background-color="#2c3e50"}
+
+## What to remember from Lecture 01
+
+::: incremental
+-   QC = filtering bad **cells** *and* bad **droplets** — both matter
+-   Thresholds are **dataset-specific**; always plot before you cut
+-   Ambient RNA is real and can be subtracted (`SoupX`, `DecontX`, `CellBender`)
+-   Doublets are detected by simulation; do it **per-sample** before integration
+-   Normalization choice is less important than *consistency* between training and downstream steps
+-   HVGs give you the gene-space PCA will operate on
+:::
+
+## Coming up next
+
+-   **Lec 02** — [Dim reduction, integration, clustering](Lecture_02_DimRed_Integration_Clustering.html)
+-   **Hands-on:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
