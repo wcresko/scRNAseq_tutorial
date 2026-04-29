@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 03 — Dim Reduction, Integration &amp; Clustering</title>
+  <title>Single Cell RNA-seq Workshop – Lecture 07 — WGCNA: Weighted Gene Co-expression Network Analysis</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 03 — Dim Reduction, Integration &amp; Clustering</h1>
+  <h1 class="title">Lecture 07 — WGCNA: Weighted Gene Co-expression Network Analysis</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,151 +1150,72 @@ Bill Cresko
 
 </section>
 <section>
-<section id="lecture-03-dim-reduction-integration-clustering" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Lecture 03: Dim Reduction, Integration &amp; Clustering</h1>
+<section id="lecture-07-wgcna" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Lecture 07: WGCNA</h1>
 
 </section>
 <section id="where-this-lecture-fits" class="slide level2">
 <h2>Where this lecture fits</h2>
 <ul>
-<li>Previous: <a href="Lecture_02_Preprocessing.html">Lec 02 — Pre-processing</a></li>
-<li><strong>You are here:</strong> Lec 03 — <em>PCA, batch correction, neighbour graph, Leiden, UMAP</em></li>
-<li>Next: <a href="Lecture_04_Annotation.html">Lec 04 — Annotation</a></li>
-<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html">Tutorial 02 — Dim Reduction &amp; Clustering</a></li>
+<li>Previous: <a href="Lecture_06_ATACseq.html">Lec 06 — Bulk + scATAC-seq</a></li>
+<li><strong>You are here:</strong> Lec 07 — <em>finding co-expressed gene modules and tying them to phenotype</em></li>
+<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_07_WGCNA.html">Tutorial 07 — WGCNA on GSE152418</a></li>
 </ul>
 </section>
 <section id="goals-of-this-lecture" class="slide level2">
 <h2>Goals of this lecture</h2>
 <ul>
-<li class="fragment">See why we always do PCA before anything else “geometric”</li>
-<li class="fragment">Choose between integration tools by how heterogeneous your data are</li>
-<li class="fragment">Build the SNN graph and pick a clustering resolution defensibly</li>
-<li class="fragment">Read a UMAP without over-interpreting it</li>
+<li class="fragment">Understand what a <strong>co-expression network</strong> is and what makes it “weighted”</li>
+<li class="fragment">Pick a <strong>soft-thresholding power</strong> so the network is approximately scale-free</li>
+<li class="fragment">Build modules with <strong>dynamic tree cut</strong>, summarize them with <strong>eigengenes</strong></li>
+<li class="fragment">Correlate modules with sample traits — and read the resulting heatmap</li>
+<li class="fragment">Apply WGCNA to <strong>scRNA-seq via pseudobulk or metacells (hdWGCNA)</strong></li>
 </ul>
-</section></section>
-<section>
-<section id="step-5-linear-dimensionality-reduction-pca" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Step 5 — Linear dimensionality reduction (PCA)</h1>
-
-</section>
-<section id="pca-in-one-slide" class="slide level2">
-<h2>PCA in one slide</h2>
-<ul>
-<li><strong><a href="../Resources_Folder/Glossary.html#p">PCA</a></strong> on scaled HVG expression gives a <strong>low-dimensional, denoised representation</strong></li>
-<li>Typical: first 20–50 PCs used for all downstream neighbor-graph steps</li>
-<li>Choose the number of PCs with an <code>ElbowPlot()</code> or <code>JackStraw()</code> / variance explained curve</li>
-</ul>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">RunPCA</span>(seu, <span class="at">npcs =</span> <span class="dv">50</span>)</span>
-<span id="cb1-2"><a></a><span class="fu">ElbowPlot</span>(seu, <span class="at">ndims =</span> <span class="dv">50</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="dimensionality-reduction-the-intuition" class="slide level2">
-<h2>Dimensionality reduction — the intuition</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjAwIDQ2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC5heCB7IGZvbnQtc2l6ZTogMzBweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgfQogICAgLnRpdGxlIHsgZm9udC1zaXplOiAyNHB4OyBmb250LXdlaWdodDogNzAwOyBmaWxsOiAjMjIyOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgPC9zdHlsZT4KICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImEiIHZpZXdCb3g9IjAgMCAxMCAxMCIgcmVmWD0iOSIgcmVmWT0iNSIgbWFya2VyV2lkdGg9IjEwIiBtYXJrZXJIZWlnaHQ9IjEwIiBvcmllbnQ9ImF1dG8iPgogICAgICA8cGF0aCBkPSJNMCwwIEwxMCw1IEwwLDEwIHoiIGZpbGw9IiMyMjIiLz4KICAgIDwvbWFya2VyPgogIDwvZGVmcz4KCiAgPCEtLSBMZWZ0OiAzRCBib3hlcyBpbiB4LHkseiAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2MCw0MCkiPgogICAgPCEtLSBheGVzIC0tPgogICAgPGxpbmUgeDE9IjAiIHkxPSIzODAiIHgyPSIwIiB5Mj0iNDAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIyIiBtYXJrZXItZW5kPSJ1cmwoI2EpIi8+CiAgICA8bGluZSB4MT0iMCIgeTE9IjM4MCIgeDI9IjM2MCIgeTI9IjM4MCIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjIiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICAgIDxsaW5lIHgxPSIwIiB5MT0iMzgwIiB4Mj0iMTIwIiB5Mj0iMjYwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMiIgbWFya2VyLWVuZD0idXJsKCNhKSIvPgogICAgPHRleHQgY2xhc3M9ImF4IiB4PSItNDAiIHk9IjUwIj56PC90ZXh0PgogICAgPHRleHQgY2xhc3M9ImF4IiB4PSIzNTUiIHk9IjQwNSI+eDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJheCIgeD0iMTA1IiB5PSIyNTAiPnk8L3RleHQ+CgogICAgPCEtLSBCbHVlIDNEIGJveCAoYmFjay1sZWZ0KSB0b3AgaGlnaGxpZ2h0ZWQgLS0+CiAgICA8Zz4KICAgICAgPCEtLSBkb3R0ZWQgY3ViZSBlZGdlcyAtLT4KICAgICAgPGcgc3Ryb2tlPSIjNTU1IiBzdHJva2UtZGFzaGFycmF5PSIzLDMiIGZpbGw9Im5vbmUiPgogICAgICAgIDxyZWN0IHg9IjUwIiAgeT0iMjQwIiB3aWR0aD0iMTQwIiBoZWlnaHQ9IjkwIi8+CiAgICAgICAgPHJlY3QgeD0iMTA1IiB5PSIxODAiIHdpZHRoPSIxNDAiIGhlaWdodD0iOTAiLz4KICAgICAgICA8bGluZSB4MT0iNTAiICB5MT0iMjQwIiB4Mj0iMTA1IiB5Mj0iMTgwIi8+CiAgICAgICAgPGxpbmUgeDE9IjE5MCIgeTE9IjI0MCIgeDI9IjI0NSIgeTI9IjE4MCIvPgogICAgICAgIDxsaW5lIHgxPSI1MCIgIHkxPSIzMzAiIHgyPSIxMDUiIHkyPSIyNzAiLz4KICAgICAgICA8bGluZSB4MT0iMTkwIiB5MT0iMzMwIiB4Mj0iMjQ1IiB5Mj0iMjcwIi8+CiAgICAgIDwvZz4KICAgICAgPHBvbHlnb24gcG9pbnRzPSIxMDUsMTgwIDI0NSwxODAgMTkwLDI0MCA1MCwyNDAiIGZpbGw9IiMxZjRlNzkiIHN0cm9rZT0iIzBkMmE0YSIvPgogICAgPC9nPgoKICAgIDwhLS0gUmVkIDNEIGJveCAoZnJvbnQtcmlnaHQpIHRvcCBoaWdobGlnaHRlZCAtLT4KICAgIDxnPgogICAgICA8ZyBzdHJva2U9IiM1NTUiIHN0cm9rZS1kYXNoYXJyYXk9IjMsMyIgZmlsbD0ibm9uZSI+CiAgICAgICAgPHJlY3QgeD0iMTgwIiB5PSIyNzAiIHdpZHRoPSIxMjAiIGhlaWdodD0iODAiLz4KICAgICAgICA8cmVjdCB4PSIyMjUiIHk9IjIyMCIgd2lkdGg9IjEyMCIgaGVpZ2h0PSI4MCIvPgogICAgICAgIDxsaW5lIHgxPSIxODAiIHkxPSIyNzAiIHgyPSIyMjUiIHkyPSIyMjAiLz4KICAgICAgICA8bGluZSB4MT0iMzAwIiB5MT0iMjcwIiB4Mj0iMzQ1IiB5Mj0iMjIwIi8+CiAgICAgICAgPGxpbmUgeDE9IjE4MCIgeTE9IjM1MCIgeDI9IjIyNSIgeTI9IjMwMCIvPgogICAgICAgIDxsaW5lIHgxPSIzMDAiIHkxPSIzNTAiIHgyPSIzNDUiIHkyPSIzMDAiLz4KICAgICAgPC9nPgogICAgICA8cG9seWdvbiBwb2ludHM9IjIyNSwyMjAgMzQ1LDIyMCAzMDAsMjcwIDE4MCwyNzAiIGZpbGw9IiNjMDM5MmIiIHN0cm9rZT0iIzdhMjAxNyIvPgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBNaWRkbGUgYXJyb3cgKyBjYXB0aW9uIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDUxMCwxNjApIj4KICAgIDx0ZXh0IGNsYXNzPSJ0aXRsZSIgeD0iODAiIHk9IjAiPkRpbWVuc2lvbmFsaXR5PC90ZXh0PgogICAgPHRleHQgY2xhc3M9InRpdGxlIiB4PSI4MCIgeT0iMzAiPnJlZHVjdGlvbjwvdGV4dD4KICAgIDxsaW5lIHgxPSIwIiB5MT0iNzUiIHgyPSIxNjAiIHkyPSI3NSIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjQiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICA8L2c+CgogIDwhLS0gUmlnaHQgcGFpcjogMkQgcHJvamVjdGlvbnMgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzMwLDYwKSI+CiAgICA8IS0tIHh5IHByb2plY3Rpb24gLS0+CiAgICA8bGluZSB4MT0iMCIgeTE9IjMwMCIgeDI9IjAiIHkyPSI0MCIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjIiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICAgIDxsaW5lIHgxPSIwIiB5MT0iMzAwIiB4Mj0iMjQwIiB5Mj0iMzAwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMiIgbWFya2VyLWVuZD0idXJsKCNhKSIvPgogICAgPHRleHQgY2xhc3M9ImF4IiB4PSItMzAiIHk9IjE2MCI+eTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJheCIgeD0iMjMwIiB5PSIzMzAiPng8L3RleHQ+CiAgICA8cmVjdCB4PSIyMCIgeT0iMTQwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzFmNGU3OSIgc3Ryb2tlPSIjMGQyYTRhIi8+CiAgICA8cmVjdCB4PSIxMzAiIHk9IjE2MCIgd2lkdGg9IjgwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2MwMzkyYiIgc3Ryb2tlPSIjN2EyMDE3Ii8+CiAgPC9nPgoKICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMDAwLDYwKSI+CiAgICA8bGluZSB4MT0iMCIgeTE9IjMwMCIgeDI9IjAiIHkyPSI0MCIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjIiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICAgIDxsaW5lIHgxPSIwIiB5MT0iMzAwIiB4Mj0iMTYwIiB5Mj0iMzAwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMiIgbWFya2VyLWVuZD0idXJsKCNhKSIvPgogICAgPHRleHQgY2xhc3M9ImF4IiB4PSItMzAiIHk9IjE2MCI+eTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJheCIgeD0iMTUwIiB5PSIzMzAiPno8L3RleHQ+CiAgICA8IS0tIHR3byB0aGluIHZlcnRpY2FsIGJhcnMgLS0+CiAgICA8cmVjdCB4PSI0MCIgIHk9IjE0MCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzFmNGU3OSIvPgogICAgPHJlY3QgeD0iMTEwIiB5PSIxNTUiIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNjMDM5MmIiLz4KICA8L2c+Cjwvc3ZnPgo=" class="quarto-figure quarto-figure-center r-stretch" style="width:95.0%"><ul>
-<li>Cells live in a very high-dimensional space (thousands of genes)</li>
-<li>Dimensionality reduction <strong>projects</strong> them into 2–50 dimensions while preserving the main structure</li>
-<li>Different projections emphasize different axes — the full signal isn’t visible in any single 2D view</li>
-</ul>
-</section></section>
-<section>
-<section id="step-6-integration-batch-correction" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Step 6 — Integration / batch correction</h1>
-
-</section>
-<section id="when-to-integrate" class="slide level2">
-<h2>When to integrate</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5MDAgNDQwIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPHN0eWxlPgogICAgLnRpdGxlIHsgZm9udC1zaXplOiAxOHB4OyBmb250LXdlaWdodDogNzAwOyBmaWxsOiAjMjIyOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAucGFuZWwgeyBmb250LXNpemU6IDE1cHg7IGZvbnQtd2VpZ2h0OiA2MDA7IGZpbGw6ICMzMzM7IHRleHQtYW5jaG9yOiBtaWRkbGU7IH0KICAgIC5sYmwgeyBmb250LXNpemU6IDEycHg7IGZpbGw6ICM1NTU7IHRleHQtYW5jaG9yOiBtaWRkbGU7IH0KICAgIC5sZWdsYmwgeyBmb250LXNpemU6IDEycHg7IGZpbGw6ICMzMzM7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjQ1MCIgeT0iMzAiPkJhdGNoIGNvcnJlY3Rpb24gLyBpbnRlZ3JhdGlvbjwvdGV4dD4KCiAgPCEtLSBMZWZ0OiBiZWZvcmUgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjAsNzApIj4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTcwIiB5PSIwIj5CZWZvcmUgaW50ZWdyYXRpb248L3RleHQ+CiAgICA8cmVjdCB4PSIwIiB5PSIxNSIgd2lkdGg9IjM0MCIgaGVpZ2h0PSIzMDAiIGZpbGw9IiNmYWZhZmEiIHN0cm9rZT0iI2NjYyIvPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTcwIiB5PSIzMzUiPmNvbG9yZWQgYnkgYmF0Y2gg4oaSIGNsdXN0ZXJzIHNwbGl0IGJ5IHNhbXBsZTwvdGV4dD4KCiAgICA8IS0tIENsdXN0ZXIgQSAtIGJhdGNoIDEgLS0+CiAgICA8ZyBmaWxsPSIjMmM3ZmI4Ij4KICAgICAgPGNpcmNsZSBjeD0iNzAiICBjeT0iODAiICByPSI0Ii8+PGNpcmNsZSBjeD0iODAiICBjeT0iOTAiICByPSI0Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjkwIiAgY3k9Ijc1IiAgcj0iNCIvPjxjaXJjbGUgY3g9IjEwMCIgY3k9Ijk1IiAgcj0iNCIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIxMDUiIHI9IjQiLz48Y2lyY2xlIGN4PSIxMTAiIGN5PSI4MCIgIHI9IjQiLz4KICAgICAgPGNpcmNsZSBjeD0iNzUiICBjeT0iMTAwIiByPSI0Ii8+PGNpcmNsZSBjeD0iOTUiICBjeT0iMTEwIiByPSI0Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjEwNSIgY3k9IjcwIiAgcj0iNCIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEEgLSBiYXRjaCAyIChvZmZzZXQpIC0tPgogICAgPGcgZmlsbD0iI2U2NjEwMSI+CiAgICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjgwIiAgcj0iNCIvPjxjaXJjbGUgY3g9IjE4MCIgY3k9IjkwIiAgcj0iNCIvPgogICAgICA8Y2lyY2xlIGN4PSIxOTAiIGN5PSI3NSIgIHI9IjQiLz48Y2lyY2xlIGN4PSIyMDAiIGN5PSI5NSIgIHI9IjQiLz4KICAgICAgPGNpcmNsZSBjeD0iMTg1IiBjeT0iMTA1IiByPSI0Ii8+PGNpcmNsZSBjeD0iMjEwIiBjeT0iODAiICByPSI0Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE3NSIgY3k9IjEwMCIgcj0iNCIvPjxjaXJjbGUgY3g9IjE5NSIgY3k9IjExMCIgcj0iNCIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEIgLSBiYXRjaCAxIC0tPgogICAgPGcgZmlsbD0iIzJjN2ZiOCI+CiAgICAgIDxjaXJjbGUgY3g9IjgwIiAgY3k9IjIwMCIgcj0iNCIvPjxjaXJjbGUgY3g9IjkwIiAgY3k9IjIxMCIgcj0iNCIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxOTUiIHI9IjQiLz48Y2lyY2xlIGN4PSIxMTAiIGN5PSIyMTUiIHI9IjQiLz4KICAgICAgPGNpcmNsZSBjeD0iOTUiICBjeT0iMjI1IiByPSI0Ii8+PGNpcmNsZSBjeD0iNzUiICBjeT0iMjIwIiByPSI0Ii8+CiAgICA8L2c+CiAgICA8IS0tIENsdXN0ZXIgQiAtIGJhdGNoIDIgLS0+CiAgICA8ZyBmaWxsPSIjZTY2MTAxIj4KICAgICAgPGNpcmNsZSBjeD0iMTgwIiBjeT0iMjAwIiByPSI0Ii8+PGNpcmNsZSBjeD0iMTkwIiBjeT0iMjEwIiByPSI0Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjIwMCIgY3k9IjE5NSIgcj0iNCIvPjxjaXJjbGUgY3g9IjIxMCIgY3k9IjIxNSIgcj0iNCIvPgogICAgICA8Y2lyY2xlIGN4PSIxOTUiIGN5PSIyMjUiIHI9IjQiLz48Y2lyY2xlIGN4PSIxNzUiIGN5PSIyMjAiIHI9IjQiLz4KICAgIDwvZz4KICAgIDwhLS0gQ2x1c3RlciBDIC0gYmF0Y2ggMSAtLT4KICAgIDxnIGZpbGw9IiMyYzdmYjgiPgogICAgICA8Y2lyY2xlIGN4PSIyMzAiIGN5PSIyNjAiIHI9IjQiLz48Y2lyY2xlIGN4PSIyNDUiIGN5PSIyNzUiIHI9IjQiLz4KICAgICAgPGNpcmNsZSBjeD0iMjU1IiBjeT0iMjY1IiByPSI0Ii8+PGNpcmNsZSBjeD0iMjQwIiBjeT0iMjgwIiByPSI0Ii8+CiAgICA8L2c+CiAgICA8IS0tIENsdXN0ZXIgQyAtIGJhdGNoIDIgLS0+CiAgICA8ZyBmaWxsPSIjZTY2MTAxIj4KICAgICAgPGNpcmNsZSBjeD0iMjkwIiBjeT0iMjYwIiByPSI0Ii8+PGNpcmNsZSBjeD0iMzA1IiBjeT0iMjc1IiByPSI0Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjMxNSIgY3k9IjI2NSIgcj0iNCIvPjxjaXJjbGUgY3g9IjMwMCIgY3k9IjI4MCIgcj0iNCIvPgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBBcnJvdyAtLT4KICA8cGF0aCBkPSJNIDQxNSAyMjAgTCA0OTUgMjIwIiBzdHJva2U9IiM1NTUiIHN0cm9rZS13aWR0aD0iMiIgZmlsbD0ibm9uZSIgbWFya2VyLWVuZD0idXJsKCNhaDIpIi8+CiAgPHRleHQgY2xhc3M9ImxibCIgeD0iNDU1IiB5PSIyMTAiPmludGVncmF0ZTwvdGV4dD4KCiAgPCEtLSBSaWdodDogYWZ0ZXIgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNTEwLDcwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE3MCIgeT0iMCI+QWZ0ZXIgaW50ZWdyYXRpb248L3RleHQ+CiAgICA8cmVjdCB4PSIwIiB5PSIxNSIgd2lkdGg9IjM0MCIgaGVpZ2h0PSIzMDAiIGZpbGw9IiNmYWZhZmEiIHN0cm9rZT0iI2NjYyIvPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTcwIiB5PSIzMzUiPmJhdGNoZXMgbWl4IHdpdGhpbiBiaW9sb2dpY2FsIGNsdXN0ZXJzPC90ZXh0PgoKICAgIDwhLS0gQ2x1c3RlciBBIG1peGVkIC0tPgogICAgPGc+CiAgICAgIDxjaXJjbGUgY3g9Ijk1IiAgY3k9IjgwIiAgcj0iNCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDUiIGN5PSI4NSIgIHI9IjQiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTE1IiBjeT0iNzUiICByPSI0IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjEwMCIgY3k9Ijk1IiAgcj0iNCIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIxMjAiIGN5PSI5MCIgIHI9IjQiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iOTAiICBjeT0iMTA1IiByPSI0IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjExMCIgY3k9IjExMCIgcj0iNCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxMjUiIGN5PSIxMDAiIHI9IjQiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNzUiICByPSI0IiBmaWxsPSIjZTY2MTAxIi8+CiAgICA8L2c+CiAgICA8IS0tIENsdXN0ZXIgQiBtaXhlZCAtLT4KICAgIDxnPgogICAgICA8Y2lyY2xlIGN4PSIxOTUiIGN5PSIxOTUiIHI9IjQiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMjA1IiBjeT0iMjA1IiByPSI0IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjIxNSIgY3k9IjIwMCIgcj0iNCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIyMDAiIGN5PSIyMTUiIHI9IjQiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMjIwIiBjeT0iMjIwIiByPSI0IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjIxMCIgcj0iNCIgZmlsbD0iI2U2NjEwMSIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEMgbWl4ZWQgLS0+CiAgICA8Zz4KICAgICAgPGNpcmNsZSBjeD0iOTUiICBjeT0iMjQwIiByPSI0IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjEwNSIgY3k9IjI1NSIgcj0iNCIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIyNjAiIHI9IjQiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTE1IiBjeT0iMjUwIiByPSI0IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjEwMCIgY3k9IjI3MCIgcj0iNCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxMjAiIGN5PSIyNjUiIHI9IjQiIGZpbGw9IiNlNjYxMDEiLz4KICAgIDwvZz4KICA8L2c+CgogIDwhLS0gTGVnZW5kIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYwLDM5NSkiPgogICAgPGNpcmNsZSBjeD0iMCIgY3k9IjAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgIDx0ZXh0IGNsYXNzPSJsZWdsYmwiIHg9IjEwIiB5PSI0Ij5iYXRjaCAxPC90ZXh0PgogICAgPGNpcmNsZSBjeD0iOTAiIGN5PSIwIiByPSI1IiBmaWxsPSIjZTY2MTAxIi8+CiAgICA8dGV4dCBjbGFzcz0ibGVnbGJsIiB4PSIxMDAiIHk9IjQiPmJhdGNoIDI8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibGVnbGJsIiB4PSIyMTAiIHk9IjQiPk1ldGhvZHM6IEhhcm1vbnksIFNldXJhdCBDQ0EvUlBDQSwgc2NWSSwgQkJLTk4sIE1OTjwvdGV4dD4KICA8L2c+CgogIDxkZWZzPgogICAgPG1hcmtlciBpZD0iYWgyIiB2aWV3Qm94PSIwIDAgMTAgMTAiIHJlZlg9IjgiIHJlZlk9IjUiIG1hcmtlcldpZHRoPSI3IiBtYXJrZXJIZWlnaHQ9IjciIG9yaWVudD0iYXV0by1zdGFydC1yZXZlcnNlIj4KICAgICAgPHBhdGggZD0iTSAwIDAgTCAxMCA1IEwgMCAxMCB6IiBmaWxsPSIjNTU1Ii8+CiAgICA8L21hcmtlcj4KICA8L2RlZnM+Cjwvc3ZnPgo=" class="quarto-figure quarto-figure-center r-stretch" style="width:88.0%"><ul>
-<li>Multiple samples / batches / donors → the same cell type can split into per-sample clusters</li>
-<li>Integration aligns shared cell types while preserving real biological differences</li>
-</ul>
-</section>
-<section id="integration-tools" class="slide level2">
-<h2>Integration tools</h2>
-<table class="caption-top">
-<colgroup>
-<col style="width: 31%">
-<col style="width: 15%">
-<col style="width: 53%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Tool</th>
-<th>Ecosystem</th>
-<th>Approach</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><strong>Harmony</strong></td>
-<td>R / Py</td>
-<td>Iterative soft-clustering in PC space</td>
-</tr>
-<tr class="even">
-<td><strong>Seurat CCA / RPCA</strong></td>
-<td>R</td>
-<td>Anchor-based cross-sample matching</td>
-</tr>
-<tr class="odd">
-<td><strong>scVI / scANVI</strong></td>
-<td>Python</td>
-<td>Variational autoencoder</td>
-</tr>
-<tr class="even">
-<td><strong>BBKNN</strong></td>
-<td>Python</td>
-<td>Batch-balanced k-NN graph</td>
-</tr>
-<tr class="odd">
-<td><strong>MNN / fastMNN</strong></td>
-<td>R / Py</td>
-<td>Mutual nearest neighbors</td>
-</tr>
-</tbody>
-</table>
-<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>Tip</strong></p>
+<p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Rule of thumb:</strong> try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases.</p>
+<p><strong>Why care about modules?</strong> A DE list of 800 genes is hard to interpret. A handful of co-regulated <strong>modules</strong> — each summarized by an eigengene and tied to a trait — is easy to act on. WGCNA reframes “which genes change?” as “which programs change?”</p>
 </div>
 </div>
 </div>
-</section>
-<section id="integration-strategies-visual-guide" class="slide level2">
-<h2>Integration strategies — visual guide</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMzAwIDYyMCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC5wdCAgIHsgZm9udC1zaXplOiAxOHB4OyBmb250LXdlaWdodDogNzAwOyBmaWxsOiAjMjIyOyB9CiAgICAuYnVsICB7IGZvbnQtc2l6ZTogMTNweDsgZmlsbDogIzIyMjsgfQogICAgLnN1YiAgeyBmb250LXNpemU6IDEycHg7IGZpbGw6ICM0NDQ7IH0KICAgIC5leCAgIHsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMjIyOyBmb250LXN0eWxlOiBpdGFsaWM7IH0KICAgIC5tb25vIHsgZm9udC1mYW1pbHk6ICJDb3VyaWVyIE5ldyIsIG1vbm9zcGFjZTsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMjIyOyB9CiAgPC9zdHlsZT4KCiAgPCEtLSBQYW5lbCAxOiBHbG9iYWwgbW9kZWxzIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLDMwKSI+CiAgICA8cmVjdCB3aWR0aD0iNDEwIiBoZWlnaHQ9IjU2MCIgcng9IjEwIiBmaWxsPSIjZmZmIiBzdHJva2U9IiMyYzdmYjgiIHN0cm9rZS13aWR0aD0iMiIvPgogICAgPHRleHQgY2xhc3M9InB0IiB4PSIyMCIgeT0iMzAiPkdsb2JhbCBtb2RlbHM8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIyMCIgeT0iNjAiPuKAoiBGaXQgcmVncmVzc2lvbiBtb2RlbCB3aXRoIGJhdGNoIGVmZmVjdCBjb3ZhcmlhdGU8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIyMCIgeT0iMTEwIj5SZXNpZHVhbHMgKG9mdGVuIHVzaW5nIGxpbmVhciByZWdyZXNzaW9uKTo8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibW9ubyIgeD0iMzAiIHk9IjE0MCI+bsyCX2djID0gZl9EKEJfYywg4oCmKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJtb25vIiB4PSIzMCIgeT0iMTc1Ij5yX2djID0gbl9nYyDiiJIgbsyCX2djID0gbl9nYyDiiJIgKM6y4oKAICsgzrLigoEgQl9jKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjMwIiB5PSIxOTUiPmluIGxpbmVhciBtb2RlbCBjYXNlPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMjYwIiB5PSIyMjAiPkV4YW1wbGU6PC90ZXh0PgogICAgPHRleHQgY2xhc3M9ImV4IiAgeD0iMjYwIiB5PSIyNDAiPnNjLnRsLnJlZ3Jlc3Nfb3V0KCk8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIyMCIgeT0iMjkwIj5Db3JyZWN0IGZvciBmaXR0ZWQgYmF0Y2ggZWZmZWN0OjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJtb25vIiB4PSIzMCIgeT0iMzI1Ij5uX2djYiA9IM6xX2cgKyBYzrJfZyArIM6zX2diICsgzrRfZ2IgzrVfZ2NiPC90ZXh0PgogICAgPCEtLSBsYWJlbHMgZm9yIGNvbXBvbmVudHMgLS0+CiAgICA8bGluZSB4MT0iNzAiICB5MT0iMzYwIiB4Mj0iNzAiICB5Mj0iMzQwIiBzdHJva2U9IiMzMzMiLz4KICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjY1IiAgeT0iMzgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5iaW8gZGVzaWduPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InN1YiIgeD0iNjUiICB5PSIzOTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPm1hdHJpeDwvdGV4dD4KICAgIDxsaW5lIHgxPSIxNjAiIHkxPSIzNjAiIHgyPSIxNjAiIHkyPSIzNDAiIHN0cm9rZT0iIzMzMyIvPgogICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMTYwIiB5PSIzODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmFkZGl0aXZlIGJhdGNoPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMTYwIiB5PSIzOTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmVmZmVjdDwvdGV4dD4KICAgIDxsaW5lIHgxPSIyNjAiIHkxPSIzNjAiIHgyPSIyNjAiIHkyPSIzNDAiIHN0cm9rZT0iIzMzMyIvPgogICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMjYwIiB5PSIzODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPm11bHRpcGxpY2F0aXZlPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMjYwIiB5PSIzOTUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPmJhdGNoIGVmZmVjdDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjIwIiB5PSI0OTAiPkV4YW1wbGU6PC90ZXh0PgogICAgPHRleHQgY2xhc3M9ImV4IiAgeD0iMjAiIHk9IjUxMCIgZm9udC13ZWlnaHQ9IjcwMCI+Q29tQmF0IC0gc2NhbnB5LnBwLmNvbWJhdCgpPC90ZXh0PgogIDwvZz4KCiAgPCEtLSBQYW5lbCAyOiBMaW5lYXIgZW1iZWRkaW5nIG1vZGVscyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0NjAsMzApIj4KICAgIDxyZWN0IHdpZHRoPSI0MTAiIGhlaWdodD0iNTYwIiByeD0iMTAiIGZpbGw9IiNmZmYiIHN0cm9rZT0iI2U2Mzg3YSIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICA8dGV4dCBjbGFzcz0icHQiIHg9IjIwIiB5PSIzMCI+TGluZWFyIGVtYmVkZGluZyBtb2RlbHM8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIyMCIgeT0iNjAiPuKAoiBQcm9qZWN0IGNlbGxzIGludG8gbG93IGRpbWVuc2lvbmFsIGVtYmVkZGluZzwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJidWwiIHg9IjIwIiB5PSI4MCI+4oCiIGZpbmQgbW9zdCBzaW1pbGFyIGNlbGxzIGluIG90aGVyIGJhdGNoIGUuZy4sIHVzaW5nPC90ZXh0PgogICAgPHRleHQgY2xhc3M9ImJ1bCIgeD0iMzIiIHk9Ijk4Ij5tdXR1YWwgbmVhcmVzdCBuZWlnaGJvdXJzIChNTk5zKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJidWwiIHg9IjIwIiB5PSIxMTgiPuKAoiBVc2UgTU5OcyBhcyBhbmNob3JzIHRvIGNhbGN1bGF0ZSBhIGNvcnJlY3Rpb248L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIzMiIgeT0iMTM2Ij52ZWN0b3I8L3RleHQ+CgogICAgPCEtLSBzbWFsbCBheGVzIHcvIGNsdXN0ZXJzIGxhYmVsbGVkIEJhdGNoMSwgQmF0Y2gyIC0tPgogICAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDAsMjAwKSI+CiAgICAgIDxsaW5lIHgxPSIwIiB5MT0iMTIwIiB4Mj0iMCIgeTI9IjAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPGxpbmUgeDE9IjAiIHkxPSIxMjAiIHgyPSIxMjAiIHkyPSIxMjAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iLTE0IiB5PSIxMCI+ejwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iNTAiIHk9IjEzNSI+eDwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iNjAiIHk9IjUiPkJhdGNoIDI8L3RleHQ+CiAgICAgIDxnIGZpbGw9IiNjMDM5MmIiPjxjaXJjbGUgY3g9IjMwIiBjeT0iMzAiIHI9IjQiLz48Y2lyY2xlIGN4PSI0MCIgY3k9IjQwIiByPSI0Ii8+PGNpcmNsZSBjeD0iNTAiIGN5PSIzMCIgcj0iNCIvPjwvZz4KICAgICAgPGcgZmlsbD0iI2YxYzQwZiI+PGNpcmNsZSBjeD0iOTAiIGN5PSIyMCIgcj0iNCIvPjxjaXJjbGUgY3g9IjEwMCIgY3k9IjMwIiByPSI0Ii8+PGNpcmNsZSBjeD0iMTEwIiBjeT0iMjUiIHI9IjQiLz48L2c+CiAgICA8L2c+CiAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyMjAsMjIwKSI+CiAgICAgIDxsaW5lIHgxPSIwIiB5MT0iMTIwIiB4Mj0iMCIgeTI9IjAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPGxpbmUgeDE9IjAiIHkxPSIxMjAiIHgyPSIxMjAiIHkyPSIxMjAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iLTE0IiB5PSIxMCI+ejwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iNTAiIHk9IjEzNSI+eCc8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjYwIiB5PSI1Ij5CYXRjaCAxPC90ZXh0PgogICAgICA8ZyBmaWxsPSIjOWI1OWI2Ij48Y2lyY2xlIGN4PSIzMCIgY3k9IjM1IiByPSI0Ii8+PGNpcmNsZSBjeD0iNDAiIGN5PSI0NSIgcj0iNCIvPjwvZz4KICAgICAgPGcgZmlsbD0iI2U2N2UyMiI+PGNpcmNsZSBjeD0iOTAiIGN5PSIyMCIgcj0iNCIvPjxjaXJjbGUgY3g9IjEwMCIgY3k9IjMwIiByPSI0Ii8+PC9nPgogICAgPC9nPgogICAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTMwLDQwMCkiPgogICAgICA8bGluZSB4MT0iMCIgeTE9IjEyMCIgeDI9IjAiIHkyPSIwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMS41Ii8+CiAgICAgIDxsaW5lIHgxPSIwIiB5MT0iMTIwIiB4Mj0iMTMwIiB5Mj0iMTIwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMS41Ii8+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9Ii0xNCIgeT0iMTAiPno8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjYwIiB5PSIxMzUiPng8L3RleHQ+CiAgICAgIDxnIGZpbGw9IiNjMDM5MmIiPjxjaXJjbGUgY3g9IjMwIiBjeT0iMzAiIHI9IjQiLz48Y2lyY2xlIGN4PSI0MCIgY3k9IjQwIiByPSI0Ii8+PC9nPgogICAgICA8ZyBmaWxsPSIjOWI1OWI2Ij48Y2lyY2xlIGN4PSI0MCIgY3k9IjMwIiByPSI0Ii8+PGNpcmNsZSBjeD0iNTAiIGN5PSI0MCIgcj0iNCIvPjwvZz4KICAgICAgPGcgZmlsbD0iI2YxYzQwZiI+PGNpcmNsZSBjeD0iOTUiIGN5PSIyNSIgcj0iNCIvPjwvZz4KICAgICAgPGcgZmlsbD0iI2U2N2UyMiI+PGNpcmNsZSBjeD0iMTA1IiBjeT0iMzAiIHI9IjQiLz48L2c+CiAgICAgIDwhLS0gTU5OIHBhaXJpbmdzIC0tPgogICAgICA8bGluZSB4MT0iMzUiIHkxPSIzNSIgeDI9IjQ1IiB5Mj0iMzUiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLWRhc2hhcnJheT0iMiwyIi8+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjMwIiB5PSI3MCI+TU5OIHBhaXJpbmdzPC90ZXh0PgogICAgPC9nPgoKICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjIwIiB5PSI1MzUiPkV4YW1wbGVzOjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJleCIgIHg9IjIwIiB5PSI1NTIiPk1OTiwgRmFzdE1OTiwgU2V1cmF0IHYzLCBTY2Fub3JhbWE8L3RleHQ+CiAgPC9nPgoKICA8IS0tIFBhbmVsIDM6IEdyYXBoLWJhc2VkICYgRGVlcCBsZWFybmluZyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4OTAsMzApIj4KICAgIDxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNTYwIiByeD0iMTAiIGZpbGw9IiNmZmYiIHN0cm9rZT0iIzI3YWU2MCIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICA8dGV4dCBjbGFzcz0icHQiIHg9IjIwIiB5PSIzMCI+R3JhcGgtYmFzZWQgbWV0aG9kcyAmYW1wOzwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJwdCIgeD0iMjAiIHk9IjUyIj5EZWVwIGxlYXJuaW5nPC90ZXh0PgogICAgPHRleHQgY2xhc3M9ImJ1bCIgeD0iMjAiIHk9IjgwIj5FbmZvcmNlIGdyYXBoIGNvbm5lY3Rpb25zIGJldHdlZW4gZGlmZmVyZW50PC90ZXh0PgogICAgPHRleHQgY2xhc3M9ImJ1bCIgeD0iMjAiIHk9Ijk2Ij5iYXRjaGVzPC90ZXh0PgoKICAgIDwhLS0gMy1jbHVzdGVyIGdyYXBoIC0tPgogICAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzAsMTEwKSI+CiAgICAgIDxnIGZpbGw9IiMyN2FlNjAiPjxjaXJjbGUgY3g9IjUwIiAgY3k9IjUwIiByPSIxMCIvPjxjaXJjbGUgY3g9IjcwIiBjeT0iMzAiIHI9IjEwIi8+PGNpcmNsZSBjeD0iOTAiIGN5PSI2NSIgcj0iMTAiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjgwIiByPSIxMCIvPjxjaXJjbGUgY3g9Ijk1IiBjeT0iNDAiIHI9IjEwIi8+PC9nPgogICAgICA8ZyBmaWxsPSIjOWI1OWI2Ij48Y2lyY2xlIGN4PSIxOTAiIGN5PSI1MCIgcj0iMTAiLz48Y2lyY2xlIGN4PSIyMTAiIGN5PSIzNSIgcj0iMTAiLz48Y2lyY2xlIGN4PSIyMzAiIGN5PSI3MCIgcj0iMTAiLz48Y2lyY2xlIGN4PSIyMjAiIGN5PSI1NSIgcj0iMTAiLz48Y2lyY2xlIGN4PSIyMDAiIGN5PSI4MCIgcj0iMTAiLz48L2c+CiAgICAgIDxnIGZpbGw9IiMyOTgwYjkiPjxjaXJjbGUgY3g9IjMxMCIgY3k9Ijc1IiByPSIxMCIvPjxjaXJjbGUgY3g9IjMyNSIgY3k9IjU1IiByPSIxMCIvPjxjaXJjbGUgY3g9IjM0NSIgY3k9IjgwIiByPSIxMCIvPjxjaXJjbGUgY3g9IjM1NSIgY3k9IjYwIiByPSIxMCIvPjwvZz4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iNjAiICB5PSIxNSI+QmF0Y2gxPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0ic3ViIiB4PSIxOTUiIHk9IjE1Ij5CYXRjaDI8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjMxNSIgeT0iMzAiPkJhdGNoMzwvdGV4dD4KICAgICAgPCEtLSBjb25uZWN0aW9ucyAtLT4KICAgICAgPGxpbmUgeDE9IjkwIiAgeTE9IjY1IiB4Mj0iMTkwIiB5Mj0iNTAiIHN0cm9rZT0iI2MwMzkyYiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPGxpbmUgeDE9Ijk1IiAgeTE9IjQwIiB4Mj0iMjEwIiB5Mj0iMzUiIHN0cm9rZT0iI2MwMzkyYiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPGxpbmUgeDE9IjIyMCIgeTE9IjU1IiB4Mj0iMzEwIiB5Mj0iNzUiIHN0cm9rZT0iI2MwMzkyYiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgICAgPGxpbmUgeDE9IjIzMCIgeTE9IjcwIiB4Mj0iMzI1IiB5Mj0iNTUiIHN0cm9rZT0iI2MwMzkyYiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICAgIDwvZz4KICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjIwIiB5PSIyNDUiPkV4YW1wbGVzOjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJleCIgIHg9IjIwIiB5PSIyNjIiPkJCS05OLCBDb25vczwvdGV4dD4KCiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIyMCIgeT0iMzAwIj5BZGQgY29uZGl0aW9uIG5vZGUgaW50byBhdXRvLWVuY29kZXI8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iYnVsIiB4PSIyMCIgeT0iMzE4Ij5hcmNoaXRlY3R1cmU8L3RleHQ+CgogICAgPCEtLSBhdXRvLWVuY29kZXIgZGlhZ3JhbSAtLT4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIwLDM0MCkiPgogICAgICA8dGV4dCBjbGFzcz0ic3ViIiB4PSIwIiB5PSIxMCI+aW5wdXQgeDwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMTYwIiB5PSIxMCI+Ym90dGxlbmVjazwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InN1YiIgeD0iMTgwIiB5PSIyNCI+bGF5ZXI8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjMzMCIgeT0iMTAiPm91dHB1dDwvdGV4dD4KICAgICAgPGcgZmlsbD0iIzliNTliNiI+CiAgICAgICAgPGNpcmNsZSBjeD0iMjAiIGN5PSI0MCIgIHI9IjgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjYwIiAgcj0iOCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iODAiICByPSI4Ii8+PGNpcmNsZSBjeD0iMjAiIGN5PSIxMDAiIHI9IjgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjEyMCIgcj0iOCIvPjxjaXJjbGUgY3g9IjIwIiBjeT0iMTQwIiByPSI4Ii8+CiAgICAgIDwvZz4KICAgICAgPGcgZmlsbD0iIzE2YTA4NSI+CiAgICAgICAgPGNpcmNsZSBjeD0iOTAiIGN5PSI2MCIgcj0iOCIvPjxjaXJjbGUgY3g9IjkwIiBjeT0iODAiIHI9IjgiLz48Y2lyY2xlIGN4PSI5MCIgY3k9IjEwMCIgcj0iOCIvPjxjaXJjbGUgY3g9IjkwIiBjeT0iMTIwIiByPSI4Ii8+CiAgICAgIDwvZz4KICAgICAgPGcgZmlsbD0iIzE2YTA4NSI+CiAgICAgICAgPGNpcmNsZSBjeD0iMTgwIiBjeT0iODAiIHI9IjgiLz48Y2lyY2xlIGN4PSIxODAiIGN5PSIxMDAiIHI9IjgiLz4KICAgICAgPC9nPgogICAgICA8Y2lyY2xlIGN4PSIxODAiIGN5PSIxMzAiIHI9IjgiIGZpbGw9IiNmMWM0MGYiLz4KICAgICAgPGcgZmlsbD0iIzE2YTA4NSI+CiAgICAgICAgPGNpcmNsZSBjeD0iMjcwIiBjeT0iNjAiIHI9IjgiLz48Y2lyY2xlIGN4PSIyNzAiIGN5PSI4MCIgcj0iOCIvPjxjaXJjbGUgY3g9IjI3MCIgY3k9IjEwMCIgcj0iOCIvPjxjaXJjbGUgY3g9IjI3MCIgY3k9IjEyMCIgcj0iOCIvPgogICAgICA8L2c+CiAgICAgIDxnIGZpbGw9IiMyOTgwYjkiPgogICAgICAgIDxjaXJjbGUgY3g9IjM0MCIgY3k9IjQwIiAgcj0iOCIvPjxjaXJjbGUgY3g9IjM0MCIgY3k9IjYwIiAgcj0iOCIvPjxjaXJjbGUgY3g9IjM0MCIgY3k9IjgwIiAgcj0iOCIvPjxjaXJjbGUgY3g9IjM0MCIgY3k9IjEwMCIgcj0iOCIvPjxjaXJjbGUgY3g9IjM0MCIgY3k9IjEyMCIgcj0iOCIvPjxjaXJjbGUgY3g9IjM0MCIgY3k9IjE0MCIgcj0iOCIvPgogICAgICA8L2c+CiAgICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjQwIiAgeT0iMTc1Ij5lbmNvZGVyPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0ic3ViIiB4PSIyNzUiIHk9IjE3NSI+ZGVjb2RlcjwvdGV4dD4KICAgIDwvZz4KICAgIDx0ZXh0IGNsYXNzPSJzdWIiIHg9IjIwIiB5PSI1MzUiPkV4YW1wbGVzOjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJleCIgIHg9IjIwIiB5PSI1NTIiPnNjVkksIHRyVkFFLCBTQVVDSUU8L3RleHQ+CiAgPC9nPgo8L3N2Zz4K" class="quarto-figure quarto-figure-center r-stretch" style="width:98.0%"><ul>
-<li><strong>Global models</strong> (e.g. ComBat, <code>sc.tl.regress_out</code>) fit a regression with batch as a covariate</li>
-<li><strong>Linear embedding / MNN</strong> (MNN, FastMNN, Seurat v3, Scanorama) find mutual nearest neighbours across batches and correct</li>
-<li><strong>Graph-based / deep learning</strong> (BBKNN, Conos, scVI, trVAE, SAUCIE) enforce cross-batch connectivity, or add batch as a node in an autoencoder</li>
-</ul>
 </section></section>
 <section>
-<section id="step-7-neighborhood-graph-clustering-embedding" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Step 7 — Neighborhood graph, clustering, embedding</h1>
+<section id="part-1-the-idea" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 1 — The idea</h1>
 
 </section>
-<section id="snn-graph-leiden-umap" class="slide level2">
-<h2>SNN graph → Leiden → UMAP</h2>
+<section id="from-correlations-to-a-network" class="slide level2">
+<h2>From correlations to a network</h2>
 <ul>
-<li>Build a <strong>shared nearest-neighbor (SNN)</strong> graph from the integrated PCs</li>
-<li><strong><a href="../Resources_Folder/Glossary.html#c">Cluster</a></strong> with <strong>Louvain</strong> or (preferred today) <strong>Leiden</strong> at a chosen resolution</li>
-<li><strong><a href="../Resources_Folder/Glossary.html#e">Embed</a></strong> for visualization with <strong>UMAP</strong> or <strong>t-SNE</strong></li>
+<li class="fragment">For each pair of genes (i, j) compute Pearson <strong>correlation</strong> <span class="math inline">\(r_{ij}\)</span> across samples</li>
+<li class="fragment">Raise to a soft-thresholding power <span class="math inline">\(\beta\)</span>: <span class="math inline">\(a_{ij} = |r_{ij}|^{\beta}\)</span> — emphasizes strong correlations, dampens weak ones</li>
+<li class="fragment">Result is a <strong>weighted adjacency matrix</strong> — every gene is connected to every other gene, but most edges are near zero</li>
+<li class="fragment">Convert to a <strong>topological overlap matrix (TOM)</strong> so genes that share many neighbours are clustered together</li>
 </ul>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(seu, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-2"><a></a>  <span class="fu">FindClusters</span>(<span class="at">resolution =</span> <span class="fl">0.5</span>, <span class="at">algorithm =</span> <span class="dv">4</span>) <span class="sc">|&gt;</span> <span class="co"># 4 = Leiden</span></span>
-<span id="cb2-3"><a></a>  <span class="fu">RunUMAP</span>(<span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>)</span>
-<span id="cb2-4"><a></a><span class="fu">DimPlot</span>(seu, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a></a>sc.pp.neighbors(adata, n_pcs<span class="op">=</span><span class="dv">30</span>)</span>
-<span id="cb3-2"><a></a>sc.tl.leiden(adata, resolution<span class="op">=</span><span class="fl">0.5</span>)</span>
-<span id="cb3-3"><a></a>sc.tl.umap(adata)</span>
-<span id="cb3-4"><a></a>sc.pl.umap(adata, color<span class="op">=</span><span class="st">&quot;leiden&quot;</span>, legend_loc<span class="op">=</span><span class="st">&quot;on data&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="why-weighted" class="slide level2">
+<h2>Why “weighted”?</h2>
+<p>A hard threshold (binary network) loses information: any gene pair just barely above the cutoff looks identical to a perfectly correlated one. The weighted soft-thresholding preserves the gradient — and Zhang &amp; Horvath (2005) showed it produces more biologically meaningful modules.</p>
+</section>
+<section id="picking-the-soft-threshold-power-beta" class="slide level2">
+<h2>Picking the soft-threshold power <span class="math inline">\(\beta\)</span></h2>
+<ul>
+<li class="fragment">Choose the smallest <span class="math inline">\(\beta\)</span> for which the network is <strong>approximately scale-free</strong> (<span class="math inline">\(R^2 \gtrsim 0.8\)</span>)</li>
+<li class="fragment">Typical values: <strong>6 for unsigned</strong>, <strong>12 for signed</strong> networks (rule of thumb from Horvath)</li>
+<li class="fragment">Use <code>pickSoftThreshold()</code> — it returns the <span class="math inline">\(R^2\)</span> vs. <span class="math inline">\(\beta\)</span> table</li>
+</ul>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(WGCNA)</span>
+<span id="cb1-2"><a></a>sft <span class="ot">&lt;-</span> <span class="fu">pickSoftThreshold</span>(<span class="fu">t</span>(expr), <span class="at">powerVector =</span> <span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, <span class="fu">seq</span>(<span class="dv">12</span>, <span class="dv">20</span>, <span class="at">by =</span> <span class="dv">2</span>)),</span>
+<span id="cb1-3"><a></a>                         <span class="at">networkType =</span> <span class="st">&quot;signed&quot;</span>, <span class="at">verbose =</span> <span class="dv">5</span>)</span>
+<span id="cb1-4"><a></a><span class="fu">plot</span>(sft<span class="sc">$</span>fitIndices<span class="sc">$</span>Power, <span class="sc">-</span><span class="fu">sign</span>(sft<span class="sc">$</span>fitIndices<span class="sc">$</span>slope) <span class="sc">*</span> sft<span class="sc">$</span>fitIndices<span class="sc">$</span>SFT.R.sq,</span>
+<span id="cb1-5"><a></a>     <span class="at">xlab =</span> <span class="st">&quot;Soft Threshold (power)&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;Scale Free Topology Model Fit, R^2&quot;</span>)</span>
+<span id="cb1-6"><a></a><span class="fu">abline</span>(<span class="at">h =</span> <span class="fl">0.80</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="callout callout-warning callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1304,47 +1225,210 @@ Bill Cresko
 <p><strong>Warning</strong></p>
 </div>
 <div class="callout-content">
-<p>UMAP distances between clusters are <strong>not quantitative</strong>. Use for visualization, not inference.</p>
+<p><strong>If no β gives R² &gt; 0.8</strong> your data is probably too small (&lt; ~20 samples), or contains technical structure (batches) overwhelming the biological signal. Fix that <em>before</em> running WGCNA — increasing β will not save you.</p>
 </div>
 </div>
 </div>
-</section>
-<section id="leiden-clustering-step-by-step" class="slide level2">
-<h2>Leiden clustering — step by step</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNDAwIDM2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC5wYW5lbCB7IGZvbnQtc2l6ZTogMTZweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLnN0ZXAgIHsgZm9udC1zaXplOiAxM3B4OyBmaWxsOiAjMjIyOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgPC9zdHlsZT4KICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImEiIHZpZXdCb3g9IjAgMCAxMCAxMCIgcmVmWD0iOSIgcmVmWT0iNSIgbWFya2VyV2lkdGg9IjgiIG1hcmtlckhlaWdodD0iOCIgb3JpZW50PSJhdXRvIj4KICAgICAgPHBhdGggZD0iTTAsMCBMMTAsNSBMMCwxMCB6IiBmaWxsPSIjMjIyIi8+CiAgICA8L21hcmtlcj4KICA8L2RlZnM+CgogIDwhLS0gUGFuZWwgMTogS05OIGdyYXBoIChhbGwgbWl4ZWQgY29sb3JzKSAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg1MCw1MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMTAiIHk9Ii0xMCI+S05OIGdyYXBoPC90ZXh0PgogICAgPGcgc3Ryb2tlPSIjODg4Ij4KICAgICAgPGxpbmUgeDE9IjQwIiB5MT0iNjAiIHgyPSI4MCIgeTI9IjUwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjUwIiB4Mj0iMTIwIiB5Mj0iNDAiLz4KICAgICAgPGxpbmUgeDE9IjEyMCIgeTE9IjQwIiB4Mj0iMTUwIiB5Mj0iNzAiLz4KICAgICAgPGxpbmUgeDE9IjgwIiB5MT0iNTAiIHgyPSI2MCIgeTI9IjkwIi8+CiAgICAgIDxsaW5lIHgxPSI2MCIgeTE9IjkwIiB4Mj0iMTAwIiB5Mj0iMTAwIi8+CiAgICAgIDxsaW5lIHgxPSIxMDAiIHkxPSIxMDAiIHgyPSIxNTAiIHkyPSI3MCIvPgogICAgICA8bGluZSB4MT0iMTAwIiB5MT0iMTAwIiB4Mj0iMTQwIiB5Mj0iMTMwIi8+CiAgICAgIDxsaW5lIHgxPSIxNDAiIHkxPSIxMzAiIHgyPSIxODAiIHkyPSIxMDAiLz4KICAgICAgPGxpbmUgeDE9IjE4MCIgeTE9IjEwMCIgeDI9IjE2MCIgeTI9IjE0MCIvPgogICAgICA8bGluZSB4MT0iMTUwIiB5MT0iNzAiIHgyPSIxOTAiIHkyPSI2MCIvPgogICAgICA8bGluZSB4MT0iNDAiIHkxPSI2MCIgeDI9IjYwIiB5Mj0iOTAiLz4KICAgICAgPGxpbmUgeDE9IjQwIiB5MT0iMTMwIiB4Mj0iODAiIHkyPSIxNTAiLz4KICAgICAgPGxpbmUgeDE9IjgwIiB5MT0iMTUwIiB4Mj0iMTIwIiB5Mj0iMTYwIi8+CiAgICAgIDxsaW5lIHgxPSIxMjAiIHkxPSIxNjAiIHgyPSIxNjAiIHkyPSIxNDAiLz4KICAgICAgPGxpbmUgeDE9IjgwIiB5MT0iMTUwIiB4Mj0iNjAiIHkyPSI5MCIvPgogICAgICA8bGluZSB4MT0iNDAiIHkxPSIxMzAiIHgyPSIxMDAiIHkyPSIxMDAiLz4KICAgIDwvZz4KICAgIDxnPgogICAgICA8Y2lyY2xlIGN4PSI0MCIgIGN5PSI2MCIgIHI9IjEwIiBmaWxsPSIjZmZmIiBzdHJva2U9IiM1NTUiLz4KICAgICAgPGNpcmNsZSBjeD0iODAiICBjeT0iNTAiICByPSIxMCIgZmlsbD0iI2MwMzkyYiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMjAiIGN5PSI0MCIgIHI9IjEwIiBmaWxsPSIjMmMzZTUwIi8+CiAgICAgIDxjaXJjbGUgY3g9IjE1MCIgY3k9IjcwIiAgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTkwIiBjeT0iNjAiICByPSIxMCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSI2MCIgIGN5PSI5MCIgIHI9IjEwIiBmaWxsPSIjZmZmIiBzdHJva2U9IiM1NTUiLz4KICAgICAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iMTAwIiByPSIxMCIgZmlsbD0iI2MwMzkyYiIvPgogICAgICA8Y2lyY2xlIGN4PSIxNDAiIGN5PSIxMzAiIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE4MCIgY3k9IjEwMCIgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTYwIiBjeT0iMTQwIiByPSIxMCIgZmlsbD0iI2FlYzZkZiIvPgogICAgICA8Y2lyY2xlIGN4PSI0MCIgIGN5PSIxMzAiIHI9IjEwIiBmaWxsPSIjYzAzOTJiIi8+CiAgICAgIDxjaXJjbGUgY3g9IjgwIiAgY3k9IjE1MCIgcj0iMTAiIGZpbGw9IiNjMDM5MmIiLz4KICAgICAgPGNpcmNsZSBjeD0iMTIwIiBjeT0iMTYwIiByPSIxMCIgZmlsbD0iI2MwMzkyYiIvPgogICAgPC9nPgogIDwvZz4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgyNzAsMTYwKSI+CiAgICA8bGluZSB4MT0iMCIgeTE9IjAiIHgyPSI0MCIgeTI9IjAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIyIiBtYXJrZXItZW5kPSJ1cmwoI2EpIi8+CiAgICA8dGV4dCBjbGFzcz0ic3RlcCIgeD0iMjAiIHk9Ii0xMCI+RmluZDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJzdGVwIiB4PSIyMCIgeT0iMjIiPmNvbW11bml0aWVzPC90ZXh0PgogIDwvZz4KCiAgPCEtLSBQYW5lbCAyOiBJbml0aWFsIHBhcnRpdGlvbiAoc2FtZSBncmFwaCBjb2xvcmVkIGJ5IGNvbW11bml0eSkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzMwLDUwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjExMCIgeT0iLTEwIj5Jbml0aWFsIHBhcnRpdGlvbjwvdGV4dD4KICAgIDxnIHN0cm9rZT0iIzg4OCI+CiAgICAgIDxsaW5lIHgxPSI0MCIgeTE9IjYwIiB4Mj0iODAiIHkyPSI1MCIvPgogICAgICA8bGluZSB4MT0iODAiIHkxPSI1MCIgeDI9IjEyMCIgeTI9IjQwIi8+CiAgICAgIDxsaW5lIHgxPSIxMjAiIHkxPSI0MCIgeDI9IjE1MCIgeTI9IjcwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjUwIiB4Mj0iNjAiIHkyPSI5MCIvPgogICAgICA8bGluZSB4MT0iNjAiIHkxPSI5MCIgeDI9IjEwMCIgeTI9IjEwMCIvPgogICAgICA8bGluZSB4MT0iMTAwIiB5MT0iMTAwIiB4Mj0iMTUwIiB5Mj0iNzAiLz4KICAgICAgPGxpbmUgeDE9IjEwMCIgeTE9IjEwMCIgeDI9IjE0MCIgeTI9IjEzMCIvPgogICAgICA8bGluZSB4MT0iMTQwIiB5MT0iMTMwIiB4Mj0iMTgwIiB5Mj0iMTAwIi8+CiAgICAgIDxsaW5lIHgxPSIxODAiIHkxPSIxMDAiIHgyPSIxNjAiIHkyPSIxNDAiLz4KICAgICAgPGxpbmUgeDE9IjE1MCIgeTE9IjcwIiB4Mj0iMTkwIiB5Mj0iNjAiLz4KICAgICAgPGxpbmUgeDE9IjQwIiB5MT0iNjAiIHgyPSI2MCIgeTI9IjkwIi8+CiAgICAgIDxsaW5lIHgxPSI0MCIgeTE9IjEzMCIgeDI9IjgwIiB5Mj0iMTUwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjE1MCIgeDI9IjEyMCIgeTI9IjE2MCIvPgogICAgICA8bGluZSB4MT0iMTIwIiB5MT0iMTYwIiB4Mj0iMTYwIiB5Mj0iMTQwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjE1MCIgeDI9IjYwIiB5Mj0iOTAiLz4KICAgIDwvZz4KICAgIDxnPgogICAgICA8Y2lyY2xlIGN4PSI0MCIgIGN5PSI2MCIgIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjgwIiAgY3k9IjUwIiAgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTIwIiBjeT0iNDAiICByPSIxMCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxNTAiIGN5PSI3MCIgIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjYwIiAgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiICByPSIxMCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE0MCIgY3k9IjEzMCIgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTgwIiBjeT0iMTAwIiByPSIxMCIgZmlsbD0iI2FlYzZkZiIvPgogICAgICA8Y2lyY2xlIGN4PSIxNjAiIGN5PSIxNDAiIHI9IjEwIiBmaWxsPSIjYWVjNmRmIi8+CiAgICAgIDxjaXJjbGUgY3g9IjQwIiAgY3k9IjEzMCIgcj0iMTAiIGZpbGw9IiNjMDM5MmIiLz4KICAgICAgPGNpcmNsZSBjeD0iODAiICBjeT0iMTUwIiByPSIxMCIgZmlsbD0iI2MwMzkyYiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMjAiIGN5PSIxNjAiIHI9IjEwIiBmaWxsPSIjYzAzOTJiIi8+CiAgICA8L2c+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDU2MCwxNjApIj4KICAgIDxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjQwIiB5Mj0iMCIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjIiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICAgIDx0ZXh0IGNsYXNzPSJzdGVwIiB4PSIyMCIgeT0iLTEwIj5SZWZpbmU8L3RleHQ+CiAgPC9nPgoKICA8IS0tIFBhbmVsIDM6IFJlZmluZWQgd2l0aCBzaGFkZWQgZ3JvdXBzIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyMCw1MCkiPgogICAgPGVsbGlwc2UgY3g9IjExMCIgY3k9IjgwIiAgcng9Ijk1IiByeT0iNTUiIGZpbGw9IiM2YmIzZTYiIG9wYWNpdHk9IjAuMzUiLz4KICAgIDxlbGxpcHNlIGN4PSIxMDAiIGN5PSIxNTAiIHJ4PSI3NSIgcnk9IjM1IiBmaWxsPSIjZWFhN2E3IiBvcGFjaXR5PSIwLjYiLz4KICAgIDxnIHN0cm9rZT0iIzg4OCI+CiAgICAgIDxsaW5lIHgxPSI0MCIgeTE9IjYwIiB4Mj0iODAiIHkyPSI1MCIvPgogICAgICA8bGluZSB4MT0iODAiIHkxPSI1MCIgeDI9IjEyMCIgeTI9IjQwIi8+CiAgICAgIDxsaW5lIHgxPSIxMjAiIHkxPSI0MCIgeDI9IjE1MCIgeTI9IjcwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjUwIiB4Mj0iNjAiIHkyPSI5MCIvPgogICAgICA8bGluZSB4MT0iNjAiIHkxPSI5MCIgeDI9IjEwMCIgeTI9IjEwMCIvPgogICAgICA8bGluZSB4MT0iMTAwIiB5MT0iMTAwIiB4Mj0iMTUwIiB5Mj0iNzAiLz4KICAgICAgPGxpbmUgeDE9IjEwMCIgeTE9IjEwMCIgeDI9IjE0MCIgeTI9IjEzMCIvPgogICAgICA8bGluZSB4MT0iMTQwIiB5MT0iMTMwIiB4Mj0iMTgwIiB5Mj0iMTAwIi8+CiAgICAgIDxsaW5lIHgxPSIxODAiIHkxPSIxMDAiIHgyPSIxNjAiIHkyPSIxNDAiLz4KICAgICAgPGxpbmUgeDE9IjE1MCIgeTE9IjcwIiB4Mj0iMTkwIiB5Mj0iNjAiLz4KICAgICAgPGxpbmUgeDE9IjQwIiB5MT0iNjAiIHgyPSI2MCIgeTI9IjkwIi8+CiAgICAgIDxsaW5lIHgxPSI0MCIgeTE9IjEzMCIgeDI9IjgwIiB5Mj0iMTUwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjE1MCIgeDI9IjEyMCIgeTI9IjE2MCIvPgogICAgICA8bGluZSB4MT0iMTIwIiB5MT0iMTYwIiB4Mj0iMTYwIiB5Mj0iMTQwIi8+CiAgICAgIDxsaW5lIHgxPSI4MCIgeTE9IjE1MCIgeDI9IjYwIiB5Mj0iOTAiLz4KICAgIDwvZz4KICAgIDxnPgogICAgICA8Y2lyY2xlIGN4PSI0MCIgIGN5PSI2MCIgIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjgwIiAgY3k9IjUwIiAgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTIwIiBjeT0iNDAiICByPSIxMCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxNTAiIGN5PSI3MCIgIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjYwIiAgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiICByPSIxMCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjE0MCIgY3k9IjEzMCIgcj0iMTAiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iMTgwIiBjeT0iMTAwIiByPSIxMCIgZmlsbD0iI2FlYzZkZiIvPgogICAgICA8Y2lyY2xlIGN4PSIxNjAiIGN5PSIxNDAiIHI9IjEwIiBmaWxsPSIjYWVjNmRmIi8+CiAgICAgIDxjaXJjbGUgY3g9IjQwIiAgY3k9IjEzMCIgcj0iMTAiIGZpbGw9IiNjMDM5MmIiLz4KICAgICAgPGNpcmNsZSBjeD0iODAiICBjeT0iMTUwIiByPSIxMCIgZmlsbD0iI2MwMzkyYiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMjAiIGN5PSIxNjAiIHI9IjEwIiBmaWxsPSIjYzAzOTJiIi8+CiAgICA8L2c+CiAgPC9nPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDg1MCwxNjApIj4KICAgIDxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjQwIiB5Mj0iMCIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjIiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICAgIDx0ZXh0IGNsYXNzPSJzdGVwIiB4PSIyMCIgeT0iLTEwIj5BZ2dyZWdhdGU8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ic3RlcCIgeD0iMjAiIHk9IjIyIj5uZXR3b3JrPC90ZXh0PgogIDwvZz4KCiAgPCEtLSBQYW5lbCA0OiBhZ2dyZWdhdGVkIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDkxMCw1MCkiPgogICAgPGxpbmUgeDE9IjcwIiB5MT0iNzAiIHgyPSIxNzAiIHkyPSIxMDAiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICA8bGluZSB4MT0iMTcwIiB5MT0iMTAwIiB4Mj0iMjEwIiB5Mj0iNTAiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICA8bGluZSB4MT0iMTcwIiB5MT0iMTAwIiB4Mj0iMjEwIiB5Mj0iMTcwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPgogICAgPGxpbmUgeDE9IjcwIiB5MT0iNzAiIHgyPSI2NSIgeTI9IjE2MCIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjIiLz4KICAgIDxsaW5lIHgxPSIxNzAiIHkxPSIxMDAiIHgyPSI2NSIgeTI9IjE2MCIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjIiLz4KICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjEwMCIgcj0iNDAiIGZpbGw9IiMyYzdmYjgiLz4KICAgIDxjaXJjbGUgY3g9IjY1IiAgY3k9IjE2MCIgcj0iMzAiIGZpbGw9IiNjMDM5MmIiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjUwIiAgcj0iMTYiIGZpbGw9IiNhZWM2ZGYiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE3MCIgcj0iMTQiIGZpbGw9IiMyYzNlNTAiLz4KICAgIDxjaXJjbGUgY3g9IjcwIiAgY3k9IjcwIiAgcj0iMTIiIGZpbGw9IiNhZWM2ZGYiLz4KICA8L2c+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTE1MCwxNjApIj4KICAgIDxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjQwIiB5Mj0iMCIgc3Ryb2tlPSIjMjIyIiBzdHJva2Utd2lkdGg9IjIiIG1hcmtlci1lbmQ9InVybCgjYSkiLz4KICAgIDx0ZXh0IGNsYXNzPSJzdGVwIiB4PSIyMCIgeT0iLTEwIj5SZWZpbmU8L3RleHQ+CiAgPC9nPgoKICA8IS0tIFBhbmVsIDU6IGZpbmFsIHBhcnRpdGlvbiAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxMjEwLDUwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjkwIiB5PSItMTAiPkZpbmFsIHBhcnRpdGlvbjwvdGV4dD4KICAgIDxlbGxpcHNlIGN4PSIxMjAiIGN5PSI5MCIgcng9IjkwIiByeT0iNjAiIGZpbGw9IiM2YmIzZTYiIG9wYWNpdHk9IjAuMzUiLz4KICAgIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjE1MCIgcng9IjQ1IiByeT0iMzAiIGZpbGw9IiNlYWE3YTciIG9wYWNpdHk9IjAuNiIvPgogICAgPGxpbmUgeDE9IjcwIiB5MT0iNzAiIHgyPSIxNzAiIHkyPSIxMDAiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICA8bGluZSB4MT0iMTcwIiB5MT0iMTAwIiB4Mj0iMjAwIiB5Mj0iNTUiIHN0cm9rZT0iIzIyMiIgc3Ryb2tlLXdpZHRoPSIyIi8+CiAgICA8bGluZSB4MT0iMTcwIiB5MT0iMTAwIiB4Mj0iMjAwIiB5Mj0iMTYwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMiIvPgogICAgPGxpbmUgeDE9IjUwIiB5MT0iMTUwIiB4Mj0iMTcwIiB5Mj0iMTAwIiBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMiIvPgogICAgPGNpcmNsZSBjeD0iMTcwIiBjeT0iMTAwIiByPSI0MCIgZmlsbD0iIzJjN2ZiOCIvPgogICAgPGNpcmNsZSBjeD0iNTAiICBjeT0iMTUwIiByPSIyNCIgZmlsbD0iI2MwMzkyYiIvPgogICAgPGNpcmNsZSBjeD0iMjAwIiBjeT0iNTUiICByPSIxNCIgZmlsbD0iI2FlYzZkZiIvPgogICAgPGNpcmNsZSBjeD0iMjAwIiBjeT0iMTYwIiByPSIxMiIgZmlsbD0iIzJjM2U1MCIvPgogICAgPGNpcmNsZSBjeD0iNzAiICBjeT0iNzAiICByPSIxMCIgZmlsbD0iI2FlYzZkZiIvPgogIDwvZz4KPC9zdmc+Cg==" class="quarto-figure quarto-figure-center r-stretch" style="width:98.0%"><ul>
-<li>Start with the <strong>KNN graph</strong> over cells in PCA space</li>
-<li><strong>Find communities</strong> → initial partition; <strong>refine</strong> merges/splits based on modularity</li>
-<li><strong>Aggregate</strong> the network, refine again → <strong>final partition</strong> (better-connected communities than Louvain)</li>
-</ul>
-</section>
-<section id="choosing-a-resolution" class="slide level2">
-<h2>Choosing a resolution</h2>
-<ul>
-<li class="fragment">No single “right” resolution exists — the question is <em>what cell types you want to resolve</em></li>
-<li class="fragment">Use <strong><code>clustree</code></strong> to visualize cluster stability across a range of resolutions</li>
-<li class="fragment">Cross-check by inspecting markers of merged vs. split clusters</li>
-</ul>
 </section></section>
 <section>
-<section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Recap &amp; what’s next</h1>
+<section id="part-2-modules" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 2 — Modules</h1>
 
 </section>
-<section id="what-to-remember-from-lecture-03" class="slide level2">
-<h2>What to remember from Lecture 03</h2>
+<section id="from-tom-to-modules" class="slide level2">
+<h2>From TOM to modules</h2>
+<ol type="1">
+<li class="fragment">Compute TOM: <span class="math inline">\(\textrm{TOM}_{ij} = \frac{\sum_u a_{iu} a_{uj} + a_{ij}}{\min(k_i, k_j) + 1 - a_{ij}}\)</span></li>
+<li class="fragment">Cluster genes by <strong><code>1 - TOM</code></strong> with average linkage</li>
+<li class="fragment">Cut the dendrogram with <strong>dynamic tree cut</strong> (<code>cutreeDynamic</code>) → modules (one per “branch”)</li>
+<li class="fragment">Merge modules whose <strong>eigengenes</strong> are highly correlated (&gt; 0.75) — avoids redundant near-duplicate modules</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>bwnet <span class="ot">&lt;-</span> <span class="fu">blockwiseModules</span>(<span class="fu">t</span>(expr),</span>
+<span id="cb2-2"><a></a>                          <span class="at">power            =</span> <span class="dv">18</span>,        <span class="co"># from pickSoftThreshold</span></span>
+<span id="cb2-3"><a></a>                          <span class="at">networkType      =</span> <span class="st">&quot;signed&quot;</span>,</span>
+<span id="cb2-4"><a></a>                          <span class="at">TOMType          =</span> <span class="st">&quot;signed&quot;</span>,</span>
+<span id="cb2-5"><a></a>                          <span class="at">minModuleSize    =</span> <span class="dv">30</span>,</span>
+<span id="cb2-6"><a></a>                          <span class="at">mergeCutHeight   =</span> <span class="fl">0.25</span>,</span>
+<span id="cb2-7"><a></a>                          <span class="at">numericLabels    =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb2-8"><a></a>                          <span class="at">maxBlockSize     =</span> <span class="dv">14000</span>)</span>
+<span id="cb2-9"><a></a><span class="fu">table</span>(bwnet<span class="sc">$</span>colors)         <span class="co"># genes per module — colours are the WGCNA convention</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="module-eigengenes-the-per-module-summary-gene" class="slide level2">
+<h2>Module eigengenes — the per-module “summary gene”</h2>
+<p>For each module, the <strong>first principal component</strong> of the module’s expression matrix is the <strong>module eigengene (ME)</strong>. It’s a single number per sample per module — and that’s what you correlate with traits.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a>MEs <span class="ot">&lt;-</span> <span class="fu">moduleEigengenes</span>(<span class="fu">t</span>(expr), bwnet<span class="sc">$</span>colors)<span class="sc">$</span>eigengenes</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Eigengenes are interpretable.</strong> A high ME for <code>MEturquoise</code> in patient X means the genes of that module are coordinately <em>up</em> in X. They reduce a 200-gene module to one column you can put in any model.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="part-3-moduletrait-relationships" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 3 — Module–trait relationships</h1>
+
+</section>
+<section id="correlate-modules-with-phenotypes" class="slide level2">
+<h2>Correlate modules with phenotypes</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a></a>trait <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(<span class="sc">~</span> severity, <span class="at">data =</span> phenoData)[, <span class="sc">-</span><span class="dv">1</span>]   <span class="co"># one-hot encoded</span></span>
+<span id="cb4-2"><a></a>moduleTraitCor    <span class="ot">&lt;-</span> <span class="fu">cor</span>(MEs, trait, <span class="at">use =</span> <span class="st">&quot;pairwise.complete.obs&quot;</span>)</span>
+<span id="cb4-3"><a></a>moduleTraitPvalue <span class="ot">&lt;-</span> <span class="fu">corPvalueStudent</span>(moduleTraitCor, <span class="at">n =</span> <span class="fu">nrow</span>(MEs))</span>
+<span id="cb4-4"><a></a><span class="fu">labeledHeatmap</span>(<span class="at">Matrix      =</span> moduleTraitCor,</span>
+<span id="cb4-5"><a></a>               <span class="at">xLabels     =</span> <span class="fu">colnames</span>(trait),</span>
+<span id="cb4-6"><a></a>               <span class="at">yLabels     =</span> <span class="fu">colnames</span>(MEs),</span>
+<span id="cb4-7"><a></a>               <span class="at">textMatrix  =</span> <span class="fu">signif</span>(moduleTraitPvalue, <span class="dv">2</span>),</span>
+<span id="cb4-8"><a></a>               <span class="at">colors      =</span> <span class="fu">blueWhiteRed</span>(<span class="dv">50</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="reading-the-heatmap" class="slide level2">
+<h2>Reading the heatmap</h2>
 <ul>
-<li class="fragment">PCA on HVGs is the substrate every downstream step builds on</li>
-<li class="fragment">Integration is <em>always</em> an editorial choice — pick the simplest method that works</li>
-<li class="fragment">Cluster on the <strong>integrated</strong> PCs, never the raw ones</li>
-<li class="fragment">UMAP is for <em>looking</em>, not for <em>measuring</em></li>
+<li class="fragment">Each cell: a Pearson <strong>r</strong> between a module eigengene and a trait, with the p-value</li>
+<li class="fragment">Modules with <em>|r| &gt; 0.5</em> and <em>p &lt; 0.05</em> are candidates</li>
+<li class="fragment"><strong>Hub genes</strong> within a strong module = highest <strong>module membership (kME)</strong> — these are your priority candidates for follow-up</li>
+<li class="fragment">Always cross-check that hub genes make biological sense (GO / KEGG enrichment of the module)</li>
+</ul>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Multiple testing.</strong> A WGCNA grid is many tests. Prefer FDR-adjusted p-values, and always check that a “significant” module survives a permutation null on shuffled trait labels.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="part-4-wgcna-on-single-cell-data" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 4 — WGCNA on single-cell data</h1>
+
+</section>
+<section id="why-classic-wgcna-struggles-on-raw-scrna" class="slide level2">
+<h2>Why classic WGCNA struggles on raw scRNA</h2>
+<ul>
+<li class="fragment">Sparsity: ~95% zeros makes pairwise correlations dominated by joint zeros</li>
+<li class="fragment">No replicates: each cell is its own column → noise drowns the structure</li>
+<li class="fragment">Solution: <strong>aggregate first</strong>, network second</li>
 </ul>
 </section>
-<section id="coming-up-next" class="slide level2">
-<h2>Coming up next</h2>
+<section id="two-practical-strategies" class="slide level2">
+<h2>Two practical strategies</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>When to use</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Pseudobulk</strong> per (sample × cell type)</td>
+<td>You have ≥ ~20 samples × cell-types</td>
+<td><code>AggregateExpression()</code> → classic <code>WGCNA</code></td>
+</tr>
+<tr class="even">
+<td><strong>Metacells</strong> (k-NN aggregates within a cell type)</td>
+<td>Single-condition atlas; rich within-cluster structure</td>
+<td><strong>hdWGCNA</strong> (Morabito et al. 2023)</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a><span class="co"># hdWGCNA sketch (signed, per-celltype)</span></span>
+<span id="cb5-2"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">SetupForWGCNA</span>(seu, <span class="at">gene_select =</span> <span class="st">&quot;fraction&quot;</span>, <span class="at">fraction =</span> <span class="fl">0.05</span>,</span>
+<span id="cb5-3"><a></a>                     <span class="at">wgcna_name =</span> <span class="st">&quot;Tcells&quot;</span>)</span>
+<span id="cb5-4"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">MetacellsByGroups</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;celltype&quot;</span>,</span>
+<span id="cb5-5"><a></a>                         <span class="at">k =</span> <span class="dv">25</span>, <span class="at">max_shared =</span> <span class="dv">10</span>, <span class="at">ident.group =</span> <span class="st">&quot;celltype&quot;</span>)</span>
+<span id="cb5-6"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">NormalizeMetacells</span>(seu)</span>
+<span id="cb5-7"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">TestSoftPowers</span>(seu, <span class="at">networkType =</span> <span class="st">&quot;signed&quot;</span>)</span>
+<span id="cb5-8"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">ConstructNetwork</span>(seu, <span class="at">soft_power =</span> <span class="dv">9</span>, <span class="at">setDatExpr =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>hdWGCNA’s metacells are not the same as Patel’s pseudobulk.</strong> Metacells aggregate <em>within</em> a cell type (creating “super-cells” inside the cluster), while pseudobulk aggregates <em>all</em> cells of one type per sample. Use metacells when you have <em>one</em> condition and want intra-cluster structure; use pseudobulk when you have <em>multiple</em> samples / conditions.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="part-5-a-workable-wgcna-workflow" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 5 — A workable WGCNA workflow</h1>
+
+</section>
+<section id="checklist" class="slide level2">
+<h2>Checklist</h2>
+<ol type="1">
+<li class="fragment"><strong>QC</strong>: <code>goodSamplesGenes()</code>, drop sample/gene outliers</li>
+<li class="fragment"><strong>Normalize</strong>: VST (<code>DESeq2::vst</code>) for bulk; log-normalize per cell type for pseudobulk</li>
+<li class="fragment"><strong>Cluster samples</strong> (<code>hclust</code> on Euclidean distance) — drop visible outliers before networking</li>
+<li class="fragment"><strong>Pick power</strong>: <code>pickSoftThreshold</code> to scale-free <span class="math inline">\(R^2 \gtrsim 0.8\)</span></li>
+<li class="fragment"><strong>Build network</strong>: <code>blockwiseModules</code> (signed, TOMType = “signed”)</li>
+<li class="fragment"><strong>Correlate</strong> module eigengenes with traits; flag |r| &gt; 0.5</li>
+<li class="fragment"><strong>Hub genes</strong> by <code>kME</code>; functional enrichment per module</li>
+<li class="fragment"><strong>Validate</strong> in an independent dataset before claiming biology</li>
+</ol>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Reproducibility:</strong> set the random seed (<code>set.seed(...)</code>) before <code>blockwiseModules</code> — module colour assignment is deterministic only if the seed is fixed.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="recap" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Recap</h1>
+
+</section>
+<section id="what-to-remember-from-lecture-07" class="slide level2">
+<h2>What to remember from Lecture 07</h2>
 <ul>
-<li><strong>Lec 04</strong> — <a href="Lecture_04_Annotation.html">Annotation</a></li>
-<li><strong>Hands-on:</strong> <a href="../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html">Tutorial 02 — Dim Reduction &amp; Clustering</a></li>
+<li class="fragment">WGCNA finds <strong>modules</strong> of co-expressed genes; eigengenes summarize them per sample</li>
+<li class="fragment">Choose <strong>β</strong> to make the network approximately scale-free, not the largest β you can fit</li>
+<li class="fragment">The interesting output is <em>module–trait correlations</em> + <em>hub genes</em></li>
+<li class="fragment">Don’t run WGCNA directly on raw single-cell counts — <strong>pseudobulk</strong> or <strong>hdWGCNA metacells</strong> first</li>
+<li class="fragment">Validate in an independent dataset</li>
+</ul>
+</section>
+<section id="companion-tutorial" class="slide level2">
+<h2>Companion tutorial</h2>
+<p><a href="../Exercise_Folder/Tutorial_07_WGCNA.html">Tutorial 07 — WGCNA on GSE152418</a> walks through Patel’s worked example: COVID-19 patient PBMC bulk RNA-seq, building a signed network, and correlating modules with disease severity.</p>
+</section>
+<section id="further-reading" class="slide level2">
+<h2>Further reading</h2>
+<ul>
+<li>Langfelder &amp; Horvath (2008) <em>BMC Bioinformatics</em> — the original WGCNA paper</li>
+<li>Morabito et al. (2023) <em>Cell Reports Methods</em> — hdWGCNA</li>
+<li><a href="https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/">WGCNA package tutorials</a> — Horvath’s official walkthroughs</li>
+<li><a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R">Patel’s <code>WGCNA.R</code></a> — the basis for our Tutorial 07</li>
 </ul>
 
 
@@ -1352,7 +1436,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Lecture 03 of 6</p>
+<p>Single Cell RNA-seq Workshop · Lecture 07 of 7</p>
 </div>
 </div></div>
 

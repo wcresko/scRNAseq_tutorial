@@ -1,0 +1,247 @@
+---
+title: "Tutorial 04 Primer — DESeq2 Basics on `airway`"
+subtitle: "A bulk-RNA-seq DE walkthrough before we tackle pseudobulk (Patel-style)"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+A primer that gets the DESeq2 mechanics out of the way **before** the pseudobulk DE tutorial. The dataset is `airway` (a Bioconductor-shipped 8-sample bulk RNA-seq experiment of dexamethasone-treated airway smooth muscle cells), so there is **no manual download** — installing the package gives you the data.
+
+This tutorial follows [Patel's `runDESeq2.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R) and [`getData.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/getData.R), with workshop-specific call-out boxes.
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it:
+
+1.  [Download the `.qmd` source](Tutorial_04_Primer_DESeq2_Basics.qmd) and open it in RStudio.
+2.  Install the packages (block below) — no other download needed.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+::: callout-note
+**Companion lecture:** [Lecture 04 — Pseudobulk DE & DESeq2](../Lecture_Folder/Lecture_04_Pseudobulk_DE.html)
+:::
+
+## Dataset — `airway`
+
+**What it is.** RNA-seq of four primary human airway smooth muscle cell lines, treated **untreated** vs. **dexamethasone**, two technical replicates each → **8 samples**. Standard reference dataset for teaching DESeq2.
+
+-   Bioconductor landing page: <https://bioconductor.org/packages/airway/>
+-   Original paper: Himes et al. (2014) *PLoS ONE* 9: e99625
+
+There's no separate download — the counts and metadata ride along with the package.
+
+```{r}
+#| label: install
+# One-time install (uncomment if needed):
+# install.packages("BiocManager")
+# BiocManager::install(c("DESeq2", "airway", "apeglm", "tidyverse"))
+```
+
+## Setup
+
+```{r}
+#| label: setup
+library(DESeq2)
+library(airway)
+library(tidyverse)
+set.seed(2026)
+```
+
+## Step 1 — Load the data and pull out counts + metadata
+
+```{r}
+#| label: load
+data(airway)
+airway
+
+counts_data <- assay(airway)         # genes × samples integer matrix
+colData     <- as.data.frame(colData(airway))
+
+# Tidy the metadata to mimic Patel's getData.R: keep cell line + treatment,
+# rename "trt"/"untrt" to something readable.
+colData <- colData[, c("cell", "dex")]
+colData$dex <- factor(gsub("trt",   "treated",   colData$dex))
+colData$dex <- factor(gsub("untrt", "untreated", colData$dex))
+
+head(counts_data[, 1:4])
+colData
+```
+
+::: {.callout-important title="Think about it"}
+1.  What's in the rows of `counts_data`? In the columns?
+2.  Why do we want `dex` as a `factor` rather than a `character`?
+
+<details>
+<summary>Show answers</summary>
+
+1.  Rows are **Ensembl gene IDs**; columns are **sample IDs** (`SRR…` accessions). Values are integer read counts.
+2.  DESeq2 builds a model matrix from factors and uses **factor levels** to decide which group is the *reference* (denominator) in `log2FoldChange`. A character column would be coerced silently and might pick the wrong reference.
+</details>
+:::
+
+## Step 2 — Sanity-check the metadata
+
+DESeq2 fails fast and unhelpfully if `colData` rows don't line up with `countData` columns. Always check.
+
+```{r}
+#| label: sanity
+all(colnames(counts_data) %in% rownames(colData))
+all(colnames(counts_data) == rownames(colData))
+```
+
+::: callout-warning
+Both should return `TRUE`. If the second is `FALSE`, **reorder `colData`** to match — don't reorder the counts (you'll forget which orientation you fixed). `colData <- colData[colnames(counts_data), ]`.
+:::
+
+## Step 3 — Build the `DESeqDataSet`
+
+```{r}
+#| label: build-dds
+dds <- DESeqDataSetFromMatrix(
+  countData = counts_data,
+  colData   = colData,
+  design    = ~ cell + dex
+)
+dds
+```
+
+::: {.callout-important title="Think about it"}
+The design is `~ cell + dex`. Why include `cell` if we only care about `dex`?
+
+<details>
+<summary>Show answers</summary>
+
+The eight samples come from **four different cell lines**. Each cell line is a paired (treated, untreated) block. Adding `cell` as a covariate **soaks up the cell-line effect** so the test for `dex` is within-line — the bulk equivalent of a paired analysis.
+</details>
+:::
+
+## Step 4 — Pre-filter low-count genes
+
+```{r}
+#| label: prefilter
+keep <- rowSums(counts(dds)) >= 10
+dds  <- dds[keep, ]
+nrow(dds)
+```
+
+::: callout-tip
+**Pre-filtering is for speed only**, not for FDR control. DESeq2 already does *independent filtering* at the `results()` step, which protects multiple testing. Dropping rows with `< 10` total counts just makes `DESeq()` faster.
+:::
+
+## Step 5 — Set the reference level
+
+```{r}
+#| label: relevel
+dds$dex <- relevel(dds$dex, ref = "untreated")
+```
+
+::: callout-warning
+**This step is easy to forget and easy to misread.** With `ref = "untreated"`, a positive `log2FoldChange` means the gene is **higher in treated**. Without `relevel()`, R's alphabetical default would flip the sign on you.
+:::
+
+## Step 6 — Run `DESeq()` and pull results
+
+```{r}
+#| label: run-deseq
+dds <- DESeq(dds)
+res <- results(dds, contrast = c("dex", "treated", "untreated"))
+summary(res)
+```
+
+::: {.callout-important title="Think about it"}
+`summary(res)` reports counts of "LFC > 0 (up)" and "outliers" and "low counts". What do "outliers" and "low counts" mean here?
+
+<details>
+<summary>Show answers</summary>
+
+-   **Outliers** are genes flagged by Cook's distance — a single sample with a wildly different count from the rest. DESeq2 sets `padj = NA` for these so they don't drive results.
+-   **Low counts** are genes filtered by *independent filtering*: their mean expression is so low they have no power to be detected at the chosen FDR. DESeq2 estimates the optimal cut adaptively.
+</details>
+:::
+
+## Step 7 — Shrink the LFCs before ranking / plotting
+
+```{r}
+#| label: lfcshrink
+res_shrunk <- lfcShrink(dds,
+                        coef = "dex_treated_vs_untreated",
+                        type = "apeglm")
+plotMA(res_shrunk, ylim = c(-3, 3))
+```
+
+::: callout-tip
+**Always rank by shrunk LFCs.** Genes with `baseMean = 2` can show wild raw LFCs purely by sampling noise; `apeglm` shrinks those toward zero and de-clutters your top-hits list.
+:::
+
+## Step 8 — Inspect a top hit
+
+```{r}
+#| label: top-hit
+top_genes <- as.data.frame(res_shrunk) |>
+  rownames_to_column("gene") |>
+  arrange(padj) |>
+  head(5)
+top_genes
+
+plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex")
+```
+
+::: {.callout-important title="Think about it"}
+Why is `plotCounts()` a more honest way to confirm a hit than just trusting the p-value?
+
+<details>
+<summary>Show answers</summary>
+
+It shows the **per-sample** values. A single outlier sample can drag the model into "significance" that disappears under inspection. Eyeballing the per-sample dots beats a single p-value every time.
+</details>
+:::
+
+## Step 9 — Sanity check by transformation + PCA
+
+Quality-control your samples *post-hoc* with a variance-stabilizing transform (`vst`) and a PCA:
+
+```{r}
+#| label: vst-pca
+vsd <- vst(dds, blind = FALSE)
+plotPCA(vsd, intgroup = c("dex", "cell"))
+```
+
+::: callout-tip
+**What you want to see.** Treated and untreated separated on PC1 or PC2 *within* each cell line. If samples cluster by cell line only and not by `dex`, your treatment effect is small relative to between-line variation — interpret the DE results accordingly.
+:::
+
+## Stretch goals
+
+-   **Interaction terms.** Try `design = ~ cell + dex + cell:dex` and compare results. (See [Patel's `interactionTerms.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/interactionTerms.R).)
+-   **Volcano plot.** Plot `-log10(padj)` vs. `log2FoldChange` from `res_shrunk` and label your top 20 hits.
+-   **Pathway enrichment.** Feed the significant genes into `clusterProfiler::enrichGO()` for a downstream view.
+
+## What you've practiced
+
+-   Building a `DESeqDataSet` from a counts matrix + sample table
+-   Adding a covariate to a design
+-   Reading DESeq2 output (LFC, lfcSE, padj, baseMean)
+-   Shrinking LFCs for honest ranking
+-   QCing samples with `vst` + PCA
+
+You're now ready for [Tutorial 04 — Pseudobulk DE](Tutorial_04_Pseudobulk_DE.html), where the same DESeq2 mechanics apply to a per-cell-type aggregated count matrix.
+
+## Credits
+
+-   Patel: [`runDESeq2.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R) and [`getData.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/getData.R)
+-   Data: [`airway`](https://bioconductor.org/packages/airway/) (Himes et al., 2014, *PLoS ONE*)

@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Extra Lecture — Pseudobulk Differential Expression</title>
+  <title>Single Cell RNA-seq Workshop – Lecture 06 — Bulk &amp; Single-Cell ATAC-seq</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Extra Lecture — Pseudobulk Differential Expression</h1>
+  <h1 class="title">Lecture 06 — Bulk &amp; Single-Cell ATAC-seq</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,136 +1150,117 @@ Bill Cresko
 
 </section>
 <section>
-<section id="pseudobulk-differential-expression" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Pseudobulk Differential Expression</h1>
+<section id="lecture-06-bulk-single-cell-atac-seq" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Lecture 06: Bulk &amp; Single-Cell ATAC-seq</h1>
 
+</section>
+<section id="where-this-lecture-fits" class="slide level2">
+<h2>Where this lecture fits</h2>
+<ul>
+<li>Previous: <a href="Lecture_05_Reference_Annotation.html">Lec 05 — Reference-based Annotation</a></li>
+<li><strong>You are here:</strong> Lec 06 — <em>measuring chromatin accessibility, in bulk and per cell</em></li>
+<li>Next: <a href="Lecture_07_WGCNA.html">Lec 07 — WGCNA</a></li>
+<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_06_scATACseq_Signac.html">Tutorial 06 — scATAC-seq with Signac</a></li>
+</ul>
 </section>
 <section id="goals-of-this-lecture" class="slide level2">
 <h2>Goals of this lecture</h2>
 <ul>
-<li class="fragment">Understand why per-cell DE between <strong>conditions</strong> is often statistically wrong</li>
-<li class="fragment">See how pseudobulk fixes it</li>
-<li class="fragment">Run a pseudobulk workflow in Seurat + DESeq2</li>
-<li class="fragment">Know when pseudobulk is and is not the right tool</li>
+<li class="fragment">Understand what <strong>ATAC-seq</strong> measures and how it complements RNA-seq</li>
+<li class="fragment">See how the <strong>bulk ATAC-seq</strong> workflow turns reads into peaks</li>
+<li class="fragment">Translate the bulk workflow to the <strong>single-cell</strong> setting (scATAC-seq, Signac)</li>
+<li class="fragment">Read scATAC QC metrics — fragment counts, TSS enrichment, nucleosome signal</li>
+<li class="fragment">Connect chromatin clusters to RNA-defined cell types via <strong>gene activity</strong></li>
 </ul>
-</section></section>
-<section>
-<section id="part-1-the-problem-with-per-cell-de" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 1 — The problem with per-cell DE</h1>
-
-</section>
-<section id="the-scientific-question" class="slide level2">
-<h2>The scientific question</h2>
-<blockquote>
-<p>In <em>cell type X</em>, which genes differ between <strong>treated</strong> and <strong>control</strong> subjects?</p>
-</blockquote>
-</section>
-<section id="why-per-cell-tests-go-wrong" class="slide level2">
-<h2>Why per-cell tests go wrong</h2>
-<ul>
-<li class="fragment">Cells from one subject are <strong>not independent observations</strong> — they share genetics, library prep, batch, treatment</li>
-<li class="fragment">Treating each cell as an independent replicate inflates the effective N by 100×–10,000×</li>
-<li class="fragment">Result: <strong>anti-conservative p-values</strong> — thousands of spuriously “significant” genes</li>
-<li class="fragment">This has been shown repeatedly in benchmarks (Squair et al. 2021; Zimmerman et al. 2021)</li>
-</ul>
-<div class="callout callout-important callout-titled callout-style-default">
+<div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>Important</strong></p>
+<p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p>If your experimental unit is the <strong>subject</strong>, your statistical unit should be the <strong>subject</strong>.</p>
+<p><strong>Why include this lecture?</strong> RNA-seq tells you what genes are <strong>expressed</strong>; ATAC-seq tells you which regulatory regions are <strong>accessible</strong>. Together they explain <em>what</em> a cell is doing and <em>what it is poised to do</em>. The analysis vocabulary (counts, peaks, dim reduction, clusters) is almost identical to scRNA-seq — the differences are mostly bioinformatic plumbing.</p>
 </div>
 </div>
 </div>
-</section>
-<section id="the-fix-in-one-sentence" class="slide level2">
-<h2>The fix in one sentence</h2>
-<blockquote>
-<p><strong>Aggregate counts per (sample, cell type); run DESeq2 / edgeR / limma-voom on the result.</strong></p>
-</blockquote>
 </section></section>
 <section>
-<section id="part-2-pseudobulk-visually" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 2 — Pseudobulk, visually</h1>
+<section id="part-1-what-atac-seq-is" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 1 — What ATAC-seq is</h1>
 
 </section>
-<section id="what-pseudobulk-does" class="slide level2">
-<h2>What pseudobulk does</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDQ2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC50aXRsZSB7IGZvbnQtc2l6ZTogMThweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLnBhbmVsIHsgZm9udC1zaXplOiAxNHB4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjMzMzOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubGJsIHsgZm9udC1zaXplOiAxMXB4OyBmaWxsOiAjNTU1OyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAudHh0IHsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMzMzOyB9CiAgICAuY2VsbEhkciB7IGZvbnQtc2l6ZTogMTFweDsgZm9udC13ZWlnaHQ6IDYwMDsgZmlsbDogIzIyMjsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjNTU1OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjUwMCIgeT0iMjgiPlBzZXVkb2J1bGs6IGFnZ3JlZ2F0ZSBjZWxscyDihpIgc2FtcGxlLWxldmVsIGNvdW50cyDihpIgYnVsayBERSBmcmFtZXdvcms8L3RleHQ+CgogIDwhLS0gUGFuZWwgMTogYW5ub3RhdGVkIGNlbGxzIGJ5IGNsdXN0ZXIgw5cgc2FtcGxlIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLDYwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMCI+MS4gU2luZ2xlIGNlbGxzIGxhYmVsZWQgYnk8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMTgiPihjbHVzdGVyLCBzYW1wbGUpPC90ZXh0PgogICAgPHJlY3QgeD0iMCIgeT0iMzAiIHdpZHRoPSIyODAiIGhlaWdodD0iMjkwIiBmaWxsPSIjZmFmYWZhIiBzdHJva2U9IiNjY2MiLz4KCiAgICA8IS0tIENsdXN0ZXIgQSAtLT4KICAgIDxnPgogICAgICA8IS0tIHNhbXBsZSBTMSAtLT4KICAgICAgPGNpcmNsZSBjeD0iNTAiICBjeT0iODAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjUiICBjeT0iNzUiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNzIiICBjeT0iMTAwIiByPSI1IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDwhLS0gc2FtcGxlIFMyIC0tPgogICAgICA8Y2lyY2xlIGN4PSI5MCIgIGN5PSI4MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI5MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIxMDIiIHI9IjUiIGZpbGw9IiMyYzdmYjgiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgIDwvZz4KICAgIDwhLS0gQ2x1c3RlciBCIC0tPgogICAgPGc+CiAgICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIxODAiIGN5PSIxODAiIHI9IjUiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTc1IiBjeT0iMTYwIiByPSI1IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIyMDUiIGN5PSIxNjUiIHI9IjUiIGZpbGw9IiNlNjYxMDEiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgICAgPGNpcmNsZSBjeD0iMjE1IiBjeT0iMTc1IiByPSI1IiBmaWxsPSIjZTY2MTAxIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjIyNSIgY3k9IjE2MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEMgLS0+CiAgICA8Zz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iMjQwIiByPSI1IiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjcwIiAgY3k9IjI1MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIvPgogICAgICA8Y2lyY2xlIGN4PSI4MCIgIGN5PSIyNDUiIHI9IjUiIGZpbGw9IiMxYjllNzciLz4KICAgICAgPGNpcmNsZSBjeD0iMTEwIiBjeT0iMjUwIiByPSI1IiBmaWxsPSIjMWI5ZTc3IiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjEyMCIgY3k9IjI0MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgoKICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjE0MCIgeT0iMzQwIj5jb2xvciA9IGNsdXN0ZXIgwrcgb3V0bGluZSA9IHNhbXBsZSBTMjwvdGV4dD4KICA8L2c+CgogIDwhLS0gQXJyb3cgLS0+CiAgPHBhdGggY2xhc3M9ImFycm93IiBkPSJNIDMyMCAyMTAgTCAzODAgMjEwIiBtYXJrZXItZW5kPSJ1cmwoI2FocCkiLz4KICA8dGV4dCBjbGFzcz0ibGJsIiB4PSIzNTAiIHk9IjIwMCI+c3VtPC90ZXh0PgoKICA8IS0tIFBhbmVsIDI6IHBzZXVkb2J1bGsgbWF0cml4IC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM5NSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjIuIFBlciAoY2x1c3Rlciwgc2FtcGxlKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTQwIiB5PSIxOCI+c3VtIG9mIGNvdW50czwvdGV4dD4KCiAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLDQwKSI+CiAgICAgIDwhLS0gaGVhZGVyIHJvdyAtLT4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9Ijc1IiAgeT0iMTUiPlMxwrdBPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMTI1IiB5PSIxNSI+UzLCt0E8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJjZWxsSGRyIiB4PSIxNzUiIHk9IjE1Ij5TMcK3QjwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9IjIyNSIgeT0iMTUiPlMywrdCPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMjc1IiB5PSIxNSI+UzHCt0M8L3RleHQ+CgogICAgICA8IS0tIHJvd3M6IGdlbmVzIC0tPgogICAgICA8ZyBmb250LWZhbWlseT0iTWVubG8sQ29uc29sYXMsbW9ub3NwYWNlIiBmb250LXNpemU9IjExIiBmaWxsPSIjMjIyIj4KICAgICAgICA8dGV4dCB4PSIwIiB5PSI0MCI+R2VuZTE8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE0MjwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIxMDAiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSIxMTciIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xNjg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NjI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Nzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjIxPC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSI2NSI+R2VuZTI8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjMzPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjEwMCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjExNyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjQxPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjE1MCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2ZmZDRhNiIvPjx0ZXh0IHg9IjE2NyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIwNTwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNmZmQ0YTYiLz48dGV4dCB4PSIyMTciIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI1MiIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTg8L3RleHQ+CgogICAgICAgIDx0ZXh0IHg9IjAiIHk9IjkwIj5HZW5lMzwvdGV4dD48cmVjdCB4PSI1NSIgeT0iNzciIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjcyIiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ODc8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYzZkYmVmIi8+PHRleHQgeD0iMTE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OTI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTQ8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTk8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTA3PC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSIxMTUiPuKApjwvdGV4dD4KICAgICAgPC9nPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTQwIiB5PSIxNzUiPmxvb2tzIGxpa2UgYSBidWxrIFJOQS1zZXEgY291bnQgbWF0cml4PC90ZXh0PgogIDwvZz4KCiAgPCEtLSBBcnJvdyBkb3duIC0tPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA1MjAgMjkwIEwgNTIwIDMzNSIgbWFya2VyLWVuZD0idXJsKCNhaHApIi8+CgogIDwhLS0gUGFuZWwgMzogREUgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzk1LDM0MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjMuIEZpdCBERSBwZXIgY2x1c3RlcjwvdGV4dD4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIwLDIwKSI+CiAgICAgIDxyZWN0IHg9IjAiICB5PSIwIiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc1IiByeD0iMTAiIGZpbGw9IiNlZWYzZmEiIHN0cm9rZT0iIzJjN2ZiOCIvPgogICAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxMCIgeT0iMjAiIGZvbnQtd2VpZ2h0PSI3MDAiPkRFU2VxMiAvIGVkZ2VSIC8gbGltbWEtdm9vbTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjQwIj5kZXNpZ24gPSB+IGNvbmRpdGlvbiAoKyBjb3ZhcmlhdGVzKTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjU4Ij5zaHJpbmthZ2UsIHByb3BlciByZXBsaWNhdGlvbiw8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjEwIiB5PSI3MyI+d2VsbC1jYWxpYnJhdGVkIHAtdmFsdWVzPC90ZXh0PgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBSaWdodCBwYW5lbDogd2h5IHBzZXVkb2J1bGsgbWF0dGVycyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MjAsNjApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNjAiIGhlaWdodD0iMzcwIiByeD0iMTAiIGZpbGw9IiNmZmY3ZDYiIHN0cm9rZT0iI2Q5YjQxYSIvPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMzAiIHk9IjI1Ij5XaHkgcHNldWRvYnVsaz88L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjU1IiBmb250LXdlaWdodD0iNzAwIj5QZXItY2VsbCBERSBwaXRmYWxsPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9Ijc1Ij5jZWxscyBmcm9tIG9uZSBzdWJqZWN0IGFyZSBub3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iOTEiPmluZGVwZW5kZW50IOKGkiBwLXZhbHVlcyB0b28gc21hbGw8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjEyMCIgZm9udC13ZWlnaHQ9IjcwMCI+UHNldWRvYnVsayBmaXhlcyB0aGlzPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE0MCI+c2FtcGxlcyBBUkUgaW5kZXBlbmRlbnQ7IGJ1bGs8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMTU2Ij5tZXRob2RzIGFyZSB3ZWxsLWNhbGlicmF0ZWQ8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE4NSIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiB0byB1c2UgaXQ8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjA1Ij7CtyBjb21wYXJpbmcgY29uZGl0aW9ucyBhY3Jvc3M8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjIxIj4gIGJpb2xvZ2ljYWwgcmVwbGljYXRlczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIyNDEiPsK3IOKJpSAzIHNhbXBsZXMgcGVyIGdyb3VwLCBpZGVhbGx5IG1vcmU8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjI3MCIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiBOT1Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjkwIj7CtyBmaW5kaW5nIGNsdXN0ZXIgbWFya2VyczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMDYiPiAgKHVzZSB3aXRoaW4tY2VsbCBtZXRob2RzKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMjYiPsK3IG9ubHkgMeKAkzIgc2FtcGxlcyB0b3RhbDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzNDYiPiAgKG5vIHJlcGxpY2F0aW9uIGF2YWlsYWJsZSk8L3RleHQ+CiAgPC9nPgoKICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImFocCIgdmlld0JveD0iMCAwIDEwIDEwIiByZWZYPSI4IiByZWZZPSI1IiBtYXJrZXJXaWR0aD0iNyIgbWFya2VySGVpZ2h0PSI3IiBvcmllbnQ9ImF1dG8tc3RhcnQtcmV2ZXJzZSI+CiAgICAgIDxwYXRoIGQ9Ik0gMCAwIEwgMTAgNSBMIDAgMTAgeiIgZmlsbD0iIzU1NSIvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgo8L3N2Zz4K" class="quarto-figure quarto-figure-center r-stretch" style="width:95.0%"></section>
-<section id="what-changes-vs.-bulk-rna-seq" class="slide level2">
-<h2>What changes vs. bulk RNA-seq?</h2>
+<section id="the-biology-in-one-slide" class="slide level2">
+<h2>The biology in one slide</h2>
 <ul>
-<li class="fragment">Structurally — <strong>nothing</strong>. The pseudobulk matrix looks like a bulk counts matrix</li>
-<li class="fragment">You use the <strong>same tools</strong>: DESeq2, edgeR, limma-voom</li>
-<li class="fragment">The only differences are:
-<ul>
-<li class="fragment">One matrix <strong>per cell type</strong></li>
-<li class="fragment">Samples with too few cells in that type get dropped or flagged</li>
-</ul></li>
+<li class="fragment">DNA in the nucleus is wrapped around histones into <strong>nucleosomes</strong></li>
+<li class="fragment">Regions where transcription factors and RNA polymerase need access (promoters, enhancers, insulators) are <strong>nucleosome-depleted</strong> → “open chromatin”</li>
+<li class="fragment"><strong>ATAC-seq</strong> uses a hyperactive <strong>Tn5 transposase</strong> that simultaneously cuts open DNA <em>and</em> tags it with sequencing adapters — only accessible regions are cut</li>
+<li class="fragment">Map reads back to the genome → peaks of read coverage = open regions</li>
 </ul>
+</section>
+<section id="atac-vs.-other-accessibility-assays" class="slide level2">
+<h2>ATAC vs. other accessibility assays</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Assay</th>
+<th>What it measures</th>
+<th>Throughput</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DNase-seq</strong></td>
+<td>DNase I cut sites</td>
+<td>High input, classic</td>
+<td>Requires lots of cells</td>
+</tr>
+<tr class="even">
+<td><strong>FAIRE-seq</strong></td>
+<td>Free, non-nucleosomal DNA</td>
+<td>Phenol-extraction</td>
+<td>Low resolution</td>
+</tr>
+<tr class="odd">
+<td><strong>ATAC-seq</strong></td>
+<td>Tn5-accessible DNA</td>
+<td>50k cells (bulk), 1 cell (sc)</td>
+<td>Default modern choice</td>
+</tr>
+<tr class="even">
+<td><strong>Cut&amp;Run / Cut&amp;Tag</strong></td>
+<td>Antibody-targeted accessibility</td>
+<td>Low input</td>
+<td>Marks TF-bound or modified regions</td>
+</tr>
+</tbody>
+</table>
 </section></section>
 <section>
-<section id="part-3-doing-it-in-seurat-deseq2" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 3 — Doing it in Seurat + DESeq2</h1>
+<section id="part-2-bulk-atac-seq-workflow" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 2 — Bulk ATAC-seq workflow</h1>
 
 </section>
-<section id="build-the-pseudobulk-matrix" class="slide level2">
-<h2>Build the pseudobulk matrix</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb1-2"><a></a></span>
-<span id="cb1-3"><a></a><span class="co"># seu is an integrated, annotated Seurat object with:</span></span>
-<span id="cb1-4"><a></a><span class="co">#   seu$sample    — biological sample ID (subject / replicate)</span></span>
-<span id="cb1-5"><a></a><span class="co">#   seu$condition — treatment vs control</span></span>
-<span id="cb1-6"><a></a><span class="co">#   seu$celltype  — annotated cell type</span></span>
-<span id="cb1-7"><a></a></span>
-<span id="cb1-8"><a></a>pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(</span>
-<span id="cb1-9"><a></a>  seu,</span>
-<span id="cb1-10"><a></a>  <span class="at">assays    =</span> <span class="st">&quot;RNA&quot;</span>,</span>
-<span id="cb1-11"><a></a>  <span class="at">group.by  =</span> <span class="fu">c</span>(<span class="st">&quot;celltype&quot;</span>, <span class="st">&quot;sample&quot;</span>),</span>
-<span id="cb1-12"><a></a>  <span class="at">return.seurat =</span> <span class="cn">FALSE</span></span>
-<span id="cb1-13"><a></a>)<span class="sc">$</span>RNA</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p><code>pb</code> is a genes × (celltype_sample) count matrix — ready for DESeq2.</p>
-</section>
-<section id="fit-deseq2-per-cell-type" class="slide level2">
-<h2>Fit DESeq2 per cell type</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a><span class="fu">library</span>(DESeq2)</span>
-<span id="cb2-2"><a></a></span>
-<span id="cb2-3"><a></a>run_pb_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct, pb_mat, sample_meta) {</span>
-<span id="cb2-4"><a></a>  cols <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="fu">paste0</span>(<span class="st">&quot;^&quot;</span>, ct, <span class="st">&quot;_&quot;</span>), <span class="fu">colnames</span>(pb_mat), <span class="at">value =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb2-5"><a></a>  mat  <span class="ot">&lt;-</span> pb_mat[, cols]</span>
-<span id="cb2-6"><a></a>  meta <span class="ot">&lt;-</span> sample_meta[<span class="fu">match</span>(<span class="fu">sub</span>(<span class="fu">paste0</span>(<span class="st">&quot;^&quot;</span>, ct, <span class="st">&quot;_&quot;</span>), <span class="st">&quot;&quot;</span>, cols),</span>
-<span id="cb2-7"><a></a>                            sample_meta<span class="sc">$</span>sample), ]</span>
-<span id="cb2-8"><a></a></span>
-<span id="cb2-9"><a></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> mat,</span>
-<span id="cb2-10"><a></a>                                <span class="at">colData   =</span> meta,</span>
-<span id="cb2-11"><a></a>                                <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
-<span id="cb2-12"><a></a>  dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb2-13"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span> <span class="fu">as.data.frame</span>()</span>
-<span id="cb2-14"><a></a>}</span>
-<span id="cb2-15"><a></a></span>
-<span id="cb2-16"><a></a>res_by_ct <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">unique</span>(seu<span class="sc">$</span>celltype),</span>
-<span id="cb2-17"><a></a>                    run_pb_de, <span class="at">pb_mat =</span> pb, <span class="at">sample_meta =</span> sample_meta)</span>
-<span id="cb2-18"><a></a><span class="fu">names</span>(res_by_ct) <span class="ot">&lt;-</span> <span class="fu">unique</span>(seu<span class="sc">$</span>celltype)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="edger-and-limma-voom-alternatives" class="slide level2">
-<h2>edgeR and limma-voom alternatives</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(edgeR)</span>
-<span id="cb3-2"><a></a>y <span class="ot">&lt;-</span> <span class="fu">DGEList</span>(<span class="at">counts =</span> mat, <span class="at">group =</span> meta<span class="sc">$</span>condition)</span>
-<span id="cb3-3"><a></a>y <span class="ot">&lt;-</span> <span class="fu">calcNormFactors</span>(y)</span>
-<span id="cb3-4"><a></a>design <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(<span class="sc">~</span> condition, meta)</span>
-<span id="cb3-5"><a></a>y <span class="ot">&lt;-</span> <span class="fu">estimateDisp</span>(y, design)</span>
-<span id="cb3-6"><a></a>fit <span class="ot">&lt;-</span> <span class="fu">glmQLFit</span>(y, design)</span>
-<span id="cb3-7"><a></a>qlf <span class="ot">&lt;-</span> <span class="fu">glmQLFTest</span>(fit, <span class="at">coef =</span> <span class="dv">2</span>)</span>
-<span id="cb3-8"><a></a><span class="fu">topTags</span>(qlf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a></a><span class="fu">library</span>(limma)</span>
-<span id="cb4-2"><a></a>v   <span class="ot">&lt;-</span> <span class="fu">voom</span>(y, design, <span class="at">plot =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb4-3"><a></a>fit <span class="ot">&lt;-</span> <span class="fu">lmFit</span>(v, design) <span class="sc">|&gt;</span> <span class="fu">eBayes</span>()</span>
-<span id="cb4-4"><a></a><span class="fu">topTable</span>(fit, <span class="at">coef =</span> <span class="dv">2</span>, <span class="at">number =</span> <span class="cn">Inf</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="from-reads-to-peaks" class="slide level2">
+<h2>From reads to peaks</h2>
+<p>![Bulk ATAC-seq workflow: align reads, mark duplicates, shift Tn5 offsets, call peaks, annotate.]</p>
+<ol type="1">
+<li class="fragment"><strong>Sequence</strong> paired-end reads (50–75 bp), trim adapters</li>
+<li class="fragment"><strong>Align</strong> with <code>bwa-mem</code> or <code>bowtie2</code> (<code>--very-sensitive</code>)</li>
+<li class="fragment"><strong>Filter</strong>: drop duplicates, mitochondrial reads (chrM is hugely over-represented), low-MAPQ reads</li>
+<li class="fragment"><strong>Shift Tn5 offsets</strong> — <code>+4</code>/<code>-5</code> bp on the two strands (Tn5 binds as a dimer)</li>
+<li class="fragment"><strong>Call peaks</strong> with <code>MACS2 callpeak --nomodel --shift -75 --extslop 150 -B --SPMR</code> (or <code>-f BAMPE</code> for paired-end)</li>
+<li class="fragment"><strong>Annotate</strong> peaks with <code>ChIPseeker</code> or <code>HOMER</code> against a TSS database</li>
+</ol>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1289,74 +1270,326 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p>All three give well-calibrated inference. DESeq2 is the most common default in the scRNA-seq literature.</p>
+<p><strong>Sanity-check the fragment-size distribution.</strong> A good ATAC library shows clear nucleosomal periodicity: a sub-100bp peak (NFR — nucleosome-free region), a ~200bp peak (mono-nucleosome), and ~400bp (di-nucleosome). Missing periodicity = library quality problem.</p>
 </div>
 </div>
 </div>
 </section>
-<section id="python-alternative-decoupler-pydeseq2" class="slide level2">
-<h2>Python alternative — decoupleR + PyDESeq2</h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a></a><span class="im">import</span> decoupler <span class="im">as</span> dc</span>
-<span id="cb5-2"><a></a><span class="im">import</span> pydeseq2.ds <span class="im">as</span> ds</span>
-<span id="cb5-3"><a></a></span>
-<span id="cb5-4"><a></a>pb <span class="op">=</span> dc.get_pseudobulk(adata, sample_col<span class="op">=</span><span class="st">&quot;sample&quot;</span>,</span>
-<span id="cb5-5"><a></a>                       groups_col<span class="op">=</span><span class="st">&quot;celltype&quot;</span>, min_cells<span class="op">=</span><span class="dv">10</span>, min_counts<span class="op">=</span><span class="dv">1000</span>)</span>
-<span id="cb5-6"><a></a></span>
-<span id="cb5-7"><a></a><span class="co"># Then fit PyDESeq2 per celltype, contrast=treated vs control</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="common-qc-metrics-in-bulk-atac" class="slide level2">
+<h2>Common QC metrics in bulk ATAC</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Healthy range</th>
+<th>What goes wrong</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>% reads on chrM</strong></td>
+<td>&lt; 30% (often &lt; 10%)</td>
+<td>High = poor mitochondrial depletion</td>
+</tr>
+<tr class="even">
+<td><strong>TSS enrichment score</strong></td>
+<td>&gt; 7 (ENCODE), &gt; 10 ideal</td>
+<td>Low = scattered, non-specific Tn5</td>
+</tr>
+<tr class="odd">
+<td><strong>Fraction of reads in peaks (FRiP)</strong></td>
+<td>&gt; 0.2</td>
+<td>Low = noisy library</td>
+</tr>
+<tr class="even">
+<td><strong>Library complexity (NRF, PBC1)</strong></td>
+<td>NRF &gt; 0.9</td>
+<td>Low = PCR-duplicated library</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Tn5 has sequence preferences.</strong> Don’t try to call SNVs or look at base-level features near peak summits — Tn5 cleaves preferentially at <code>GC</code>-rich sites and biases the apparent footprint.</p>
+</div>
+</div>
+</div>
 </section></section>
 <section>
-<section id="part-4-practical-guidance" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 4 — Practical guidance</h1>
+<section id="part-3-single-cell-atac-seq" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 3 — Single-cell ATAC-seq</h1>
 
 </section>
-<section id="when-to-use-pseudobulk" class="slide level2">
-<h2>When to use pseudobulk</h2>
+<section id="scatac-vs.-scrna-same-shape-different-math" class="slide level2">
+<h2>scATAC vs. scRNA — same shape, different math</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th>scRNA-seq</th>
+<th>scATAC-seq</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Feature</td>
+<td>gene</td>
+<td>peak (or bin / motif / TF)</td>
+</tr>
+<tr class="even">
+<td>Counts</td>
+<td>UMI per gene per cell</td>
+<td>Tn5 cut events per peak per cell</td>
+</tr>
+<tr class="odd">
+<td>Sparsity</td>
+<td>~90% zeros</td>
+<td>~98–99% zeros (most peaks not seen in most cells)</td>
+</tr>
+<tr class="even">
+<td>Dim reduction</td>
+<td>PCA on log-normalized counts</td>
+<td><strong>LSI</strong> (TF-IDF + SVD) on binarized counts</td>
+</tr>
+<tr class="odd">
+<td>Standard tools</td>
+<td>Seurat / scanpy</td>
+<td><strong>Signac</strong> / ArchR / SnapATAC2</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Why LSI not PCA?</strong> scATAC counts are nearly binary (a peak is either captured or not in a cell). Variance-stabilizing normalization (TF-IDF) followed by SVD handles this better than naive PCA on log-counts.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-10x-multiome-scatac-fragment-file" class="slide level2">
+<h2>The 10x Multiome / scATAC fragment file</h2>
+<p>The primary input for <code>Signac</code> is a <strong><code>fragments.tsv.gz</code></strong> — every line is one Tn5 cut event:</p>
+<pre><code>chr1   10125   10570   AAACGAAAGAGGAGCC-1   2</code></pre>
+<p><code>chrom  start  end  cell_barcode  duplicate_count</code></p>
+<p>A <code>tabix</code> index (<code>.tbi</code>) is built so <code>Signac</code> can pull fragments for any genomic region in O(log n).</p>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Download the fragment file even if you only have the peak matrix.</strong> Many downstream operations (gene activity, motif scoring, coverage plots) re-count fragments per region from scratch.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="scatac-qc-metrics-what-to-look-at" class="slide level2">
+<h2>scATAC QC metrics — what to look at</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Healthy range</th>
+<th>What it catches</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong><code>nCount_peaks</code></strong> (fragments in peaks per cell)</td>
+<td>1,000–50,000</td>
+<td>Low = empty droplet; very high = doublet</td>
+</tr>
+<tr class="even">
+<td><strong><code>pct_reads_in_peaks</code></strong> (FRiP per cell)</td>
+<td>&gt; 15%</td>
+<td>Low = noisy / dying cell</td>
+</tr>
+<tr class="odd">
+<td><strong><code>blacklist_ratio</code></strong></td>
+<td>&lt; 0.05</td>
+<td>High = repetitive / artefactual</td>
+</tr>
+<tr class="even">
+<td><strong><code>nucleosome_signal</code></strong></td>
+<td>&lt; 4</td>
+<td>High = degraded library, poor periodicity</td>
+</tr>
+<tr class="odd">
+<td><strong><code>TSS.enrichment</code></strong></td>
+<td>&gt; 2 (per-cell)</td>
+<td>Low = no real chromatin signal</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a><span class="co"># Patel-style QC subset (from scATACSeq_standard_workflow.R)</span></span>
+<span id="cb2-2"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">subset</span>(pbmc,</span>
+<span id="cb2-3"><a></a>               <span class="at">subset =</span> peak_region_fragments <span class="sc">&gt;</span> <span class="dv">3000</span> <span class="sc">&amp;</span></span>
+<span id="cb2-4"><a></a>                        peak_region_fragments <span class="sc">&lt;</span> <span class="dv">20000</span> <span class="sc">&amp;</span></span>
+<span id="cb2-5"><a></a>                        pct_reads_in_peaks    <span class="sc">&gt;</span> <span class="dv">15</span> <span class="sc">&amp;</span></span>
+<span id="cb2-6"><a></a>                        blacklist_ratio       <span class="sc">&lt;</span> <span class="fl">0.05</span> <span class="sc">&amp;</span></span>
+<span id="cb2-7"><a></a>                        nucleosome_signal     <span class="sc">&lt;</span> <span class="dv">4</span> <span class="sc">&amp;</span></span>
+<span id="cb2-8"><a></a>                        TSS.enrichment        <span class="sc">&gt;</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="the-signac-workflow" class="slide level2">
+<h2>The Signac workflow</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(Signac); <span class="fu">library</span>(Seurat); <span class="fu">library</span>(EnsDb.Hsapiens.v75)</span>
+<span id="cb3-2"><a></a></span>
+<span id="cb3-3"><a></a>counts <span class="ot">&lt;-</span> <span class="fu">Read10X_h5</span>(<span class="st">&quot;data/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5&quot;</span>)</span>
+<span id="cb3-4"><a></a>chrom_assay <span class="ot">&lt;-</span> <span class="fu">CreateChromatinAssay</span>(</span>
+<span id="cb3-5"><a></a>  <span class="at">counts    =</span> counts,</span>
+<span id="cb3-6"><a></a>  <span class="at">sep       =</span> <span class="fu">c</span>(<span class="st">&quot;:&quot;</span>, <span class="st">&quot;-&quot;</span>),</span>
+<span id="cb3-7"><a></a>  <span class="at">fragments =</span> <span class="st">&quot;data/atac_v1_pbmc_10k_fragments.tsv.gz&quot;</span>,</span>
+<span id="cb3-8"><a></a>  <span class="at">min.cells =</span> <span class="dv">10</span>, <span class="at">min.features =</span> <span class="dv">200</span>)</span>
+<span id="cb3-9"><a></a></span>
+<span id="cb3-10"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(<span class="at">counts =</span> chrom_assay, <span class="at">assay =</span> <span class="st">&quot;ATAC&quot;</span>,</span>
+<span id="cb3-11"><a></a>                           <span class="at">meta.data =</span> <span class="fu">read.csv</span>(<span class="st">&quot;data/atac_v1_pbmc_10k_singlecell.csv&quot;</span>,</span>
+<span id="cb3-12"><a></a>                                                <span class="at">row.names =</span> <span class="dv">1</span>))</span>
+<span id="cb3-13"><a></a></span>
+<span id="cb3-14"><a></a><span class="co"># ATAC-specific normalization + reduction</span></span>
+<span id="cb3-15"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">RunTFIDF</span>(pbmc)</span>
+<span id="cb3-16"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">FindTopFeatures</span>(pbmc, <span class="at">min.cutoff =</span> <span class="st">&quot;q5&quot;</span>)</span>
+<span id="cb3-17"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">RunSVD</span>(pbmc)</span>
+<span id="cb3-18"><a></a></span>
+<span id="cb3-19"><a></a><span class="co"># Skip LSI component 1 — usually correlates with depth, not biology</span></span>
+<span id="cb3-20"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(pbmc, <span class="at">reduction =</span> <span class="st">&quot;lsi&quot;</span>, <span class="at">dims =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">30</span>)</span>
+<span id="cb3-21"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(pbmc, <span class="at">reduction =</span> <span class="st">&quot;lsi&quot;</span>, <span class="at">dims =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">30</span>) <span class="sc">|&gt;</span></span>
+<span id="cb3-22"><a></a>        <span class="fu">FindClusters</span>(<span class="at">algorithm =</span> <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Always drop LSI component 1.</strong> It almost always reflects sequencing depth per cell, not biology. <code>dims = 2:30</code> is the canonical Signac choice.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="part-4-connecting-atac-to-rna" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 4 — Connecting ATAC to RNA</h1>
+
+</section>
+<section id="gene-activity-scores" class="slide level2">
+<h2>Gene-activity scores</h2>
+<p>To label scATAC clusters using familiar gene markers, build a <strong>gene activity matrix</strong> — sum fragments overlapping each gene body + 2 kb upstream:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a></a>gene.activities <span class="ot">&lt;-</span> <span class="fu">GeneActivity</span>(pbmc)</span>
+<span id="cb4-2"><a></a>pbmc[[<span class="st">&quot;RNA&quot;</span>]] <span class="ot">&lt;-</span> <span class="fu">CreateAssayObject</span>(<span class="at">counts =</span> gene.activities)</span>
+<span id="cb4-3"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">NormalizeData</span>(pbmc, <span class="at">assay =</span> <span class="st">&quot;RNA&quot;</span>,</span>
+<span id="cb4-4"><a></a>                      <span class="at">normalization.method =</span> <span class="st">&quot;LogNormalize&quot;</span>,</span>
+<span id="cb4-5"><a></a>                      <span class="at">scale.factor =</span> <span class="fu">median</span>(pbmc<span class="sc">$</span>nCount_RNA))</span>
+<span id="cb4-6"><a></a></span>
+<span id="cb4-7"><a></a><span class="fu">DefaultAssay</span>(pbmc) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span>
+<span id="cb4-8"><a></a><span class="fu">FeaturePlot</span>(pbmc, <span class="fu">c</span>(<span class="st">&quot;MS4A1&quot;</span>,<span class="st">&quot;CD3D&quot;</span>,<span class="st">&quot;LEF1&quot;</span>,<span class="st">&quot;NKG7&quot;</span>,<span class="st">&quot;TREM1&quot;</span>,<span class="st">&quot;LYZ&quot;</span>),</span>
+<span id="cb4-9"><a></a>            <span class="at">max.cutoff =</span> <span class="st">&quot;q95&quot;</span>, <span class="at">ncol =</span> <span class="dv">3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Gene activity is a proxy.</strong> Accessibility around a gene loosely correlates with expression — but a gene can be open without being transcribed (poised), or transcribed without obvious accessibility (long-range enhancer). Use it for clustering / labelling, not for quantifying expression.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="label-transfer-from-scrna-to-scatac" class="slide level2">
+<h2>Label transfer from scRNA to scATAC</h2>
+<p>If you also have a matched scRNA dataset (10x Multiome, or a published PBMC reference such as Signac’s <code>pbmc_10k_v3.rds</code>), use <strong>anchor-based label transfer</strong>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a>pbmc_rna <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;data/pbmc_10k_v3.rds&quot;</span>)</span>
+<span id="cb5-2"><a></a>anchors <span class="ot">&lt;-</span> <span class="fu">FindTransferAnchors</span>(<span class="at">reference =</span> pbmc_rna, <span class="at">query =</span> pbmc,</span>
+<span id="cb5-3"><a></a>                               <span class="at">reduction =</span> <span class="st">&quot;cca&quot;</span>)</span>
+<span id="cb5-4"><a></a>pred    <span class="ot">&lt;-</span> <span class="fu">TransferData</span>(<span class="at">anchorset =</span> anchors, <span class="at">refdata =</span> pbmc_rna<span class="sc">$</span>celltype,</span>
+<span id="cb5-5"><a></a>                        <span class="at">weight.reduction =</span> pbmc[[<span class="st">&quot;lsi&quot;</span>]], <span class="at">dims =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">30</span>)</span>
+<span id="cb5-6"><a></a>pbmc <span class="ot">&lt;-</span> <span class="fu">AddMetaData</span>(pbmc, pred)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="downstream-you-can-reach-for" class="slide level2">
+<h2>Downstream you can reach for</h2>
 <ul>
-<li class="fragment">Comparing <strong>conditions across biological samples</strong> (treatment, genotype, time)</li>
-<li class="fragment">You have at least ~3 samples per group (ideally 5+)</li>
-<li class="fragment">Cell type of interest has enough cells per sample (a common rule: ~10+ cells)</li>
+<li><strong>Differential accessibility</strong> — <code>FindMarkers(test.use = &quot;LR&quot;, latent.vars = &quot;nCount_peaks&quot;)</code></li>
+<li><strong>Motif enrichment</strong> — <code>Signac::FindMotifs</code> against <code>JASPAR2020</code></li>
+<li><strong>Per-cell TF activity</strong> — <code>chromVAR</code> deviations</li>
+<li><strong>Coverage plots</strong> — <code>CoveragePlot()</code> to visualize fragment pileups by cell type</li>
+</ul>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Latent variable matters.</strong> Use <code>latent.vars = &quot;nCount_peaks&quot;</code> (or <code>&quot;peak_region_fragments&quot;</code>) for differential accessibility — depth varies wildly across cells and otherwise drives spurious “DA peaks”.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Recap &amp; what’s next</h1>
+
+</section>
+<section id="what-to-remember-from-lecture-06" class="slide level2">
+<h2>What to remember from Lecture 06</h2>
+<ul>
+<li class="fragment">ATAC-seq measures <strong>chromatin accessibility</strong> via Tn5 tagmentation</li>
+<li class="fragment">Bulk ATAC-seq goes reads → peaks → annotation; scATAC-seq adds a barcode layer per Tn5 event</li>
+<li class="fragment">scATAC math is <strong>LSI</strong>, not PCA — and the first component is usually depth, drop it</li>
+<li class="fragment">Per-cell QC has its own metrics: TSS enrichment, nucleosome signal, FRiP</li>
+<li class="fragment"><strong>Gene activity scores</strong> + label transfer let you reuse RNA cell-type labels in chromatin space</li>
 </ul>
 </section>
-<section id="when-not-to-use-pseudobulk" class="slide level2">
-<h2>When <strong>not</strong> to use pseudobulk</h2>
+<section id="coming-up-next" class="slide level2">
+<h2>Coming up next</h2>
 <ul>
-<li class="fragment">Finding <strong>cluster markers</strong> for annotation — use within-cell methods (<code>FindAllMarkers</code>, Wilcoxon, MAST)</li>
-<li class="fragment">Only 1–2 samples per condition — no replication to pseudobulk over</li>
-<li class="fragment">Continuous traits measured per cell (e.g. pseudotime) — use models that handle the continuous covariate</li>
-</ul>
-</section>
-<section id="common-pitfalls" class="slide level2">
-<h2>Common pitfalls</h2>
-<ul>
-<li class="fragment"><strong>Too few cells per sample</strong> per cell type → zero-inflated pseudobulk; drop that cell type or those samples with a <code>min_cells</code> filter</li>
-<li class="fragment"><strong>Confounded designs</strong>: if every treated sample is on one 10x run, integration won’t rescue bad design</li>
-<li class="fragment"><strong>Ignoring covariates</strong>: include <code>batch</code>, <code>sex</code>, <code>age</code> in the design formula — DESeq2 will use them</li>
-<li class="fragment"><strong>Reporting single-cell N</strong>: always report N = number of <strong>samples</strong>, not number of cells, for condition-level DE</li>
-</ul>
-</section>
-<section id="diagnostic-plots-worth-running" class="slide level2">
-<h2>Diagnostic plots worth running</h2>
-<ul>
-<li class="fragment">PCA of the pseudobulk samples <strong>within a cell type</strong> — do replicates cluster by condition, or by batch?</li>
-<li class="fragment">MA / volcano plots per cell type</li>
-<li class="fragment">Hierarchical clustering of pseudobulk samples — quick confound check</li>
-</ul>
-</section>
-<section id="summary" class="slide level2">
-<h2>Summary</h2>
-<ul>
-<li class="fragment">Per-cell DE between conditions → <strong>anti-conservative p-values</strong></li>
-<li class="fragment">Pseudobulk recovers proper replication and lets you use battle-tested bulk tools</li>
-<li class="fragment">Keep per-cell methods for <strong>marker genes within a dataset</strong>, use pseudobulk for <strong>condition comparisons across subjects</strong></li>
+<li><strong>Lec 07</strong> — <a href="Lecture_07_WGCNA.html">WGCNA</a>: co-expression networks for bulk and pseudobulk data</li>
+<li><strong>Hands-on:</strong> <a href="../Exercise_Folder/Tutorial_06_scATACseq_Signac.html">Tutorial 06 — scATAC-seq with Signac</a></li>
 </ul>
 </section>
 <section id="further-reading" class="slide level2">
 <h2>Further reading</h2>
 <ul>
-<li>Squair <em>et al.</em> 2021, <em>Nature Communications</em> — “Confronting false discoveries in single-cell differential expression”</li>
-<li>Zimmerman <em>et al.</em> 2021, <em>Nature Communications</em> — “A practical solution to pseudoreplication bias in single-cell studies”</li>
-<li>Crowell <em>et al.</em> 2020, <em>Nature Communications</em> — muscat, a pseudobulk toolkit for scRNA-seq</li>
-<li>Heumos <em>et al.</em> 2023 — “Best practices for single-cell analysis across modalities”</li>
+<li><a href="https://stuartlab.org/signac/articles/pbmc_vignette">Signac vignette — PBMC scATAC</a> — what Patel’s tutorial follows</li>
+<li><a href="https://www.archrproject.com/">ArchR book</a> — alternative scATAC stack, fast on large datasets</li>
+<li><a href="https://www.encodeproject.org/atac-seq/">ENCODE ATAC-seq pipeline standards</a> — bulk QC thresholds</li>
 </ul>
 
 
@@ -1364,7 +1597,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop</p>
+<p>Single Cell RNA-seq Workshop · Lecture 06 of 7</p>
 </div>
 </div></div>
 
