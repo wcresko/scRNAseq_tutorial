@@ -37,12 +37,17 @@ cd Exercise_Folder
 quarto render
 cd ..
 
-# Belt-and-braces: in case the `resources:` copy in root _quarto.yml does
-# not propagate on some Quarto versions, make sure every exercise .qmd
-# also ends up next to its rendered .html for students to download.
-echo "=== Ensuring exercise .qmd sources are available for download ==="
+# Copy each exercise .qmd source to docs/Exercise_Folder/ as a *.qmd.txt
+# file so students can download it cleanly. The .txt extension stops
+# Quarto from auto-rewriting the link href to the rendered .html and
+# stops the browser from trying to render the file inline; students are
+# instructed (in Exercises.qmd and each tutorial's intro) to drop the
+# trailing `.txt` after downloading.
+echo "=== Copying exercise .qmd sources to docs/ as .qmd.txt for download ==="
 mkdir -p docs/Exercise_Folder
-cp -f Exercise_Folder/*.qmd docs/Exercise_Folder/
+for f in Exercise_Folder/*.qmd; do
+  cp -f "$f" "docs/Exercise_Folder/$(basename "$f").txt"
+done
 
 if [ "${SOLUTIONS:-0}" = "1" ]; then
   echo "=== Rendering INSTRUCTOR SOLUTIONS (eval=true) ==="
