@@ -27,6 +27,7 @@ editor: visual
 
 library(tidyverse)
 library(knitr)
+library(gridExtra)
 theme_set(theme_minimal(base_size = 14))
 set.seed(2026)
 ```
@@ -107,6 +108,49 @@ Bulk is cheap, mature, and statistically well-understood. If your question is "d
 ::: callout-warning
 The single biggest analytical pitfall in scRNA-seq is treating cells as biological replicates. We come back to this in Lecture 04 (pseudobulk DE).
 :::
+
+## Sparsity, in numbers
+
+```{r}
+#| label: sparsity-illustration
+#| echo: false
+#| fig-width: 10
+#| fig-height: 4
+
+set.seed(2026)
+# Three regimes: bulk (dense), Smart-seq (intermediate), 10x v3 (sparse)
+make_panel <- function(p_zero, label) {
+  m <- matrix(rbinom(40 * 60, 1, prob = 1 - p_zero), nrow = 40, ncol = 60)
+  m[m == 1] <- rpois(sum(m == 1), 4)
+  expand.grid(gene = seq_len(40), cell = seq_len(60)) |>
+    mutate(count = as.vector(m),
+           panel = paste0(label, "\n(", round(p_zero * 100), "% zeros)"))
+}
+
+dat <- bind_rows(
+  make_panel(0.05, "Bulk RNA-seq"),
+  make_panel(0.55, "Smart-seq2"),
+  make_panel(0.92, "10x 3' v3 droplet")
+)
+
+dat$panel <- factor(dat$panel, levels = unique(dat$panel))
+
+ggplot(dat, aes(cell, gene, fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "#2c3e50", name = "count") +
+  facet_wrap(~ panel, nrow = 1) +
+  labs(x = "Cells (or samples)", y = "Genes",
+       title = "What 'sparse' looks like — same panel size, three measurement regimes") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(),
+        strip.text = element_text(face = "bold"),
+        panel.grid = element_blank())
+```
+
+-   **Bulk:** every gene is detected in every sample (\~5% zeros; mostly truly off genes)
+-   **Smart-seq2** (full-length plate-based): \~50–60% zeros — moderate dropout but rich per-cell signal
+-   **10x 3' v3** droplet: \~90–95% zeros — most (cell, gene) pairs are zero because shallow capture + 3'-only chemistry samples a fraction of the transcriptome
+-   The implication for analysis: every step has to handle counts that are *mostly* zero. That's why we have specialized normalisation (`SCTransform`), HVG selection, and graph-based clustering instead of the bulk RNA-seq toolkit.
 
 # Part 2 — How the data are generated {background-color="#2c3e50"}
 
@@ -222,6 +266,22 @@ adata
 
 ::: callout-note
 **`min.cells = 3` and `min.features = 200`** are *defaults*, not gospel. They drop genes seen in fewer than 3 cells and droplets with fewer than 200 detected genes — sensible for whole-tissue 10x data, sometimes too aggressive for very rare cell types or shallow protocols.
+:::
+
+## The downstream workflow at a glance
+
+![](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="92%"}
+
+-   That cell × gene matrix is the **input** to every analytical step the rest of the workshop covers
+-   The eight steps fall naturally into four chunks, each with a dedicated lecture:
+    -   **Pre-processing** (Lec 01 / Tut 01): QC → doublets → normalisation → HVGs
+    -   **Geometry** (Lec 02 / Tut 02): scale → PCA → integration → neighbour graph → Leiden → t-SNE/UMAP
+    -   **Annotation** (Lec 03, Lec 05 / Tut 03, Tut 05): markers, manual annotation, reference-based annotation (SingleR / Azimuth)
+    -   **Differential expression** (Lec 04 / Tut 04): pseudobulk + DESeq2 — *the* answer to "are cells biological replicates?"
+-   Lectures 06 (scATAC-seq) and 07 (WGCNA) extend the same conceptual toolkit to other data modalities
+
+::: callout-tip
+**A 4-step mental compression.** From here on out, every chunk of the pipeline (a) cleans something, (b) puts things on a sensible scale, (c) finds structure, (d) names that structure with biology. If any step skips one of those, look harder.
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
