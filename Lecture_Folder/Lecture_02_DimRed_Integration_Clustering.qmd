@@ -224,7 +224,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 | **MNN / fastMNN**     | R / Py    | Mutual nearest neighbors              |
 
 ::: callout-tip
-**Rule of thumb:** try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases. Patel's `singleCell_integrate_harmony.R` is a good worked example on the `ifnb` dataset.
+**Rule of thumb:** try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases. The workshop's [Tutorial 04](../Exercise_Folder/Tutorial_04_Integration.html) walks Harmony and Seurat anchors on the `ifnb` dataset (CTRL vs IFN-β-stimulated PBMCs) — the canonical small two-sample integration case. For a complementary, notebook-driven walkthrough see also the [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) integration chapter.
 :::
 
 ::: callout-warning
@@ -300,6 +300,16 @@ gridExtra::grid.arrange(p_before, p_after, nrow = 1)
 ::: callout-warning
 The "after" panel above is a cartoon. Real integration *warps* the embedding non-rigidly — that's what makes it powerful and what makes over-integration dangerous. Always sanity-check with both batch and a known biological covariate.
 :::
+
+## Diagnosing over- and under-correction
+
+Three diagnostics, all of which appear in [Tutorial 04](../Exercise_Folder/Tutorial_04_Integration.html):
+
+1. **Color the post-integration UMAP by sample.** Cells from each sample should interleave within every cluster. Clusters that remain mostly one sample are either (a) under-corrected or (b) genuinely sample-specific biology (e.g. an activated state present only after stimulation).
+2. **Color it by a *biological* covariate.** Cell-type labels (or reference-mapped predictions) should occupy single regions. If a cell type fragments into multiple clusters, integration is leaving residual sample structure.
+3. **Score a known biological signal at the cell level and check it survives.** For `ifnb`, score each cell on a panel of interferon-stimulated genes (`ISG15`, `IFI6`, `MX1`, ...) and confirm STIM cells still score higher than CTRL cells *within the same cluster*. If integration has flattened that gap, you've over-corrected.
+
+These three checks generalize to any batch-integrated dataset. The third is particularly important and easy to forget.
 
 # Step 7 — Neighbour graph + Leiden clustering {background-color="#2c3e50"}
 

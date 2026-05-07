@@ -1,6 +1,6 @@
 ---
 title: "Tutorial 01 — scRNA-seq: QC & Preprocessing"
-subtitle: "Load a 10x dataset, filter cells, normalize, pick HVGs, scale"
+subtitle: "Load a two-sample dataset (ifnb), filter cells, normalize, pick HVGs, scale"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -20,174 +20,144 @@ editor: visual
 
 ## About this tutorial
 
-The first of a three-part series walking the standard **Seurat** scRNA-seq workflow, using the public **10x Genomics NSCLC DTC** dataset (20k cells, 7 donors, 3' v3.1 Multiplex). This part stops after **ScaleData** — the object you save here is the input to Tutorial 02.
+The first of a four-part series walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~14,000 cells, ~25 MB on disk, no 10x click-through.
 
--   Upstream script: *Khushbu Patel, single-cell RNA-seq standard workflow*
--   Reference vignette: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
+Why two samples from the start? Because Tutorial 04 will teach **integration** — and integration only makes sense if you've already loaded, QC-filtered, and clustered samples that come from different conditions / batches. We carry both `STIM` and `CTRL` cells through every step.
+
+::: callout-tip
+**Want to scale up to a bigger dataset later?** Once you've worked through 01 → 04 on `ifnb`, the parallel **NSCLC scaling exercises** in `Exercise_Folder/NSCLC_FullDataset/` re-do the same workflow on a 20k cell, 250 MB dataset. They are written to be run on **Talapas** as R + SLURM jobs — see [Tutorial_SLURM_Basics](Tutorial_SLURM_Basics.html).
+:::
 
 ::: {.callout-tip title="How to use this page"}
 The rendered HTML shows the code but does **not** execute it (chunks default to `eval: false`). To actually run the analysis:
 
 1.  Download the `.qmd` source: <a href="Tutorial_01_QC_Preprocessing.qmd.txt" download="Tutorial_01_QC_Preprocessing.qmd">Tutorial_01_QC_Preprocessing.qmd</a>. If your browser saves the file as `Tutorial_01_QC_Preprocessing.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
-2.  Download the dataset using the browser instructions [below](#downloading-the-data) and place the files in a `data/` folder at the repository root.
+2.  Install the `ifnb` dataset once (one R command — see [Setup](#setup)).
 3.  Work through the chunks, flipping `eval: true` as you go.
 :::
 
-## Dataset — 20k NSCLC DTC (10x Genomics)
+## Dataset — `ifnb` (Kang *et al.* 2017)
 
-**What it is.** Twenty-thousand dissociated tumor cells (DTCs) pooled from **seven non-small-cell lung cancer (NSCLC) donors**, run on the 10x Chromium **3' v3.1** assay with **CellPlex multiplexing** (CMO hashing) so that every cell carries both a gene-expression profile and a sample-of-origin barcode.
+**What it is.** Peripheral blood mononuclear cells (PBMCs) from eight lupus patients. Each donor's PBMCs were split into two aliquots:
 
--   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
--   Reference genome: GRCh38 (human)
--   Chemistry: 10x Chromium Single Cell 3' v3.1 (dual index, Next GEM), CellPlex multiplexing
--   Cell count (target recovery): \~20,000 post-filter cells across 7 donors
+-   **`CTRL`** — control (no stimulation), \~6,500 cells
+-   **`STIM`** — treated with interferon-β for 6 hours, \~7,500 cells
 
-This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/singleCell_standard_workflow.R) — but we use the smaller **filtered** matrix instead of the 1.5 GB raw matrix because Cell Ranger has already trimmed the empty-droplet barcodes for you.
+Together \~14,000 cells across two samples on the **10x Chromium 3' v1** assay. **Cell-type labels** (e.g. `CD14 Mono`, `CD4 Naive T`, `B`, `NK`, `DC`) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.
 
-### Downloading the data {#downloading-the-data}
-
-10x Genomics gates dataset downloads behind a click-through terms-of-service prompt, so programmatic transfers with `wget` / `curl` return **HTTP 403** on a fresh machine. The reliable path — and the one we use in this workshop — is to download the data manually through your web browser:
-
-1.  Open the [landing page](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0) in your browser.
-2.  Scroll to the **Output and supplemental files** section.
-3.  Find the row labelled *Feature / cell matrix (filtered)* and click **Download**. Accept the *Sign in or share data with us* / TOS pop-up if it appears.
-4.  Save the file `20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz` (≈250 MB) to your usual downloads folder.
-
-Now make a `data/` directory at the **root of the tutorial repository** (i.e. one level up from `Exercise_Folder/`), move the downloaded archive into it, and unpack it. From a terminal:
-
-```bash
-# From the repository root (the folder that contains Exercise_Folder/)
-mkdir -p data
-mv ~/Downloads/20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz data/
-cd data
-tar -xzf 20k_NSCLC_DTC_3p_nextgem_Multiplex_count_filtered_feature_bc_matrix.tar.gz
-```
-
-::: callout-tip
-If you prefer not to use a terminal, double-clicking the `.tar.gz` on macOS, Windows, or most Linux desktops will extract it in place. The result is the same.
-:::
-
-After unpacking you should have a `filtered_feature_bc_matrix/` sub-directory inside `data/`, containing the **three sparse-matrix files** Cell Ranger emits:
-
-```
-data/
-└── filtered_feature_bc_matrix/
-    ├── barcodes.tsv.gz
-    ├── features.tsv.gz
-    └── matrix.mtx.gz
-```
-
-Those three files together encode the counts matrix that this tutorial uses; `Read10X()` in Seurat reads the directory and stitches them into a sparse matrix.
-
-### The three files inside the bundle
-
-| File | Format | Contents |
-|---|---|---|
-| `barcodes.tsv.gz` | gzipped TSV, one column | One row per cell barcode, e.g. `AAACCTGAGAAACCAT-1` — the 16-bp 10x barcode plus a `-N` suffix indicating the GEM well. These become the **column names** of the counts matrix. |
-| `features.tsv.gz` | gzipped TSV, three columns | One row per measured feature: `Ensembl ID`, `gene symbol`, and feature **type** (`Gene Expression` or `Multiplexing Capture`). The `gene symbol` column becomes the **row names** of the counts matrix. |
-| `matrix.mtx.gz` | gzipped Matrix Market | Sparse integer **UMI counts** in coordinate (`i  j  value`) format — one entry per non-zero (feature, cell) pair. The header records total features × cells × non-zero entries. |
+-   **Reference:** Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94. [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
+-   **Origin:** GEO accession [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
+-   **Distributed via:** `SeuratData` R package (one `InstallData()` call)
+-   **Used in:** Tutorials 01 → 04 of this workshop, and the official [Seurat integration vignette](https://satijalab.org/seurat/articles/integration_introduction.html)
 
 ::: callout-note
-Cell Ranger has already dropped empty-droplet barcodes from this **filtered** matrix, which is why we use it instead of the larger raw matrix. The `min.cells = 3` and `min.features = 200` arguments we apply in Step 2 are *additional* per-feature and per-cell sanity filters layered on top of Cell Ranger's filter.
+**Why this dataset for teaching.** It's small enough to run on a laptop, it has a clean two-condition structure (so integration is meaningful), and the cell types are PBMCs — well-known, well-marked, and easy to reason about. The interferon response is a strong, biologically real signal that drives both batch-style separation (use case for integration) **and** condition-level differential expression (use case for pseudobulk DE in Tutorial 06).
 :::
 
-### Data dictionary — `Read10X()` return value
+### Disk-space budget
 
-`Read10X()` on this multi-feature directory returns a **named list** of sparse matrices (one per feature type). Each sparse matrix has:
+| Item | Size |
+|---|---|
+| `ifnb` raw counts (compressed cache) | \~25 MB |
+| `ifnb` Seurat object in memory | \~600 MB |
+| `.rds` snapshots saved between tutorials | \~500 MB each |
 
-| Slot | Type | Description |
+Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01–04.
+
+### Data dictionary — what's in the loaded `ifnb` Seurat object
+
+| Slot | Class | Contents |
 |---|---|---|
-| `dimnames[[1]]` (rows) | character | Gene **symbols** (e.g. `MT-ND1`, `CD3D`, `KRT8`), taken from column 2 of `features.tsv.gz`. |
-| `dimnames[[2]]` (cols) | character | 16-bp 10x **cell barcodes** (e.g. `AAACCTGAGAAACCAT-1`), taken from `barcodes.tsv.gz`. The `-1` suffix is the GEM-well index. |
-| values | integer | **UMI counts** from `matrix.mtx.gz` — number of unique transcript molecules observed for that (gene, cell) pair. |
-
-| Named slot in the returned list | Matrix shape | Meaning |
-|---|---|---|
-| `` $`Gene Expression` `` | \~36,600 genes × \~42,000 barcodes | The gene-expression counts. **This is what the tutorial uses.** |
-| `` $`Multiplexing Capture` `` | \~12 CMOs × \~42,000 barcodes | Per-barcode CellPlex hashtag counts, used to demultiplex donors. Not used here. |
+| `ifnb@assays$RNA@counts` | `dgCMatrix` | Raw UMI counts. \~14,000 genes × \~14,000 cells (sparse). |
+| `ifnb@meta.data$stim` | factor | `"CTRL"` or `"STIM"` — the **sample-of-origin** label. This becomes the integration covariate. |
+| `ifnb@meta.data$seurat_annotations` | factor | Author-curated cell-type labels from the original paper. Useful as ground truth in Tutorial 03. |
+| `ifnb@meta.data$nCount_RNA`, `nFeature_RNA` | numeric | Auto-populated by `CreateSeuratObject` — UMIs and unique genes per cell. |
 
 ## Learning goals
 
 By the end of this tutorial you will be able to:
 
--   Read a 10x sparse-matrix directory into Seurat
--   Add per-cell QC metrics and visualize them
+-   Install and load a `SeuratData` package
+-   Inspect a multi-sample Seurat object and split it by sample
+-   Add per-cell QC metrics (`percent.mt`, `percent.rb`) and visualize them per sample
 -   Choose filtering thresholds that are defensible for *your* dataset
 -   Run `NormalizeData` → `FindVariableFeatures` → `ScaleData` and understand what each does
--   Track how each preprocessing step changes the dimensions of the counts matrix
+-   Save the QC'd object so Tutorial 02 can pick it up
 
-## Setup
+## Setup {#setup}
 
 ```{r}
 #| label: setup
 
+# One-time install (skip if already installed):
+# install.packages(c("Seurat", "tidyverse"))
+# install.packages("SeuratData", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
+# SeuratData::InstallData("ifnb")
+
 library(Seurat)
+library(SeuratData)
 library(tidyverse)
 
 set.seed(2026)
 ```
 
+::: callout-note
+`SeuratData` is **not on CRAN**. Install it from the Satija lab's R-universe mirror as shown above. The first time you call `InstallData("ifnb")`, it downloads \~25 MB to your user library; subsequent loads are instant.
+:::
+
 ------------------------------------------------------------------------
 
-## Step 1 — Read the 10x filtered matrix
+## Step 1 — Load the `ifnb` dataset
 
 ```{r}
 #| label: load
 
-# After unpacking the .tar.gz, ../data/filtered_feature_bc_matrix/ contains
-#   barcodes.tsv.gz, features.tsv.gz, matrix.mtx.gz
-nsclc.sparse.m <- Read10X(data.dir = "../data/filtered_feature_bc_matrix/")
+ifnb <- LoadData("ifnb")
+ifnb
 
-# 10x multi-feature outputs return a NAMED LIST — keep the Gene Expression slice
-str(nsclc.sparse.m)
-cts <- nsclc.sparse.m$`Gene Expression`
-dim(cts)
+# What samples are in here?
+table(ifnb$stim)
 
-# Record the starting matrix dimensions for the summary table later
-dim_raw <- dim(cts)
+# Author-curated cell-type labels (we'll use these as ground truth in Tut 03)
+table(ifnb$seurat_annotations)
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  Why does `Read10X` sometimes return a **list** instead of a matrix?
-2.  What does each dimension of `cts` represent?
+1.  Why do real integration tutorials almost always have at least two samples?
+2.  What's the difference between a "sample" (`stim`) and a "cell type" (`seurat_annotations`) in this dataset?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  10x Multiplex / CellPlex / CITE-seq / multiome runs produce multiple measurement types in one Cell Ranger output (e.g. `Gene Expression`, `Antibody Capture`, `Peaks`, `Multiplexing Capture`). The reader returns a named list so you can pull the slice you want.
-2.  Rows = genes (features), columns = cell barcodes. `dim(cts)[1]` is the gene count, `dim(cts)[2]` is the cell count.
+1.  Integration aligns the **shared biological signal** between samples while preserving any **real differences** between them. With one sample there's nothing to align — clustering on PCs alone is enough. The `ifnb` dataset has CTRL and STIM as two samples drawn from the same donors, which is the perfect minimal setup to teach the alignment step.
+2.  `stim` is the **technical / experimental covariate** — which condition the cell came from. `seurat_annotations` is the **biological identity** — what kind of cell it is. Integration aims to remove `stim`-driven structure from the embedding *without* erasing `seurat_annotations`-driven structure.
 
 </details>
 :::
 
-## Step 2 — Create the Seurat object
+## Step 2 — Inspect dimensions, split by sample
+
+The `ifnb` object already arrives as a single Seurat object containing both conditions. For a two-sample QC workflow, it's useful to look at QC metrics **per sample** rather than globally — that way you'll catch a sample-specific quality issue (e.g. one sample with much lower depth) before it confounds the analysis.
 
 ```{r}
-#| label: create-object
+#| label: split
 
-nsclc.seurat.obj <- CreateSeuratObject(
-  counts       = cts,
-  project      = "NSCLC",
-  min.cells    = 3,
-  min.features = 200
-)
-nsclc.seurat.obj
-
-# Record dimensions after the CreateSeuratObject filters
-dim_after_create <- dim(nsclc.seurat.obj)
+# Record the starting matrix dimensions
+dim_raw <- dim(ifnb)
+dim_raw
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  What exactly do `min.cells = 3` and `min.features = 200` remove?
-2.  The `nsclc.sparse.m` list still sits in memory. What would `rm(nsclc.sparse.m); gc()` do, and why might you want to?
+1.  The `ifnb` object holds both CTRL and STIM cells in a single counts matrix. What information distinguishes a CTRL barcode from a STIM barcode?
+2.  Why might it matter to split visualizations by `stim` even though clustering happens on the joint matrix?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  `min.cells = 3` drops genes detected in fewer than 3 cells (likely noise). `min.features = 200` drops barcodes with fewer than 200 detected genes — mostly empty droplets and broken cells. These are *permissive* first-pass filters.
-2.  It releases the raw list and its memory. The full 10x raw feature matrix is large (often several GB); once counts are inside the Seurat object, the raw list is redundant.
+1.  The `stim` column in `meta.data`. Each barcode also carries the `-1` / `-2` GEM-well suffix from Cell Ranger, but you should never rely on barcode suffixes for sample membership — the metadata is the source of truth.
+2.  Per-sample plots reveal **batch-level QC issues** (lower median depth in one sample, different mitochondrial fractions, different cell counts per cluster) that can be hidden by a global histogram. If one sample's distribution is shifted, you may need different filter thresholds for it — or you may need to investigate before going further.
 
 </details>
 :::
@@ -197,49 +167,58 @@ dim_after_create <- dim(nsclc.seurat.obj)
 ```{r}
 #| label: qc-metrics
 
-nsclc.seurat.obj[["percent.mt"]] <- PercentageFeatureSet(nsclc.seurat.obj, pattern = "^MT-")
-head(nsclc.seurat.obj@meta.data)
+ifnb[["percent.mt"]] <- PercentageFeatureSet(ifnb, pattern = "^MT-")
+ifnb[["percent.rb"]] <- PercentageFeatureSet(ifnb, pattern = "^RP[SL]")
+
+head(ifnb@meta.data)
 ```
+
+::: callout-note
+The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-coding mitochondrial genes (MT-ND1, MT-CO1, …) and `^RP[SL]` matches the ribosomal protein genes (RPS\*, RPL\*). For mouse data the conventions are lowercase: `^mt-` and `^Rp[sl]`.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  What biological signal does `percent.mt` capture?
-2.  Why `"^MT-"` specifically? What would you use for mouse?
+2.  Why might `percent.rb` (ribosomal-protein fraction) be useful?
 
 <details>
 
 <summary>Show answers</summary>
 
 1.  Dying or stressed cells leak cytoplasmic RNA while retaining mitochondrial RNA, so their mitochondrial fraction rises. High `percent.mt` flags apoptotic / compromised cells.
-2.  `"^MT-"` matches human mitochondrial gene symbols (MT-ND1, MT-CO1, …). For mouse the convention is lowercase: `"^mt-"`.
+2.  Ribosomal-protein genes are **highly expressed** and **broadly variable** across cell states. A very low or very high `percent.rb` per cluster is sometimes a tell-tale sign of a metabolic / activation difference rather than a cell-type difference — useful to separate "this cluster is biologically distinct" from "this cluster is just translationally quiet."
 
 </details>
 :::
 
-## Step 4 — Visualize QC
+## Step 4 — Visualize QC, per sample
 
 ```{r}
 #| label: qc-plots
 
-VlnPlot(nsclc.seurat.obj,
-        features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
-        ncol = 3)
+VlnPlot(ifnb,
+        features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
+        group.by = "stim",
+        ncol = 4,
+        pt.size = 0)
 
-FeatureScatter(nsclc.seurat.obj,
+FeatureScatter(ifnb,
                feature1 = "nCount_RNA",
-               feature2 = "nFeature_RNA") +
+               feature2 = "nFeature_RNA",
+               group.by = "stim") +
   geom_smooth(method = "lm")
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  What does a **fat tail** on the `nFeature_RNA` violin suggest?
-2.  On the `nCount_RNA` vs `nFeature_RNA` scatter, what would a doublet look like? A dying cell?
+1.  Compare the violins between CTRL and STIM. Are the medians similar? Does either sample have a much fatter upper tail on `nFeature_RNA`?
+2.  What would a doublet look like on the `nCount_RNA` vs `nFeature_RNA` scatter? A dying cell?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  A long upper tail often means **doublets** — barcodes where two cells got trapped in one droplet, inflating both UMI count and unique gene count.
-2.  Doublets sit **high on both axes**, often above the main trend line. Dying cells are **low** on both and tend to have **high `percent.mt`** (check by coloring or faceting).
+1.  In `ifnb` the two samples are very similar in median QC metrics — that's a feature, not a bug, because the donors are matched. A noticeably fatter upper tail in one sample would suggest more **doublets** there (perhaps a higher loading concentration). A noticeably *lower* median `nFeature_RNA` would suggest sequencing depth or cell-quality differences.
+2.  Doublets sit **high on both axes**, often above the main trend line. Dying cells are **low** on both and tend to have **high `percent.mt`** (color the scatter by `percent.mt` or facet by it).
 
 </details>
 :::
@@ -249,28 +228,28 @@ FeatureScatter(nsclc.seurat.obj,
 ```{r}
 #| label: filter
 
-nsclc.seurat.obj <- subset(
-  nsclc.seurat.obj,
+ifnb <- subset(
+  ifnb,
   subset = nFeature_RNA > 200 &
            nFeature_RNA < 2500 &
            percent.mt   < 5
 )
-nsclc.seurat.obj
+ifnb
+table(ifnb$stim)
 
-# Record dimensions after the QC subset() filter
-dim_after_filter <- dim(nsclc.seurat.obj)
+dim_after_filter <- dim(ifnb)
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  The default cutoff here is `percent.mt < 5`. Is that appropriate for tumor tissue?
+1.  Did the CTRL or STIM sample lose more cells in this filter? If they lost noticeably different fractions, what would that suggest?
 2.  How would you set thresholds *empirically* rather than by default?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Not always — tumor and certain primary tissues routinely have higher baseline `percent.mt` (\~10–20%). A 5% cutoff can strip out viable tumor cells. **Inspect the distribution first**; set the knee.
-2.  Look at the violin/histogram shape; choose thresholds that trim the clear **tails** (not the mode). Some workshops use median ± *k* × MAD, or the `scater::isOutlier()` function for an automated rule.
+1.  If one sample loses a much larger fraction at `percent.mt < 5` it usually means its cells were under more stress at dissociation or stimulation. For `ifnb`, IFN-β stimulation can mildly elevate `percent.mt` in some donors — flag the sample, but don't necessarily relax the threshold without thinking.
+2.  Look at the per-sample violin / histogram shape; choose thresholds that trim the clear **tails** (not the mode). For an automated rule, use `scater::isOutlier()` or `median ± k·MAD` — and consider running it **per sample** so a globally lopsided distribution doesn't push the cutoff in the wrong direction for one sample.
 
 </details>
 :::
@@ -280,14 +259,13 @@ dim_after_filter <- dim(nsclc.seurat.obj)
 ```{r}
 #| label: normalize
 
-nsclc.seurat.obj <- NormalizeData(nsclc.seurat.obj)
+ifnb <- NormalizeData(ifnb)
 # Equivalent explicit form:
-# NormalizeData(nsclc.seurat.obj,
+# NormalizeData(ifnb,
 #               normalization.method = "LogNormalize",
 #               scale.factor = 10000)
 
-# Record dimensions after normalization (these should be identical to dim_after_filter)
-dim_after_normalize <- dim(nsclc.seurat.obj)
+dim_after_normalize <- dim(ifnb)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -299,49 +277,7 @@ dim_after_normalize <- dim(nsclc.seurat.obj)
 <summary>Show answers</summary>
 
 1.  For each cell: divide each gene's count by the cell's total count, multiply by `scale.factor` (default 10 000), then take `log1p`. In formula form: `log(1 + (count_gc / total_c) * 10000)`.
-2.  `SCTransform` models the mean–variance relationship per gene with a regularized negative binomial, which is usually better for **low-count** datasets and more faithful downstream variance. It also replaces the NormalizeData → FindVariableFeatures → ScaleData chain in a single call.
-
-</details>
-:::
-
-## Counts matrix progression — summary
-
-So far we've taken a freshly loaded 10x counts matrix and pushed it through two filtering steps. `NormalizeData()` rescales values but **does not** add or drop rows or columns, so the matrix shape is unchanged after Step 6. The table below makes the progression explicit so you can see exactly how many features (genes) and barcodes (cells) each step removed.
-
-```{r}
-#| label: dim-summary
-
-dim_summary <- tibble::tribble(
-  ~step,                                                        ~features_before,    ~features_after,        ~barcodes_before,    ~barcodes_after,
-  "Step 1 — Read10X (raw load)",                                 NA_integer_,         dim_raw[1],             NA_integer_,         dim_raw[2],
-  "Step 2 — CreateSeuratObject (min.cells=3, min.features=200)", dim_raw[1],          dim_after_create[1],    dim_raw[2],          dim_after_create[2],
-  "Step 5 — subset() QC filter (nFeature_RNA, percent.mt)",      dim_after_create[1], dim_after_filter[1],    dim_after_create[2], dim_after_filter[2],
-  "Step 6 — NormalizeData (no dimension change)",                dim_after_filter[1], dim_after_normalize[1], dim_after_filter[2], dim_after_normalize[2]
-)
-dim_summary
-```
-
-Your printed numbers will be similar to (not necessarily identical to) the values below — small differences in package versions or `Read10X` behaviour can shift the exact counts:
-
-| Step | Features before | Features after | Barcodes before | Barcodes after |
-|---|---:|---:|---:|---:|
-| Step 1 — Read10X (raw load)                                    | —      | ~36,601 | —      | ~42,386 |
-| Step 2 — CreateSeuratObject (`min.cells=3`, `min.features=200`) | ~36,601 | ~24,000 | ~42,386 | ~22,000 |
-| Step 5 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~24,000 | ~24,000 | ~22,000 | ~17,000 |
-| Step 6 — `NormalizeData` (no dimension change)                  | ~24,000 | ~24,000 | ~17,000 | ~17,000 |
-
-Steps 7 (`FindVariableFeatures`) and 8 (`ScaleData`) likewise leave the matrix shape intact — they only attach extra metadata or transform values in place — so this table captures the entire dimensional story of the tutorial.
-
-::: {.callout-important title="Think about it"}
-1.  Which step removes the largest number of features? Which removes the largest number of barcodes? Are those expected?
-2.  If you relaxed `percent.mt < 5` to `percent.mt < 10`, which row of this table would change, and in which direction?
-
-<details>
-
-<summary>Show answers</summary>
-
-1.  Most **features** are removed by `CreateSeuratObject`'s `min.cells = 3` rule, because many genes are detected in essentially zero cells of this filtered matrix (and the `Multiplexing Capture` rows do not appear here at all — we kept only the `Gene Expression` slice). Most **barcodes** are removed by `subset()` — that's where we apply biological QC thresholds on top of Cell Ranger's empty-droplet filter.
-2.  Only the Step 5 row would change. `barcodes_after` would go up because a more permissive `percent.mt` threshold retains more cells; the feature count is unaffected.
+2.  `SCTransform` models the mean–variance relationship per gene with a regularized negative binomial, which is usually better for **low-count** datasets and more faithful downstream variance. It also replaces the NormalizeData → FindVariableFeatures → ScaleData chain in a single call. For `ifnb` either approach works fine.
 
 </details>
 :::
@@ -351,26 +287,26 @@ Steps 7 (`FindVariableFeatures`) and 8 (`ScaleData`) likewise leave the matrix s
 ```{r}
 #| label: hvgs
 
-nsclc.seurat.obj <- FindVariableFeatures(
-  nsclc.seurat.obj,
+ifnb <- FindVariableFeatures(
+  ifnb,
   selection.method = "vst",
   nfeatures = 2000
 )
 
-top10 <- head(VariableFeatures(nsclc.seurat.obj), 10)
-plot1 <- VariableFeaturePlot(nsclc.seurat.obj)
+top10 <- head(VariableFeatures(ifnb), 10)
+plot1 <- VariableFeaturePlot(ifnb)
 LabelPoints(plot = plot1, points = top10, repel = TRUE)
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  Why do we want to focus on *variable* genes instead of using all genes?
+1.  Which genes are at the top of `top10`? Many will be **interferon-stimulated genes** (ISGs) like `ISG15`, `IFI6`, `IFIT1` — why?
 2.  What happens if you set `nfeatures = 500`? Or `nfeatures = 10000`?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Most genes are housekeeping / ubiquitously expressed and carry little cell-type information. Selecting HVGs raises signal-to-noise for PCA and clustering and speeds everything up.
+1.  Because half the dataset (the STIM sample) has IFN-β–induced ISG expression while the other half (CTRL) does not, ISGs have **enormous variance across cells** and rise to the top of the HVG list. This is exactly the signal we'll see drive batch-style separation in Tutorial 02 — and it's exactly what integration in Tutorial 04 will need to handle without erasing.
 2.  Too few (500) risks missing subtle cell-type signals and is brittle to noisy gene choices. Too many (10 000) pulls in low-information genes and dilutes the signal. 1 500–3 000 is a common sweet spot; 2 000 is a good default.
 
 </details>
@@ -381,14 +317,14 @@ LabelPoints(plot = plot1, points = top10, repel = TRUE)
 ```{r}
 #| label: scale
 
-all.genes <- rownames(nsclc.seurat.obj)
-nsclc.seurat.obj <- ScaleData(nsclc.seurat.obj, features = all.genes)
+all.genes <- rownames(ifnb)
+ifnb <- ScaleData(ifnb, features = all.genes)
 ```
 
 ::: {.callout-important title="Think about it"}
 1.  What does `ScaleData` do to each gene numerically?
 2.  Why is scaling necessary *before* PCA?
-3.  How would you regress out the cell cycle or `percent.mt` here?
+3.  Could you `vars.to.regress = "stim"` here and skip integration in Tutorial 04?
 
 <details>
 
@@ -396,25 +332,52 @@ nsclc.seurat.obj <- ScaleData(nsclc.seurat.obj, features = all.genes)
 
 1.  Centers each gene's expression to mean 0 and scales to unit variance across cells (z-scoring).
 2.  PCA finds directions of maximum variance. Without scaling, highly-expressed genes (which inherently have large raw variance) would dominate PCs, regardless of whether they are biologically informative.
-3.  Pass `vars.to.regress = c("percent.mt", "S.Score", "G2M.Score")` (after running `CellCycleScoring()` for the latter two). ScaleData regresses those out of each gene's expression before z-scoring.
+3.  You *could*, but regressing on a binary covariate is a **brittle** form of batch correction — it removes a linear effect uniformly across all cells, but real batch effects are usually non-linear and cell-type-specific. Modern integration methods (Harmony, anchors, scVI) are much better tools. We use `ScaleData` here as the standard pre-PCA step and reserve the integration question for Tutorial 04.
 
 </details>
 :::
+
+## Counts matrix progression — summary
+
+```{r}
+#| label: dim-summary
+
+dim_summary <- tibble::tribble(
+  ~step,                                                    ~features_after,        ~barcodes_after,
+  "Step 1 — LoadData (raw)",                                 dim_raw[1],             dim_raw[2],
+  "Step 5 — subset() QC filter (nFeature_RNA, percent.mt)",  dim_after_filter[1],    dim_after_filter[2],
+  "Step 6 — NormalizeData (no dimension change)",            dim_after_normalize[1], dim_after_normalize[2]
+)
+dim_summary
+```
+
+You should see roughly:
+
+| Step | Features after | Barcodes after |
+|---|---:|---:|
+| Step 1 — LoadData                                              | ~14,053 | ~13,999 |
+| Step 5 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~14,053 | ~13,500 |
+| Step 6 — `NormalizeData` (no dimension change)                  | ~14,053 | ~13,500 |
+
+(Numbers will vary by a few hundred depending on package versions.)
 
 ## Save and continue to Tutorial 02
 
 ```{r}
 #| label: save
 
-saveRDS(nsclc.seurat.obj, file = "../data/nsclc_preprocessed.rds")
+# Make sure ../data/ exists
+dir.create("../data", showWarnings = FALSE)
+
+saveRDS(ifnb, file = "../data/ifnb_preprocessed.rds")
 ```
 
 ::: callout-tip
-The saved `.rds` is the starting point for **Tutorial 02 — Dimensionality reduction & clustering**.
+The saved `.rds` is the starting point for **Tutorial 02 — Dimensionality reduction & clustering**. We deliberately keep both `CTRL` and `STIM` cells in the same object — Tutorial 02 will run PCA + clustering on the unintegrated joint data so you can **see the batch effect** before fixing it in Tutorial 04.
 :::
 
 ## Credits
 
--   Dataset: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
--   Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow
--   Reference: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
+-   Dataset: `ifnb` from the `SeuratData` package — Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
+-   Reference vignettes: [Seurat integration tutorial](https://satijalab.org/seurat/articles/integration_introduction.html) · [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
+-   Inspiration for the multi-step QC pacing: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) (Sengupta lab)

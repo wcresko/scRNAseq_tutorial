@@ -49,6 +49,14 @@ for f in Exercise_Folder/*.qmd; do
   cp -f "$f" "docs/Exercise_Folder/$(basename "$f").txt"
 done
 
+# Same for the NSCLC scaling exercises (kept side-by-side as the Talapas
+# scaling path — see Datasets.qmd).
+mkdir -p docs/Exercise_Folder/NSCLC_FullDataset
+for f in Exercise_Folder/NSCLC_FullDataset/*.qmd; do
+  [ -e "$f" ] || continue
+  cp -f "$f" "docs/Exercise_Folder/NSCLC_FullDataset/$(basename "$f").txt"
+done
+
 if [ "${SOLUTIONS:-0}" = "1" ]; then
   echo "=== Rendering INSTRUCTOR SOLUTIONS (eval=true) ==="
   cd Exercise_Folder
