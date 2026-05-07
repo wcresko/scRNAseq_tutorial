@@ -20,7 +20,7 @@ editor: visual
 
 ::: callout-important
 **This is the Talapas scaling exercise, not the laptop tutorial.**
-The main workshop sequence (Tutorials 01 → 07 in [Exercises](../../Exercises.html)) runs on the small **`ifnb`** dataset (\~25 MB) and is designed for a laptop. **Do those first.** This NSCLC scaling exercise re-runs the QC / dim-reduction / annotation steps on a 10× larger dataset (20k cells, 7 donors, \~250 MB compressed) so you can see how the same workflow scales — typically run as R + SLURM scripts on Talapas. See the [SLURM Basics tutorial](../Tutorial_SLURM_Basics.html).
+The main workshop sequence (Tutorials 01 → 12 in [Exercises](../../Exercises.html)) runs on the small **`ifnb`** dataset (\~25 MB) and is designed for a laptop. **Do those first.** This NSCLC scaling exercise re-runs the QC / dim-reduction / annotation steps on a 10× larger dataset (20k cells, 7 donors, \~250 MB compressed) so you can see how the same workflow scales — typically run as R + SLURM scripts on Talapas. See the [SLURM Basics tutorial](../Tutorial_SLURM_Basics.html).
 :::
 
 ## About this tutorial
@@ -250,16 +250,57 @@ FeatureScatter(nsclc.seurat.obj,
 </details>
 :::
 
-## Step 5 — Filter low-quality cells
+## Step 5 — Doublet detection with `scDblFinder`
+
+`scDblFinder` simulates artificial doublets, trains a classifier, and returns a per-cell score and class. NSCLC's CellPlex multiplexing means we have CMO-derived sample labels — but the doublets we care about here are **droplet-level** doublets (two cells in one bead), which form *within* each 10x channel. For the simplest case (all cells loaded in one library) we run scDblFinder on the entire object; if you have CMO-demultiplexed sample assignments and want per-sample doublet rates, split first.
+
+```{r}
+#| label: doublet
+#| eval: false
+
+# install if needed:
+# BiocManager::install("scDblFinder")
+library(scDblFinder)
+
+set.seed(2026)
+
+sce <- as.SingleCellExperiment(nsclc.seurat.obj)
+sce <- scDblFinder(sce, returnType = "sce")
+
+nsclc.seurat.obj$scDblFinder.score <- colData(sce)$scDblFinder.score
+nsclc.seurat.obj$scDblFinder.class <- colData(sce)$scDblFinder.class
+
+table(nsclc.seurat.obj$scDblFinder.class)
+
+VlnPlot(nsclc.seurat.obj,
+        features = c("nFeature_RNA", "nCount_RNA"),
+        group.by = "scDblFinder.class", pt.size = 0)
+```
+
+::: {.callout-important title="Think about it"}
+A 20k-cell NSCLC run will typically flag \~5–8% of cells as doublets. Why might the doublet rate be higher in tumor dissociations than in PBMCs?
+
+<details>
+
+<summary>Show answers</summary>
+
+Tumor dissociations produce **larger, stickier cells** (epithelial / mesenchymal) that are more likely to clump than free-floating immune cells. Some "doublets" are actually un-dissociated cell pairs that survive the microfluidic pinch. CellPlex / hash-tag demultiplexing helps catch *cross-sample* doublets (one barcode mapping to two CMOs) but does **not** catch within-sample doublets — that's what scDblFinder is for.
+
+</details>
+:::
+
+## Step 6 — Filter low-quality cells
 
 ```{r}
 #| label: filter
 
+# Optionally include the scDblFinder.class filter (uncomment after running Step 4b):
 nsclc.seurat.obj <- subset(
   nsclc.seurat.obj,
   subset = nFeature_RNA > 200 &
            nFeature_RNA < 2500 &
            percent.mt   < 5
+           # & scDblFinder.class == "singlet"
 )
 nsclc.seurat.obj
 
@@ -281,7 +322,7 @@ dim_after_filter <- dim(nsclc.seurat.obj)
 </details>
 :::
 
-## Step 6 — Normalize
+## Step 7 — Normalize
 
 ```{r}
 #| label: normalize
@@ -321,8 +362,8 @@ dim_summary <- tibble::tribble(
   ~step,                                                        ~features_before,    ~features_after,        ~barcodes_before,    ~barcodes_after,
   "Step 1 — Read10X (raw load)",                                 NA_integer_,         dim_raw[1],             NA_integer_,         dim_raw[2],
   "Step 2 — CreateSeuratObject (min.cells=3, min.features=200)", dim_raw[1],          dim_after_create[1],    dim_raw[2],          dim_after_create[2],
-  "Step 5 — subset() QC filter (nFeature_RNA, percent.mt)",      dim_after_create[1], dim_after_filter[1],    dim_after_create[2], dim_after_filter[2],
-  "Step 6 — NormalizeData (no dimension change)",                dim_after_filter[1], dim_after_normalize[1], dim_after_filter[2], dim_after_normalize[2]
+  "Step 6 — subset() QC filter (nFeature_RNA, percent.mt)",      dim_after_create[1], dim_after_filter[1],    dim_after_create[2], dim_after_filter[2],
+  "Step 7 — NormalizeData (no dimension change)",                dim_after_filter[1], dim_after_normalize[1], dim_after_filter[2], dim_after_normalize[2]
 )
 dim_summary
 ```
@@ -333,8 +374,8 @@ Your printed numbers will be similar to (not necessarily identical to) the value
 |---|---:|---:|---:|---:|
 | Step 1 — Read10X (raw load)                                    | —      | ~36,601 | —      | ~42,386 |
 | Step 2 — CreateSeuratObject (`min.cells=3`, `min.features=200`) | ~36,601 | ~24,000 | ~42,386 | ~22,000 |
-| Step 5 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~24,000 | ~24,000 | ~22,000 | ~17,000 |
-| Step 6 — `NormalizeData` (no dimension change)                  | ~24,000 | ~24,000 | ~17,000 | ~17,000 |
+| Step 6 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~24,000 | ~24,000 | ~22,000 | ~17,000 |
+| Step 7 — `NormalizeData` (no dimension change)                  | ~24,000 | ~24,000 | ~17,000 | ~17,000 |
 
 Steps 7 (`FindVariableFeatures`) and 8 (`ScaleData`) likewise leave the matrix shape intact — they only attach extra metadata or transform values in place — so this table captures the entire dimensional story of the tutorial.
 
@@ -352,7 +393,7 @@ Steps 7 (`FindVariableFeatures`) and 8 (`ScaleData`) likewise leave the matrix s
 </details>
 :::
 
-## Step 7 — Highly variable features
+## Step 8 — Highly variable features
 
 ```{r}
 #| label: hvgs
@@ -382,7 +423,7 @@ LabelPoints(plot = plot1, points = top10, repel = TRUE)
 </details>
 :::
 
-## Step 8 — Scale
+## Step 9 — Scale
 
 ```{r}
 #| label: scale

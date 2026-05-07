@@ -6,7 +6,7 @@ This page describes the datasets the workshop uses, where to download them, and 
 
 The workshop runs on **two parallel dataset paths**:
 
--   **Laptop path (default).** A small two-sample dataset (`ifnb`, \~25 MB, \~14k cells) that lets you complete the entire scRNA-seq workflow — including **integration** — on a typical laptop. This is what the numbered tutorials (01–07) use.
+-   **Laptop path (default).** A small two-sample dataset (`ifnb`, \~25 MB, \~14k cells) that lets you complete the entire scRNA-seq workflow — including **integration** — on a typical laptop. This is what the numbered tutorials (01–09) use.
 -   **Talapas scaling path (optional).** A larger 20k-cell, 7-donor dataset (10x NSCLC DTC, \~250 MB compressed, \~700 MB extracted) that shows how the same workflow scales up. The companion tutorials live in `Exercise_Folder/NSCLC_FullDataset/` and are designed to be run as R + SLURM scripts on the [Talapas cluster](Resources_Folder/VSCode_Talapas.html). Use this path **after** you've worked through the laptop tutorials.
 
 Where applicable, we follow Khushbu Patel's [YouTube Tutorials](https://github.com/kpatel427/YouTubeTutorials) so her video walkthroughs serve as supplementary material.
@@ -18,34 +18,37 @@ By convention every tutorial reads from `../data/` — i.e. a `data/` folder at 
 ```
 scrnaseq_workshop/
 ├── Exercise_Folder/
-│   ├── Tutorial_01_QC_Preprocessing.qmd      (laptop, ifnb)
+│   ├── Tutorial_01_QC_Preprocessing.qmd          (laptop, ifnb)
 │   ├── Tutorial_02_DimReduction_Clustering.qmd
 │   ├── Tutorial_03_Markers_Annotation.qmd
 │   ├── Tutorial_04_Integration.qmd
 │   ├── Tutorial_05_Primer_DESeq2_Basics.qmd
 │   ├── Tutorial_06_Pseudobulk_DE.qmd
-│   ├── Tutorial_07_Reference_Annotation.qmd
-│   ├── Tutorial_08_scATACseq_Signac.qmd
-│   ├── Tutorial_09_WGCNA.qmd
-│   └── NSCLC_FullDataset/                    (Talapas scaling exercises)
+│   ├── Tutorial_07_FunctionalAnalysis.qmd        (clusterProfiler)
+│   ├── Tutorial_08_DifferentialAbundance.qmd     (miloR)
+│   ├── Tutorial_09_Reference_Annotation.qmd
+│   ├── Tutorial_10_scATACseq_Signac.qmd
+│   ├── Tutorial_11_WGCNA.qmd
+│   ├── Tutorial_12_Spatial_Transcriptomics.qmd   (Visium, stxBrain)
+│   └── NSCLC_FullDataset/                        (Talapas scaling exercises)
 │       ├── Tutorial_NSCLC_01_QC_Preprocessing.qmd
 │       ├── Tutorial_NSCLC_02_DimReduction_Clustering.qmd
 │       └── Tutorial_NSCLC_03_Markers_Annotation.qmd
 └── data/
-    ├── (ifnb is loaded via SeuratData — no download to data/)
+    ├── (ifnb and stxBrain are loaded via SeuratData — no download to data/)
     ├── filtered_feature_bc_matrix/                # NSCLC (Talapas exercise)
     │   ├── barcodes.tsv.gz
     │   ├── features.tsv.gz
     │   └── matrix.mtx.gz
-    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5  # scATAC (Tut 08)
-    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 08)
-    ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 08)
-    └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 09)
+    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5  # scATAC (Tut 10)
+    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 10)
+    ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 10)
+    └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 11)
 ```
 
 Tutorials 01–04 do **not** need anything in `data/` to start — `ifnb` is downloaded once into your R user library by `SeuratData`. They only write to `data/` (the chained `.rds` files between tutorials).
 
-## Tutorials 01–07 — `ifnb` (Kang *et al.* 2017, two-sample PBMCs)
+## Tutorials 01–09 — `ifnb` (Kang *et al.* 2017, two-sample PBMCs)
 
 **What it is.** Peripheral blood mononuclear cells (PBMCs) from eight lupus donors. Each donor's cells were split in half and one half was treated with **interferon-β** for 6 hours; the other half was held as a control. Both samples were pooled and run on the **10x Chromium 3' v1** assay.
 
@@ -57,7 +60,7 @@ Total: \~13,999 cells across two samples — small enough to run end-to-end on a
 -   Reference: Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
 -   GEO accession: [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
 -   Distribution: `SeuratData` R package (no manual download)
--   Used by: Tutorials 01 → 07
+-   Used by: Tutorials 01 → 09
 
 ### Why `ifnb` for teaching
 
@@ -102,7 +105,7 @@ BiocManager::install("airway")
 library(airway); data(airway)
 ```
 
-## Tutorial 08 — PBMC 10k scATAC-seq v1 (10x, hg19)
+## Tutorial 10 — PBMC 10k scATAC-seq v1 (10x, hg19)
 
 Used for the scATAC-seq tutorial. **Same dataset as Patel's** [`scATACSeq_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R) and the [Signac PBMC vignette](https://stuartlab.org/signac/articles/pbmc_vignette).
 
@@ -123,7 +126,7 @@ wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1
 The earlier "Next GEM v1.1" re-release of this sample is mapped to **hg38** (filenames prefixed `atac_v1_pbmc_10k_nextgem_*`). The tutorial assumes the **v1 / hg19** release because it pairs with `EnsDb.Hsapiens.v75`.
 :::
 
-## Tutorial 09 — GSE152418 (COVID-19 PBMC bulk RNA-seq)
+## Tutorial 11 — GSE152418 (COVID-19 PBMC bulk RNA-seq)
 
 **What it is.** PBMC bulk RNA-seq from a published cross-sectional study of COVID-19 patients (Arunachalam *et al.* 2020, *Science*). Severity gradient from healthy to ICU. Same dataset as Patel's [`WGCNA.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R).
 
@@ -194,13 +197,29 @@ wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_
 ```
 :::
 
+## Tutorial 12 — `stxBrain` (10x Visium adult mouse brain)
+
+**What it is.** Two 10x Visium sections from the same adult mouse brain — one **anterior** (\~2,700 spots) and one **posterior** (\~3,300 spots). Each spot is \~55 µm and captures the transcripts from \~1–10 cells underneath. Total ≈ 6,000 spots across two sections, \~50 MB on disk.
+
+-   Distribution: `SeuratData::InstallData("stxBrain")` (no manual download, no 10x click-through)
+-   Used in: Tutorial 12 (Spatial Transcriptomics)
+-   Reference: 10x Genomics public Visium dataset; workflow follows the [Seurat spatial vignette](https://satijalab.org/seurat/articles/spatial_vignette).
+
+```r
+SeuratData::InstallData("stxBrain")
+ant  <- LoadData("stxBrain", type = "anterior1")
+post <- LoadData("stxBrain", type = "posterior1")
+```
+
+The anterior + posterior pair mirrors the two-sample structure of `ifnb`: same biology, two batches, perfect for teaching the Visium-flavoured integration workflow.
+
 ## Reference / annotation datasets (no manual download)
 
 These are loaded automatically by the relevant R packages on first use — you don't need to download them manually, but they do need an internet connection the first time.
 
 | Reference | Loaded by | Used in |
 |---|---|---|
-| `HumanPrimaryCellAtlasData()` | `celldex` | Tutorial 07 (SingleR) |
+| `HumanPrimaryCellAtlasData()` | `celldex` | Tutorial 09 (SingleR — Seurat default reference path) |
 | Azimuth `pbmcref` | `Azimuth` / `SeuratData` | Tutorial 07 |
 | `EnsDb.Hsapiens.v75` | Bioconductor | Tutorial 08 (scATAC) |
 
@@ -212,8 +231,8 @@ These are loaded automatically by the relevant R packages on first use — you d
 | Per-tutorial `.rds` snapshots (laptop path) | — | up to \~2 GB if you keep them all |
 | **Talapas scaling exercise (NSCLC filtered)** | \~250 MB | \~700 MB |
 | **Talapas scaling exercise (NSCLC raw `.h5`, optional)** | \~1.5 GB | \~1.5 GB (single file) |
-| Tutorial 08 — PBMC 10k scATAC-seq | \~2.5 GB | \~5 GB |
-| Tutorial 09 — GSE152418 raw counts | \~7 MB | \~80 MB |
+| Tutorial 10 — PBMC 10k scATAC-seq | \~2.5 GB | \~5 GB |
+| Tutorial 11 — GSE152418 raw counts | \~7 MB | \~80 MB |
 | Reference data (cached) | — | \~500 MB |
 
 For a **laptop-only workshop** doing Tutorials 01–07, plan for **\~3 GB total** including reference caches and intermediate `.rds` files. Add the NSCLC scaling exercise on top and you're at **\~5 GB**; the full ATAC + WGCNA suite pushes the total to \~12 GB.

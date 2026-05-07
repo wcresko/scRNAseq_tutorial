@@ -223,7 +223,111 @@ FeatureScatter(ifnb,
 </details>
 :::
 
-## Step 5 — Filter low-quality cells
+## Step 5 — Optional: ambient-RNA correction with SoupX
+
+In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambient mRNA** into every droplet. After Cell Ranger, this shows up as a low background of "wrong" transcripts in every cell — most visibly when a cell expresses a marker for a *different* cell type at low level. **`SoupX`** estimates the ambient profile and corrects each cell's counts. It runs *before* QC filtering and replaces the counts matrix with a cleaned one.
+
+::: callout-warning
+**SoupX needs both the raw and filtered Cell Ranger matrices** (`raw_feature_bc_matrix/` and `filtered_feature_bc_matrix/`) because it learns the soup profile from empty droplets. The `ifnb` SeuratData package only ships the **filtered** matrix, so you cannot run SoupX on `ifnb` directly. The code below is the canonical pattern — use it on **your own** 10x data, or on the [NSCLC scaling exercise](NSCLC_FullDataset/Tutorial_NSCLC_01_QC_Preprocessing.html) where the raw matrix is available.
+:::
+
+```{r}
+#| label: soupx
+#| eval: false
+
+# Pattern for any 10x dataset where you have the raw Cell Ranger output:
+# library(SoupX)
+# library(DropletUtils)
+#
+# # 1. Point at the Cell Ranger 'outs/' directory (containing raw_feature_bc_matrix/
+# #    and filtered_feature_bc_matrix/)
+# sc <- load10X("path/to/cellranger/outs")
+#
+# # 2. (Recommended) provide preliminary clusters so SoupX can refine the soup
+# #    profile per cluster. Compute these with a quick Seurat workflow on the
+# #    filtered matrix first, then attach:
+# # sc <- setClusters(sc, setNames(seu$seurat_clusters, colnames(seu)))
+# # sc <- setDR(sc, Embeddings(seu, "umap"))
+#
+# # 3. Estimate the ambient contamination fraction
+# sc <- autoEstCont(sc)
+# rho <- sc$fit$rhoEst
+# message("Estimated ambient fraction: ", round(rho, 3))
+#
+# # 4. Adjust the counts (round to integers so downstream UMI tools are happy)
+# adj <- adjustCounts(sc, roundToInt = TRUE)
+#
+# # 5. Use `adj` (a sparse matrix) as the input to CreateSeuratObject() in Step 1
+# #    instead of the raw filtered matrix. Everything else in this tutorial then
+# #    runs on the cleaned counts.
+```
+
+::: {.callout-important title="Think about it"}
+1.  Why does SoupX need the **raw** (pre-filter) matrix? What information does it pull from there?
+2.  When is SoupX overkill? When is it essential?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  The raw matrix contains droplets that captured **no real cell** — they hold only ambient RNA. SoupX uses those empty droplets to estimate the soup's expression profile, then subtracts a fraction of that profile from every called cell.
+2.  **Overkill:** small contamination (rho ≲ 0.05), well-prepared samples, no marker bleed-through. **Essential:** complex tissues with high cell death / large cell-type differences (tumor microenvironment, mucosal tissues), or any time you see a marker like `HBB` or `IGKC` showing up faintly in cells that shouldn't express it.
+
+</details>
+:::
+
+## Step 6 — Doublet detection with `scDblFinder`
+
+A **doublet** is one barcode's worth of counts that came from two cells getting trapped in the same droplet. They show up as cells with anomalously high `nCount_RNA` and `nFeature_RNA` and a mixed expression profile (e.g. T-cell markers AND B-cell markers in the same cell). The simple `nFeature_RNA < 2500` filter from Step 7 catches some, but doublets that pair two *different* cell types of similar size will pass that filter — you need a model.
+
+`scDblFinder` simulates artificial doublets, trains a classifier to distinguish them from singletons, and returns a per-cell score and class. Critically, **doublets form within a sample, not across samples**, so we run it per sample.
+
+```{r}
+#| label: dbl
+
+# install if needed:
+# BiocManager::install("scDblFinder")
+library(scDblFinder)
+
+set.seed(2026)
+
+# Run scDblFinder per sample, then merge the results back into the Seurat object
+ifnb_list <- SplitObject(ifnb, split.by = "stim")
+ifnb_list <- lapply(ifnb_list, function(x) {
+  sce <- as.SingleCellExperiment(x)
+  sce <- scDblFinder(sce, returnType = "sce")
+  x$scDblFinder.score <- colData(sce)$scDblFinder.score
+  x$scDblFinder.class <- colData(sce)$scDblFinder.class    # "singlet" or "doublet"
+  x
+})
+ifnb <- merge(ifnb_list[[1]], y = ifnb_list[-1])
+
+# How many doublets were called per sample?
+table(sample = ifnb$stim, class = ifnb$scDblFinder.class)
+
+# Inspect: doublets should sit at the high end of nCount/nFeature
+VlnPlot(ifnb,
+        features = c("nFeature_RNA", "nCount_RNA"),
+        group.by = "scDblFinder.class", pt.size = 0)
+```
+
+::: {.callout-important title="Think about it"}
+1.  Why run `scDblFinder` **per sample** instead of on the merged object?
+2.  scDblFinder marks \~5–10% of cells as doublets in a typical 10x run. If your run shows 25%, what likely happened?
+3.  Some pipelines run doublet detection *after* clustering and remove doublet-enriched clusters wholesale. Why might that be more conservative than removing per-cell doublet calls?
+
+<details>
+
+<summary>Click for answer</summary>
+
+1.  Doublets are made when **two cells from the same droplet load** are co-encapsulated. Cells from different samples (CTRL and STIM here) were prepared in separate channels, so a STIM and a CTRL cell can never be a doublet. Running per-sample also lets each sample's doublet-rate be modeled correctly.
+2.  Either you over-loaded the chip (the loading concentration was too high — typical for "nominal 10k cells, recovered 18k") or there's a quality problem (debris, large cell aggregates) making the simulated-doublet classifier confused. Inspect `nCount_RNA`/`nFeature_RNA` distributions and the ambient fraction.
+3.  Per-cell doublet calls have false positives. If you trust them and remove individual cells, you may *also* be removing legitimate cycling cells, large activated cells, or megakaryocytes (which look doublet-like by sheer transcriptional output). Removing doublet-enriched **clusters** is more conservative — only act on a cluster where the doublet fraction is clearly elevated and the markers don't make biological sense.
+
+</details>
+:::
+
+## Step 7 — Filter low-quality cells
 
 ```{r}
 #| label: filter
@@ -232,7 +336,8 @@ ifnb <- subset(
   ifnb,
   subset = nFeature_RNA > 200 &
            nFeature_RNA < 2500 &
-           percent.mt   < 5
+           percent.mt   < 5 &
+           scDblFinder.class == "singlet"
 )
 ifnb
 table(ifnb$stim)
@@ -254,7 +359,7 @@ dim_after_filter <- dim(ifnb)
 </details>
 :::
 
-## Step 6 — Normalize
+## Step 8 — Normalize
 
 ```{r}
 #| label: normalize
@@ -282,7 +387,7 @@ dim_after_normalize <- dim(ifnb)
 </details>
 :::
 
-## Step 7 — Highly variable features
+## Step 9 — Highly variable features
 
 ```{r}
 #| label: hvgs
@@ -312,7 +417,7 @@ LabelPoints(plot = plot1, points = top10, repel = TRUE)
 </details>
 :::
 
-## Step 8 — Scale
+## Step 10 — Scale
 
 ```{r}
 #| label: scale
@@ -345,8 +450,8 @@ ifnb <- ScaleData(ifnb, features = all.genes)
 dim_summary <- tibble::tribble(
   ~step,                                                    ~features_after,        ~barcodes_after,
   "Step 1 — LoadData (raw)",                                 dim_raw[1],             dim_raw[2],
-  "Step 5 — subset() QC filter (nFeature_RNA, percent.mt)",  dim_after_filter[1],    dim_after_filter[2],
-  "Step 6 — NormalizeData (no dimension change)",            dim_after_normalize[1], dim_after_normalize[2]
+  "Step 7 — subset() QC filter (nFeature_RNA, percent.mt)",  dim_after_filter[1],    dim_after_filter[2],
+  "Step 8 — NormalizeData (no dimension change)",            dim_after_normalize[1], dim_after_normalize[2]
 )
 dim_summary
 ```
@@ -356,8 +461,8 @@ You should see roughly:
 | Step | Features after | Barcodes after |
 |---|---:|---:|
 | Step 1 — LoadData                                              | ~14,053 | ~13,999 |
-| Step 5 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~14,053 | ~13,500 |
-| Step 6 — `NormalizeData` (no dimension change)                  | ~14,053 | ~13,500 |
+| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~14,053 | ~13,500 |
+| Step 8 — `NormalizeData` (no dimension change)                  | ~14,053 | ~13,500 |
 
 (Numbers will vary by a few hundred depending on package versions.)
 
