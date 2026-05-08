@@ -1,0 +1,220 @@
+---
+title: "Chapter 1 — Preprocessing: From a Counts Matrix to a Filtered, Normalized Object"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** This is the long-form companion to **[Lecture 01 — Pre-processing](../Lecture_Folder/Lecture_01_Preprocessing.html)** and **[Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)**. Read this for the deeper "why"; the lecture is the slide-deck summary; the tutorial is the runnable code. **Prerequisites:** [Appendix H — Single-Cell Biology Refresher](Appendix_H_SC_Biology_Refresher.html), [Appendix I — Statistical Foundations](Appendix_I_Statistical_Foundations.html) §§ 1–3 (Poisson/NB, mean–variance), [Appendix D — R Programming](Appendix_D_R_Programming.html) (vectors, sparse matrices).
+:::
+
+## 1.1 Why preprocessing exists
+
+Single-cell RNA-seq starts with a **counts matrix**: rows are genes, columns are barcoded droplets, entries are integer UMI counts. This is the output that Cell Ranger or STARsolo produces from a raw 10x sequencing run. It is *not* an analysis-ready object. It contains, in roughly equal numbers, three categories of objects we need to separate:
+
+1. **Real cells**, the population of interest, with reasonable RNA content
+2. **Empty droplets** that captured only ambient RNA from the cell suspension
+3. **Doublets** — droplets that captured two cells each, producing a chimeric expression profile
+4. **Damaged or dying cells**, identifiable by elevated mitochondrial RNA
+
+Preprocessing is the act of cleaning out (2)–(4) before downstream analysis. In a typical 10x run, perhaps 70–85% of barcodes that pass Cell Ranger's first-pass filter are real, well-behaved cells. The remaining 15–30% are noise that — if left in — will drive PCs, clusters, and apparent cell types in your dataset. You will spend *more* analytical effort tracking them down later than you would spend filtering them out now.
+
+This chapter walks each of these decisions: what the noise looks like, what it costs to leave it in, and how we recognize it in the data.
+
+## 1.2 The standard Seurat-flavored workflow, named
+
+Across the field there is broad agreement on the steps and on roughly the order. The **Seurat eight-step workflow** — which the workshop tutorials use — is:
+
+1. **Load** the counts matrix into a `Seurat` object
+2. **Compute QC metrics** per cell: total UMI count, total detected gene count, mitochondrial fraction
+3. **(Optional) Ambient-RNA correction** with `SoupX`
+4. **Doublet detection** with `scDblFinder`
+5. **Filter** cells using thresholds chosen from the QC distributions
+6. **Normalize** counts to remove per-cell sequencing-depth differences
+7. **Find highly variable genes (HVGs)** to focus downstream on biological signal
+8. **Scale** the HVG matrix (z-score across cells) so each gene is given equal weight in PCA
+
+The Scanpy / Bioconductor `scran`+`scater` workflows are essentially identical with different function names. The intuition behind each step is what matters; once you understand the *why*, swapping toolkits is mechanical.
+
+::: callout-tip
+**Read along with the tutorial.** The [Tutorial 01](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html) chunks are organized in this same eight-step order. Each chunk's *Think about it* prompt is meant to be answered with the conceptual material in this chapter.
+:::
+
+## 1.3 Quality-control metrics — what they measure and why
+
+Three numbers per cell carry most of the QC information:
+
+### 1.3.1 `nCount_RNA` — total UMIs per cell
+
+This is just the sum of the cell's column in the counts matrix: how many distinct RNA molecules (UMIs, not reads — see [Appendix H §4](Appendix_H_SC_Biology_Refresher.html)) were captured for this barcode. It serves as a rough proxy for "how deeply was this cell sequenced?"
+
+The distribution across cells is typically log-normal-shaped, with a peak at 5,000–15,000 UMIs for a healthy 10x 3' v3 run. Cells in the **left tail** are either undersequenced, lysed, or empty; cells in the **right tail** are either particularly transcriptionally active *or* are doublets (two cells contributing UMIs to one barcode).
+
+Numerical signpost: a healthy cell has at least \~1,000 UMIs; below 500 is almost always noise. The exact lower threshold depends on the tissue (some cell types — neutrophils, plasma cells — are biologically transcriptionally lower than lymphocytes).
+
+### 1.3.2 `nFeature_RNA` — number of unique genes detected
+
+The count of distinct genes with at least one UMI in the cell. Strongly correlated with `nCount_RNA` but **plateaus** at the saturation of the cell's expressed transcriptome. A typical PBMC has 1,500–4,000 detected genes; a metabolically active cell or doublet pushes higher.
+
+`nFeature_RNA` and `nCount_RNA` together let you see the cell's *complexity*: a cell with many UMIs but few unique genes is over-amplifying a small set of highly-expressed transcripts (a bad sign — sometimes a hemoglobin-saturated red blood cell, sometimes a degraded library). Plot them against each other; healthy cells fall on a single linear-ish trend.
+
+### 1.3.3 `percent.mt` — mitochondrial fraction
+
+Compute the fraction of UMIs that map to mitochondrial-encoded genes (in human, gene symbols starting with `MT-`; in mouse, `mt-`). The mitochondrion has its own genome with \~37 genes; when a cell's plasma membrane breaks down (apoptosis, dissociation stress), cytoplasmic mRNAs leak out faster than mitochondrial ones, so dying cells show **elevated** `percent.mt`.
+
+Healthy cells: 2–10% (tissue-dependent). Tumor cells often run higher (15–25%). Cells above 30% are nearly always damaged. The rule is **plot the distribution per sample first, then choose a threshold from the data** — there is no universal cutoff.
+
+For full statistical detail on why we use these three metrics specifically and not, say, total reads or duplication rate, see [Appendix I §1](Appendix_I_Statistical_Foundations.html) and [@Appendix_H_SC_Biology_Refresher §6].
+
+## 1.4 The barcode-rank knee plot — empty droplets vs cells
+
+A complementary diagnostic is the **knee plot**: sort barcodes by total UMI count descending and plot rank vs total UMIs on a log–log scale.
+
+Real cells form a high plateau on the left. Empty droplets form a low plateau on the right. Between them, the curve drops sharply through a **knee** that separates the two. Cell Ranger's empty-droplet calling uses this knee (plus an EmptyDrops likelihood test below it) to call cells. The `filtered_feature_bc_matrix/` you start the tutorials with has had this filter applied.
+
+The plot is still worth looking at for **your own** data because pathological samples produce pathological knees:
+
+- **Two knees** — usually two cell-size populations (e.g. a clean lymphocyte cell line + a contaminating macrophage line)
+- **No clear knee** — the barcode-loading was too sparse, or the cell suspension was very heterogeneous in size
+- **A short plateau and a long tail** — over-loaded chip; many doublets; the upper plateau is contaminated with multiplets
+
+The knee plot is the single most informative diagnostic figure for an scRNA-seq run. Save it with your raw data.
+
+## 1.5 Ambient-RNA correction with SoupX
+
+When cells lyse during dissociation (and some always do), their cytoplasmic mRNA spills into the suspension. Every droplet — including good cells — captures a small amount of this **ambient RNA**. The contamination is in proportion to the ambient profile (mostly the most-expressed genes from the most-abundant cell type) and is often 5–15% of a cell's measured counts.
+
+The practical effect: a cell that doesn't express gene X actually shows non-zero X due to the ambient bath. If gene X is a highly-discriminative marker for some cell type, this can blur cell-type boundaries, falsely suggest cell-cell communication, and inflate marker p-values.
+
+**SoupX** estimates the ambient profile from the empty-droplet counts and subtracts a learned fraction from each cell's counts. The fraction (ρ, the contamination rate) is estimated automatically (`autoEstCont()`) by looking at expression of "non-expressed" genes — genes that should be zero in a particular cell-type cluster but that show low non-zero counts because of the soup.
+
+When to run it:
+
+- **Always**, if your suspension was complex (tumor microenvironment, multiple tissues, high cell-death rate)
+- **Probably not necessary** for clean immune cell populations (PBMCs from healthy donors usually have ρ < 0.05)
+- **Required if** you intend to do cell-cell communication analysis — that field is sensitive to ambient bleed
+
+SoupX needs both the **raw** and **filtered** Cell Ranger matrices, because the soup profile is learned from empty droplets. The workshop's `ifnb` dataset only ships the filtered matrix, so the SoupX block in Tutorial 01 is illustrative; run it for real on the NSCLC scaling exercise (which has both matrices) or on your own 10x output.
+
+For the broader file-format context, see [Appendix G — Gene-Expression Databases & File Formats](Appendix_G_Databases_FileFormats.html).
+
+## 1.6 Doublet detection
+
+A **doublet** is one barcode's worth of UMIs from two cells trapped in one droplet. The 10x chemistry produces \~1% multiplet rate per 1,000 cells loaded, so a 10k-cell run is roughly 10% doublets. They survive the basic gene-count filter when the two cells are similar in size (a CD4 T + CD8 T doublet looks like a slightly bigger T cell, not a clear outlier).
+
+**`scDblFinder`** simulates artificial doublets by averaging pairs of real cells, trains a classifier (a gradient-boosted tree) to discriminate them from singletons, and assigns each cell a doublet score and class. Crucially, **doublets only form within a sample** — cells from different 10x channels can never co-encapsulate — so we run the classifier per sample, not on a merged object.
+
+Practical notes:
+
+- Doublet *removal* is destructive. A real activated T cell can look slightly doublet-like by transcriptional output. The conservative approach is to remove flagged doublets *after* clustering, only when an entire cluster is doublet-enriched
+- The reported doublet rate should match your loading: 5,000 cells loaded → \~5% expected; 20,000 cells → \~20% expected. A 25% rate from a 5k-cell run is a red flag
+- Set a seed before running; `scDblFinder` is stochastic
+
+For more on why doublets specifically (and not, say, all noise) deserve a dedicated detector, see [Appendix H §11](Appendix_H_SC_Biology_Refresher.html).
+
+## 1.7 Filtering: thresholds chosen from the distribution, not the textbook
+
+The big mistake at this step: copying thresholds from a tutorial without looking at *your* data. The right thresholds depend on the tissue, the chemistry, the dissociation protocol, and the run quality. Three rules:
+
+1. **Plot the per-sample distributions before choosing thresholds.** A violin or histogram per sample, on log scale for `nCount` and `nFeature`. The left tail's shoulder is a defensible cutoff; the bare minimum is whatever clearly cuts away the empty-droplet remnants.
+2. **Use median ± k·MAD as a starting point.** The `scater::isOutlier` function does this automatically. For `percent.mt`, the rule "anything more than 3 MADs above the per-sample median" is conservative but data-driven.
+3. **Document your choices.** Record the exact numerical thresholds in your methods section ([Appendix J](Appendix_J_Methods_Template.html)). "We filtered low-quality cells" is not a defensible methods sentence.
+
+The workshop's `ifnb` filter — `nFeature_RNA > 200`, `nFeature_RNA < 2500`, `percent.mt < 5`, `scDblFinder.class == "singlet"` — is reasonable for healthy PBMCs but would over-filter a tumor or BAL fluid sample. Treat any specific thresholds as starting points.
+
+## 1.8 Normalization
+
+After filtering, every cell still has a different `nCount_RNA` — its sequencing depth. Without correction, a deeper-sequenced cell has higher absolute counts for every gene, regardless of biology. **Normalization** removes this technical variance.
+
+The standard transformation is **log-normalize**:
+
+$$\tilde y_{ij} = \log_2\!\left(\frac{y_{ij}}{C_j}\cdot 10^4 + 1\right)$$
+
+where $y_{ij}$ is gene $i$'s count in cell $j$, $C_j$ is the cell's total UMI count, and the $+1$ keeps zeros mapping to zero. This is what Seurat's `NormalizeData()` does; the result lives in `seu@assays$RNA@data`. Post-normalization, every cell has an effectively normalized counts vector with no strong dependence on its raw library size.
+
+An alternative is **`SCTransform`**, which fits a per-gene negative-binomial regression on raw counts as a function of cell depth and uses **Pearson residuals** as the normalized values. Pearson residuals have approximately constant variance across the mean-expression range, which makes downstream PCA/clustering more stable. `SCTransform` is preferred for very low-count datasets and is the default for spatial transcriptomics (Visium, where each spot pools 1–10 cells with wider count variation).
+
+For the statistical machinery behind both transformations — what variance-stabilizing means and why over-dispersion is the central issue — see [Appendix I §§2–3](Appendix_I_Statistical_Foundations.html).
+
+## 1.9 Highly variable genes (HVGs)
+
+Once normalized, every gene contributes some variance to the data. Most of it is uninformative: housekeeping genes, ribosomal proteins, ubiquitously-expressed genes whose variance reflects sequencing noise more than biology. We want to focus PCA and clustering on the genes that **actually distinguish cell types**.
+
+The standard tool is **variance-stabilized feature selection**:
+
+1. Fit the relationship between each gene's mean expression and its variance across cells
+2. For each gene, compute a *standardized variance* = observed variance / fitted variance-given-mean
+3. Take the top N (typically 2,000) by standardized variance — these are the HVGs
+
+Seurat's `FindVariableFeatures(method = "vst")` does exactly this. The shortlist almost always includes recognizable cell-type markers (CD14, MS4A1, GNLY, etc.) plus condition-induced genes if your dataset has a strong perturbation (interferon-stimulated genes in `ifnb`, hypoxia markers in tumor data, etc.).
+
+Why 2,000? Empirically, somewhere between 1,500 and 3,000 is the sweet spot for most 10x datasets:
+
+- Below \~1,000: rare cell types disappear because their distinguishing genes don't make the cut
+- Above \~5,000: the list becomes diluted with low-information genes; PCA performance plateaus or degrades
+
+Going down further (e.g. 500 HVGs) is sometimes justified for atlas-scale data where speed matters more than fine resolution.
+
+## 1.10 Scaling
+
+The last step before PCA: z-score each gene **across cells** so it has mean 0 and SD 1. Why? Because PCA finds directions of maximum variance. Without scaling, a few highly-expressed genes (whose variance is large simply because their absolute expression is large) would dominate PC1 — and we want PC1 to track *biology*, not raw expression magnitude.
+
+Optional at this step: **regress out unwanted covariates**. `ScaleData(seu, vars.to.regress = c("percent.mt", "nCount_RNA"))` removes the linear effect of `percent.mt` and library size from each gene before z-scoring. Useful when these covariates are driving early PCs in your data; usually unnecessary for clean datasets.
+
+A note: SCTransform does scaling implicitly — its Pearson residuals are already on a comparable scale across genes — so if you used `SCTransform`, you don't run `ScaleData`.
+
+## 1.11 What you have at the end
+
+After steps 1–8, the `Seurat` object holds:
+
+- `@assays$RNA@counts` — raw integer UMI counts (the input)
+- `@assays$RNA@data` — log-normalized values
+- `@assays$RNA@scale.data` — z-scored HVG matrix (the input to PCA)
+- `@assays$RNA$var.features` — vector of \~2,000 HVG names
+- `@meta.data` — per-cell metadata (sample, QC metrics, doublet calls)
+
+The next chapter ([Chapter 2 — Dimensionality Reduction & Clustering](Chapter_02_DimReduction.html)) takes the scaled HVG matrix and turns it into clusters and a UMAP.
+
+## 1.12 Common errors and what they mean
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `Read10X` returns a list, not a matrix | The Cell Ranger output has multiple feature types (RNA + ADT + CMO) | Pull out the slice you want: `counts$``Gene Expression`` ` |
+| Filter removes 80% of cells | Your thresholds are wrong, or QC distributions are bad | Plot per-sample distributions; recompute thresholds from the data |
+| `percent.mt` is 0 for every cell | The mitochondrial gene pattern doesn't match | Check `rownames(seu)` for `MT-` (human) or `mt-` (mouse) |
+| `scDblFinder` flags 30% of cells | Either you over-loaded the chip, or you ran it on a merged object | Run per sample; if rate is genuinely 30% then your run is poor quality |
+| HVG list is dominated by ribosomal genes | Your data had no strong biology, or QC was insufficient | Re-check QC; consider regressing out `percent.rb`; choose a tissue with cleaner heterogeneity |
+
+For a longer list of preprocessing pitfalls, see the **Common errors** callout at the top of [Tutorial 01](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html).
+
+## 1.13 Where this material is also discussed
+
+- **Lecture:** [Lecture 01 — Pre-processing](../Lecture_Folder/Lecture_01_Preprocessing.html)
+- **Tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
+- **Biology background:** [Appendix H — Single-Cell Biology Refresher](Appendix_H_SC_Biology_Refresher.html)
+- **Stats background:** [Appendix I — Statistical Foundations](Appendix_I_Statistical_Foundations.html), §§ 1–3
+- **File formats and what's in `filtered_feature_bc_matrix/`:** [Appendix G](Appendix_G_Databases_FileFormats.html)
+- **R basics for the code chunks:** [Appendix D — R Programming](Appendix_D_R_Programming.html)
+- **Methods-section template covering this chapter's choices:** [Appendix J](Appendix_J_Methods_Template.html)
+
+## 1.14 Going further
+
+::: incremental
+- **`scran` quickCluster + computeSumFactors** — Bioconductor's deconvolution-based normalization, theoretically more principled than Seurat's `LogNormalize` for very heterogeneous datasets
+- **`DropletUtils::emptyDrops`** — the EmptyDrops paper (Lun et al. 2019); a more sensitive empty-droplet caller than Cell Ranger's default knee-finding
+- **`scuttle::isOutlier`** — automated outlier-based threshold selection
+- **Heumos *et al.* 2023, *sc-best-practices*** — Chapter 6 covers QC in more depth than any single tutorial can
+:::

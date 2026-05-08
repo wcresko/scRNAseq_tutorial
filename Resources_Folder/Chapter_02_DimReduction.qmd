@@ -1,0 +1,185 @@
+---
+title: "Chapter 2 — Dimensionality Reduction & Clustering"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 02](../Lecture_Folder/Lecture_02_DimReduction_Clustering.html)** and **[Tutorial 02](../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html)**. Builds on **[Chapter 1](Chapter_01_Preprocessing.html)** (you start with a scaled HVG matrix). **Prerequisites:** [Appendix I](Appendix_I_Statistical_Foundations.html) §§ 4–9 (linear models, eigendecomposition), [Appendix D](Appendix_D_R_Programming.html) (sparse matrices, factors).
+:::
+
+## 2.1 The mental model: project, partition, paint
+
+After preprocessing, every cell is a point in a \~2,000-dimensional gene-expression space (one dimension per HVG). That space has too many dimensions to do anything useful with directly: most pairs of cells are nearly equidistant under Euclidean distance — the **curse of dimensionality** — and "neighbors" stop carrying meaning.
+
+Three steps fix this:
+
+1. **Project** to a lower-dimensional space that keeps the structured variance (PCA → 20–50 PCs)
+2. **Partition** the cells into communities of mutually-similar neighbors (k-NN graph + Leiden)
+3. **Paint** the result onto a 2-D picture for inspection (UMAP or t-SNE)
+
+Each step is a separate idea with its own theory and failure modes. This chapter walks them in order.
+
+## 2.2 PCA — what it does and why it works first
+
+Principal Component Analysis finds **orthogonal directions of maximum variance** in the data. Concretely, given the centered, scaled HVG matrix $\tilde X$ (cells × genes), PCA computes the singular value decomposition
+
+$$\tilde X = U \Sigma V^\top$$
+
+where:
+
+- $V$ (genes × $k$) holds the **loadings** — each column is a direction in gene space
+- $U\Sigma$ (cells × $k$) holds the **scores** — each cell's coordinates in PC space
+- $\sigma_i^2 / \sum \sigma_j^2$ is the **fraction of variance explained** by PC $i$
+
+In scRNA-seq the first \~10 PCs usually separate **major cell-type axes** (T vs B vs myeloid; epithelial vs stromal vs immune); PCs 10–30 resolve subtypes (CD4 vs CD8, naive vs memory); beyond \~50, you're almost entirely in noise.
+
+Why PCA *first*? Three reasons:
+
+::: incremental
+1. **Compression.** 2,000 genes → 30 PCs. Faster everything downstream.
+2. **Denoising.** The discarded high-PC directions are dominated by per-cell sampling noise, not signal.
+3. **Decorrelation.** PCs are orthogonal by construction, so Euclidean distance in PC space behaves the way intuition expects (which it does *not* in raw HVG space).
+:::
+
+UMAP and clustering operate on PCs, not raw expression, exactly because of (3). Skip PCA and try to UMAP the scaled HVG matrix and you'll get visibly worse embeddings, slower runtime, and unstable cluster solutions.
+
+## 2.3 Choosing how many PCs to keep
+
+The standard tool is the **scree plot** (sometimes called an elbow plot): for each PC, plot the variance it explains, in descending order. The shape is a steep initial drop, an **elbow**, and a long noise floor.
+
+Rules of thumb:
+
+- The elbow is usually between PC15 and PC30 for 10x runs of 5–50k cells
+- Lean **high** rather than low: going from 20 to 30 PCs rarely hurts; going from 30 to 50 mostly costs runtime
+- A more principled alternative is the **JackStraw** permutation test (`Seurat::JackStraw`), which compares each PC's variance to a null distribution; slow on large datasets
+- For atlas-scale (>100k cells), 50 PCs is typical
+
+A PC dominated by mitochondrial or ribosomal genes is a **red flag**: it's tracking cell quality, not biology. If PC1 looks like that, your QC was too lax — go back to filtering.
+
+## 2.4 The shared-nearest-neighbor (SNN) graph
+
+After PCA, we want to identify groups of similar cells. Two-decade-old methods like K-means are inappropriate for scRNA-seq because:
+
+- K-means assumes clusters are spherical and equally sized (false — rare cell types coexist with abundant ones)
+- K-means requires you to know `k` in advance (the *whole point* is often to discover how many populations there are)
+
+The modern alternative is **graph-based clustering**, which has two stages:
+
+### 2.4.1 Build the k-nearest-neighbor (kNN) graph
+
+For each cell, find its $k$ nearest neighbors in PC space (typically $k = 20$). Connect each cell to its neighbors with edges. The result is a graph where every cell has degree $k$.
+
+### 2.4.2 Promote to a shared-nearest-neighbor (SNN) graph
+
+For every edge $(i, j)$ in the kNN graph, weight it by how many of $i$'s neighbors are also $j$'s neighbors — the **Jaccard similarity** of their neighborhoods. Edges between cells in the same dense region get high weight; edges between cells on the boundary of a cluster get low weight. The SNN graph is what clustering actually runs on.
+
+Seurat's `FindNeighbors(seu, dims = 1:30)` builds both. The SNN graph stored in `seu@graphs$RNA_snn` is then handed to `FindClusters`.
+
+## 2.5 Leiden community detection
+
+The clustering algorithm of choice is **Leiden** (Traag, Waltman, van Eck 2019), which improves on Louvain by guaranteeing well-connected communities. The objective is **modularity** — a measure of how much denser within-community edges are than the random expectation.
+
+Leiden iterates:
+
+1. Local moves: each cell joins the neighbor's community if doing so increases modularity
+2. Refinement: split sub-communities that have low internal connectivity
+3. Aggregation: collapse each community into a node and run again
+
+The final partition is a labeling of every cell into a numbered cluster. `FindClusters(seu, resolution = 0.5, algorithm = 4)` runs Leiden in Seurat (`algorithm = 4` selects Leiden; `1` is Louvain).
+
+The **resolution parameter** controls granularity:
+
+- Low resolution (0.1–0.3) → few, broad clusters (immune cell families)
+- Medium (0.5–0.7) → typical PBMC-scale dataset, 8–15 clusters
+- High (1.0+) → many small clusters; subdivides cell states
+
+There is **no single "right" resolution.** The right one is the one that matches your biological question. Run several and inspect with [`clustree`](https://cran.r-project.org/package=clustree) to see how clusters split as resolution increases. Resolutions where the clustree topology is **stable** (clusters don't shuffle membership across nearby resolutions) are defensible.
+
+## 2.6 t-SNE and UMAP: visualization, not analysis
+
+Once you have clusters defined on the SNN graph, you want a 2-D picture of them. Two non-linear methods dominate:
+
+### 2.6.1 t-SNE
+
+Models pairwise distances in high-D as a probability distribution (Gaussian, with bandwidth set per-cell to match a target perplexity), and tries to find a 2-D arrangement whose distance distribution (Student's $t$ in low-D, hence "t" in t-SNE) has minimal Kullback–Leibler divergence to the original.
+
+The KL loss is **asymmetric**: it heavily penalizes putting true neighbors far apart but only weakly penalizes putting unrelated cells nearby. This is why t-SNE preserves **local neighborhoods** beautifully and why **cluster-to-cluster distances on a t-SNE plot are not meaningful**.
+
+The **perplexity** parameter (default 30) is roughly "how many neighbors does each cell consider". Low perplexity (5–15) emphasizes very local structure; high (50+) smooths over fine subtypes. Worth running at multiple perplexities and looking for stable structure across them.
+
+### 2.6.2 UMAP
+
+Builds a fuzzy weighted graph of local neighborhoods (per-cell normalization makes points in dense and sparse regions both still see their own local neighbors) and finds a 2-D embedding by stochastic gradient descent on a cross-entropy objective.
+
+The cross-entropy is **symmetric** in its penalty structure (both "wrong-far" and "wrong-close" errors are penalized), so UMAP preserves more global topology than t-SNE — *not perfectly*, but enough that cluster *positions* are roughly meaningful (still don't measure pseudotime in UMAP coordinates).
+
+UMAP is the workshop default. Two parameters:
+
+- `n.neighbors` (default 30): smaller = more local; larger = more global
+- `min.dist` (default 0.3): smaller = tighter clusters with clear gaps; larger = spread-out, good for continua
+
+UMAP is **noticeably more stable** across `n.neighbors` than t-SNE is across perplexity. Usually one well-chosen UMAP is enough.
+
+## 2.7 What UMAPs do *not* tell you
+
+The most-violated rule in scRNA-seq figure interpretation:
+
+::: callout-warning
+**A UMAP plot does not tell you:**
+
+1. **Inter-cluster distance.** Two clusters drawn far apart are not necessarily more dissimilar than two drawn nearby.
+2. **Cluster density.** Apparent point density depends on `min.dist` and is not biological cell density.
+3. **Trajectory direction.** Apparent gradients can be optimization artifacts; use trajectory tools (Slingshot, Monocle3, scVelo) for that question.
+:::
+
+A UMAP **is** good for: showing the cluster solution from §2.5, mapping a gene's expression onto cells (`FeaturePlot`), and spotting batch effects (color by sample after integration). A UMAP is **not** good for: differential testing, distance-based statistics, or claims about lineage relationships.
+
+## 2.8 The single-sample workflow ends here; multi-sample needs Chapter 4
+
+Everything above is the **single-sample** workflow: one biological condition, one batch, no need to align across samples. If you have only one sample, you read off cell types from the clusters (Chapter 3) and you're done.
+
+If you have **two or more samples** and the unintegrated UMAP shows them as separate islands — every cell type appearing twice or more, once per sample — you have a **batch effect** problem and need integration. That's Chapter 4.
+
+The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it by sample. If samples interleave within clusters, you don't need integration. If samples form parallel structures, you do.
+
+## 2.9 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `RunPCA` errors with "no variable features" | You skipped `FindVariableFeatures` | Run it before `ScaleData` |
+| The scree plot has no clear elbow | Either your QC was insufficient or your data is genuinely high-rank | Inspect the top loadings; try 30 PCs |
+| Cluster numbers reshuffle between R sessions | You didn't `set.seed()` | `set.seed(2026)` before `FindClusters` and `RunUMAP`; use `random.seed = 2026` argument |
+| UMAP shows a cluster that has no biology | Sometimes batch / depth artifact, sometimes a rare cell type — inspect markers (Chapter 3) | Don't dismiss; investigate |
+| `FindClusters` is very slow | Install `presto` (CRAN); Seurat detects it automatically and uses a much faster Wilcoxon implementation | `install.packages("presto")` |
+
+## 2.10 Where this material is also discussed
+
+- **Lecture:** [Lecture 02 — Dim Reduction & Clustering](../Lecture_Folder/Lecture_02_DimReduction_Clustering.html)
+- **Tutorial:** [Tutorial 02 — Dim Reduction & Clustering](../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html)
+- **Linear-algebra background:** [Appendix I §§ 4–9](Appendix_I_Statistical_Foundations.html)
+- **Glossary entries:** [PCA, UMAP, t-SNE, Leiden, SNN](Glossary.html)
+- **Next chapter:** [Chapter 3 — Markers & Manual Annotation](Chapter_03_Markers_Annotation.html)
+- **For multi-sample data:** [Chapter 4 — Multi-Sample Integration](Chapter_04_Integration.html)
+
+## 2.11 Going further
+
+::: incremental
+- **`harmony` and `liger`** — alternative integrations that work on PCs (next chapter)
+- **`densMAP`** — a UMAP variant that preserves cluster densities, addressing one of the limitations in §2.7
+- **Linderman et al. 2019** — `openTSNE` paper; faster, more controllable t-SNE
+- **McInnes et al. 2018** — UMAP paper; the foundational reference
+:::

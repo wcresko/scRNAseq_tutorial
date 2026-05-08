@@ -1,0 +1,183 @@
+---
+title: "Chapter 4 — Multi-Sample Integration"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 04](../Lecture_Folder/Lecture_04_Integration.html)** and **[Tutorial 04](../Exercise_Folder/Tutorial_04_Integration.html)**. Builds on **[Chapter 2](Chapter_02_DimReduction.html)** (PCA + clustering) and **[Chapter 3](Chapter_03_Markers_Annotation.html)** (manual annotation, used here for diagnostic checks).
+:::
+
+## 4.1 The problem integration solves
+
+Suppose you have two samples — say, peripheral blood from a control donor and from a patient — and you want a unified clustering and annotation. You run the [Chapter 1](Chapter_01_Preprocessing.html) → [Chapter 2](Chapter_02_DimReduction.html) workflow on the joint object. You compute a UMAP. You color it by sample.
+
+If the colors **interleave** within every cluster, you don't need integration: the technical and biological structures are aligned, and downstream analyses can proceed.
+
+If the samples form **parallel structures** — every cell type appearing twice, once per sample — you have a **batch effect**. PC1 of the joint dataset is now tracking *which sample the cell came from* rather than *what cell type it is*. Clusters at the standard resolution will be sample-specific rather than cell-type-specific. Pseudobulk DE between samples becomes non-comparable because you have no shared definition of "the same cell type" across them.
+
+**Integration** is the family of methods that warp the embedding so the same cell type from different samples ends up in the same cluster, while preserving any *real* biological differences between samples (e.g. an activated state present in one sample but not another).
+
+## 4.2 The diagnostic: when do you need integration?
+
+Run the unintegrated PCA + UMAP from Chapter 2 and inspect three things:
+
+1. **UMAP colored by sample.** Do colors interleave or form islands?
+2. **UMAP colored by author cell-type label** (if available — the workshop's `ifnb` ships them in `seurat_annotations`). Does each cell type form *one* region or *multiple* (one per sample)?
+3. **`table(seu$cluster, seu$sample)`** — what fraction of each cluster is each sample?
+
+If samples are interleaved within most clusters and a balanced fraction shows up everywhere, you do not need integration. If samples form per-cluster islands and many clusters are >80% one sample, you do.
+
+The workshop's `ifnb` shows the second pattern dramatically: PC1 is essentially the IFN-β response axis. CTRL and STIM cells split every cell type into two sister clusters. This is the canonical "integration is needed" case.
+
+## 4.3 The conceptual taxonomy of integration methods
+
+| Family | Examples | Mechanism | When to use |
+|---|---|---|---|
+| **Linear / regression** | ComBat, `sc.pp.regress_out` | Fit batch as a covariate; subtract its linear effect | Simple cases; rarely sufficient on its own for scRNA-seq |
+| **Mutual nearest neighbors** | MNN, fastMNN, Seurat anchors | Find pairs of cells that are nearest neighbors *across* batches; learn a correction from those anchors | Two or a few batches with similar cell-type compositions |
+| **Soft clustering in PC space** | **Harmony** | Iteratively re-cluster cells with a batch-mixing penalty; shift centroids toward batch balance | Most-used in 2026 — fast, scales to atlas sizes, works well for 2–50 batches |
+| **Variational autoencoders** | scVI, scANVI | Learn a latent representation conditioned on batch; the decoder can be ignored, the latent used like PCs | Atlas-scale; especially with strong batch heterogeneity |
+| **Graph-based** | BBKNN, Conos | Modify the kNN graph to balance cross-batch edges | Fast; works well on already-PCA'd data |
+
+The workshop's [Tutorial 04](../Exercise_Folder/Tutorial_04_Integration.html) walks **Harmony** and **Seurat anchors** because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy.
+
+## 4.4 Harmony in detail
+
+Harmony (Korsunsky et al. 2019, *Nat Methods*) operates in PC space — *after* you've run `RunPCA` on the joint object. It iterates four steps until convergence:
+
+1. **Soft-cluster** cells with a batch-diversity penalty: each cell is assigned soft membership in $K$ clusters; the objective rewards clusters whose membership is balanced across batches
+2. **Compute centroids**: a global centroid per cluster, plus per-batch centroids per cluster
+3. **Compute correction factors**: the difference between each per-batch centroid and the global centroid
+4. **Shift each cell** by a soft-cluster-weighted combination of those correction factors
+
+The output is a `harmony` reduction that is a drop-in replacement for `pca` in `FindNeighbors` and `RunUMAP`. The original PCs are preserved separately.
+
+Harmony's strengths:
+
+- **Fast** — minutes for atlas-scale (~M cells) data
+- **Conservative** — preserves rare populations well
+- **Single-tunable**: `theta` (default 2) controls how aggressively to mix batches; rarely needs adjustment
+
+Harmony's weaknesses:
+
+- Less effective on very heterogeneous batches (cell types absent in one but present in another); works best when most cell types are shared
+
+## 4.5 Seurat anchors in detail
+
+The Seurat workflow (Stuart, Butler et al. 2019, *Cell*) works in two stages:
+
+### 4.5.1 Find anchors
+
+For each pair of samples:
+
+1. Project both into a shared low-rank space using **canonical correlation analysis (CCA)** + L2 normalization
+2. For each cell, find its mutual nearest neighbors **across** samples — pairs $(i_A, j_B)$ where $i_A$ is among $j_B$'s nearest neighbors *and* vice versa
+3. Score each anchor by how consistent its local neighborhood is — anchors whose neighborhoods are mutually inhabited are scored high; isolated anchors (likely doublet-driven or technical) are scored low
+
+The result is a list of anchored cell pairs and their confidence scores.
+
+### 4.5.2 Apply the correction
+
+Each cell in sample $B$ is moved toward its anchored partner in sample $A$, weighted by anchor score. The amount of movement is regularized so cells far from any anchor barely move.
+
+The corrected expression lives in `seu@assays$integrated@data`. PCA on this corrected assay produces the integrated reduction used downstream.
+
+Seurat anchors' strengths:
+
+- **Most rigorous of the alignment methods** — anchor scoring filters bad correspondences
+- **Preserves rare populations** more conservatively than Harmony
+- **Built-in to Seurat**, no extra packages
+
+Seurat anchors' weaknesses:
+
+- **Slow** — for atlas data, easily an hour+; Harmony is 10× faster
+- **Complex** — multiple steps each with parameters; harder to tune
+
+## 4.6 The over-correction problem
+
+The cardinal failure mode of integration is **erasing real biological differences** by being too aggressive. If your two samples are *biologically* different (CTRL vs IFN-β–stimulated), and integration spatially mixes them too completely, you also erase the IFN response — which is the actual biology of the experiment.
+
+The right outcome: cells from both samples interleave on the UMAP **but their gene-level expression still differs in the way the perturbation predicts**. CTRL and STIM cells of the same cluster sit in the same UMAP region but the STIM cells still express more `ISG15`, `IFI6`, `MX1`, etc.
+
+This is testable. The workshop's diagnostic is the **ISG score gap**:
+
+1. Score each cell on a panel of interferon-stimulated genes using `AddModuleScore` (run on the original `RNA` assay, **not** the integrated assay — the integrated assay's expression values aren't valid for DE)
+2. For each cell type, compute mean ISG score in CTRL vs STIM
+3. Confirm STIM > CTRL within every cell type
+
+If the gap is gone, integration over-corrected. Push *less* hard (lower Harmony `theta`, or use Seurat anchors with default settings). If the gap is preserved, integration was successful.
+
+## 4.7 The under-correction problem
+
+The opposite failure: clusters *remain* sample-specific after integration. There are two interpretations and they require different responses:
+
+::: incremental
+1. **Genuinely sample-specific biology.** A cell type that exists in one sample but not the other (e.g. an "activated" T-cell state present only in stimulated samples) *should* remain sample-specific after integration — that's real biology, not residual batch effect. Integration *should not* mix it.
+2. **Residual batch effect.** A cell type clearly present in both samples but still split into two clusters after integration. That's under-correction; push integration harder.
+:::
+
+Distinguishing them requires biological knowledge and careful inspection of cluster markers. If the sample-specific cluster's markers match an *activation state* (cytokines, ISGs) rather than a *lineage* (CD4, CD79A), it's likely real biology. If the markers are the same lineage markers as a sample-mixed cluster, it's under-correction.
+
+## 4.8 The three diagnostics, in order
+
+For every integrated dataset, run all three:
+
+1. **UMAP by sample** — colors should interleave within each cluster (after integration). If a cluster is >80% one sample, suspect either over- or under-correction
+2. **UMAP by biology** (cell-type labels, or a known signature score) — each cell type / state should occupy one region (not multiple, as in unintegrated data)
+3. **Known biological signal preserved** — score a known biology-associated module per cell, confirm it still differs between conditions *within* clusters as the experiment predicts
+
+Methods sections of integration papers virtually always report (1). Many skip (2). Most skip (3). All three are equally important.
+
+## 4.9 Pseudoreplicate caveat
+
+Some users of integration methods are tempted to treat the **integrated assay** as a fully-corrected expression matrix and run downstream analyses (DE, marker tests) on it. **This is wrong.**
+
+The integrated assay holds expression values that are valid for *geometry* — PCA, neighbor graph, UMAP, clustering. They are **not** valid for differential expression because the correction can dampen, distort, or invert real biological variation in a way that biases per-gene tests.
+
+The discipline:
+
+- Use `DefaultAssay(seu) <- "integrated"` *before* `RunPCA`, `FindNeighbors`, `FindClusters`, `RunUMAP`
+- Switch back to `DefaultAssay(seu) <- "RNA"` *after* clustering, *before* `FindMarkers`, `FindAllMarkers`, marker scoring, or any DE work
+
+This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
+
+## 4.10 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| Harmony errors "no `pca` reduction" | You skipped `RunPCA` | Run PCA first; Harmony works on PCs |
+| ISG score gap is zero after integration | You scored on the integrated assay | Set `DefaultAssay(seu) <- "RNA"` before `AddModuleScore` |
+| Clusters after integration look identical to unintegrated | `FindNeighbors` is using `pca` not `harmony` | `FindNeighbors(seu, reduction = "harmony", dims = 1:30)` |
+| `IntegrateData` returns a 5-dim object that won't slot into `RunPCA` | Seurat v5 / v4 API mismatch | In v5, anchor integration produces a layered Assay5; consult the [Seurat v5 vignette](https://satijalab.org/seurat/articles/seurat5_integration) |
+
+## 4.11 Where this material is also discussed
+
+- **Lecture:** [Lecture 04 — Multi-Sample Integration](../Lecture_Folder/Lecture_04_Integration.html)
+- **Tutorial:** [Tutorial 04 — Two-Sample Integration](../Exercise_Folder/Tutorial_04_Integration.html)
+- **scNotebooks Module 5** (parallel walkthrough on the same `ifnb` dataset): [crosswalk](scNotebooks_Crosswalk.html)
+- **Stats background:** [Appendix I § 9](Appendix_I_Statistical_Foundations.html) on variance partitioning
+- **Methods-section template:** [Appendix J § Multi-sample integration](Appendix_J_Methods_Template.html)
+
+## 4.12 Going further
+
+::: incremental
+- **Korsunsky et al. 2019** — Harmony paper, [doi:10.1038/s41592-019-0619-0](https://doi.org/10.1038/s41592-019-0619-0)
+- **Stuart, Butler et al. 2019** — Seurat v3 / anchor integration, [doi:10.1016/j.cell.2019.05.031](https://doi.org/10.1016/j.cell.2019.05.031)
+- **Lopez et al. 2018** — scVI, [doi:10.1038/s41592-018-0229-2](https://doi.org/10.1038/s41592-018-0229-2)
+- **Luecken et al. 2022** — *Benchmarking atlas-level data integration*, the canonical comparison paper, [doi:10.1038/s41592-021-01336-8](https://doi.org/10.1038/s41592-021-01336-8)
+- **LISI / k-BET** — quantitative integration metrics; not yet in the workshop tutorials but are standard for benchmarking
+:::

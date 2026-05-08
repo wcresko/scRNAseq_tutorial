@@ -1,0 +1,186 @@
+---
+title: "Chapter 9 — Reference-based Annotation"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 09](../Lecture_Folder/Lecture_09_Reference_Annotation.html)** and **[Tutorial 09](../Exercise_Folder/Tutorial_09_Reference_Annotation.html)**. **Prerequisites:** [Chapter 3 — Manual Annotation](Chapter_03_Markers_Annotation.html) (the complement to this).
+:::
+
+## 9.1 The two paradigms
+
+Cell-type labeling has two methodological camps:
+
+**Manual annotation (Chapter 3)** — inspect canonical markers per cluster, assign names by hand. Interpretable, biased by the annotator's experience, requires a literature.
+
+**Reference-based annotation (this chapter)** — map your cells against a *labeled reference dataset* using a statistical method. Reproducible, biased by the reference's coverage, requires a reference of the same tissue.
+
+Best practice is to run **both** and **reconcile disagreements** — they catch different kinds of errors. Manual annotation catches references missing your cell type; reference-based annotation catches missed subdivisions and reduces annotator bias.
+
+## 9.2 SingleR — correlation against a reference
+
+SingleR (Aran et al. 2019, *Nat Immunol*) compares each query cell's expression vector against per-label reference profiles by Spearman correlation, then assigns the best-matching label. The procedure:
+
+1. **Build a reference**: for each cell-type label, average expression across the reference cells
+2. **Compute correlation**: per query cell, the Spearman correlation of (query expression, reference profile) for every label
+3. **Pick the top-correlation label**, optionally with a fine-tuning step that re-runs on the top-correlated subset
+
+Strengths:
+
+- Works with bulk-RNA-seq references (you can use `celldex::HumanPrimaryCellAtlasData()` — a curated bulk reference covering 37 main human cell types)
+- Fast for moderate cell counts
+- Returns confidence diagnostics (per-label scores, prune calls)
+
+Weaknesses:
+
+- Reference choice matters a lot: a PBMC reference will mis-label tumor cells; a brain reference will mis-label kidney cells. Pick references matched to your tissue
+- Without a confidence threshold, every cell gets a label — including cells whose biology isn't in the reference at all
+
+The workshop tutorial uses `HumanPrimaryCellAtlasData()` for the `ifnb` PBMC dataset. For tumor or non-immune tissues, the reference choice is harder.
+
+## 9.3 SingleR confidence — the `delta` and `pruneScores`
+
+Each prediction comes with two diagnostics:
+
+**`delta`** = top-label score minus median score across all labels. A small `delta` (< 0.05) means the reference can't decide — multiple types fit equally well — and the call is shaky.
+
+**`pruneScores()`** automatically NAs the labels for cells where `delta` is too small. The pruned `singler_label_pruned` column has labels you trust; cells with `NA` are flagged for manual review.
+
+Always report the prune fraction in your methods. Healthy: 5–15% pruned. >25%: your reference doesn't cover your data well — pick a different one.
+
+## 9.4 Azimuth — anchor-based reference mapping
+
+Azimuth wraps Seurat's anchor-based mapping (the same method as Seurat integration, applied with a query → reference orientation). Pre-built atlas-quality references are available:
+
+| Reference | Tissue | Source |
+|---|---|---|
+| `pbmcref` | PBMCs | Hao et al. 2021 (Seurat v4 paper) |
+| `motorcortexref` | mouse cortex | Allen Brain Atlas |
+| `fetusref` | human fetal | HCA Fetal Atlas |
+| `lungref` | adult lung | HCA Lung Cell Atlas |
+| (more) | various | atlas consortia |
+
+For each query cell, Azimuth:
+
+1. Projects it into the reference's PC space using shared HVGs
+2. Finds its anchored partner cells in the reference (mutual nearest neighbors after L2 normalization)
+3. Transfers the anchor partners' labels (with confidence weights)
+4. Reports a **mapping score** per cell — how well the cell projected into the reference manifold
+
+Strengths:
+
+- Very fast (the reference is precomputed)
+- Hierarchical labels (`predicted.celltype.l1`, `l2`, `l3`) — coarse to fine resolution
+- Atlas-trained references are huge and well-annotated
+
+Weaknesses:
+
+- Same as SingleR: reference must match the tissue
+- Cells outside the reference manifold get low mapping scores but still get labeled — must filter on `mapping.score`
+
+## 9.5 Reading Azimuth's mapping score
+
+`mapping.score` reflects how well the cell's local neighborhood projects into the reference's manifold. Bimodal distributions are common: one peak is in-reference cells (mapping score 0.7–1.0), the other is out-of-reference cells (0.0–0.4).
+
+For cells with low mapping score:
+
+- The label assignment is unreliable — don't trust it
+- These are usually cells whose biology isn't in the reference (e.g. tumor cells when the reference is PBMC)
+
+In an `ifnb` PBMC analysis with the `pbmcref` reference, mapping scores should be uniformly high (>0.7) because the data is the reference's intended target. In a tumor analysis using `pbmcref`, the immune cells score high and the tumor/stromal cells score low — and you should *not* trust the labels on the low-scoring cells.
+
+## 9.6 CellTypist — pre-trained logistic regression
+
+CellTypist (Domínguez Conde et al. 2022, *Science*) trains logistic-regression models per cell type from atlas-scale references, then runs the trained model on your query data. Models are available per tissue (immune, gut, kidney, etc.).
+
+Compared to SingleR (correlation-based) and Azimuth (anchor-based), CellTypist:
+
+- Is the fastest of the three
+- Returns per-cell probabilities for every label (multi-label aware)
+- Has the largest pre-trained model library
+
+The Python implementation is more mature; the R port is less complete. For Python-native workflows, CellTypist is often preferred over SingleR.
+
+## 9.7 The reconciliation step
+
+After running multiple methods, you have:
+
+- Manual labels (`celltype_manual` from Chapter 3)
+- SingleR labels (`singler_label_pruned`)
+- Azimuth labels (`predicted.celltype.l2`)
+
+A workable reconciliation rule: **majority vote with manual as default**:
+
+```r
+seu$celltype_final <- with(seu@meta.data, dplyr::case_when(
+  celltype_manual == singler_label_pruned     ~ celltype_manual,
+  celltype_manual == predicted.celltype.l2    ~ celltype_manual,
+  TRUE                                         ~ paste0("REVIEW:", celltype_manual)
+))
+```
+
+Cells where any one auto-method agrees with manual get the manual label. Cells where both auto-methods disagree get a `REVIEW:` prefix and you investigate manually.
+
+For the `ifnb` workflow this typically agrees on 92%+ of cells — the disagreements concentrate in:
+
+- T-cell subsets (CD4 Naive vs Memory)
+- Rare populations (pDC, Mk, Eryth)
+- Activated states (T activated, B activated) where lineage and state coexist
+
+These are exactly the cells that benefit from human review.
+
+## 9.8 The Cell Ontology connection
+
+For final labels, store the ontology term ID alongside the human label:
+
+```r
+seu$cell_type_ontology_term_id <- case_when(
+  seu$celltype_final == "B"          ~ "CL:0000236",
+  seu$celltype_final == "CD14 Mono"  ~ "CL:0001054",
+  ...
+)
+```
+
+This is required for CELLxGENE submission (see [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html)) and makes your dataset interoperable with atlas resources. Look up IDs at [OLS](https://www.ebi.ac.uk/ols4/).
+
+## 9.9 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `celldex::HumanPrimaryCellAtlasData` hangs | First-time download (~500 MB) or proxy issue | Configure `setExperimentHubOption("PROXY", ...)` if behind firewall |
+| `RunAzimuth` errors during reference download | Partial cache | Delete `~/.cache/Azimuth/`, retry |
+| All cells get labeled "T cells" | Reference too broad; using `label.main` not `label.fine` | Try `label.fine`; or pick a more specific reference (e.g. `MonacoImmuneData`) |
+| Mapping scores are uniformly low | Wrong reference for your tissue | Match tissue; consider an atlas like Tabula Sapiens |
+| Manual and Azimuth disagree on T-cell subsets | Normal — T-cell subdivision is genuinely hard | Inspect markers; document; sometimes both are partly right |
+
+## 9.10 Where this material is also discussed
+
+- **Lecture:** [Lecture 09](../Lecture_Folder/Lecture_09_Reference_Annotation.html)
+- **Tutorial:** [Tutorial 09](../Exercise_Folder/Tutorial_09_Reference_Annotation.html)
+- **Manual annotation (the complement):** [Chapter 3](Chapter_03_Markers_Annotation.html)
+- **Cell Ontology lookup:** [Appendix G § 1.2](Appendix_G_Databases_FileFormats.html), [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html)
+
+## 9.11 Going further
+
+::: incremental
+- **Aran et al. 2019** — SingleR paper, [doi:10.1038/s41590-018-0276-y](https://doi.org/10.1038/s41590-018-0276-y)
+- **Hao et al. 2021** — Seurat v4 / Azimuth, [doi:10.1016/j.cell.2021.04.048](https://doi.org/10.1016/j.cell.2021.04.048)
+- **Domínguez Conde et al. 2022** — CellTypist, [doi:10.1126/science.abl5197](https://doi.org/10.1126/science.abl5197)
+- **`celldex` book** — [bioconductor.org/books/release/SingleRBook](https://bioconductor.org/books/release/SingleRBook/)
+- **Azimuth web tool** — [azimuth.hubmapconsortium.org](https://azimuth.hubmapconsortium.org/)
+- **scNotebooks Module 04** — parallel walkthrough of automated annotation
+:::
