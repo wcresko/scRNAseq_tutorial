@@ -8,7 +8,56 @@ links:
   - text: Email
     icon: envelope
     href: mailto:wcresko@uoregon.edu
+execute:
+  echo: false
+  warning: false
+  message: false
 ---
+
+```{r}
+#| label: landing-umap
+#| fig-width: 8
+#| fig-height: 5
+#| fig-cap: "A clustered UMAP of single-cell RNA-seq data — colored by cell type. Producing a figure like this is the goal of Lectures 02–04."
+
+library(ggplot2)
+library(dplyr)
+library(tibble)
+library(purrr)
+
+set.seed(2026)
+
+celltypes <- c("CD14 Mono", "CD16 Mono", "B", "CD4 T", "CD8 T", "NK", "DC", "Platelet")
+centers <- tibble(
+  ct = celltypes,
+  cx = c(-4.5, -4.0, 3.5, 4.0,  1.0, -1.5, -3.0, 4.5),
+  cy = c( 2.5, -1.5, 3.0, -2.5, -3.5, 4.5,  -1.0, 0.5)
+)
+n_per <- c(420, 220, 380, 520, 360, 240, 140, 90)
+
+cells <- map2_dfr(centers$ct, n_per, function(ct, n) {
+  c <- centers |> filter(ct == !!ct)
+  tibble(
+    ct = ct,
+    u1 = c$cx + rnorm(n, 0, 0.55),
+    u2 = c$cy + rnorm(n, 0, 0.55)
+  )
+})
+
+ggplot(cells, aes(u1, u2, color = ct)) +
+  geom_point(alpha = 0.75, size = 0.9) +
+  scale_color_brewer(palette = "Set2", name = NULL) +
+  labs(x = "UMAP 1", y = "UMAP 2") +
+  guides(color = guide_legend(override.aes = list(size = 3, alpha = 1))) +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_line(color = "grey92"),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    legend.position = "right"
+  )
+```
 
 Welcome to the Single Cell RNA-seq Workshop. This website hosts the lectures, hands-on exercises, datasets, and reference material for the workshop. It was built with [Quarto](https://quarto.org/docs/websites).
 
