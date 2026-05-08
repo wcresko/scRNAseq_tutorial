@@ -1,0 +1,200 @@
+---
+title: "Chapter 0 — Bulk vs Single-Cell RNA-seq: An Overview"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 00](../Lecture_Folder/Lecture_00_Bulk_vs_scRNAseq.html)**. This is the chapter you read **before** starting the workshop. **Prerequisites:** [Appendix H — Single-Cell Biology Refresher](Appendix_H_SC_Biology_Refresher.html) if your molecular biology is rusty.
+:::
+
+## 0.1 What this workshop teaches
+
+By the end of this workshop, you will be able to take a 10x Cell Ranger output for **your own** dataset and run it end-to-end:
+
+1. **Load** the counts matrix
+2. **QC** the cells, removing empty droplets, doublets, and damaged cells
+3. **Normalize, reduce dimensions, and cluster** to find populations
+4. **Annotate** cell types using markers and reference atlases
+5. **Integrate** multiple samples without erasing biology
+6. **Compare conditions** with pseudobulk DESeq2 + functional enrichment + differential abundance
+7. **Apply the same toolkit** to spatial transcriptomics, scATAC-seq, and (with adaptation) WGCNA
+8. **Deposit** the result in CELLxGENE / GEO / SRA following FAIR principles
+
+You'll also know enough to **defend** every choice you made — to a reviewer, a collaborator, or yourself in three years.
+
+## 0.2 Why single-cell?
+
+Bulk RNA-seq pools mRNA from many cells in a tissue and gives you **one expression profile per sample**. It's cheap, mature, and statistically well-understood. If your question is "does gene X change with treatment, averaged across the tissue?", bulk is still the right tool.
+
+Bulk cannot tell you:
+
+- How many *cell types* are in the tissue, and in what proportions
+- Whether an "up" gene reflects a *within-cell-type* change or a *composition* shift
+- Rare populations, transitional states, developmental trajectories
+- Cell–cell communication patterns
+
+scRNA-seq measures one expression profile **per cell**. Heterogeneity becomes visible. Rare populations become detectable. Lineage trajectories become traceable. The cost is that the measurement is sparse, noisy, and operationally complex — which is why preprocessing (Chapter 1) is one of the longest chapters in this book.
+
+## 0.3 What carries over from bulk RNA-seq
+
+Most analyses you've done on bulk RNA-seq apply at a new resolution to scRNA-seq:
+
+- The basic measurement is **count of reads / UMIs per gene**
+- Statistical concerns — normalization, batch effects, multiple testing, replication — are the same
+- DE analyses (Chapter 6) reuse the bulk DESeq2 model after **pseudobulk aggregation**
+- WGCNA (Chapter 11) was a bulk method; it adapts to single-cell with care
+- Functional enrichment (Chapter 7) is unchanged — same tools, same gene sets
+
+If you've done bulk RNA-seq, much of scRNA-seq is the same scaffolding at a new resolution.
+
+## 0.4 What's genuinely new
+
+Three things scRNA-seq adds that bulk doesn't have:
+
+### 0.4.1 Sparsity
+
+A typical droplet scRNA-seq counts matrix is **90–95% zeros**. Most (gene, cell) pairs are zero — partly because the cell didn't express the gene, partly because the chemistry sampled only a fraction of expressed transcripts (technical "dropout"). Every tool has to handle this:
+
+- Storage: sparse matrix formats (`dgCMatrix` in R, `scipy.sparse` in Python). A dense 30,000 gene × 14,000 cell matrix in `double` is 3.4 GB; the sparse equivalent is 150 MB.
+- Normalization: log-normalize handles zeros via the `+1` term; SCTransform handles them via NB regression
+- Statistics: per-gene tests on sparse vectors require care; clustering can't use squared-Euclidean distance directly
+
+Bulk has none of this. Bulk is dense; the smallest non-zero counts are still comfortably above zero.
+
+### 0.4.2 Cells are not statistical replicates
+
+In bulk RNA-seq, your samples (donors, mice, replicates) are independent observations. Statistical tests on them are honest as long as N is reasonable.
+
+In scRNA-seq, you have *cells* (millions per study) and *donors* (tens). The cells from one donor share genetics, dissociation batch, library prep — they are **not independent**. Treating cells as replicates inflates effective N by ~1000× and produces anti-conservative p-values for any cross-donor question.
+
+This is the **cardinal sin of scRNA-seq** and it shows up in many forms:
+
+- Per-cell DE between conditions (wrong; use pseudobulk — Chapter 6)
+- Cluster-level Fisher tests for differential abundance (wrong; use neighborhoods — Chapter 8)
+- "Deep" power calculations using cell counts (wrong; use donor counts)
+
+Every chapter that involves cross-donor inference references this rule. See [Appendix I § 8](Appendix_I_Statistical_Foundations.html) for the empirical demonstration.
+
+### 0.4.3 Cell type is a latent variable
+
+In bulk RNA-seq, you know what your samples are — they're labeled at the bench. In scRNA-seq, the cell types in your dataset are something you have to **discover** from the data. Clustering (Chapter 2), markers (Chapter 3), and reference annotation (Chapter 9) all exist to address this. Half the analytical effort in scRNA-seq is recovering this latent variable; the other half is using it.
+
+### 0.4.4 Integration is a first-class problem
+
+In bulk RNA-seq, batch effects exist but are usually handled by including batch as a covariate in DESeq2's design matrix. The fix is one line of code.
+
+In scRNA-seq, batch effects are spatial — they corrupt PCA and UMAP and clustering before DESeq2 ever runs. Multi-sample analyses that don't integrate produce per-sample islands; analyses that integrate too aggressively erase biology. **Integration** (Chapter 4) is its own substantial topic.
+
+## 0.5 The 10x Chromium chemistry, in one paragraph
+
+The dominant single-cell platform in 2026 is 10x Genomics' Chromium controller. Cells in suspension are encapsulated one-per-droplet alongside a barcoded gel bead. Each bead carries primers with the same **cell barcode** (16 bp, identifying the droplet) and unique **UMIs** (12 bp, identifying the molecule). Inside the droplet, mRNA is reverse-transcribed using the bead's primer; cDNA inherits both the cell barcode and the UMI. After PCR and Illumina sequencing, every read carries:
+
+- Cell barcode → which cell
+- UMI → which original molecule (collapse PCR duplicates)
+- cDNA sequence → which gene
+
+The result, after `cellranger count` runs, is a **cell × gene UMI counts matrix** — the input to Chapter 1. See [Appendix H §§ 4–5](Appendix_H_SC_Biology_Refresher.html) for the full chemistry detail.
+
+## 0.6 Numbers to keep in your head
+
+Order-of-magnitude landmarks for a typical 10x scRNA-seq study:
+
+| Quantity | Typical |
+|---|---|
+| Genes in human genome (protein-coding) | ~20,000 |
+| Genes annotated in Cell Ranger reference | ~36,000 |
+| Cells per 10x channel | 1,000–10,000 |
+| UMIs per cell, 10x 3' v3 | 5,000–30,000 |
+| Genes detected per cell | 500–5,000 |
+| Sparsity (% zeros) | 90–95% |
+| Doublet rate, well-loaded | 5–10% |
+| Mitochondrial fraction in healthy cells | 1–15% |
+| Cost per 10x channel (Chromium) | ~\$2–4 K |
+
+A two-condition study with 4 donors per group typically uses 16 channels = ~\$50 K of 10x consumables, before sequencing.
+
+## 0.7 The workshop's pedagogical structure
+
+The 13 numbered topics are paired 1:1 across **lectures**, **tutorials**, and **book chapters**:
+
+| Lecture | Tutorial | Book chapter | Topic |
+|---|---|---|---|
+| 01 | 01 | 01 | Preprocessing |
+| 02 | 02 | 02 | Dim Reduction & Clustering |
+| 03 | 03 | 03 | Markers & Manual Annotation |
+| 04 | 04 | 04 | Multi-Sample Integration |
+| 05 | 05 | 05 | DESeq2 Fundamentals |
+| 06 | 06 | 06 | Pseudobulk DE |
+| 07 | 07 | 07 | Functional Analysis |
+| 08 | 08 | 08 | Differential Abundance |
+| 09 | 09 | 09 | Reference Annotation |
+| 10 | 10 | 10 | scATAC-seq |
+| 11 | 11 | 11 | WGCNA |
+| 12 | 12 | 12 | Spatial Transcriptomics |
+| 13 | 13 | 13 | FAIR & Data Sharing |
+
+Plus **Appendices A–J** as background reading: computing fundamentals, Unix, regex, R programming, Git, HPC, databases, biology refresher, statistical foundations, and methods-section template.
+
+For each topic, the recommended order is:
+
+1. **Read the lecture** — sets up the concepts
+2. **Read the chapter** — the longer-form story
+3. **Do the tutorial** — hands-on practice
+4. **Consult the appendices** as you hit gaps
+
+For the Capstone Mini-Project, you put it all together on a dataset of your choice. See [Capstone](../Capstone.html).
+
+## 0.8 What you need to bring
+
+The minimum:
+
+- A laptop with R ≥ 4.4, RStudio, ~10 GB free disk
+- Comfort with `dplyr` (filter / select / mutate / summarise / pipe)
+- Some prior command-line experience (`cd`, `ls`, `wget`)
+- A Github account (for cloning the workshop repo)
+
+Optional but useful:
+
+- Prior bulk RNA-seq exposure — most analytical concepts will be familiar
+- Prior molecular biology coursework — the biology refresher (Appendix H) handles this if rusty
+
+The [Setup](../Setup.html) page is a one-button install that gets you from a fresh laptop to "ready to run Tutorial 01" in 30–60 minutes.
+
+## 0.9 Where to start
+
+::: incremental
+- **Day 1 reading:** Lecture 00 + this Chapter 0 + Appendix H if your bio is rusty
+- **Day 2:** Lecture 01 + Chapter 1 + Tutorial 01
+- **Day 3 onward:** one lecture/tutorial pair per session, in numerical order
+- **Capstone:** apply to your own dataset (see [Capstone](../Capstone.html))
+:::
+
+## 0.10 Where this material is also discussed
+
+- **Lecture:** [Lecture 00 — Bulk vs Single-Cell RNA-seq](../Lecture_Folder/Lecture_00_Bulk_vs_scRNAseq.html)
+- **Biology background:** [Appendix H](Appendix_H_SC_Biology_Refresher.html)
+- **The full workshop schedule:** [Schedule](../Schedule.html)
+- **Capstone project guide:** [Capstone](../Capstone.html)
+
+## 0.11 Going further
+
+::: incremental
+- **Heumos et al. 2023, *Nat Rev Genet*** — companion paper to the [sc-best-practices book](https://www.sc-best-practices.org/), high-level overview
+- **Stuart, Butler et al. 2019, *Cell*** — Seurat v3 paper; foundational for the workshop's R toolkit
+- **Wolf, Angerer & Theis 2018, *Genome Biology*** — Scanpy; the Python equivalent
+- **Tang et al. 2009, *Nature Methods*** — the first single-cell RNA-seq experiment, useful historical context
+:::

@@ -1,0 +1,158 @@
+---
+title: "Chapter 8 — Differential Abundance: Do Cell-Type Proportions Change?"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 08](../Lecture_Folder/Lecture_08_DifferentialAbundance.html)** and **[Tutorial 08](../Exercise_Folder/Tutorial_08_DifferentialAbundance.html)**. **Prerequisites:** [Chapter 4 — Integration](Chapter_04_Integration.html) (you need an integrated reduction), [Chapter 6 — Pseudobulk DE](Chapter_06_Pseudobulk_DE.html) (parallel statistical machinery).
+:::
+
+## 8.1 The complementary question
+
+Differential expression (Chapters 5–6) asks: *for cells of the same type, which genes change between conditions?* Differential abundance asks: *do **cell-type proportions** themselves change between conditions?*
+
+These are independent questions. A perturbation can change cell-type composition, gene expression within types, both, or neither. A complete condition-level analysis reports both.
+
+For example, in a scRNA-seq study of a viral infection vs control, you might find:
+
+- DE positive, DA negative: every immune cell shifts toward an antiviral state, but proportions are unchanged
+- DA positive, DE negative: a memory T-cell population expands in infected samples, but expression within each cell type is unchanged
+- Both positive: both populations and their per-cell expression change
+
+The two analyses tell different parts of the story. Reviewers increasingly expect both.
+
+## 8.2 Why cluster-level proportion tests fail
+
+The naive approach: count cells per (cluster, sample), make a 2×2 table per cluster, run Fisher's exact / chi-squared. This breaks for three reasons:
+
+::: incremental
+1. **Hard cluster boundaries are arbitrary.** A cell type that spans two clusters at one resolution and one cluster at another gives a different test result. Resolution-dependent inferences are bad.
+2. **Within-cluster heterogeneity is invisible.** A "T cell" cluster containing both expanding-activated and shrinking-naive subpopulations will show no net change at the cluster level — but real DA at finer resolution.
+3. **Cells aren't independent samples.** Cluster-level Fisher tests treat every cell as a replicate; the right unit is the donor, just like in DE.
+:::
+
+The first two are particularly insidious. Cluster boundaries on a smooth biology gradient are dotted lines, not real ones, and proportion tests on dotted lines are unstable.
+
+## 8.3 The miloR approach — neighborhoods, not clusters
+
+`miloR` (Dann et al. 2022, *Nat Biotechnol*) replaces hard clusters with overlapping **neighborhoods** on the kNN graph. Each neighborhood is a representative cell plus its $k$ nearest neighbors; \~1000 neighborhoods are sampled to cover the data.
+
+The procedure:
+
+1. Build the kNN graph on the **integrated** PC reduction (the same one used for clustering)
+2. Sample \~1000 neighborhoods (`makeNhoods` with `prop = 0.1, refined = TRUE`)
+3. Count cells per (sample × neighborhood)
+4. Fit a negative-binomial GLM per neighborhood with the design (`~ donor + condition`)
+5. Apply **SpatialFDR** correction across overlapping neighborhoods
+
+The output is a per-neighborhood log-fold-change in abundance and an FDR-controlled p-value. Since neighborhoods overlap, the corrected significance accounts for the correlation between adjacent tests.
+
+## 8.4 Why neighborhoods recover what clusters miss
+
+Imagine a continuous biological gradient — naive T cells transitioning to effector. Hard clustering will draw a single boundary somewhere along the gradient and label one side "naive" and the other "effector". A cluster-level proportion test sees the two clusters and reports their relative proportions.
+
+If the perturbation shifts the *position* of the gradient (more cells now near the effector end), neighborhoods near the effector end show up-DA and neighborhoods near the naive end show down-DA. The cluster-level test, depending on where the boundary fell, might report the change correctly, or might miss it entirely if the boundary happened to sit in a stable region.
+
+For continuous biology, neighborhoods almost always recover more signal than clusters. For very discrete biology (B cells vs T cells), they give the same answer. So neighborhoods are at worst equivalent and often better.
+
+## 8.5 Neighborhood size — the only parameter you'll tune
+
+The defaults (`k = 30`, `d = 20`, `prop = 0.1`) work well for most 10–50k-cell datasets. The diagnostic is `plotNhoodSizeHist(milo)`: the distribution of cells per neighborhood.
+
+Target: median size between 50 and 200. Below \~30 the test is underpowered; above \~500 you're spatially smoothing too much and losing fine structure.
+
+If your peak is too small, increase `k` (try 50 or 75) and re-run. If too large, decrease `k`.
+
+## 8.6 The design and replication requirements
+
+Same design framework as DESeq2:
+
+- `~ stim` — two-condition contrast, no other covariates
+- `~ donor + stim` — paired design (preferred when donors are balanced across conditions)
+- `~ batch + stim` — block on batch effects
+- `~ severity` — continuous covariate
+
+And the same replication requirements as pseudobulk DE: at minimum 4 vs 4 biological replicates for moderate effects. With 1 vs 1 you get NA p-values everywhere — no degrees of freedom.
+
+::: callout-warning
+**Don't pseudo-replicate by splitting cells into "fake donors".** The workshop's [Tutorial 08](../Exercise_Folder/Tutorial_08_DifferentialAbundance.html) does this for `ifnb` (because the SeuratData distribution lacks donor IDs) but flags it as a teaching shortcut. Synthetic-donor pseudo-replication makes the test anti-conservative — its p-values have no biological meaning. For real DA inference, you need real donor IDs.
+:::
+
+## 8.7 Reading the signature plots
+
+### 8.7.1 The neighborhood graph
+
+Each dot is a neighborhood, sized by cell count, colored by log-fold-change (red = enriched in condition; blue = depleted). Faint = SpatialFDR > 0.1.
+
+Look for:
+
+- **Bright clusters of dots** — a region of cell-type space that consistently shifts
+- **Mixed regions** — neighborhoods near each other with opposite effects (a sign of within-cell-type heterogeneity)
+
+### 8.7.2 The DA beeswarm
+
+`plotDAbeeswarm(da_results, group.by = "seurat_annotations")` plots each neighborhood's log-fold-change as a dot, grouped by the cell-type label of the neighborhood's representative cell.
+
+Reading rules:
+
+- A cell type with most points above zero → enriched in the perturbed condition
+- A cell type with most points below zero → depleted
+- A cell type with points scattered above AND below zero → within-cell-type heterogeneity (some sub-states up, others down)
+
+The third pattern is the case where neighborhoods recover what cluster-level testing misses. It's also the most biologically interesting pattern — flag and investigate.
+
+## 8.8 The integration prerequisite
+
+miloR builds neighborhoods on whichever reduction you give it. **Use the integrated reduction**, not the unintegrated PCA. Reasons:
+
+1. If batch effects dominate the unintegrated kNN graph, neighborhoods cluster by sample, and the test "detects" composition shifts that are really batch artifacts
+2. The biology you care about (cell-type proportion shifts) is best resolved when batch is corrected for
+
+In Seurat: `buildGraph(milo, k = 30, d = 20, reduced.dim = "HARMONY")` (or `"PCA"` if integration was done in PCA space).
+
+## 8.9 Annotating neighborhoods
+
+After the test, each neighborhood has a log-FC and SpatialFDR but no semantic label. `annotateNhoods(milo, da_results, coldata_col = "seurat_annotations")` assigns each neighborhood the modal cell-type label of its members. Use this to:
+
+- Generate the beeswarm plot (§8.7.2)
+- Summarize: count significant neighborhoods per cell type
+- Cross-tabulate against your manual annotations (Chapter 3)
+
+## 8.10 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `reducedDimNames(milo)` doesn't include HARMONY | SCE conversion dropped reductions | Re-add: `reducedDim(milo, "HARMONY") <- Embeddings(seu, "harmony")` |
+| Neighborhood size histogram peaks at <30 | Neighborhoods too small | Increase `k` to 50 or 75 |
+| `testNhoods` returns all NA p-values | No replication in design | Need ≥ 2 samples per condition; with 1 vs 1, no test possible |
+| `plotNhoodGraphDA` errors "UMAP_HARMONY not found" | Dimred name mismatch | Check `reducedDimNames(milo)`; pass the correct name to `layout =` |
+| All neighborhoods show similar log-FC | Possibly real (uniform shift), or possibly under-correction in integration | Check Chapter 4 over-correction diagnostics; if integration is fine, trust the result |
+
+## 8.11 Where this material is also discussed
+
+- **Lecture:** [Lecture 08](../Lecture_Folder/Lecture_08_DifferentialAbundance.html)
+- **Tutorial:** [Tutorial 08](../Exercise_Folder/Tutorial_08_DifferentialAbundance.html)
+- **DE complement:** [Chapter 6 — Pseudobulk DE](Chapter_06_Pseudobulk_DE.html), [Lecture 06](../Lecture_Folder/Lecture_06_Pseudobulk_DE.html)
+- **Integration prerequisite:** [Chapter 4](Chapter_04_Integration.html)
+
+## 8.12 Going further
+
+::: incremental
+- **Dann et al. 2022** — miloR paper, [doi:10.1038/s41587-021-01033-z](https://doi.org/10.1038/s41587-021-01033-z)
+- **Büttner et al. 2021** — `scCODA`, a Bayesian compositional alternative, [doi:10.1038/s41467-021-27150-6](https://doi.org/10.1038/s41467-021-27150-6)
+- **Phipson et al. 2022** — `propeller`, fast linear-model DA, [doi:10.1093/bioinformatics/btac582](https://doi.org/10.1093/bioinformatics/btac582)
+:::

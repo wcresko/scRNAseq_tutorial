@@ -1,0 +1,171 @@
+---
+title: "Chapter 13 — FAIR Principles & Data Sharing"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 13](../Lecture_Folder/Lecture_13_FAIR_DataSharing.html)** and **[Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html)**. **Cross-reference:** [Appendix G — Gene-Expression Databases & File Formats](Appendix_G_Databases_FileFormats.html), [Appendix J — Methods Section Template](Appendix_J_Methods_Template.html).
+:::
+
+## 13.1 Why this chapter is the closing chapter
+
+Every paragraph of this workshop has been about *generating* good scRNA-seq results. This chapter is about *preserving* them — making sure that the data you've collected, the analysis you've done, and the conclusions you've drawn don't disappear into a lab hard drive.
+
+Done well, data sharing produces:
+
+- **Citations.** Reanalysis papers cite their input datasets. A well-deposited dataset is reused; reuse means citation.
+- **Reproducibility.** A reviewer asking "can I see your raw data?" gets a one-line answer.
+- **Atlas integration.** Your dataset can be pulled into HCA / CELLxGENE / Tabula Sapiens. Visibility you won't get otherwise.
+- **Funder compliance.** NIH (2023+) and most major funders *require* a Data Management & Sharing Plan; FAIR-aligned plans pass review faster.
+
+Done poorly, sharing produces nothing — the dataset sits in someone's old lab drive, eventually unreadable, unused, eventually deleted.
+
+The cost of doing FAIR is paid up-front during the project. The payoff is paid back over the rest of your career and the lifetime of the data. Skipping it feels efficient and is not.
+
+## 13.2 The FAIR principles
+
+Wilkinson et al. 2016 (*Sci Data*) proposed four guiding principles for data management:
+
+| Principle | One-line definition |
+|---|---|
+| **F**indable | Data + metadata have a persistent identifier searchable in a registry |
+| **A**ccessible | Anyone (or anyone authorized) can retrieve the data via an open protocol |
+| **I**nteroperable | Data uses shared vocabularies so different datasets combine cleanly |
+| **R**eusable | Provenance + clear licence + sufficient metadata for reanalysis |
+
+FAIR is not "open" — FAIR data can be access-controlled (e.g. patient genomes in a controlled-access archive). The "A" requires that the *protocol* for access is open and standardized, not that the data itself is.
+
+Every line in your data-deposition workflow should map back to one of these four. The most common failure is "I"; the most common omission is "F" (people deposit data without a stable identifier or without indexing it where searchers will look).
+
+## 13.3 The repository ecosystem
+
+For an scRNA-seq study you typically deposit in **multiple** repositories, each serving a different audience:
+
+### NCBI hierarchy (the canonical raw-data and processed-data archive)
+
+- **BioProject** (`PRJNA######`) — the **study** as a whole. One per paper.
+- **BioSample** (`SAMN########`) — each **biological sample**. Tissue, treatment, donor metadata lives here.
+- **SRA** (`SRR#######`) — the **raw sequencing reads** (FASTQs, BAMs).
+- **GEO** (`GSE######`) — the **processed** data: counts matrices, normalized files, expression metadata. GEO records pull SRA + BioSample IDs in.
+
+For scRNA-seq, you create all four. The [Appendix G](Appendix_G_Databases_FileFormats.html) reference card details what each one holds.
+
+### Single-cell-aware repositories
+
+Beyond the generic raw archive, deposit in a scRNA-seq–native repository so the data is *queryable as scRNA-seq*:
+
+| Repository | Run by | What it accepts | Strengths |
+|---|---|---|---|
+| **CELLxGENE Discover** | CZI | AnnData (`.h5ad`) with required metadata | Browseable atlas, in-browser visualization, schema-validated |
+| **Human Cell Atlas Data Portal** | HCA Consortium | Raw + processed, full provenance graph | Strict QC, integrated atlas |
+| **Single Cell Expression Atlas** | EBI | Counts + author annotations | Curated, queryable per-gene across studies |
+| **Single Cell Portal** | Broad Institute | Loose; raw + processed | Easy upload, less curation |
+
+The recommended workflow in 2026: **raw FASTQs to SRA + BioProject; processed data to GEO; AnnData with cell-type metadata to CELLxGENE**. The triple-deposit is not redundant — each repository serves a different audience (raw-data reanalyzers, traditional bench biologists, single-cell-tool users).
+
+## 13.4 The metadata is most of the work
+
+You can't reuse a counts matrix you can't interpret. "Sample 1, Sample 2, Sample 3" is *not metadata*. At minimum, your metadata answers: who is the donor, what's the tissue, what's the condition, what's the protocol, who processed it, when, with what library prep, on what machine, with what software version.
+
+For human samples: also consent type, age range (often binned for de-identification), self-reported sex / gender, and ancestry.
+
+The CELLxGENE schema is the most demanding of the major repositories and also the most reusable. Meeting CELLxGENE's bar gets you GEO + HCA "for free". Required fields:
+
+| Field | Vocabulary |
+|---|---|
+| `donor_id` | study-internal, anonymized |
+| `tissue` + `tissue_ontology_term_id` | **Uberon** (`UBERON:0002048` = lung) |
+| `cell_type_ontology_term_id` | **Cell Ontology** (`CL:0000236` = B cell) |
+| `disease_ontology_term_id` | **MONDO** or `PATO:0000461` (normal) |
+| `assay_ontology_term_id` | **EFO** (`EFO:0009922` = 10x 3' v3) |
+| `organism_ontology_term_id` | **NCBI Taxonomy** (`NCBITaxon:9606` = human) |
+| `sex_ontology_term_id` | PATO (`PATO:0000383` female / `PATO:0000384` male) |
+| `development_stage_ontology_term_id` | HsapDv (human) / MmusDv (mouse) |
+| `self_reported_ethnicity_ontology_term_id` | HANCESTRO |
+| `is_primary_data` | Boolean |
+| `suspension_type` | `cell` / `nucleus` |
+
+These ontology IDs are looked up at the [Ontology Lookup Service](https://www.ebi.ac.uk/ols4/). The mapping from "B cell" to `CL:0000236` is what makes your dataset interoperable with every other CELLxGENE-deposited dataset.
+
+## 13.5 File formats and what to deposit
+
+| Layer | Format | Why |
+|---|---|---|
+| Raw reads | `.fastq.gz` (paired or single-end) | Universally supported |
+| Aligned reads | `.bam` + `.bai` | Optional — useful for re-alignment |
+| Per-cell counts | `.h5` (10x), `.mtx` + `barcodes.tsv` + `features.tsv` | Cell Ranger output |
+| Annotated object | **`.h5ad`** (AnnData) preferred; `.rds` (Seurat) accepted by some | CELLxGENE / scverse-native |
+| Metadata sheet | `.csv` / `.tsv` (also embedded in `.h5ad` via `.obs`) | Sample-level + per-cell |
+| Analysis code | git repo (Zenodo for archival) | Reproducibility |
+
+::: callout-warning
+**Seurat `.rds` files are not future-proof.** They lock the data to the Seurat version that wrote them. For long-term archival use **AnnData (`.h5ad`)** — versioned, language-agnostic, HDF5-based, readable by Scanpy / Seurat 5 / `anndata-rs`.
+:::
+
+## 13.6 Plan submission at experimental design time
+
+The biggest mistake: thinking about deposition only after the manuscript is in revision. By then:
+
+- Sample-level metadata is buried in lab notebooks across multiple students
+- Ontology terms have to be reverse-engineered from sketchy memory
+- You need to chase three former rotation students for their consent forms
+
+**Do this instead:** at experimental design time, build the **canonical sample sheet** ([Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html) ships a template). Include every field you'll need at deposition. Version-control it alongside your code. As samples come in, update the sheet. At the end of the project, the sheet *is* your BioSample / SRA / GEO upload.
+
+This single discipline will save you a week of frantic data archeology at submission time.
+
+## 13.7 The end-to-end submission workflow
+
+Eight steps:
+
+1. **Plan.** Build the canonical sample sheet at design time.
+2. **Create BioProject** (one per study) at submit.ncbi.nlm.nih.gov. Get a `PRJNA######`.
+3. **Create BioSamples** (one per sample). Batch-upload `.tsv` from the canonical sheet. Each gets a `SAMN########`.
+4. **Submit raw `.fastq.gz` to SRA.** Each sequencing run gets an `SRR#######`. Link each to its `SAMN`.
+5. **Analyze the data.** This is the rest of the workshop.
+6. **Submit processed counts + per-cell metadata to GEO.** Get a `GSE######`. Link to BioProject + SRA.
+7. **Convert Seurat → AnnData and submit to CELLxGENE Discover.** Schema-validate first; iterate until the validator passes.
+8. **Cite all accessions in your manuscript's *Data Availability* section.**
+
+[Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html) walks all of this hands-on, generating the BioSample / SRA / GEO upload `.tsv` files and the AnnData from the workshop's `ifnb_annotated_final.rds`.
+
+## 13.8 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `SeuratDisk::SaveH5Seurat` fails | Seurat v5 Assay5 not supported by old SeuratDisk | Use the dev branch: `remotes::install_github("mojaveazure/seurat-disk")` |
+| `bitr` returns empty | Case mismatch (`Cd3d` vs `CD3D`) or wrong organism DB | Check; use `org.Mm.eg.db` for mouse |
+| CELLxGENE validator: "ontology term not found" | Ontology IDs get updated periodically | Look up current IDs at ols4 |
+| Validator passes locally but submission portal rejects | Schema version updates faster than your local validator | Check current schema before submitting |
+| "Inconsistent sample names" between BioSample / SRA / GEO sheets | Manual transcription error | Always derive all sheets from a single canonical sheet programmatically |
+
+## 13.9 Where this material is also discussed
+
+- **Lecture:** [Lecture 13](../Lecture_Folder/Lecture_13_FAIR_DataSharing.html)
+- **Tutorial:** [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html)
+- **Database & file-format reference:** [Appendix G](Appendix_G_Databases_FileFormats.html)
+- **Methods-section template (the "Data availability" paragraph):** [Appendix J](Appendix_J_Methods_Template.html)
+- **scNotebooks Module 13** — parallel walkthrough
+
+## 13.10 Going further
+
+::: incremental
+- **Wilkinson et al. 2016** — original FAIR paper, [doi:10.1038/sdata.2016.18](https://doi.org/10.1038/sdata.2016.18)
+- **CELLxGENE schema documentation** — [github.com/chanzuckerberg/single-cell-curation](https://github.com/chanzuckerberg/single-cell-curation)
+- **NIH Data Management & Sharing Policy** (2023) — required for all NIH-funded studies
+- **scNotebooks Module 13** — parallel walkthrough with extra detail on ArrayExpress and HCA Data Portal
+:::
