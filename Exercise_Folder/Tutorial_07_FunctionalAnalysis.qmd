@@ -43,6 +43,25 @@ We'll do both per cell type and then **compare cell types** with `compareCluster
 |---|---|---|
 | `../data/ifnb_pseudobulk_de.csv` | Tutorial 06 | Long table of per-cell-type DE results: columns `gene`, `baseMean`, `log2FoldChange`, `lfcSE`, `pvalue`, `padj`, `celltype`. The contrast was `STIM` vs `CTRL`. |
 
+
+::: {.callout-warning title="Common errors / things that bite"}
+**Many gene symbols don't map via `bitr`** — gene-symbol-to-ENTREZ-ID mapping is incomplete (deprecated symbols, lncRNAs, pseudogenes). A 5–10% unmapped rate is normal. Check the unmapped list with `setdiff(unique(de$gene), de_mapped$symbol)` — if it's mostly pseudogenes / lncRNAs, ignore. If it's all gene symbols, your `org.Hs.eg.db` may be out of date — `BiocManager::install("org.Hs.eg.db", update = TRUE)`.
+
+**`enrichGO` returns 0 enriched terms** — most often you forgot the `universe = uni` argument and `enrichGO` is using "all annotated genes in the genome" as the background. That over-inflates the p-value of common terms and makes everything non-significant. Always pass the genes you actually tested.
+
+**GSEA produces "ties detected" warning** — `log2FoldChange` ties from multiple genes with identical effect sizes break the rank-based test. `arrange(desc(log2FoldChange))` followed by `distinct(ENTREZID, .keep_all = TRUE)` handles it. The tutorial does this in the helper.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_07_FunctionalAnalysis.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
+
 ## Setup
 
 ```{r}

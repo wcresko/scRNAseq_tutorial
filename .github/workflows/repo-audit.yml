@@ -1,0 +1,168 @@
+name: Repo audit (links, alt-text, image usage)
+
+# Catches drift across renumberings:
+# - Cross-links to .html files whose .qmd source doesn't exist
+# - Images referenced from .qmd but missing from disk
+# - Tutorials whose internal title number doesn't match the filename
+# - Lectures whose footer "Lecture X of N" doesn't match
+#
+# Fast — runs in ~30 sec, no R / Quarto needed.
+
+on:
+  push:
+    branches: [ main, claude/** ]
+  pull_request: {}
+  workflow_dispatch: {}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cross-link audit
+        run: |
+          python3 <<'PYEOF'
+          import os, re, glob, sys
+
+          # Build the set of .qmd files that exist
+          qmd_files = set()
+          for p in glob.glob('**/*.qmd', recursive=True):
+              if 'docs/' in p:
+                  continue
+              qmd_files.add(os.path.basename(p))
+
+          broken = []
+          for path in glob.glob('**/*.qmd', recursive=True):
+              if 'docs/' in path:
+                  continue
+              with open(path) as f:
+                  text = f.read()
+              for m in re.finditer(r'\]\(([^)]+)\)', text):
+                  target = m.group(1).split('#')[0].split('?')[0].strip()
+                  if target.startswith(('http', 'mailto', '#')) or not target:
+                      continue
+                  if not target.endswith('.html'):
+                      continue
+                  if 'qmd.txt' in target:
+                      continue
+                  target_qmd = os.path.basename(target).replace('.html', '.qmd')
+                  if target_qmd not in qmd_files:
+                      broken.append((path, target))
+
+          if broken:
+              print(f'BROKEN cross-links found: {len(broken)}')
+              for p, t in broken:
+                  print(f'  {p}: -> {t}')
+              sys.exit(1)
+          print(f'OK: {len(qmd_files)} .qmd files, no broken cross-links.')
+          PYEOF
+
+      - name: Image-usage audit
+        run: |
+          python3 <<'PYEOF'
+          import os, re, glob, sys
+
+          # Build set of images on disk under known image roots
+          all_images = set()
+          for d in ['Lecture_Folder/images', 'Resources_Folder/images']:
+              if not os.path.isdir(d):
+                  continue
+              for root, _dirs, files in os.walk(d):
+                  for f in files:
+                      if f.lower().endswith(('.svg', '.png', '.jpg', '.jpeg', '.gif')):
+                          all_images.add(f)
+
+          # Find image references in .qmd files
+          referenced = set()
+          for path in glob.glob('**/*.qmd', recursive=True):
+              if 'docs/' in path:
+                  continue
+              with open(path) as f:
+                  text = f.read()
+              for m in re.finditer(r'images/([A-Za-z0-9_./-]+\.(?:svg|png|jpg|jpeg|gif))',
+                                    text, re.IGNORECASE):
+                  referenced.add(os.path.basename(m.group(1)))
+
+          # Missing referenced images (referenced but not on disk anywhere)
+          missing = referenced - all_images
+          if missing:
+              print(f'MISSING referenced images: {len(missing)}')
+              for img in sorted(missing):
+                  print(f'  {img}')
+              sys.exit(1)
+          print(f'OK: {len(referenced)} image references all resolve to disk.')
+          PYEOF
+
+      - name: Tutorial / lecture number consistency
+        run: |
+          python3 <<'PYEOF'
+          import os, re, glob, sys
+
+          fails = []
+
+          # Tutorials
+          for path in sorted(glob.glob('Exercise_Folder/Tutorial_*.qmd')):
+              fname = os.path.basename(path)
+              m = re.match(r'Tutorial_(\d+)_', fname)
+              if not m:
+                  continue
+              fnum = int(m.group(1))
+              with open(path) as f:
+                  text = f.read()
+              tm = re.search(r'^title:\s*"Tutorial\s+(\d+)', text, re.MULTILINE)
+              if tm and int(tm.group(1)) != fnum:
+                  fails.append(f'{fname}: filename={fnum} but title="Tutorial {tm.group(1)}"')
+
+          # Lectures
+          for path in sorted(glob.glob('Lecture_Folder/Lecture_*.qmd')):
+              fname = os.path.basename(path)
+              if fname == 'Lecture_Template.qmd':
+                  continue
+              m = re.match(r'Lecture_(\d+)_', fname)
+              if not m:
+                  continue
+              fnum = int(m.group(1))
+              with open(path) as f:
+                  text = f.read()
+              tm = re.search(r'^title:\s*"Lecture\s+(\d+)', text, re.MULTILINE)
+              if tm and int(tm.group(1)) != fnum:
+                  fails.append(f'{fname}: filename={fnum} but title="Lecture {tm.group(1)}"')
+              # Footer
+              fm = re.search(r'Lecture\s+(\d+)\s+of\s+(\d+)', text)
+              if fm and int(fm.group(1)) != fnum:
+                  fails.append(f'{fname}: filename={fnum} but footer says "Lecture {fm.group(1)} of {fm.group(2)}"')
+
+          if fails:
+              print(f'INCONSISTENT numbering: {len(fails)} mismatches')
+              for f in fails:
+                  print(f'  {f}')
+              sys.exit(1)
+          print('OK: every tutorial and lecture filename matches its title and footer.')
+          PYEOF
+
+      - name: Empty alt-text audit (advisory)
+        # Doesn't fail the build — alt text is being filled in incrementally
+        run: |
+          n_empty=$(grep -rh -E '!\[\]\(' --include='*.qmd' . 2>/dev/null | wc -l)
+          echo "Images with empty alt text: $n_empty"
+          if [ "$n_empty" -gt 0 ]; then
+            grep -rn -E '!\[\]\(' --include='*.qmd' .  | head -20
+            echo "(advisory only — not failing the build)"
+          fi
+
+      - name: Typo audit (advisory)
+        # Common misspellings — same caveat
+        run: |
+          n=$(grep -rni -E '\b(occured|recieved|seperat|teh|adn|publically|untill|tomatoe|recieve)\b' --include='*.qmd' . 2>/dev/null | wc -l)
+          echo "Common-typo hits: $n"
+          if [ "$n" -gt 0 ]; then
+            grep -rni -E '\b(occured|recieved|seperat|teh|adn|publically|untill|tomatoe|recieve)\b' --include='*.qmd' . | head
+          fi

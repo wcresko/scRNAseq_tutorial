@@ -2,33 +2,113 @@
 title: "Syllabus"
 ---
 
-## Workshop Description
+## Workshop description
 
-*A short paragraph describing the workshop: what single cell RNA-seq is, who the workshop is intended for, the prerequisites (e.g. basic familiarity with R and the command line), and what participants should expect to be able to do by the end.*
+This workshop is a hands-on introduction to **single-cell RNA-seq analysis** for biology graduate students who already know enough R to write a `dplyr` pipeline and have used the command line a little. It assumes no prior single-cell experience.
 
-## Workshop Structure
+The goal is for you to leave able to take a 10x Cell Ranger output for *your own* dataset and run it end to end — QC, integration, clustering, annotation, condition-level differential expression, functional analysis, and FAIR submission — and to write a defensible methods section about what you did.
 
-*Describe the structure: number of days/weeks, balance between lecture and hands-on, where slides and exercises live, how participants should prepare for each session.*
+The workshop covers:
 
-## Learning Objectives
+- **scRNA-seq fundamentals** — how the data are generated, what makes them sparse, where bulk RNA-seq intuition transfers and where it fails
+- **The standard Seurat workflow** — quality control, normalization, dimensionality reduction, clustering, marker-based annotation
+- **Multi-sample integration** — Harmony and Seurat anchors on a real two-condition dataset, with diagnostics for over-correction
+- **Condition-level analysis** — pseudobulk differential expression with DESeq2, functional enrichment with `clusterProfiler`, differential abundance with `miloR`
+- **Reference-based annotation** — `SingleR` and Azimuth, when to trust them and when not to
+- **Adjacent modalities** — bulk + single-cell ATAC-seq with Signac, WGCNA, spatial transcriptomics with Visium
+- **Real-data engineering** — running Cell Ranger on Talapas, FAIR data sharing, ontology-coded metadata
+
+The workshop deliberately runs on a **laptop-friendly dataset** (`ifnb`, \~14k cells, no 10x click-through) so you can complete the full pipeline without a compute account. A parallel **Talapas scaling exercise** repeats the workflow on a 20k-cell tumor dataset and walks the raw-FASTQ → counts pipeline as SLURM jobs.
+
+## Who this workshop is for
+
+You'll get the most out of this workshop if you:
+
+- Are a graduate student or postdoc starting a research project that involves scRNA-seq
+- Can write basic R: read a CSV, use the tidyverse pipe `|>`, write a function, install a CRAN package
+- Have used a Unix command line — `cd`, `ls`, `grep`, `wget` — at least a few times
+- Have a laptop with at least 16 GB RAM and 10 GB free disk
+
+If you have **no R experience**, work through [Appendix D — R Programming](Resources_Folder/Appendix_D_R_Programming.html) first; the workshop assumes you can read and modify the code chunks in the tutorials.
+
+If you have **no command-line experience**, [Appendix B — Unix & the Command Line](Resources_Folder/Appendix_B_Unix_Command_Line.html) is a fast way to get there.
+
+If your **molecular biology** is rusty, the Single-Cell Biology refresher (Appendix H) covers what mRNA, transcription, library prep, UMIs, and barcoding actually mean before Lecture 00 starts using those terms.
+
+## Prerequisites
+
+| Prerequisite | What you need | Where to learn it |
+|---|---|---|
+| **R, intermediate** | Tidyverse pipe, dplyr verbs, ggplot2, writing functions | [Appendix D](Resources_Folder/Appendix_D_R_Programming.html), [R for Data Science 2e](https://r4ds.hadley.nz/) |
+| **RStudio** | Open a project, edit a `.qmd`, run a chunk | [Appendix D](Resources_Folder/Appendix_D_R_Programming.html) |
+| **Unix command line, basic** | Navigate, install software, run a `wget` | [Appendix B](Resources_Folder/Appendix_B_Unix_Command_Line.html) |
+| **Git, basic** | `git clone`, `git commit`, `git push` | [Appendix E](Resources_Folder/Appendix_E_Git_GitHub.html) |
+| **Molecular biology, refresher OK** | What mRNA, transcription, library prep mean | [Appendix H](Resources_Folder/Appendix_H_SC_Biology_Refresher.html) |
+| **Statistics, refresher OK** | Variance, regression, multiple-testing | [Appendix I](Resources_Folder/Appendix_I_Statistical_Foundations.html) |
+
+## Workshop structure
+
+The workshop runs as 11 topic lectures + 13 hands-on tutorials, paired so you read the lecture first and then complete the matching tutorial. Plan for **roughly 1 hour of lecture + 1.5–2 hours of tutorial per session**.
+
+For full-length workshops:
+
+- **Two-week format** — 11 sessions over ten weekdays + one project-day, \~3 hours each. Typical for an in-person summer workshop.
+- **Term-long format** — one lecture/tutorial pair per week over a 10–12 week term, with the spatial / FAIR / Talapas-advanced material as bonus weeks. Typical for a graduate-level course.
+- **Self-paced** — work through the lectures and tutorials in order, at your own pace. The full set takes \~25–35 hours.
+
+See the [Schedule](Schedule.qmd) for a session-by-session map.
+
+## Learning objectives
 
 By the end of this workshop, participants will be able to:
 
--   *Objective 1 — e.g. describe the biology and measurement process underlying single cell RNA-seq data.*
--   *Objective 2 — e.g. perform quality control, filtering, and normalization on a scRNA-seq count matrix.*
--   *Objective 3 — e.g. carry out dimensionality reduction and clustering, and interpret the results.*
--   *Objective 4 — e.g. identify marker genes and annotate cell types.*
--   *Objective 5 — e.g. perform differential expression between groups of cells.*
--   *Objective 6 — e.g. integrate multiple datasets and correct for batch effects.*
+1. **Load** a 10x Cell Ranger output into Seurat, **inspect** the data structure, and **describe** what each file in `filtered_feature_bc_matrix/` contains.
+2. **Run quality control** on per-cell metrics (`nCount`, `nFeature`, `percent.mt`), apply doublet detection (`scDblFinder`) and ambient-RNA correction (`SoupX`), and **defend** chosen filter thresholds.
+3. **Carry out** the standard Seurat workflow — normalization, HVG selection, scaling, PCA, neighbor-graph, Leiden clustering, UMAP — and **explain** what each step does.
+4. **Identify cluster markers** with `FindAllMarkers` / `FindConservedMarkers`, **read** the five canonical marker visualizations (Vln / Feature / Heatmap / Ridge / Dot), and **assign** cell-type labels based on canonical markers.
+5. **Integrate** multiple samples with **Harmony** and **Seurat anchors**, **diagnose** over-correction with a known biological signal, and **defend** the choice of integration method.
+6. **Run** condition-level pseudobulk differential expression with **DESeq2**, **explain** why per-cell tests are statistically wrong for condition contrasts, and **interpret** the resulting log-fold-changes and FDR.
+7. **Perform** functional enrichment on DE results with `clusterProfiler` (GO, GSEA, Reactome), and **build** a `compareCluster` cross-cell-type summary plot.
+8. **Run** differential abundance testing with `miloR` and **explain** how it complements differential expression.
+9. **Apply** reference-based annotation with `SingleR` and `Azimuth`, **read** their confidence diagnostics, and **reconcile** automated calls against manual annotation.
+10. **Carry out** an scATAC-seq analysis with Signac, **explain** how chromatin-accessibility QC differs from scRNA-seq QC, and **link** ATAC clusters to RNA cell types via gene-activity scores.
+11. **Apply** WGCNA to bulk RNA-seq data and **interpret** module-trait relationships.
+12. **Load** a Visium spatial transcriptomics dataset, **find** spatially variable genes (Moran's I), **integrate** sections, and **explain** the difference between a spot, a cell, and a deconvoluted cell-type fraction.
+13. **Prepare** a CELLxGENE-conformant metadata sheet and **submit** a study to NCBI BioProject / GEO / SRA following FAIR principles.
+14. **Run** Cell Ranger / cellranger-atac on Talapas as a SLURM job (advanced track) and **scale** to a multi-sample study.
 
-## Assessments / Exercises
+## Assessments
 
-*Describe how exercises are structured, whether they are graded, and how participants should submit them if at all.*
+For self-paced learners, completion = working through all 11 lectures + 13 tutorials, including the *Think about it* prompts. There are no graded assessments.
 
-### *Grading (if applicable)*
+For instructors using this material in a formal course, a typical breakdown:
 
-| Assignment   | Percentage of Total Grade |
-|--------------|:-------------------------:|
-| *Exercise 1* |           *%*             |
-| *Exercise 2* |           *%*             |
-| *Project*    |           *%*             |
+| Component | Suggested weight |
+|---|---:|
+| Lecture quizzes (one per lecture, 5 questions each) | 20% |
+| Tutorial completion + *Think about it* answers turned in | 30% |
+| Mid-workshop reproducibility report (re-render someone else's tutorial output and document any differences) | 15% |
+| **Capstone mini-project** — apply the laptop-path workflow to a public dataset of your choice; turn in a 4-page report with figures and a methods section | 35% |
+
+The [Capstone Mini-Project guide](Capstone.qmd) has detailed instructions, deliverable templates, and grading rubric examples.
+
+## Materials and resources
+
+- **Lecture slides** are listed under [Lectures](Lectures.qmd) — read these before the matching tutorial.
+- **Hands-on tutorials** are under [Exercises](Exercises.qmd) — open each `.qmd` in RStudio and work through the chunks.
+- **Reference material** (computing fundamentals, Unix, R, Git, HPC, databases, glossary) lives under [Resources](Resources.qmd).
+- **External reading** is listed in [Additional Readings](Additional_Readings.qmd).
+- **Datasets** and download instructions are on the [Datasets](Datasets.qmd) page.
+- **Setup script** (one-shot install) is on the [Setup](Setup.qmd) page.
+
+## Code of conduct
+
+All participants are expected to follow the workshop's [Code of Conduct](Code_of_Conduct.qmd). The workshop is also committed to accessibility — see the [Accessibility statement](Accessibility.qmd) for what we provide and how to request accommodations.
+
+## Citing this workshop
+
+If this workshop helped you learn scRNA-seq for a project that gets published, please cite it:
+
+> Cresko, W. A. (2026). *Single Cell RNA-seq Workshop.* University of Oregon. https://github.com/wcresko/scRNAseq_tutorial
+
+A `CITATION.cff` file at the repo root provides a machine-readable version.
