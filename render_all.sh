@@ -57,6 +57,17 @@ for f in Exercise_Folder/NSCLC_FullDataset/*.qmd; do
   cp -f "$f" "docs/Exercise_Folder/NSCLC_FullDataset/$(basename "$f").txt"
 done
 
+# Same for the Talapas raw-data processing tutorials (Cell Ranger / cellranger-atac).
+mkdir -p docs/Exercise_Folder/Talapas_RawData
+for f in Exercise_Folder/Talapas_RawData/*.qmd; do
+  [ -e "$f" ] || continue
+  cp -f "$f" "docs/Exercise_Folder/Talapas_RawData/$(basename "$f").txt"
+done
+
+# Copy metadata templates into the rendered docs so students can download them
+mkdir -p docs/Resources_Folder/metadata_templates
+cp -f Resources_Folder/metadata_templates/* docs/Resources_Folder/metadata_templates/ 2>/dev/null || true
+
 if [ "${SOLUTIONS:-0}" = "1" ]; then
   echo "=== Rendering INSTRUCTOR SOLUTIONS (eval=true) ==="
   cd Exercise_Folder
