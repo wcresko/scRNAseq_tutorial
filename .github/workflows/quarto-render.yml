@@ -1,0 +1,97 @@
+name: Quarto render (smoke test)
+
+# Catches workshop-breaking changes early:
+# - Quarto can't render the site (broken qmd, broken yaml)
+# - A lecture's R simulation chunks crash (eval: true)
+# - A required package isn't installable
+#
+# Does NOT run the full tutorial-evaluation profile (that needs the workshop datasets,
+# which are too big for CI). For full evaluation, see render-solutions.yml.
+
+on:
+  push:
+    branches: [ main, claude/** ]
+    paths:
+      - '**.qmd'
+      - '**.yml'
+      - '**.css'
+      - 'render_all.sh'
+      - '.github/workflows/quarto-render.yml'
+  pull_request:
+    paths:
+      - '**.qmd'
+      - '**.yml'
+      - '**.css'
+      - 'render_all.sh'
+  workflow_dispatch: {}
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4'
+
+      - name: Install Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.5.57'
+
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/R/renv
+          key: ${{ runner.os }}-r-${{ hashFiles('**/renv.lock') }}-v1
+          restore-keys: ${{ runner.os }}-r-
+
+      - name: Install minimal R packages for lecture rendering
+        # Lectures use only tidyverse / knitr / gridExtra / patchwork for their R chunks.
+        # Tutorials need the full Bioconductor stack but the website-render profile
+        # has eval: false, so this is enough for the smoke test.
+        run: |
+          R -e '
+          options(repos = c(CRAN = "https://cloud.r-project.org"))
+          pkgs <- c("rmarkdown", "knitr", "tidyverse", "ggplot2", "gridExtra",
+                    "patchwork", "tibble", "forcats", "RColorBrewer")
+          install.packages(setdiff(pkgs, rownames(installed.packages())))
+          '
+
+      - name: Render lectures
+        # revealjs slides — eval: true (R simulation chunks render)
+        run: |
+          cd Lecture_Folder
+          quarto render
+
+      - name: Render top-level pages + Resources
+        # Most are eval: false; lectures already rendered above
+        run: quarto render
+
+      - name: Render exercise tutorials (student version, eval=false)
+        # eval: false means no Bioconductor stack needed — just check the qmd parses
+        run: |
+          cd Exercise_Folder
+          quarto render
+
+      - name: Verify rendered output exists
+        run: |
+          test -f docs/index.html
+          test -d docs/Lecture_Folder
+          test -d docs/Exercise_Folder
+          test -d docs/Resources_Folder
+          test -f docs/Lecture_Folder/Lecture_00_Bulk_vs_scRNAseq.html
+          test -f docs/Exercise_Folder/Tutorial_01_QC_Preprocessing.html
+          test -f docs/Resources_Folder/Appendix_D_R_Programming.html
+          echo "All expected build artifacts present."
+
+      - name: Upload rendered site (preview)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-site
+          path: docs/
+          retention-days: 7

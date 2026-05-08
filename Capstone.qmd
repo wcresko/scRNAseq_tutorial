@@ -1,0 +1,144 @@
+---
+title: "Capstone Mini-Project"
+subtitle: "Apply the workshop workflow to a real dataset and write up the result"
+---
+
+The tutorials walk you through `ifnb` — a clean, well-behaved, two-condition PBMC dataset that always works. Real data are messier. The capstone is the bridge: you take **everything you learned** in Tutorials 01–09 (or a subset agreed with your instructor) and apply it end to end to a **dataset of your own choosing**, then write up a 4-page report you could hand to your PI.
+
+::: callout-tip
+**Why a capstone?** Single-cell competence is the difference between *running other people's code* and *making real-data decisions in real time*. The capstone forces the second.
+:::
+
+## What you produce
+
+A short report (\~4 pages including figures) plus the code and outputs that produced it:
+
+1. **Cover page** — title, your name, dataset chosen, date, brief 100-word summary
+2. **Introduction (½ page)** — the biological question you're asking, and why this dataset is appropriate
+3. **Methods section (1 page)** — the version of [Methods Template (Appendix J)](Resources_Folder/Appendix_J_Methods_Template.html) you adapted; specific filter thresholds, parameter choices, and tools/versions you used
+4. **Results (1.5–2 pages)** — at minimum: a QC summary, a UMAP, a marker dot plot, and a per-cell-type DE summary (volcano or top-genes table). Add an integration before/after pair if your dataset has multiple samples
+5. **Discussion (½ page)** — what surprised you; one limitation; one thing you'd do next if you had another month
+6. **Reproducibility appendix** — `sessionInfo()` output, link to your code (GitHub or Zenodo), data-availability statement following [Lecture 11 — FAIR](Lecture_Folder/Lecture_11_FAIR_DataSharing.html)
+
+Hand in the report **as a Quarto-rendered PDF or HTML**, with the source `.qmd` and the rendered output in a single `capstone_<lastname>/` folder.
+
+## Time budget
+
+::: incremental
+- **5–8 hours** — total realistic time for a student who has completed Tutorials 01–09
+- **2 hours** of that is the writeup, *not* the analysis
+- If your dataset takes more than \~3 hours of analysis time on a laptop, it's too big — pick a subset of cells or a smaller dataset
+:::
+
+## Picking a dataset
+
+The right dataset is one where you can **describe, in two sentences, the biological question** without using the word "single-cell". Three common starting points:
+
+### Option A — A published study near your own research interests
+
+Search [GEO](https://www.ncbi.nlm.nih.gov/geo/) or [CELLxGENE](https://cellxgene.cziscience.com/) for studies in your tissue / disease / model organism. Pick a *published* study (so you have a paper to compare your results against), with **fewer than 50,000 cells total** (so it runs on a laptop).
+
+::: callout-tip
+**The quick-search recipe.** On CELLxGENE, filter by your tissue + organism, sort by "publication date", pick a study with 10k–50k cells and a paper in *Nature Communications / Cell Reports / eLife* (those journals tend to share clean, reusable AnnData objects with author cell-type labels).
+:::
+
+### Option B — A SeuratData built-in
+
+Fast and laptop-safe. Several useful options:
+
+| Dataset | Cells | Conditions | What it teaches |
+|---|---|---|---|
+| `panc8` (8-method pancreas) | \~14k | 8 protocols × 1 tissue | Cross-protocol integration; method-effect vs biology |
+| `bmcite` (BM CITE-seq) | \~30k | 1 condition, RNA + ADT | CITE-seq; multi-modal reasoning |
+| `pbmcsca` (7 PBMC methods) | \~32k | 7 protocols | Strong batch-effect challenge |
+
+Install with `SeuratData::InstallData("<dataset>")`.
+
+### Option C — Your own lab's data
+
+If you have a published scRNA-seq dataset from your lab — or your PI is willing to give you a sample from a study in progress — that's the gold standard. Talk to your PI before downloading anything from a project that hasn't been published.
+
+::: callout-warning
+**For unpublished data**, get explicit permission, agree what counts as the deliverable (often a *de-identified* analysis), and include a data-availability statement explaining the embargo. Don't post unpublished data to a public Zenodo / GitHub.
+:::
+
+### Datasets that are NOT good capstone choices
+
+- A 1.5M-cell atlas — too big for laptop, the workflow won't finish in 5 hours
+- A dataset with no published paper — you have nothing to validate against
+- A dataset with no condition contrast — no way to demonstrate DE / DA
+- A dataset whose tissue you have no biological intuition for ("I picked the lung dataset because it sounds cool") — you won't be able to read your own cell-type calls
+
+## Suggested workflow (1-day version)
+
+A reasonable plan if you set aside a full day:
+
+| Hour | Step | Output |
+|---|---|---|
+| **1** | Download data; load into Seurat / SCE; first-pass QC plots; choose filter thresholds | `seu_qc.rds` |
+| **2** | Normalize, HVGs, scale, PCA, ElbowPlot; pick `n_pcs` | `seu_pca.rds` |
+| **3** | If multi-sample: integrate with Harmony; check before/after; run the diagnostics from Lecture 02 | `seu_integrated.rds` |
+| **4** | Cluster at 2–3 resolutions; pick one with `clustree`; UMAP | `seu_clustered.rds` |
+| **5** | Find markers; manual annotation against canonical panels for your tissue | `seu_annotated.rds` |
+| **6** | If you have a condition contrast: pseudobulk DE per cell type with DESeq2 | `de_results.csv` |
+| **7** | Functional analysis on the DE list (clusterProfiler GO/Reactome) | `enrichment.csv` + figures |
+| **8** | Writeup: methods, results, discussion, reproducibility | `capstone.qmd` rendered to PDF |
+
+If you don't have a multi-sample design, skip integration (hour 3) and DE/functional (hours 6–7) and instead do **reference-based annotation** with SingleR/Azimuth (Lecture 07 + Tutorial 09).
+
+## The first 30 minutes: do these *before* writing any analysis code
+
+::: incremental
+1. **Read the paper.** What was the experimental design? Sample sizes? Tissue? Disease? What did they conclude?
+2. **Download the metadata, not just the counts.** Look at every column. Do you understand what each metadata field means? If not, look it up before you start.
+3. **Open the dataset's CELLxGENE / atlas viewer** if it has one. Scroll the UMAP. Get a *visual* feel for what cell types are there before any code runs.
+4. **Decide on your contrast.** For most studies that's "condition vs control" or "disease vs healthy" or "treatment X vs Y". Write it down in one sentence.
+5. **Sanity-check the cell count.** If it's >50k, plan to subsample (`subset(seu, downsample = 5000)` works fine).
+:::
+
+## What "good" looks like
+
+A capstone report at the **competent grad student** bar:
+
+- The figures are readable: axes labeled, legends present, color schemes color-blind safe
+- The methods section is reproducible — someone reading it could re-do your analysis from your `.qmd`
+- Filter thresholds are *defended*, not just stated ("`percent.mt < 10` because the violin shows the QC tail at \~12%")
+- Cell-type labels are backed by ≥ 2 markers each, not just one
+- Surprises are flagged ("I expected to see a B-cell cluster but didn't; this is consistent with the paper's claim that B cells were depleted")
+- The reproducibility appendix shows package versions
+- The total page count is **4 pages**, not 12 — concise communication is itself part of the deliverable
+
+## Grading rubric (when used as a graded assignment)
+
+| Criterion | Weight | What we look for |
+|---|---:|---|
+| Methods reproducibility | 25% | Specific thresholds, parameters, tool versions; someone could re-run from your description |
+| QC + filter justification | 15% | Defensible thresholds, with a plot showing why |
+| Annotation defensibility | 20% | Multi-marker logic, cross-checked with reference annotation, surprise / uncertainty acknowledged |
+| Figure quality | 15% | Labeled axes, legends, color-blind palettes, no chart-junk |
+| Discussion + interpretation | 15% | Connects results to the biological question; flags one limitation; suggests one next step |
+| Reproducibility / code | 10% | Code in version control or rendered alongside; `sessionInfo()` included |
+
+## Submission and presentation
+
+For the **two-week format**, the capstone is presented in 5-minute student lightning talks on the final day, followed by a 1-week deadline to submit the written report.
+
+For the **term-long format**, capstone presentations occupy the final week; written reports are due 1 week after the last presentation.
+
+For **self-paced**, there's no formal submission — but write up the report anyway. The forcing function of writing is most of the learning.
+
+## Examples of past capstone projects
+
+(Examples are illustrative — adapt the level of ambition to your background.)
+
+- *"Identifying cell-type–specific responses to dexamethasone in airway smooth muscle"* — student combined the workshop's `airway` bulk dataset with a public scRNA-seq study from the same lab to compare bulk DE vs pseudobulk DE
+- *"Reconciling Azimuth and manual annotation on a published HNSCC dataset"* — student ran Tutorial 09 on a 30k-cell HNSCC tumor study, found 4 clusters where Azimuth and manual disagreed, dug into the markers, and reported on which 2 of the 4 disagreements were genuine reference-mismatch
+- *"miloR-detected exhaustion expansion in chronic LCMV infection"* — student took a published mouse-infection scRNA-seq dataset, applied the Tutorial 08 workflow, and recovered a known T-cell exhaustion expansion at higher resolution than the paper's cluster-level claim
+- *"Spatial gene programs in adult mouse hippocampus subregions"* — student worked through Tutorial 12 on `stxBrain`, then redid the analysis on a different Visium hippocampus section (different paper) and compared the spatially variable gene lists
+
+## See also
+
+- [Methods-section template](Resources_Folder/Appendix_J_Methods_Template.html) — adapt for your report
+- [FAIR Lecture 11](Lecture_Folder/Lecture_11_FAIR_DataSharing.html) + [Tutorial 13](Exercise_Folder/Tutorial_13_FAIR_Metadata.html) — for the data-availability section
+- [Statistical Foundations (Appendix I)](Resources_Folder/Appendix_I_Statistical_Foundations.html) — reference for the stats you'll be using
+- [Glossary](Resources_Folder/Glossary.html) — for terms you need to use carefully

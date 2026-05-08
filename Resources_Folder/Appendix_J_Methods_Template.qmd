@@ -1,0 +1,219 @@
+---
+title: "Appendix J: Methods Section Template for an scRNA-seq Paper"
+subtitle: "Annotated boilerplate you can copy, adapt, and defend"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+editor: visual
+---
+
+A reviewer who knows the field can read your methods section and tell, in two paragraphs, whether your analysis is reproducible. This appendix is a template that — if you fill in every blank — produces a methods section a careful reviewer will be happy with.
+
+::: callout-tip
+**How to use this.** Copy the template below into your manuscript draft. Replace the `{{ angle-bracketed }}` placeholders. **Delete the explanatory comments** before submission (they appear in the rendered version below, in italics). Keep the bullet points short and specific.
+:::
+
+# Why a strong methods section matters
+
+A grad student's first scRNA-seq paper gets reviewed by people who've read 200 of these. They have a fast checklist:
+
+::: incremental
+1. Did you specify Cell Ranger version, reference, and chemistry?
+2. Did you give *numerical* QC thresholds (not just "we filtered low-quality cells")?
+3. Did you state how many PCs you used and how you chose?
+4. Did you specify integration method *and* parameters?
+5. Did you specify the DE method, contrast direction, and FDR threshold?
+6. Are the data and code available with stable identifiers?
+7. Are software versions pinned?
+:::
+
+A methods section that answers all seven in plain text is reproducible. One that's vague on any of them earns a "needs revision".
+
+---
+
+# Methods template — copy this
+
+The block below is the template. Each numbered subsection corresponds to the workshop's lectures. The `{{ ... }}` markers are placeholders to fill in.
+
+::: callout-note
+The **italic notes** under each subsection in this rendered page explain what to fill in. **Delete those notes** when you copy the template into your manuscript.
+:::
+
+---
+
+## Sample collection and 10x library preparation
+
+> Single-cell RNA-seq libraries were prepared from `{{ tissue / cell type }}` samples obtained from `{{ N }}` donors (`{{ N_treated }}` treated, `{{ N_control }}` control; demographics in Supplementary Table `{{ X }}`). Tissue was dissociated using `{{ dissociation protocol — e.g. "the Miltenyi Tumor Dissociation Kit per manufacturer protocol" }}`, viability assessed by `{{ method }}` (median viability `{{ X }}%`), and cells loaded onto a `{{ instrument — e.g. "10x Chromium controller (10x Genomics)" }}` targeting `{{ N }}` cells per channel. Single Cell 3' v`{{ chemistry version, e.g. "3.1" }}` chemistry libraries were prepared per manufacturer protocol and sequenced on an `{{ sequencer — e.g. "Illumina NovaSeq 6000" }}` to a target depth of `{{ N }}` reads per cell. `{{ Optional CMO multiplexing details }}`.
+
+*Why every blank matters: dissociation protocol affects which cell types survive; chemistry version (3' v3 vs v3.1) affects gene-detection sensitivity; sequencing depth determines what you can call. The donor demographics block deflects "did you balance for sex / age?" reviewer questions.*
+
+## Read alignment and feature counting
+
+> Raw sequencing reads (BCL files) were converted to FASTQ using `cellranger mkfastq` (10x Genomics, v`{{ X.Y.Z }}`). Reads were aligned to the `{{ genome — e.g. "GRCh38" }}` reference (`refdata-gex-`{{ X-Y-Z }}`, 10x Genomics) and feature counted using `cellranger count` (v`{{ X.Y.Z }}`) with default parameters except `{{ any non-defaults — e.g. "--include-introns true" }}`. The filtered feature-barcode matrices (Cell Ranger empty-droplet calling) were used for downstream analysis.
+
+*This block is non-negotiable. Cell Ranger version + reference + chemistry change every release; not citing them makes the analysis irreproducible.*
+
+## Quality control and ambient-RNA correction
+
+> Ambient RNA contamination was estimated and removed using `SoupX` (v`{{ X.Y.Z }}`); the contamination fraction (rho) ranged from `{{ X.XX }}` to `{{ Y.YY }}` across samples. Doublets were called using `scDblFinder` (v`{{ X.Y.Z }}`) run per sample, and `{{ N }} %` of barcodes were classified as doublets and removed. Cells were further filtered to require `{{ N1 }}` < `nFeature_RNA` < `{{ N2 }}` and `percent.mt` < `{{ N }}`%; thresholds were chosen by inspection of per-sample QC distributions (Supplementary Fig. `{{ X }}`). After filtering, `{{ N }}` cells remained for downstream analysis (`{{ X }}%` of input).
+
+*Reviewers want the actual numbers. Generic "low-quality cells were removed" is a red flag.*
+
+## Normalization and feature selection
+
+> Counts were normalized using Seurat's `NormalizeData` (default `LogNormalize`, scale.factor = 10,000). The top `{{ 2000 }}` highly variable genes were selected using `FindVariableFeatures` with the `vst` method. Variable genes were `z`-score scaled across cells using `ScaleData` `{{ with / without }}` regression of `{{ percent.mt / cell-cycle scores / nCount_RNA — list any covariates regressed }}`.
+
+*Or, if SCTransform: "Counts were normalized using `SCTransform` with `{{ N }}` variable genes and `{{ percent.mt }}` regressed out."*
+
+## Dimensionality reduction and clustering
+
+> Principal component analysis was run on the scaled HVG matrix; the first `{{ N_PCs }}` PCs were used for downstream analysis based on inspection of the elbow plot. A shared-nearest-neighbor graph was constructed on the PCA reduction using `FindNeighbors` (`k = `{{ 20 }}`)`, and clusters were called by Leiden community detection (`FindClusters`, algorithm = 4) at resolution `{{ 0.5 }}`. UMAP embedding was computed using `RunUMAP` on the same `{{ N_PCs }}` PCs with `n.neighbors = `{{ 30 }}` and `min.dist = `{{ 0.3 }}`.
+
+*The exact resolution + neighbors + min.dist let a reader reproduce the UMAP and cluster solution. Without them, your figure is a polaroid.*
+
+## Multi-sample integration
+
+`{{ Use this section if you integrated across samples / batches / donors }}`
+
+> To remove sample-of-origin variation while preserving cell-type structure, samples were integrated using `Harmony` (v`{{ X.Y.Z }}`; `{{ Korsunsky et al. 2019 }}`) with `{{ "stim" / batch ID }}` as the grouping variable. Default Harmony parameters were used except `{{ list non-defaults }}`. Integration quality was assessed by (i) visual inspection of the post-integration UMAP colored by sample and by author cell-type label; (ii) confirmation that a known biological signal (`{{ ISG score / cell-cycle / disease score }}`) remained higher in `{{ STIM / treated }}` than `{{ CTRL / control }}` within each cell type, indicating no over-correction.
+
+*Or, for Seurat anchors: "Integration was performed using Seurat's CCA-based anchor workflow (`FindIntegrationAnchors`, dims = 1:`{{ 20 }}`; `IntegrateData`)."*
+
+*Naming the over-correction diagnostic — and reporting it survived — is what separates a credible integration claim from a hand-wavy one.*
+
+## Cell-type annotation
+
+> Clusters were annotated by manual inspection of canonical lineage markers (CD14, LYZ, MS4A1, CD79A, CD8A, GNLY, ...). Where automatic annotation was used, predictions from `SingleR` (v`{{ X.Y.Z }}`) against `{{ celldex::HumanPrimaryCellAtlasData() }}` and Azimuth (v`{{ X.Y.Z }}`) against the `{{ pbmcref }}` reference were obtained, and a final consensus label was assigned where ≥ 2 of {manual, SingleR, Azimuth} agreed. Disagreements were resolved by inspecting cluster-specific markers (Supplementary Table `{{ X }}`).
+
+*Multi-method consensus is the modern standard. A single annotation method is no longer sufficient for atlas-quality work.*
+
+## Differential expression analysis
+
+> Condition-level differential expression was performed using a **pseudobulk** approach. For each cell type, raw UMI counts were aggregated per (donor, condition) using `Seurat::AggregateExpression`. Aggregated samples with fewer than `{{ 10 }}` cells were excluded. `DESeq2` (v`{{ X.Y.Z }}`; Love et al. 2014) was fit per cell type with the design `~ `{{ donor + condition / condition }}`. The `condition_`{{ STIM / treatment }}`_vs_`{{ CTRL / control }}` coefficient was tested by Wald test, and log-fold-changes were shrunk using `apeglm` (Zhu et al. 2019). Genes with Benjamini-Hochberg-adjusted `p_adj < 0.05` and `|log_2 FC| > `{{ 1 }}` were considered significant.
+
+*The `~ donor + condition` form is the right design when donors are paired across conditions. If they're not, just `~ condition` — but say so. Reviewers will ask.*
+
+## Functional enrichment
+
+`{{ Use this section if you ran functional analysis on DE results }}`
+
+> Gene-set enrichment analysis was performed per cell type using `clusterProfiler` (v`{{ X.Y.Z }}`; Yu et al. 2012) and `ReactomePA`. For ORA, significant DE genes (`padj < 0.05`, `|log_2 FC| > {{ 1 }}`) were tested against (i) GO Biological Process, (ii) Reactome pathways, and (iii) MSigDB Hallmark gene sets, with the universe set to all genes tested by DESeq2 for that cell type. For GSEA, the full ranked list of `log_2 FC` (signed by direction) was used. Multiple-testing correction was applied with Benjamini-Hochberg per database; terms with `q < 0.05` were reported.
+
+## Differential abundance analysis
+
+`{{ Use this section if you ran miloR or scCODA }}`
+
+> Compositional shifts in cell-type proportions across conditions were tested using `miloR` (v`{{ X.Y.Z }}`; Dann et al. 2022). A k-nearest-neighbor graph was constructed on the integrated `{{ Harmony }}` reduction (`buildGraph`, k = `{{ 30 }}`, d = `{{ 20 }}`). Approximately `{{ 1000 }}` overlapping neighborhoods were sampled (`makeNhoods`, prop = 0.1, refined = TRUE). Cell counts per (sample × neighborhood) were tested for differential abundance using a negative-binomial GLM with the design `~ `{{ donor + condition }}`, with neighborhood-level `p`-values controlled by `SpatialFDR < 0.1`.
+
+## Spatial transcriptomics
+
+`{{ Use this section if Visium / Xenium / etc. }}`
+
+> Visium spatial transcriptomics data were processed with `spaceranger count` (10x Genomics, v`{{ X.Y.Z }}`) against the `{{ GRCh38 }}` reference. Spot-level expression was normalized using `SCTransform` (Seurat). Clustering was performed via `RunPCA` (npcs = `{{ 30 }}`), `FindNeighbors`, and `FindClusters` (resolution = `{{ 0.5 }}`). Spatially variable features were identified using `FindSpatiallyVariableFeatures` with the `moransi` selection method on the top `{{ 1000 }}` highly variable genes. Cell-type proportions per spot were estimated by deconvolution against `{{ atlas / reference }}` using `{{ spacexr / RCTD / cell2location }}` (v`{{ X.Y.Z }}`).
+
+## Software and reproducibility
+
+> All analyses were performed in R (v`{{ 4.4.X }}`; R Core Team) with Seurat (v`{{ 5.X.X }}`), DESeq2 (v`{{ X.Y.Z }}`), Harmony (v`{{ X.Y.Z }}`), `clusterProfiler` (v`{{ X.Y.Z }}`), `miloR` (v`{{ X.Y.Z }}`), and the Bioconductor stack version `{{ X.Y }}`. Analysis code is available at `{{ GitHub URL or Zenodo DOI }}` and the exact computational environment is captured in `renv.lock` (v`{{ X.Y.Z }}` of `renv`). Random seeds were set at the start of each analysis script (`set.seed(2026)`) and the `RNG version` was `{{ 4.4.X }}`.
+
+*The `set.seed` + `RNGversion` combination is what makes UMAP / clustering / shrinkage outputs literally reproducible. Without it, two runs of the same code produce slightly different cluster numbers.*
+
+## Data availability
+
+> Raw sequencing reads have been deposited at the NCBI Sequence Read Archive under BioProject `{{ PRJNA}}{{ ###### }}`. Processed gene-expression matrices and per-cell metadata are available at the Gene Expression Omnibus under accession `{{ GSE }}{{ ###### }}`. An annotated AnnData object conforming to the CELLxGENE Discover schema is available at `{{ https://cellxgene.cziscience.com/<dataset-slug> }}`. All analysis code, lab-internal metadata sheets, and the `renv` lockfile are at `{{ GitHub URL }}`. Pre-rendered analysis notebooks (HTML) are at `{{ GitHub Pages URL }}`.
+
+*A complete data-availability statement contains both **raw data** (SRA/ENA), **processed** (GEO), **annotated** (CELLxGENE/HCA), and **code**. See [Lecture 11 — FAIR](../Lecture_Folder/Lecture_11_FAIR_DataSharing.html) for the full submission workflow.*
+
+---
+
+# Reproducibility checklist (one-page)
+
+Print this page out and tape it to your monitor while writing methods. If you can't fill in any of the blanks, you have a hole in your analysis — find it and close it.
+
+| Item | Filled? |
+|---|---|
+| Cell Ranger version | ☐ |
+| Reference genome version | ☐ |
+| Chemistry (3' v2 / v3 / v3.1 / 5' / multiome) | ☐ |
+| Sequencing depth (reads per cell) | ☐ |
+| Dissociation protocol | ☐ |
+| `nCount` filter — both bounds | ☐ |
+| `nFeature` filter — both bounds | ☐ |
+| `percent.mt` filter | ☐ |
+| Doublet detection method | ☐ |
+| Ambient-RNA correction method | ☐ |
+| Normalization method (Log / SCT) | ☐ |
+| Number of HVGs | ☐ |
+| Number of PCs used | ☐ |
+| `FindNeighbors` k | ☐ |
+| Clustering algorithm (Leiden / Louvain) | ☐ |
+| Clustering resolution | ☐ |
+| UMAP `n.neighbors` and `min.dist` | ☐ |
+| Integration method | ☐ |
+| Integration covariate | ☐ |
+| Integration over-correction diagnostic | ☐ |
+| Annotation method(s) | ☐ |
+| DE method (DESeq2 / edgeR / etc.) | ☐ |
+| DE design formula | ☐ |
+| LFC shrinkage method | ☐ |
+| FDR threshold | ☐ |
+| LFC threshold | ☐ |
+| Cells-per-pseudobulk filter | ☐ |
+| GSEA / ORA databases used | ☐ |
+| Random seed | ☐ |
+| All package versions | ☐ |
+| Code availability URL + DOI | ☐ |
+| Data accessions (BioProject / GEO / CELLxGENE) | ☐ |
+
+---
+
+# Specific phrasing pitfalls to avoid
+
+::: incremental
+- **"Cells were filtered for quality."** No numerical thresholds. Bad.
+- **"Standard parameters were used."** Standard *for which version* of *which package*? Usually means "I forget".
+- **"Integration was performed."** Which method? With what covariate?
+- **"Differential expression was performed using `FindMarkers`."** This is per-cell DE, which is anti-conservative for condition contrasts. If your contrast is between conditions / donors, this sentence will draw a reviewer's red pen. Use pseudobulk + DESeq2 instead, or specifically explain why per-cell was appropriate (e.g. you're comparing clusters within one donor, not conditions).
+- **"All available cells were used."** No filter? No sense of total / passed. Usually means you didn't QC seriously.
+- **Citing an old Seurat version (v3.1 / v4.0) when v5+ is current**, without explanation. Either upgrade or justify.
+:::
+
+# Worked example
+
+Here's the same Methods section as above, **filled in** for the workshop's `ifnb` analysis:
+
+> *Sample collection.* Single-cell RNA-seq data were obtained from a published study (Kang et al. 2017, *Nat Biotechnol*; GSE96583), comprising peripheral blood mononuclear cells from 8 lupus donors (4 control vs 4 IFN-β-stimulated, donor-paired) prepared on the 10x Chromium Single Cell 3' v1 chemistry.
+>
+> *Read alignment and feature counting.* Counts were obtained as published (the `ifnb` distribution in `SeuratData`). The reference matrix used the GRCh38 annotation as provided by 10x Genomics.
+>
+> *Quality control.* Doublets were called using `scDblFinder` (v1.20.0) run per sample; 7.2% of barcodes were classified as doublets and removed. Cells were further filtered to require 200 < `nFeature_RNA` < 2,500 and `percent.mt` < 5%. After filtering, 13,876 cells remained for downstream analysis (99.1% of input). Ambient-RNA correction with SoupX was not performed because raw matrices were not available in the SeuratData distribution.
+>
+> *Normalization.* Counts were normalized using Seurat's `NormalizeData` (`LogNormalize`, scale.factor = 10,000). The top 2,000 highly variable genes were selected using `FindVariableFeatures` (`vst` method). Variable genes were `z`-score scaled using `ScaleData` without covariate regression.
+>
+> *Dimensionality reduction and clustering.* PCA was run on the scaled HVG matrix; the first 20 PCs were used for downstream analysis based on inspection of the elbow plot. A shared-nearest-neighbor graph was constructed (`FindNeighbors`, k = 20); Leiden clustering was performed at resolution 0.5. UMAP embedding used the same 20 PCs with `n.neighbors = 30` and `min.dist = 0.3`.
+>
+> *Multi-sample integration.* CTRL and STIM samples were integrated using Harmony (v1.2.0) with `stim` as the grouping variable, default parameters. Integration was assessed by post-integration UMAP coloring by `stim` and `seurat_annotations` (the published cell-type labels). A panel of interferon-stimulated genes (`ISG15, IFI6, IFIT1, IFIT3, MX1, OAS1, RSAD2, ISG20, IFIT2`) was scored per cell using `AddModuleScore`; STIM cells maintained higher scores than CTRL cells within every cell type, confirming no over-correction.
+>
+> *Cell-type annotation.* Clusters were annotated against canonical PBMC markers (CD14, LYZ, FCGR3A, MS4A1, CD79A, IL7R, CCR7, S100A4, CD8A, GZMK, GNLY, NKG7, FCER1A, CST3); reference-based predictions from SingleR (v2.6.0) against `celldex::HumanPrimaryCellAtlasData()` and Azimuth (v0.5.0) against `pbmcref` were obtained for cross-validation, with > 92% agreement against manual labels.
+>
+> *Differential expression.* Pseudobulk DE was performed by aggregating counts per (donor, condition) using `Seurat::AggregateExpression`. Aggregated samples with fewer than 10 cells were excluded. `DESeq2` (v1.44.0) was fit per cell type with the design `~ donor + stim`. The `stim_STIM_vs_CTRL` coefficient was tested (Wald), and log-fold-changes were shrunk using `apeglm` (v1.26.0). Genes with `padj < 0.05` and `|log_2 FC| > 1` were considered significant.
+>
+> *Software.* All analyses were performed in R 4.4.0 with Seurat 5.1.0, DESeq2 1.44.0, Harmony 1.2.0, `clusterProfiler` 4.12.0, and the Bioconductor 3.19 release. Analysis code is at https://github.com/{{ user }}/{{ repo }}/, with the exact environment captured in `renv.lock` (renv 1.0.7). The seed `2026` was set at the start of every analysis script.
+>
+> *Data availability.* All data are from publicly available sources (GSE96583, Kang et al. 2017). Analysis code, intermediate `.rds` files, and the Quarto-rendered analysis notebooks are at https://github.com/{{ user }}/{{ repo }}/.
+
+That's \~1 page of text and meets every point on the reproducibility checklist.
+
+---
+
+## See also
+
+- [Lecture 11 — FAIR Principles & Data Sharing](../Lecture_Folder/Lecture_11_FAIR_DataSharing.html) — the *why* behind data availability statements
+- [Tutorial 13 — FAIR Metadata & Submission](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html) — produces the BioSample / SRA / GEO / CELLxGENE metadata referenced in the data-availability paragraph
+- [Compute Environments](../Compute_Environments.html) — for the renv lockfile and Docker / Apptainer details cited in the software paragraph
+- [Capstone Mini-Project](../Capstone.html) — adapt this template for your capstone report

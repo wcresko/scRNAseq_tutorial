@@ -1,0 +1,365 @@
+---
+title: "Appendix I: Statistical Foundations for scRNA-seq"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: true
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse); library(knitr)
+theme_set(theme_minimal(base_size = 13)); set.seed(2026)
+```
+
+This appendix is a working reference for the statistics actually used by the workshop's lectures and tutorials. It assumes a beginning grad student who took an undergraduate stats course — distributions, regression, p-values — but has rust on the specifics.
+
+::: callout-tip
+**Goal of this appendix.** You should be able to read Lecture 04 (Pseudobulk DE) and recognize every term used: "negative binomial", "size factors", "shrinkage", "BH correction", "log-fold-change", "design matrix". This is the appendix that gets you there.
+:::
+
+# 1. Counts, distributions, and why we need them
+
+scRNA-seq data are **integer counts**. Counts are *not* continuous — you can't have 4.7 UMIs of a gene. So the standard Normal-distribution toolkit (t-tests, linear regression on the raw counts) doesn't apply directly. We need distributions defined on integers.
+
+## The Poisson distribution — counts under "perfect" sampling
+
+If a cell has $\mu$ true molecules of gene X and we sample uniformly, the count we observe follows a **Poisson** distribution:
+
+$$P(K = k) = \frac{e^{-\mu}\mu^k}{k!}$$
+
+Key Poisson facts:
+
+::: incremental
+- Mean = $\mu$
+- **Variance = $\mu$** (variance equals the mean — the defining property)
+- Two parameters? No. Just one: $\mu$
+:::
+
+```{r}
+#| label: poisson-vs-nb
+#| echo: false
+#| fig-width: 9
+#| fig-height: 3.5
+
+set.seed(2026)
+# Simulate: gene with mean expression = 5 across many cells
+n <- 4000
+poisson_counts <- rpois(n, lambda = 5)
+
+# Negative binomial with same mean but added "biological" variance (size = 2)
+nb_counts <- rnbinom(n, mu = 5, size = 2)
+
+dat <- bind_rows(
+  tibble(distribution = "Poisson", count = poisson_counts,
+         label = paste0("Poisson(μ=5)  mean=", round(mean(poisson_counts),2),
+                         "  var=", round(var(poisson_counts), 2))),
+  tibble(distribution = "Negative binomial", count = nb_counts,
+         label = paste0("NB(μ=5, size=2)  mean=", round(mean(nb_counts),2),
+                         "  var=", round(var(nb_counts), 2)))
+)
+
+ggplot(dat, aes(count, fill = distribution)) +
+  geom_histogram(binwidth = 1, color = "white") +
+  facet_wrap(~ label, scales = "free_y") +
+  scale_fill_manual(values = c("Poisson" = "#3498db",
+                                "Negative binomial" = "#c0392b"),
+                     guide = "none") +
+  labs(title = "Poisson vs Negative Binomial — same mean, different variance",
+       x = "Observed count per cell", y = "Number of cells") +
+  theme(strip.text = element_text(face = "bold"))
+```
+
+The Poisson is what you'd get if every cell with the same "mean" had counts that *only* varied because of sampling noise. **Real RNA-seq data has more spread than Poisson predicts** — the variance is *bigger* than the mean. This is called **over-dispersion**.
+
+## The negative binomial — counts with biological + technical variance
+
+The **negative binomial (NB)** adds a second parameter to handle over-dispersion. With mean $\mu$ and dispersion $\phi$, its variance is:
+
+$$\text{Var}(K) = \mu + \frac{\mu^2}{\phi}$$
+
+Two helpful intuitions:
+
+::: incremental
+- As $\phi \to \infty$, variance → $\mu$ — NB collapses back to Poisson
+- For finite $\phi$, variance is **larger** than mean. The smaller $\phi$, the more over-dispersion
+- DESeq2's `dispersion` parameter is essentially $1/\phi$ — bigger DESeq2 dispersion = more over-dispersed
+:::
+
+::: callout-tip
+**The single most important fact about scRNA-seq distributions.** UMI counts are over-dispersed. Always. Tools that assume Poisson (very few do; Naïve t-tests definitely don't even assume that) underestimate the variance and produce **anti-conservative p-values** — false positives. The negative binomial is the right default.
+:::
+
+# 2. Mean-variance relationships
+
+If you plot **log(variance)** vs **log(mean)** for every gene in a real RNA-seq dataset, you don't see a flat line — you see a structured curve.
+
+```{r}
+#| label: mean-variance
+#| echo: false
+#| fig-width: 7
+#| fig-height: 4
+
+set.seed(2026)
+n_genes <- 6000
+gene_means <- 10^runif(n_genes, -1, 3)   # log10-uniform from 0.1 to 1000
+# Simulate per-gene NB variance
+gene_phi <- 100 / (gene_means + 1)  # smaller phi for higher means -> typical mean-variance
+gene_var  <- gene_means + (gene_means^2) / pmax(gene_phi, 0.5)
+
+dat <- tibble(mean_expr = gene_means, var_expr = gene_var)
+
+ggplot(dat, aes(mean_expr, var_expr)) +
+  geom_point(alpha = 0.2, size = 0.7, color = "#34495e") +
+  geom_abline(slope = 1, intercept = 0, color = "#3498db", linewidth = 0.6, linetype = 2) +
+  geom_smooth(method = "loess", color = "#c0392b", se = FALSE) +
+  scale_x_log10() + scale_y_log10() +
+  labs(title    = "Mean-variance relationship — typical RNA-seq",
+       subtitle = "Blue dashed = Poisson (var = mean); red = real (over-dispersed)",
+       x = "Per-gene mean expression (log10)",
+       y = "Per-gene variance (log10)")
+```
+
+Key observations:
+
+::: incremental
+- The Poisson line (variance = mean, blue dashed) is the **lower bound**. Real genes are at or above it
+- Low-mean genes are roughly Poisson; high-mean genes have far more variance than Poisson predicts. That's the over-dispersion
+- DESeq2 / edgeR / limma-voom **fit a curve to this relationship** to estimate per-gene dispersion. They use the curve as a prior to **shrink** noisy single-gene estimates toward the trend
+:::
+
+This is why those tools work better than per-gene Wald tests for low-count datasets: they borrow strength across genes.
+
+# 3. Normalization
+
+Each cell has a different total UMI count (its **library size** or **sequencing depth**). A cell with 20,000 UMIs across all genes will have larger gene-level counts than a cell with 5,000 UMIs, even if the cells have identical biology. Normalization removes this technical variance.
+
+## Size-factor normalization (DESeq2 / edgeR)
+
+For each cell $j$, compute a **size factor** $s_j$ that scales away differences in total depth. Then the normalized count is:
+
+$$\tilde y_{ij} = \frac{y_{ij}}{s_j}$$
+
+DESeq2's "median of ratios" estimator is the standard. The crucial property: it's **robust** — a few highly-expressed genes don't dominate the size factor.
+
+## Log-normalization (Seurat default)
+
+Seurat's `NormalizeData()` does:
+
+$$\tilde y_{ij} = \log_2\left(\frac{y_{ij}}{C_j} \cdot 10000 + 1\right)$$
+
+where $C_j$ is the cell's total UMI count. This is "log of CPM-like" — and the `+1` keeps zeros mapping to zero (otherwise `log(0)` is undefined).
+
+## SCTransform — variance-stabilizing transform
+
+`SCTransform()` fits a per-gene NB regression on the raw counts as a function of cell depth, then uses the **Pearson residuals** as the normalized values. The residuals have approximately constant variance across the mean-expression range, which makes downstream PCA / clustering more stable.
+
+::: callout-tip
+**Which normalization to use?** Seurat's `NormalizeData` is the default for tutorials and works fine. `SCTransform` is the recommended for low-count datasets and for spatial (Visium spots span 1–10 cells, larger dynamic range). DESeq2's size-factor normalization is what you use for **pseudobulk DE** (Tutorial 06). All three are different choices for different stages.
+:::
+
+# 4. The design matrix and linear models
+
+When DESeq2 runs `~ condition` or `~ donor + condition`, it's fitting a **generalized linear model (GLM)** with a negative-binomial likelihood:
+
+$$\log(\mu_{ij}) = X_j^\top \beta_i$$
+
+where:
+
+::: incremental
+- $\mu_{ij}$ is the expected count of gene $i$ in sample $j$
+- $X_j$ is the **design matrix row** for sample $j$ — encodes "which condition is this?", "which donor?", "what's the batch?"
+- $\beta_i$ is the per-gene coefficient vector — what we want to estimate
+:::
+
+For `~ condition` with two levels (`CTRL`, `STIM`), $X_j$ is a 2-column matrix:
+
+```{r}
+#| label: design-matrix
+#| echo: false
+sample_df <- tibble(
+  sample_id = c("CTRL_1","CTRL_2","CTRL_3","CTRL_4","STIM_1","STIM_2","STIM_3","STIM_4"),
+  condition = c("CTRL","CTRL","CTRL","CTRL","STIM","STIM","STIM","STIM")
+)
+mm <- model.matrix(~ condition, data = sample_df)
+cbind(sample_df, as_tibble(mm)) |> kable()
+```
+
+The `(Intercept)` column is all 1s; the `conditionSTIM` column is 0 for CTRL and 1 for STIM. The fitted $\beta$ for the `conditionSTIM` coefficient is the **log-fold-change** of STIM vs CTRL, *on the natural log scale*.
+
+::: callout-warning
+**`log2FoldChange` vs `log_2`-coefficient**. DESeq2 reports `log2FoldChange` (base-2 logarithm); your $\beta$ from `glm()` is on the natural-log scale. Multiply by $1/\ln 2 \approx 1.44$ to convert. DESeq2 handles this automatically — but if you ever fit a GLM yourself, watch the units.
+:::
+
+# 5. Hypothesis testing — Wald, LRT, p-values
+
+DESeq2's default is the **Wald test** for each coefficient:
+
+$$z = \frac{\hat\beta - 0}{\hat{SE}(\hat\beta)}$$
+
+If the model is correct and the coefficient is truly zero, $z$ is approximately standard normal. Most pipelines convert to a p-value via the normal distribution.
+
+A more powerful (but slower) alternative is the **likelihood ratio test (LRT)**: fit the full model with `~ donor + condition`, fit a reduced model with `~ donor`, and compare their likelihoods. Useful for testing whether *all* levels of a factor matter, not just one.
+
+## What p-values mean (and don't mean)
+
+::: incremental
+- A p-value is the probability of seeing a result *at least this extreme* if the null hypothesis is true. Period.
+- **Not** the probability the null is true given the data
+- **Not** the probability you'd get the same result on replication
+- A small p-value tells you the data are unlikely under the null. It tells you nothing about the magnitude of the effect — that's what `log2FoldChange` is for
+:::
+
+# 6. The multiple-testing problem and FDR
+
+If you test 10,000 genes at $\alpha = 0.05$ and the null is true for all of them, you'd expect 500 false positives by chance. That's unusable.
+
+The fix is **multiple-testing correction**. The two main approaches:
+
+| Method | Controls | Strictness |
+|---|---|---|
+| **Bonferroni** | Family-wise error rate (FWER) — probability of *any* false positive across all tests | Very strict — divide $\alpha$ by the number of tests |
+| **Benjamini-Hochberg (BH)** | False discovery rate (FDR) — expected fraction of "significant" hits that are false positives | Less strict — controls the *proportion* of false positives among rejections |
+
+DESeq2's `padj` column is the BH-corrected p-value. **Filter on `padj < 0.05` to control FDR at 5%**, meaning you accept that \~5% of your hits will be false positives.
+
+::: callout-tip
+**The intuition for FDR.** If your DE list has 200 genes at `padj < 0.05`, expect about 10 to be wrong. That's usually a fine bargain. Bonferroni would let you keep maybe 20 with rock-solid certainty — much more conservative, and most often more conservative than what biology requires.
+:::
+
+# 7. Shrinkage and why it matters
+
+A gene with `baseMean = 2` has very few reads to estimate effect size from. Its raw `log2FoldChange` is enormous and noisy — totally driven by sampling luck. If you sort by raw LFC, you get a top-10 list of garbage low-count genes.
+
+**Shrinkage** pulls noisy estimates toward a common prior:
+
+$$\beta_{shrunk} = w \cdot \beta_{raw} + (1 - w) \cdot 0$$
+
+where $w$ depends on how confident the estimate is. High-count, high-confidence genes barely shrink; low-count, noisy genes shrink toward zero.
+
+```{r}
+#| label: shrinkage-cartoon
+#| echo: false
+#| fig-width: 8
+#| fig-height: 4
+
+set.seed(2026)
+n <- 600
+mean_expr <- 10^runif(n, -1, 3)
+true_lfc <- rnorm(n, 0, 0.4); true_lfc[1:30] <- rnorm(30, 2.5, 0.3)
+# raw LFC is true + sampling noise; noise scales as 1/sqrt(mean_expr)
+raw_lfc <- true_lfc + rnorm(n, 0, 1/sqrt(mean_expr) * 2)
+# shrunk LFC pulls toward 0 weighted by confidence
+shrink <- 1 - 1 / (1 + 0.5 * sqrt(mean_expr))
+shrunk_lfc <- raw_lfc * shrink
+
+dat <- tibble(mean_expr, raw = raw_lfc, shrunk = shrunk_lfc) |>
+  pivot_longer(c(raw, shrunk), names_to = "estimate", values_to = "lfc")
+dat$estimate <- factor(dat$estimate, levels = c("raw","shrunk"),
+                        labels = c("Raw log2FC (noisy)", "Shrunk log2FC (apeglm)"))
+
+ggplot(dat, aes(mean_expr, lfc)) +
+  geom_point(alpha = 0.4, size = 0.8, color = "#34495e") +
+  facet_wrap(~ estimate) +
+  geom_hline(yintercept = 0, color = "grey50", linetype = 2) +
+  scale_x_log10() +
+  labs(title = "LFC shrinkage: noisy low-count genes pulled toward zero",
+       x = "baseMean (log10)", y = "log2 fold-change")
+```
+
+Key tools:
+
+::: incremental
+- **`apeglm`** — DESeq2's recommended shrinkage estimator (Zhu *et al.* 2019). The default for `lfcShrink()`
+- **`ashr`** — adaptive shrinkage. Also good. Sometimes more shrinkage on weak signals
+- **`normal`** — DESeq2's older shrinkage. Don't use unless the others fail
+:::
+
+::: callout-tip
+**Always shrink LFCs before ranking or making volcano plots.** Otherwise your "top hits" are dominated by low-count noise. `lfcShrink()` is one extra line of code.
+:::
+
+# 8. Why per-cell tests are wrong for condition contrasts
+
+This is the single most-violated rule in scRNA-seq.
+
+The setup: you have 4 donors per condition (treated vs control), each contributing \~3,000 cells to the analysis. Total: 24,000 cells. You want to know which genes change with treatment in `CD14 Mono` cells.
+
+**Wrong:** subset to the `CD14 Mono` cluster, run `FindMarkers(..., ident.1 = "treated", ident.2 = "control")` on the per-cell counts. The Wilcoxon test treats each cell as an independent observation. With 6,000 cells per group, **everything looks significant** — you'll get 5,000 "significant" hits.
+
+**Why wrong:** cells from the same donor are *not* independent. They share genetics, dissociation batch, library prep, and so on. The number of independent biological replicates is the **number of donors**, not the number of cells. Treating cells as independent inflates the effective sample size by \~1000× and produces anti-conservative p-values.
+
+**Right:** sum the per-cell counts to get a (donor × condition) **pseudobulk** matrix — 8 columns, one per donor. Run DESeq2 on the pseudobulk with `~ condition`. With $N = 8$, the test is honest.
+
+::: callout-important
+**Per-cell tests are fine for *exploratory marker discovery*** (e.g. "what's a marker for cluster 7?") because you're not making a condition claim — you're just listing genes that distinguish a cluster. They are **not** valid for condition contrasts, period. See Squair *et al.* 2021 for the empirical demonstration.
+:::
+
+# 9. Variance partitioning — what does "explained" mean?
+
+Concept that comes up in PCA, batch-effect diagnostics, and integration metrics.
+
+**Total variance** of a dataset can be decomposed into:
+
+$$\text{Var(total)} = \text{Var(biological)} + \text{Var(technical)} + \text{Var(noise)}$$
+
+Each PC explains some fraction of the total. The **scree plot** shows what fraction each PC explains. The **elbow** is where additional PCs stop explaining biology and start explaining noise.
+
+For integration: a "good" integrated reduction has biological variance preserved (cells of the same type cluster) and technical variance removed (cells from the same donor *don't* cluster). LISI / k-BET / silhouette scores quantify this trade-off.
+
+# 10. The Bayesian shadow on shrinkage
+
+DESeq2's shrinkage estimators are technically Bayesian. The "prior" is the fitted dispersion-vs-mean curve; each gene's per-gene estimate is the "data"; the shrunk estimate is the posterior mean.
+
+You don't need to think Bayesian to use DESeq2. But it helps to know that:
+
+::: incremental
+- The dispersion shrinkage is informed by *all* genes — the whole dataset is the prior
+- `apeglm` shrinks LFCs toward zero — its prior is "most genes don't change much"
+- A Bayesian framework is also why `padj = NA` for some genes — DESeq2 prunes genes whose data are insufficient to update the prior meaningfully
+:::
+
+If you want to dive in, the canonical text is Gelman, Carlin, Stern et al. (2013) *Bayesian Data Analysis*.
+
+# 11. Statistical literacy checklist
+
+You're stats-ready for the workshop if you can answer these without looking:
+
+::: incremental
+1. Why is the negative binomial used instead of Poisson for RNA-seq?
+2. What does a size factor do? Why does DESeq2 need one?
+3. What is `padj` adjusting for, and what does FDR mean?
+4. Why do we *shrink* log-fold-changes before ranking?
+5. Why is per-cell DE statistically wrong for condition contrasts?
+6. What is the difference between the Wald test and the LRT?
+7. What does "over-dispersion" mean numerically?
+:::
+
+If any of these are foggy, re-read the section and the answer becomes obvious.
+
+# 12. Going further
+
+- **Holmes & Huber** — *Modern Statistics for Modern Biology* — free online at <https://www.huber.embl.de/msmb/>. Chapters 3 (NB / Poisson), 6 (testing), 9 (clustering) are directly relevant
+- **Gelman, Hill, Vehtari** — *Regression and Other Stories* — for the regression / GLM mindset
+- **Wilks** — *Statistical Methods in the Atmospheric Sciences* — surprisingly good chapters on hypothesis testing for non-statisticians (chapter 5)
+- **Squair et al. 2021** — the canonical paper on why per-cell DE goes wrong, [doi:10.1038/s41467-021-25960-2](https://doi.org/10.1038/s41467-021-25960-2)
+- **Love, Huber & Anders 2014** — DESeq2 paper, [doi:10.1186/s13059-014-0550-8](https://doi.org/10.1186/s13059-014-0550-8)
+
+## See also
+
+- [Lecture 04 — Pseudobulk DE & DESeq2](../Lecture_Folder/Lecture_04_Pseudobulk_DE.html) — the workshop's primary applied DE lecture
+- [Tutorial 05 — DESeq2 Primer on `airway`](../Exercise_Folder/Tutorial_05_Primer_DESeq2_Basics.html) — bulk DESeq2 walkthrough
+- [Tutorial 06 — Pseudobulk DE](../Exercise_Folder/Tutorial_06_Pseudobulk_DE.html) — DESeq2 on pseudobulk single-cell counts
+- [Glossary](Glossary.html) — for definitions of FDR, dispersion, etc.
