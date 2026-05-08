@@ -106,6 +106,26 @@ By the end of this exercise you will be able to:
 **`CreateChromatinAssay` warns about "duplicate fragments"** — usually safe to ignore; happens when the same fragment is recorded under different cell barcodes. If the warning rate is high (> 5%), suspect a sample-mixing issue upstream.
 :::
 
+::: {.callout-tip title="When you need to liftOver — hg19 ↔ hg38"}
+If you ever need to bring a third-party peak set or annotation onto the build you're working on, do a coordinate **liftOver** with `rtracklayer` and a UCSC chain file. Don't try to remap by gene name — coordinate offsets between hg19 and hg38 are nontrivial.
+
+```r
+library(rtracklayer)
+
+# Load hg19 BED-style coordinates (chr, start, end)
+coords <- read.delim("data/peaks_hg19.bed", header = FALSE)
+names(coords) <- c("chromosome", "start", "end")
+gr <- GRanges(coords)
+
+# UCSC chain file: download once from
+# https://hgdownload.soe.ucsc.edu/goldenPath/hg19/liftOver/hg19ToHg38.over.chain.gz
+chain   <- import.chain("chain_files/hg19ToHg38.over.chain")
+results <- as.data.frame(liftOver(gr, chain))
+```
+
+A few coordinates may map to multiple intervals (or none) — `liftOver()` returns a `GRangesList`, so always check `lengths(results) == 1` before downstream filtering. The reverse direction uses `hg38ToHg19.over.chain`. Mouse equivalents: `mm9ToMm10`, `mm10ToMm39`.
+:::
+
 
 ::: {.callout-tip title="Solutions / instructor copy"}
 The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
@@ -442,8 +462,51 @@ saveRDS(pbmc, file = "../data/pbmc_atac_clustered.rds")
 -   **Motif enrichment** — use `chromVAR` or Signac's `RunChromVAR` for TF-motif activity per cell
 -   **Multi-modal integration** — integrate scRNA-seq + scATAC-seq from the same cells (multiome) using `FindTransferAnchors`
 
+### Stretch — motif enrichment with HOMER (alternative to chromVAR)
+
+Signac's `FindMotifs()` and `chromVAR` are the in-R toolchain. **HOMER** (`findMotifsGenome.pl`) is the classic command-line alternative — same question, very different stack. Useful when you want to share results with a collaborator who lives in HOMER, or when you want a known-motif `p`-value table without standing up `chromVAR`.
+
+The input HOMER expects is a tab-separated peak file with `chr / start / end / strand` columns. From your Signac peak set:
+
+```r
+peaks <- granges(pbmc[["peaks"]])
+df <- data.frame(
+  chr    = as.character(seqnames(peaks)),
+  start  = start(peaks),
+  end    = end(peaks),
+  strand = "+"
+)
+write.table(df, "results/peaks_homer.bed", quote = FALSE,
+            sep = "\t", row.names = FALSE, col.names = FALSE)
+```
+
+Then run HOMER from the shell:
+
+```bash
+# Background = all open regions; foreground = your peaks of interest
+findMotifsGenome.pl results/peaks_homer.bed hg19 results/homer_out -size 200
+
+# Locate instances of one motif inside the same peaks
+findMotifsGenome.pl results/peaks_homer.bed hg19 results/homer_out \
+    -find results/homer_out/knownResults/known1.motif \
+  > results/homer_motif_instances.txt
+
+# Or: annotate peaks with known motifs in a single pass
+annotatePeaks.pl results/peaks_homer.bed hg19 \
+    -m results/homer_out/knownResults/known1.motif \
+  > results/homer_motif_annotated.txt
+```
+
+::: callout-warning
+**HOMER's `-size` flag matters.** `-size 200` centres a 200 bp window on each peak — appropriate for ATAC-seq peaks (typically 500–1000 bp wide). For wider regions or full-peak coverage use `-size given`. See the [HOMER peakMotifs notes](http://homer.ucsd.edu/homer/ngs/peakMotifs.html).
+:::
+
+::: callout-tip
+**Genome assembly must match your peak coordinates.** This workshop's PBMC 10k v1 data is **hg19**, so use `hg19` here. Run `configureHomer.pl -list` to see what's installed locally, or `configureHomer.pl -install hg19` to fetch it. If your peaks are on a different build (e.g. you re-aligned to hg38), liftOver them first using the call-out earlier in this tutorial — don't pass mismatched coordinates to HOMER.
+:::
+
 ## Credits
 
 -   Reference vignette: [Signac PBMC scATAC-seq vignette](https://stuartlab.org/signac/articles/pbmc_vignette)
--   Workflow source: Khushbu Patel, single-cell ATAC-seq standard workflow
+-   Workflow source: Khushbu Patel, single-cell ATAC-seq standard workflow ([scATAC-seq](https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R), [HOMER motif workflow](https://github.com/kpatel427/YouTubeTutorials/blob/main/runHomer.sh), [liftOver](https://github.com/kpatel427/YouTubeTutorials/blob/main/liftcoordinates.R))
 -   Data: 10x Genomics PBMC 10k scATAC-seq
