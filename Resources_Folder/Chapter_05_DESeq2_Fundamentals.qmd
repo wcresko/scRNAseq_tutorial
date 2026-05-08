@@ -1,0 +1,225 @@
+---
+title: "Chapter 5 — DESeq2 Fundamentals"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 05](../Lecture_Folder/Lecture_05_DESeq2_Fundamentals.html)** and **[Tutorial 05 — DESeq2 Primer on `airway`](../Exercise_Folder/Tutorial_05_Primer_DESeq2_Basics.html)**. **Prerequisites:** [Appendix I — Statistical Foundations](Appendix_I_Statistical_Foundations.html), especially §§ 1–3 (NB / Poisson / over-dispersion), § 4 (mean-variance relationship), §§ 5–7 (testing).
+:::
+
+## 5.1 Why we learn DESeq2 on bulk first
+
+Pseudobulk differential expression for scRNA-seq (Chapter 6) is exactly bulk DESeq2 applied to per-cell-type aggregated counts. So we learn the bulk model in isolation here, on the canonical bulk dataset (`airway` from Bioconductor — 8 samples of dexamethasone-treated airway smooth muscle cells), and then in Chapter 6 we apply it almost mechanically to the single-cell aggregation.
+
+This is the most heavily used statistical model in functional genomics. Earning a working understanding of it is worth several lectures.
+
+## 5.2 The negative-binomial GLM
+
+DESeq2 fits, for each gene, a generalized linear model:
+
+$$\log(\mu_{ij}) = X_j^\top \beta_i + \log(s_j)$$
+
+where:
+
+- $\mu_{ij}$ is the expected count of gene $i$ in sample $j$
+- $X_j$ is the **design matrix row** for sample $j$ (encodes condition, batch, etc.)
+- $\beta_i$ is the per-gene coefficient vector (what we want)
+- $s_j$ is the **size factor** for sample $j$ — depth normalization, fitted separately
+
+The likelihood is **negative binomial**:
+
+$$Y_{ij} \sim \mathrm{NB}(\mu_{ij}, \alpha_i)$$
+
+with per-gene **dispersion** $\alpha_i$ that controls how much variance exceeds the Poisson baseline. The variance is $\mu_{ij}(1 + \alpha_i \mu_{ij})$.
+
+The choice of NB rather than Poisson is non-negotiable for RNA-seq counts. Poisson assumes variance = mean; real RNA-seq has variance > mean (over-dispersion), and Poisson testing is **anti-conservative** — it produces falsely-significant p-values. The NB adds a per-gene parameter to absorb the extra variance; results are honest. See [Appendix I § 1–2](Appendix_I_Statistical_Foundations.html) for the underlying distributions.
+
+## 5.3 Size factors — depth normalization
+
+Different samples have different sequencing depth. Without correction, a sample with twice as many total reads has twice the count for every gene, regardless of biology. The DESeq2 size factor $s_j$ corrects this:
+
+$$s_j = \mathrm{median}_i\left( \frac{y_{ij}}{(\prod_k y_{ik})^{1/n}} \right)$$
+
+This is the **median of ratios** estimator. It computes a per-gene "geometric mean across samples" baseline, then for each sample takes the median of (sample $j$'s count / baseline) across genes. The result is robust — a few highly-expressed genes can't dominate.
+
+`DESeqDataSetFromMatrix(...)` and the subsequent `DESeq(dds)` call do this automatically; you don't typically interact with size factors directly. But knowing the formula clarifies why DESeq2 is robust to a few genes shifting wildly between samples.
+
+## 5.4 Dispersion estimation and shrinkage
+
+Every gene has its own dispersion $\alpha_i$, but with N = 6 or 8 samples per group, per-gene estimates are extremely noisy. DESeq2 borrows strength across genes by **shrinking** dispersion estimates toward a fitted trend (mean expression vs dispersion).
+
+The procedure:
+
+1. Maximum-likelihood per-gene dispersion estimates
+2. Fit a parametric trend: log-dispersion as a function of log-mean
+3. Shrink each gene's estimate toward the trend, weighted by its uncertainty
+
+The result: high-confidence genes (high counts, many samples) keep their MLE estimates; low-confidence genes (low counts) are pulled to the trend. The `dispersions(dds)` slot holds the final shrunk values; `plotDispEsts(dds)` visualizes the trend.
+
+This is a **Bayesian-flavored procedure** — the trend is the prior, the per-gene MLE is the likelihood, the shrunk value is the posterior. See [Appendix I § 7](Appendix_I_Statistical_Foundations.html) for the connection.
+
+## 5.5 The design matrix and contrasts
+
+The `design = ~ ...` argument specifies which sample-level covariates affect expression. The simplest case:
+
+```r
+DESeqDataSetFromMatrix(countData = ..., colData = ..., design = ~ condition)
+```
+
+Here `condition` is a factor with levels `untreated` and `treated`. The model has two coefficients per gene: an intercept (log expected expression in `untreated`, the reference level) and a `conditiontreated` coefficient (log fold-change of `treated` vs `untreated`).
+
+For paired designs:
+
+```r
+design = ~ donor + condition
+```
+
+This adds donor as a covariate, soaking up donor-level variation. The `condition` coefficient now estimates the treatment effect *within each donor* — much more powerful when donors are paired.
+
+For interactions:
+
+```r
+design = ~ donor + group + condition + group:condition
+```
+
+This tests whether the effect of `condition` differs between groups.
+
+Always run `relevel()` to set your reference level explicitly:
+
+```r
+dds$condition <- relevel(dds$condition, ref = "untreated")
+```
+
+If you skip this, R's alphabetical default may pick the wrong reference, flipping the sign of every fold-change in your output. Hard to debug after the fact.
+
+## 5.6 The Wald test and p-values
+
+DESeq2's default per-coefficient test is the **Wald test**:
+
+$$z = \frac{\hat\beta - 0}{\hat{SE}(\hat\beta)}$$
+
+Under the null ($\beta = 0$), $z$ is approximately standard normal. The two-sided p-value is $2(1 - \Phi(|z|))$.
+
+For testing whether *any* level of a multi-level factor matters, use the **likelihood ratio test (LRT)**:
+
+```r
+dds <- DESeq(dds, test = "LRT", reduced = ~ donor)
+```
+
+This compares the full model (`~ donor + condition`) to the reduced model (`~ donor`); the LRT statistic is $-2 \log(L_{reduced}/L_{full})$ and is $\chi^2$-distributed. Useful when `condition` has 3+ levels.
+
+For both tests, the output table from `results(dds)` has columns:
+
+| Column | Meaning |
+|---|---|
+| `baseMean` | mean of normalized counts |
+| `log2FoldChange` | effect size, base-2 log scale |
+| `lfcSE` | standard error of LFC |
+| `stat` | Wald statistic (or LRT statistic) |
+| `pvalue` | raw test p-value |
+| `padj` | BH-adjusted (the FDR you should filter on) |
+
+## 5.7 LFC shrinkage — never skip
+
+Genes with very low counts (`baseMean < 5`) have huge LFC standard errors. Their raw `log2FoldChange` values are noisy and dominated by sampling luck. Sort the unshrunk results by LFC and your "top hits" will be a list of garbage low-count genes.
+
+The fix: **shrinkage**:
+
+```r
+res_shrunk <- lfcShrink(dds, coef = "condition_treated_vs_untreated",
+                        type = "apeglm")
+```
+
+`apeglm` (Zhu, Ibrahim & Love 2019) is the recommended estimator. It pulls noisy LFCs toward zero, weighted by their uncertainty. High-confidence genes barely change; low-count noisy genes shrink dramatically.
+
+Always shrink before:
+
+- Volcano plots
+- Ranking by effect size
+- Any "top genes" list
+
+The unshrunk LFC is fine for hypothesis testing (the p-value cares about the SE-scaled LFC, not the LFC itself), but for *ranking* and *visualization*, shrunk values are far more honest.
+
+The shrinkage is a Bayesian procedure with `apeglm`'s prior — see [Appendix I § 7](Appendix_I_Statistical_Foundations.html) for the connection to the dispersion shrinkage in §5.4. It's the same idea: borrow strength from all genes to stabilize each gene's estimate.
+
+## 5.8 The full bulk DESeq2 workflow, in one block
+
+```r
+library(DESeq2); library(airway)
+data(airway)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = assay(airway),
+  colData   = colData(airway),
+  design    = ~ cell + dex
+)
+
+# Pre-filter low-count genes (speed only — does not affect FDR)
+dds <- dds[rowSums(counts(dds)) >= 10, ]
+
+# Reference level (so log2FC sign means what you think)
+dds$dex <- relevel(dds$dex, ref = "untrt")
+
+# Fit
+dds <- DESeq(dds)
+
+# Get results for the contrast of interest
+res <- results(dds, contrast = c("dex", "trt", "untrt"))
+
+# Shrink LFCs for ranking and visualization
+res <- lfcShrink(dds, coef = "dex_trt_vs_untrt", res = res, type = "apeglm")
+
+# Filter to significant genes
+sig <- subset(res, padj < 0.05 & abs(log2FoldChange) > 1)
+nrow(sig)
+```
+
+[Tutorial 05](../Exercise_Folder/Tutorial_05_Primer_DESeq2_Basics.html) walks through this exact recipe with the `airway` dataset.
+
+## 5.9 Independent filtering — what `padj = NA` means
+
+You'll see some genes have `padj = NA` even when their `pvalue` is small. This is **independent filtering**: DESeq2 automatically excludes very-low-count genes from BH adjustment, on the grounds that they have insufficient power to ever be significant and including them dilutes the FDR for the rest.
+
+The filter is selected adaptively to maximize the number of detected genes at the chosen alpha. It is *not* a bug; it is making FDR more powerful. If you need to re-include filtered genes for a custom analysis, set `independentFiltering = FALSE` in `results()`.
+
+Cook's-distance filtering also produces NAs: extreme outlier samples in a small experiment can break the dispersion estimate for one gene, and DESeq2 NAs it. Inspect with `assays(dds)[["cooks"]]`.
+
+## 5.10 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| Wrong sign on `log2FoldChange` | Reference level was alphabetical default | `relevel()` your factor before `DESeq()` |
+| `apeglm` errors with "name not found" | You passed a contrast vector instead of coefficient name | Use `coef = "<name>"` from `resultsNames(dds)` |
+| Many `padj = NA` | Independent filtering | This is normal; if you really want all genes, `independentFiltering = FALSE` |
+| Dispersion plot is U-shaped | Mean-variance modeling failed; usually too few samples or batch confound | Inspect; consider model design |
+| Significant gene count is 0 | Real biological effect is small, or you're underpowered | Lower LFC threshold; check sample size; verify dispersion looks right |
+
+## 5.11 Where this material is also discussed
+
+- **Lecture:** [Lecture 05 — DESeq2 Fundamentals](../Lecture_Folder/Lecture_05_DESeq2_Fundamentals.html)
+- **Tutorial:** [Tutorial 05 — DESeq2 Primer on `airway`](../Exercise_Folder/Tutorial_05_Primer_DESeq2_Basics.html)
+- **Statistical foundations:** [Appendix I §§ 1–7](Appendix_I_Statistical_Foundations.html)
+- **Next chapter:** [Chapter 6 — Pseudobulk DE](Chapter_06_Pseudobulk_DE.html) — applies this model to per-cell-type aggregated single-cell counts
+
+## 5.12 Going further
+
+::: incremental
+- **Love, Huber & Anders 2014** — DESeq2 paper, [doi:10.1186/s13059-014-0550-8](https://doi.org/10.1186/s13059-014-0550-8)
+- **Zhu, Ibrahim & Love 2019** — `apeglm`, [doi:10.1093/bioinformatics/bty895](https://doi.org/10.1093/bioinformatics/bty895)
+- **edgeR** (Robinson, McCarthy & Smyth 2010) — alternative NB GLM with quasi-likelihood
+- **limma-voom** (Law et al. 2014) — log-CPM linear modeling; faster, sometimes cleaner for very large designs
+:::

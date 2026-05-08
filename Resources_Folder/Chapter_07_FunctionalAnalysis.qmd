@@ -1,0 +1,197 @@
+---
+title: "Chapter 7 — Functional Analysis: Turning DE Lists into Biology"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 07](../Lecture_Folder/Lecture_07_FunctionalAnalysis.html)** and **[Tutorial 07](../Exercise_Folder/Tutorial_07_FunctionalAnalysis.html)**. **Prerequisites:** [Chapter 6 — Pseudobulk DE](Chapter_06_Pseudobulk_DE.html) (you start with a per-cell-type DE table).
+:::
+
+## 7.1 The next zoom-out: from genes to themes
+
+Pseudobulk DE produces a long list of significant genes per cell type. For `ifnb` STIM vs CTRL, that list is hundreds of genes long for the responding cell types. You can't put a 300-gene list in a paper figure or in a 30-second talk. You need to collapse those lists into a smaller number of **biological themes** — pathways, functional categories, signaling cascades.
+
+That's functional analysis. The output is the same: a ranked list of *terms* (GO Biological Process terms, Reactome pathways, MSigDB Hallmarks) with associated p-values and effect sizes. The terms are interpretable in a way the gene list isn't.
+
+## 7.2 Two methods, two questions
+
+**Over-Representation Analysis (ORA)** asks: among my **significant gene set**, are any predefined gene sets enriched relative to a background? Input: a binary set of "significant" genes plus a "universe" of all tested genes. Test: hypergeometric / Fisher's exact per gene set.
+
+**Gene-Set Enrichment Analysis (GSEA)** asks: when my genes are **ranked** by direction-and-strength of change, do any predefined sets cluster at the top or bottom of the ranking? Input: a ranked vector of all tested genes (typically by signed log-fold-change). Test: a permutation test on the running enrichment statistic.
+
+Both answer the question "which biological themes are over-represented in my DE result?" but with different sensitivities:
+
+::: incremental
+- **ORA** is fast, easy to read, intuitive. Best when you have a clear cutoff (e.g. `padj < 0.05 & |log2FC| > 1`) and a moderate-sized gene list.
+- **GSEA** uses the *full* ranking and is more sensitive when the effect is broad-but-modest — e.g. an entire ISG family slightly up rather than a few super-significant hits.
+:::
+
+In practice, run both. If they agree on the top themes, you have a robust finding. If they disagree, GSEA is usually closer to the truth (it doesn't depend on a threshold choice).
+
+## 7.3 The hypergeometric test (ORA in detail)
+
+For each gene set $S$:
+
+- $k$ = number of genes in **both** my significant list and $S$
+- $K$ = number of genes in my significant list
+- $n$ = number of genes in $S$ ∩ universe
+- $N$ = number of genes in universe
+
+$P(X \ge k)$ under the hypergeometric null is
+
+$$P(X \ge k) = \sum_{j=k}^{\min(K, n)} \frac{\binom{n}{j}\binom{N-n}{K-j}}{\binom{N}{K}}$$
+
+Apply BH correction across all gene sets tested. Filter on `q < 0.05`.
+
+The key parameter is the **universe**. The default is "all genes annotated for the organism", but the **correct universe** is "all genes you tested in DESeq2" — which after filtering and per-cell-type subsetting is much smaller. Using the default inflates the apparent enrichment of common terms (housekeeping pathways), making everything look significant. Always pass `universe = uni` explicitly.
+
+## 7.4 GSEA in detail
+
+For each gene set $S$:
+
+1. Walk through the ranked gene list from most-up-regulated to most-down-regulated
+2. Increment a running statistic when the gene is in $S$ (weighted by its $|LFC|$); decrement when it isn't
+3. The running statistic peaks at some position; that peak is the **enrichment score (ES)**
+4. Permute the gene labels many times to build a null ES distribution
+5. The **Normalized Enrichment Score (NES)** is the ES rescaled by the null distribution; the p-value is the fraction of permutations with NES at least as extreme as the observed
+
+A positive NES means the set's genes are concentrated at the **top** of the ranking (up in the contrast). A negative NES means concentrated at the **bottom** (down in the contrast). The running-enrichment plot (Subramanian et al. 2005) shows the walk visually.
+
+GSEA's strengths:
+
+- No threshold choice — uses the whole ranking
+- Detects coordinated modest changes
+- Direction-aware (signed)
+
+Weaknesses:
+
+- Slower (permutation testing)
+- Requires the full DE table, not a filtered list
+
+For the workshop's `ifnb` STIM-vs-CTRL contrast, GSEA reliably finds the IFN response pathways (Reactome's "Interferon Signaling", MSigDB's "INTERFERON_ALPHA_RESPONSE", etc.) at very high NES.
+
+## 7.5 Picking a database
+
+The big-five gene-set databases:
+
+| Database | Strength | When to start here |
+|---|---|---|
+| **GO Biological Process** | Comprehensive, hierarchical | Always run as a baseline |
+| **GO Molecular Function** | Function & catalysis | When BP is dominated by generic terms |
+| **GO Cellular Component** | Subcellular localization | Probing trafficking / structural biology |
+| **Reactome** | Curated signaling pathways | Immune / signaling biology |
+| **KEGG** | Classic metabolic pathways | Metabolism; legacy comparison |
+| **MSigDB Hallmark** | 50 well-known broad biological states | Headline figures, low-noise summaries |
+| **WikiPathways** | Community-curated, fast updates | Niche pathways missing elsewhere |
+
+Run **multiple** databases and look for **consensus** terms. The same biology will appear in different forms across databases — "type I interferon signaling pathway" (GO BP), "Interferon Signaling" (Reactome), "INTERFERON_ALPHA_RESPONSE" (Hallmark) — and cross-database agreement is the strongest evidence that a finding is real biology rather than a database-specific artifact.
+
+## 7.6 The redundancy problem
+
+GO BP has \~30,000 terms with heavy parent–child overlap. After ORA you may see 50 hits like:
+
+> *response to virus / type I interferon signaling pathway / cellular response to type I interferon / regulation of type I interferon signaling pathway / response to interferon-beta / ...*
+
+These are the same biology described eight ways. Three fixes:
+
+::: incremental
+1. **Use a smaller curated database for the headline.** MSigDB Hallmark has only 50 sets. Lead with that.
+2. **Cluster similar terms.** `enrichplot::pairwise_termsim()` + `treeplot()` builds a similarity tree, lets you collapse branches.
+3. **Tighter cutoffs.** `pvalueCutoff = 0.01`, `qvalueCutoff = 0.05` so the top 5 terms aren't 50 redundant ones.
+:::
+
+## 7.7 The `compareCluster` plot
+
+The single most informative figure in cross-cell-type functional analysis:
+
+```r
+sig_by_ct <- de_all |>
+  filter(padj < 0.05, abs(log2FoldChange) > 0.5) |>
+  split(~ celltype) |>
+  map(~ unique(.x$ENTREZID))
+
+cc <- compareCluster(geneClusters = sig_by_ct,
+                     fun           = "enrichGO",
+                     OrgDb         = org.Hs.eg.db,
+                     ont           = "BP",
+                     pvalueCutoff  = 0.05)
+
+dotplot(cc, showCategory = 8)
+```
+
+A dot plot with cell types on x, terms on y, color = significance, size = gene count. Reading rules:
+
+- A row that lights up across **every** cell type → the **shared core response** (here, type I IFN signaling)
+- A row that lights up in **only some** cell types → cell-type-specific biology (antigen presentation in monocytes + B cells; T-cell activation only in T cells)
+
+Lead with this in your paper. Per-cell-type bar plots become supplementary.
+
+## 7.8 Symbol-to-ENTREZ mapping
+
+Most enrichment tools work in ENTREZ-ID space because that's how `OrgDb` packages key annotations. Convert with:
+
+```r
+de_mapped <- de |>
+  mutate(symbol = gene) |>
+  inner_join(
+    bitr(unique(.$symbol),
+         fromType = "SYMBOL",
+         toType   = "ENTREZID",
+         OrgDb    = org.Hs.eg.db),
+    by = c("symbol" = "SYMBOL")
+  )
+```
+
+Some symbols won't map — deprecated symbols, lncRNAs without ENTREZ entries, pseudogenes. A 5–10% unmapped rate is normal; check the unmapped list. If it's mostly gene symbols (not pseudogenes), update `org.Hs.eg.db`.
+
+## 7.9 Pitfalls
+
+::: incremental
+1. **Wrong universe.** ORA with the default genome-wide universe inflates "common term" p-values. Always use the tested-gene universe.
+2. **All terms are technical artifacts.** GO is full of terms like "translation" and "ribosomal subunit assembly". If those top your list, your QC was insufficient — re-check before claiming biology.
+3. **No multiple-testing across databases.** Running ORA against 4 databases × 30,000 terms is 120,000 tests. BH per database; report the database with the result.
+4. **Reporting raw p-values.** Always report `p.adjust` (BH) or `q-value`.
+5. **ORA on the all-DE list.** ORA on "any DE gene" can't distinguish up- from down-regulated. Run separately on each side, or use GSEA which handles direction natively.
+:::
+
+## 7.10 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `bitr` returns 0 mappings | Case mismatch (`Cd3d` vs `CD3D`) or wrong organism DB | Check `rownames(seu)` casing; use `org.Mm.eg.db` for mouse |
+| `enrichGO` returns 0 terms | Universe was wrong (genome-wide instead of tested) | Always pass `universe = uni` |
+| GSEA "ties detected" warning | Multiple genes with identical LFC | `arrange(desc(log2FoldChange)) |> distinct(ENTREZID, .keep_all = TRUE)` |
+| Top GO terms are all generic ("metabolic process") | The database has too many shared parents | Switch to Reactome or Hallmark for headline; use treeplot for redundancy |
+| Different runs give different top terms | Random seed differences in GSEA permutation test | `set.seed(2026)` before `gseGO` |
+
+## 7.11 Where this material is also discussed
+
+- **Lecture:** [Lecture 07](../Lecture_Folder/Lecture_07_FunctionalAnalysis.html)
+- **Tutorial:** [Tutorial 07](../Exercise_Folder/Tutorial_07_FunctionalAnalysis.html)
+- **Source DE table:** [Chapter 6](Chapter_06_Pseudobulk_DE.html), [Tutorial 06](../Exercise_Folder/Tutorial_06_Pseudobulk_DE.html)
+- **Compositional complement:** [Chapter 8 — Differential Abundance](Chapter_08_DifferentialAbundance.html)
+- **scNotebooks Module 04** — parallel walkthrough of GO enrichment
+
+## 7.12 Going further
+
+::: incremental
+- **Yu et al. 2012** — `clusterProfiler` paper, [doi:10.1089/omi.2011.0118](https://doi.org/10.1089/omi.2011.0118)
+- **Subramanian et al. 2005** — original GSEA paper, [doi:10.1073/pnas.0506580102](https://doi.org/10.1073/pnas.0506580102)
+- **Yu's [Biomedical Knowledge Mining book](https://yulab-smu.top/biomedical-knowledge-mining-book/)** — free online, comprehensive
+- **`fgsea`** — fast pure-GSEA implementation; useful when `clusterProfiler` is too slow
+- **`gprofiler2`** — alternative web API; multi-organism support out of the box
+:::

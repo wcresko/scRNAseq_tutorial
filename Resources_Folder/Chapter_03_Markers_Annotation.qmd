@@ -1,0 +1,166 @@
+---
+title: "Chapter 3 — Markers & Manual Cell-Type Annotation"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 03](../Lecture_Folder/Lecture_03_Markers_Annotation.html)** and **[Tutorial 03](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)**. Builds on **[Chapter 2](Chapter_02_DimReduction.html)** (you have a clustered object). **Prerequisites:** familiarity with the canonical lineage panels for your tissue (the workshop uses PBMC; see [Glossary](Glossary.html) for cell-type definitions).
+:::
+
+## 3.1 The conceptual move from clusters to cell types
+
+A *cluster* is a graph property: the output of community detection on the SNN graph. A *cell type* is a biological claim about identity that connects to a literature, an ontology (Cell Ontology), and a set of expected functional behaviors. Going from one to the other is the most subjective step in the entire scRNA-seq workflow, and the one reviewers will scrutinize most.
+
+Two paradigms:
+
+- **Manual annotation** (this chapter, [Lecture 03](../Lecture_Folder/Lecture_03_Markers_Annotation.html)): inspect canonical marker expression in each cluster and assign a name. Interpretable, but biased by the annotator's experience.
+- **Reference-based annotation** ([Chapter 9](Chapter_09_Reference_Annotation.html), [Lecture 09](../Lecture_Folder/Lecture_09_Reference_Annotation.html)): map cells against a labeled reference atlas using SingleR, Azimuth, or CellTypist. Reproducible, but biased by the reference's coverage.
+
+Best practice: **run both, reconcile disagreements, document choices.** Disagreements typically flag rare subtypes, transitional states, or biology your reference doesn't cover. They are usually informative, not errors.
+
+## 3.2 Finding markers — the statistical core
+
+`FindAllMarkers(seu)` runs, for each cluster $c$, a Wilcoxon rank-sum test comparing the gene's expression in cluster $c$ vs all other clusters combined. The output is a per-cluster ranked gene list with:
+
+| Column | Meaning |
+|---|---|
+| `gene` | gene symbol |
+| `cluster` | cluster being tested |
+| `avg_log2FC` | log2 fold-change in cluster $c$ vs others |
+| `pct.1` | fraction of cells in cluster $c$ expressing the gene (UMI > 0) |
+| `pct.2` | fraction of cells in *other* clusters expressing the gene |
+| `p_val` | raw Wilcoxon p-value |
+| `p_val_adj` | Bonferroni-adjusted (Seurat's choice) |
+
+A "good" marker has high `pct.1`, low `pct.2`, and high `avg_log2FC`. The ranking by `avg_log2FC` (or a score like `pct.1 - pct.2`) gets you a top-N list per cluster.
+
+::: callout-warning
+**`FindAllMarkers` finds genes *enriched* in a cluster, not necessarily canonical markers.** A gene can top the list of cluster $c$ either because it's a literature lineage marker (good) or because some technical / state effect happens to differentiate the cluster (e.g. ISGs in the unintegrated `ifnb` data). Cross-check the top hits against canonical panels before naming clusters from them.
+:::
+
+## 3.3 Conserved markers — for case-control designs
+
+If your dataset has multiple conditions (e.g. CTRL vs STIM in `ifnb`), naive `FindAllMarkers` will surface treatment-induced genes as "cluster markers" — and you'll mis-label populations by their interferon response rather than their lineage.
+
+**`FindConservedMarkers`** runs the marker test **inside each condition** and reports genes that come up in both. This protects against treatment-driven mis-annotation:
+
+```r
+FindConservedMarkers(seu,
+                     ident.1      = 3,                  # cluster of interest
+                     grouping.var = "stim")             # condition column
+```
+
+The output combines per-condition results, so you can see whether the gene is a marker in CTRL only, STIM only, or both. Both means it's a stable lineage marker; one only means it's a state marker.
+
+Use `FindConservedMarkers` whenever you have a non-trivial perturbation in your design. It is the right default for *any* multi-condition study.
+
+## 3.4 The five marker visualizations
+
+[Tutorial 03 §3](../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers) walks five canonical plot types. Each is best for a different question.
+
+### 3.4.1 VlnPlot — distribution per cluster, one gene at a time
+
+Best for **bimodality, outliers, comparing 4–8 candidate markers side-by-side**. A "good" marker has one cluster's violin bulging while the rest sit at zero. If two clusters bulge similarly, the marker is shared by two cell types — keep looking.
+
+### 3.4.2 FeaturePlot — single gene, every cell, on the UMAP
+
+Best for **spatial/topological structure on the embedding**. A good marker shows expression concentrated in one UMAP region; a scattered FeaturePlot suggests the gene is either a poor marker or a technical signature.
+
+### 3.4.3 DotPlot — mean × percent across clusters × genes
+
+Best for the **publication panel figure**. Dot color = mean expression; dot size = percent of cells expressing. Compact: 16 markers × 12 clusters fits on one row. The single most-used plot in cell-type annotation papers.
+
+### 3.4.4 DoHeatmap — top markers across clusters, every cell as a column
+
+Best for showing **the global cluster ↔ marker block structure**. Each cluster's top markers should "light up" in its own diagonal block. Caveat: it shows cells, not clusters, so a dominant cluster (40%+ of cells) visually monopolizes the plot. For balanced display, prefer DotPlot.
+
+### 3.4.5 RidgePlot — density per cluster
+
+Best for **graded/continuum genes** (e.g. naive→memory T-cell markers like `S100A4`). The density curves overlap, showing where the cell-type boundaries are soft.
+
+## 3.5 The decision loop for assigning labels
+
+The practical workflow:
+
+1. **Compute top markers** per cluster with `FindAllMarkers` or `FindConservedMarkers`
+2. **Cross-reference** the top 5–10 against canonical panels (CellMarker 2.0, PanglaoDB, Azimuth references)
+3. **Confirm visually** with a DotPlot of the canonical panel × clusters (does each cluster's expected marker actually concentrate there?)
+4. **Assign labels** with `RenameIdents`, store in `seu$celltype_manual`
+5. **Document** *why* you assigned each label — write a sentence per cluster in your lab notebook (a future reviewer or future-you will thank you)
+
+For the workshop's `ifnb` PBMCs, the canonical panel is small and highly stereotyped:
+
+| Cell type | Canonical markers |
+|---|---|
+| CD14+ Monocyte | `CD14`, `LYZ`, `S100A8`, `S100A9` |
+| CD16+ Monocyte | `FCGR3A`, `MS4A7`, `CDKN1C` |
+| Dendritic cell | `FCER1A`, `CST3`, `CLEC10A` |
+| pDC | `LILRA4`, `IL3RA`, `CLEC4C` |
+| CD4 Naive T | `IL7R`, `CCR7`, `LEF1` |
+| CD4 Memory T | `IL7R`, `S100A4` |
+| CD8 T | `CD8A`, `CD8B`, `GZMK` |
+| NK | `GNLY`, `NKG7`, `KLRD1` |
+| B | `MS4A1`, `CD79A`, `CD79B` |
+| Megakaryocyte | `PPBP`, `PF4` |
+
+For tumor / non-immune tissues, the panel is much larger and more disputed; consult tissue-specific atlases.
+
+## 3.6 Risks and how to avoid them
+
+::: incremental
+- **Single-marker labels.** A cluster top-marked by `CD3D` is "T cell" — but is it CD4 or CD8? Naive or memory? Activated or resting? Always label from **combinations**: marker presence *plus* absence of competing markers.
+- **Marker leakage from ambient RNA.** If you skipped SoupX (Chapter 1) and your suspension was complex, low-level marker expression in the wrong cluster may be ambient bleed, not real expression. Symptom: every cluster shows low non-zero `HBB`. Fix: re-run with SoupX.
+- **Treatment-state mistaken for cell type.** ISGs (interferon-stimulated genes) lighting up half a dataset usually means a stimulation, not a new cell type. Use `FindConservedMarkers` (§3.3).
+- **Doublet-driven "intermediate" types.** A "T-myeloid intermediate" cluster expressing both `CD3D` and `CD14` is almost always doublets. Verify with `scDblFinder` per-cluster doublet fraction; if elevated, drop the cluster.
+:::
+
+## 3.7 The relationship to the Cell Ontology
+
+The **Cell Ontology (CL)** is a community-maintained hierarchy of ~2,400 cell-type terms, each with a stable identifier (e.g. `CL:0000236` = B cell). When you annotate, you should be assigning *to* an ontology term, not just typing a free-text label. Reasons:
+
+- **Interoperability.** Cell-type labels in different studies can only be combined if they reference the same ontology
+- **Submission requirement.** CELLxGENE Discover (the de-facto atlas browser) requires Cell Ontology IDs, not free-text labels
+- **Discoverability.** Other groups can find your dataset by querying the ontology
+
+The mapping from Seurat label to CL ID is a manual step. The [Ontology Lookup Service](https://www.ebi.ac.uk/ols4/) is the searchable interface; type "B cell" and you get `CL:0000236`. Store the IDs in `seu@meta.data$cell_type_ontology_term_id`. [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html) walks the full mapping for the `ifnb` cell types.
+
+## 3.8 Common errors
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| `FindAllMarkers` is very slow | Wilcoxon implementation is the bottleneck | `install.packages("presto")` — Seurat detects it automatically |
+| Top markers per cluster are mostly ribosomal | Your QC/normalization didn't suppress ribosomal variance | Consider regressing out `percent.rb`; consider stricter HVG selection |
+| Marker dot plot has gaps where canonical markers should be | Your dataset lacks that cell type, or you're using the wrong assay | Check `DefaultAssay(seu)` is `"RNA"` for marker tests, not `"integrated"` |
+| `RenameIdents` errors | Argument order or factor levels mismatch | Build the named vector explicitly: `c("0" = "B", "1" = "CD14 Mono", ...)` |
+| Manual labels on the unintegrated object don't match labels on the integrated object | Cluster numbers differ between integrations | Re-annotate after integration; Cluster *numbers* are not stable across re-clusterings, only per-cell labels are |
+
+## 3.9 Where this material is also discussed
+
+- **Lecture:** [Lecture 03](../Lecture_Folder/Lecture_03_Markers_Annotation.html)
+- **Tutorial:** [Tutorial 03](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)
+- **Reference-based annotation (the complement):** [Chapter 9](Chapter_09_Reference_Annotation.html), [Lecture 09](../Lecture_Folder/Lecture_09_Reference_Annotation.html)
+- **Cell Ontology lookup:** [Appendix G §1.2](Appendix_G_Databases_FileFormats.html), [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html)
+- **Statistical foundations of the marker tests:** [Appendix I §§ 5–6](Appendix_I_Statistical_Foundations.html)
+
+## 3.10 Going further
+
+::: incremental
+- **CellMarker 2.0** ([http://117.50.127.228/CellMarker/](http://117.50.127.228/CellMarker/)) — searchable curated marker database
+- **PanglaoDB** ([https://panglaodb.se/](https://panglaodb.se/)) — single-cell-derived marker compendium
+- **Azimuth web tool** ([https://azimuth.hubmapconsortium.org/](https://azimuth.hubmapconsortium.org/)) — automated annotation against curated atlases
+- **scNotebooks Module 04** ([scNotebooks Crosswalk](scNotebooks_Crosswalk.html)) — parallel walkthrough of manual + automated annotation
+:::
