@@ -1,0 +1,375 @@
+---
+title: "Appendix G: Gene-Expression Databases & File Formats"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+This appendix is a **field guide** to the public databases that hold scRNA-seq data and to the file formats those data come in. It pairs with **[scNotebooks Module 01](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module01/module01.html)** — read that for an interactive Colab tour, read this for a written reference you can scan in 10 minutes.
+
+::: callout-note
+**Why an appendix and not a tutorial?** Public-database exploration is a **skill** more than a procedure — every dataset's metadata is slightly different, every repository's interface evolves, and the right portal depends on your question. The exercise at the end of this page asks you to navigate them yourself. The reading material below is the map.
+:::
+
+# Part 1 — The major repositories
+
+Six repositories hold most of the world's published scRNA-seq data. They differ in audience (researchers vs developers), data layer (raw vs processed), and curation (curated vs free-deposit). Most published studies show up in **at least three** of them.
+
+## The big-six summary
+
+| Repository | Run by | Holds | When to use it |
+|---|---|---|---|
+| [**GEO**](https://www.ncbi.nlm.nih.gov/geo/) — Gene Expression Omnibus | NCBI (US) | **Processed** counts + per-cell metadata, links to SRA raw | First place to search for a published study (`GSE######`) |
+| [**SRA**](https://www.ncbi.nlm.nih.gov/sra) — Sequence Read Archive | NCBI (US) | **Raw** FASTQ / BAM | When you need to re-process a study from FASTQ |
+| [**ArrayExpress / BioStudies**](https://www.ebi.ac.uk/biostudies/) | EBI (Europe) | Raw + processed (mirrored with NCBI) | European-led studies; some HCA datasets land here first |
+| [**Single Cell Expression Atlas (SCEA)**](https://www.ebi.ac.uk/gxa/sc/home) | EBI (Europe) | **Curated** processed scRNA-seq across species | Curated, queryable; great for cross-study browsing |
+| [**Human Cell Atlas Data Portal**](https://data.humancellatlas.org/) | HCA Consortium | Raw + processed for HCA-affiliated atlases | Atlas-scale human studies, full provenance metadata |
+| [**CELLxGENE Discover**](https://cellxgene.cziscience.com/) | Chan Zuckerberg Initiative | Schema-validated **AnnData** with cell ontology | In-browser visualization, queryable per-gene across atlases |
+
+## GEO — the default first stop
+
+**[Gene Expression Omnibus](https://www.ncbi.nlm.nih.gov/geo/)** archives processed expression data from microarrays, bulk RNA-seq, and (increasingly) single-cell. Every published scRNA-seq paper that you'll find on PubMed will *almost certainly* deposit at GEO under a `GSE######` accession.
+
+What lives in a typical GEO record:
+
+-   A **study summary** and **design**, in plain English
+-   One **GSM######** sub-record per sample, with a sample-level metadata table
+-   **Supplementary files**: counts matrices (`*.tsv.gz`, `*.h5`, `*.mtx`), per-cell metadata (`*.csv`), often a Seurat `.rds` (which is *not* a stable archival format — see the file-formats section)
+-   A **BioProject** link upstream and (almost always) **SRA** links to the raw FASTQs
+
+When you read a paper that says *"data are available at GEO under GSE183852"*, the workflow is: open <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE183852> → scroll to **Supplementary file** → download.
+
+::: callout-tip
+GEO's **GEOquery** R package (`BiocManager::install("GEOquery")`) lets you pull supplementary files directly from R: `getGEOSuppFiles("GSE152418")`. Tutorial 11 (WGCNA) uses this.
+:::
+
+## SRA — the raw-data archive
+
+**[Sequence Read Archive](https://www.ncbi.nlm.nih.gov/sra)** holds the actual `.fastq.gz` files you'd need to re-run Cell Ranger / STAR / kallisto-bustools yourself. Each run gets an `SRR#######` ID; each experiment an `SRX#######`; each sample a `BioSample SAMN########`.
+
+Use SRA when you want to:
+
+-   Re-align with a newer reference genome
+-   Re-process with a different chemistry assumption (e.g. someone marked it 10x v2 but you suspect v3)
+-   Pull just one sample from a multi-sample study
+-   Run a different pre-processing pipeline (cellranger vs STARsolo vs kallisto-bustools) for a benchmark
+
+Practical access:
+
+-   **`sra-tools`** command line — `prefetch SRR12345678` then `fasterq-dump --split-files SRR12345678` (gives paired R1.fastq + R2.fastq)
+-   **[SRA Explorer](https://sra-explorer.info/)** — pastes-in an accession, returns ready-to-use `wget` / `curl` / `aspera` commands
+-   The **EBI mirror** (ENA) often has direct `ftp://` URLs for FASTQs you can `wget` without `sra-tools`
+
+::: callout-warning
+SRA FASTQs are **big**. A single 10x scRNA-seq sample is typically 5–30 GB of raw reads. Plan storage before you `prefetch`.
+:::
+
+## Single Cell Expression Atlas (EBI) — curated, multi-species
+
+**[SCEA](https://www.ebi.ac.uk/gxa/sc/home)** is **curated** — every dataset is re-processed by EBI staff with a uniform pipeline, so cross-study comparisons make sense. Coverage extends well beyond human/mouse: plants, fungi, parasites, fly atlas, malaria atlas.
+
+Use SCEA when you want to:
+
+-   Compare expression of a gene across many cell types and tissues without downloading anything
+-   Find datasets in a non-model organism (it's the best portal for plant scRNA-seq, for instance)
+-   Pull *re-processed* counts (so a study from 2018 can be compared to one from 2024 without you re-aligning either)
+
+## Human Cell Atlas Data Portal — atlas-scale human
+
+**[HCA Data Portal](https://data.humancellatlas.org/)** holds the datasets contributed to the Human Cell Atlas consortium — large, multi-lab, atlas-scale studies of healthy human tissues. The defining features:
+
+-   **Bionetworks** — datasets organized by tissue family (Lung, Nervous System, Skin, Gut, …) with **unified atlases** that integrate across studies
+-   **Strict metadata QC** before deposition — every field is ontology-coded
+-   **Provenance graph** — for each cell, you can trace back to the donor, dissociation protocol, library prep, sequencer, and analysis pipeline
+-   **Export to Terra cloud** for in-place analysis (paid, third-party)
+
+Use the HCA when you want **the gold-standard** reference dataset for a human tissue.
+
+## CELLxGENE Discover — schema-validated, in-browser
+
+**[CELLxGENE](https://cellxgene.cziscience.com/)** is the Chan Zuckerberg Initiative's atlas browser plus deposition portal. Two faces:
+
+1.  **The browser** — every dataset visualizes as a UMAP in your browser; click a cell → see its metadata; pick two groups → run differential expression on the spot
+2.  **The deposition pipeline** — a dataset is only accepted if its **AnnData (`.h5ad`)** passes the [CELLxGENE schema validator](https://github.com/chanzuckerberg/single-cell-curation), which checks every required ontology field
+
+This makes CELLxGENE the **most reusable** repository — every dataset has the same fields, queryable by cell type, tissue, disease, sex, ancestry, etc. The [**CELLxGENE Census**](https://chanzuckerberg.github.io/cellxgene-census/) is a Python/R-queryable cross-dataset index — pull every "human lung CD4 T cell" across every dataset in CELLxGENE in a single API call.
+
+For your own work, **submitting to CELLxGENE forces you to make your metadata clean**. That's a feature.
+
+## PanglaoDB and CellTypist — annotation aids, not deposit archives
+
+These two are **not deposit archives** — they're tools that consume your data and help annotate it.
+
+-   **[PanglaoDB](https://panglaodb.se/)** — discontinued but still useful. Marker-gene compendium across mouse + human scRNA-seq. Search "B cell" and get the canonical marker list.
+-   **[CellTypist](https://www.celltypist.org/)** — Python package + web tool. Logistic-regression models trained on annotated atlases (immune cells, gut, kidney, etc.); upload your data, get cell-type calls. The web interface lets you browse the underlying training atlases.
+
+Both pair naturally with manual marker-based annotation in **[Tutorial 03](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)** and reference-based annotation in **[Tutorial 09](../Exercise_Folder/Tutorial_09_Reference_Annotation.html)**.
+
+## How to choose
+
+| If you want... | Go to... |
+|---|---|
+| The processed count matrix from a paper | **GEO** |
+| The raw FASTQs | **SRA / ENA** |
+| A re-processed counts matrix (uniform pipeline) | **SCEA** |
+| The HCA reference atlas for a tissue | **HCA Data Portal** |
+| To browse / query / co-visualize many datasets in a browser | **CELLxGENE** |
+| Marker genes for annotation | **PanglaoDB** |
+| Automated cell-type calls on your data | **CellTypist** |
+
+# Part 2 — File formats {#file-formats}
+
+scRNA-seq travels through three or four file formats from sequencer to Seurat object. Knowing what each one stores — and what each one *doesn't* — saves a lot of debugging.
+
+## Raw sequencing reads
+
+### `.fastq` / `.fastq.gz`
+
+Plain-text format with a strict 4-line-per-read repeat:
+
+```
+@SRR12345.1 NS500126:1:H7TG3BGXY:1:11101:18923:1057
+NCATGCAGCGTACGGTAATTGGCAGGCATTAGCAGCATCC
++
+#AAAAFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+```
+
+| Line | Content |
+|---|---|
+| 1 | Header — read ID, machine, lane, tile, x/y, etc. Starts with `@` |
+| 2 | The **sequence** — A/C/G/T/N |
+| 3 | A `+` separator (sometimes repeats the header) |
+| 4 | **Per-base quality** in Phred+33 ASCII encoding (`!` = Q0, `I` = Q40) |
+
+`.fastq.gz` is just the same content with gzip compression — the *de facto* standard because uncompressed FASTQ is huge.
+
+For **paired-end reads** (the usual case for 10x), you get two files per sample/lane: `_R1_` (cell barcode + UMI for 10x; mate-1 for bulk) and `_R2_` (the actual cDNA insert).
+
+### 10x naming convention
+
+Cell Ranger requires a strict pattern:
+
+```
+<SAMPLE>_S<num>_L<lane>_<read>_001.fastq.gz
+```
+
+Example: `pbmc_1k_v3_S1_L001_R1_001.fastq.gz`
+
+-   `<SAMPLE>` — your sample name (no underscores in the name itself, ideally)
+-   `S<num>` — the **sample index** (1-based)
+-   `L<lane>` — the sequencing lane (4 lanes per Illumina flow cell typical)
+-   `<read>` — `R1` (cell barcode + UMI), `R2` (cDNA), `I1` / `I2` (Illumina sample indices)
+-   `_001` — fixed suffix from the Illumina demultiplexer
+
+Don't rename. If you must, symlink the renamed back to the canonical pattern.
+
+## Aligned / processed by Cell Ranger
+
+### Cell Ranger `outs/` directory
+
+After `cellranger count` finishes, you get this structure:
+
+```
+outs/
+├── web_summary.html              ← QC report, open in browser
+├── metrics_summary.csv           ← QC numbers, machine-readable
+├── filtered_feature_bc_matrix/   ← cells called by Cell Ranger's empty-droplet algorithm
+│   ├── barcodes.tsv.gz
+│   ├── features.tsv.gz
+│   └── matrix.mtx.gz
+├── filtered_feature_bc_matrix.h5 ← same as above, single HDF5 file
+├── raw_feature_bc_matrix/        ← ALL barcodes, including empty droplets — what SoupX needs
+├── raw_feature_bc_matrix.h5
+├── possorted_genome_bam.bam (+ .bai)   ← position-sorted aligned reads
+├── molecule_info.h5              ← per-UMI provenance, used by `cellranger aggr`
+└── analysis/                     ← Cell Ranger's automatic clustering (rough; ignore)
+```
+
+For most downstream R workflows you only ever need `filtered_feature_bc_matrix/` (or `.h5`). The rest is for QC, re-processing, and special workflows.
+
+### `barcodes.tsv.gz` — one row per cell barcode
+
+A gzipped, single-column TSV. One barcode per line:
+
+```
+AAACCTGAGAAACCAT-1
+AAACCTGAGAAACGAG-1
+AAACCTGAGAAACGCC-1
+...
+```
+
+The trailing `-1` is the **GEM well number** assigned by Cell Ranger (so multiple lanes from the same library can be combined; `-1` for one library is the default). These are the **column names** of the counts matrix.
+
+### `features.tsv.gz` — one row per gene/feature
+
+A gzipped, three-column TSV. One feature per line:
+
+```
+ENSG00000243485    MIR1302-2HG     Gene Expression
+ENSG00000237613    FAM138A         Gene Expression
+ENSG00000186092    OR4F5           Gene Expression
+```
+
+| Column | Content |
+|---|---|
+| 1 | Ensembl gene ID — stable across genome builds |
+| 2 | Gene symbol (HGNC for human, MGI for mouse) — what `Read10X` uses as row names |
+| 3 | Feature type — `Gene Expression`, `Antibody Capture` (CITE-seq), `Multiplexing Capture` (CMO), `Peaks` (ATAC), `Custom` |
+
+These are the **row names** of the counts matrix.
+
+::: callout-note
+Cell Ranger ≤ 2 used `genes.tsv.gz` instead of `features.tsv.gz`. `Read10X` handles both; if you're on an old dataset and getting a "file not found" error, this is the issue.
+:::
+
+### `matrix.mtx.gz` — the counts, in sparse Matrix Market format
+
+A gzipped Matrix Market file — a sparse-matrix text format that lists only non-zero entries:
+
+```
+%%MatrixMarket matrix coordinate integer general
+%
+33538 1222 4324901
+33509 1 1
+33510 1 2
+33514 1 1
+...
+```
+
+| Line | Content |
+|---|---|
+| 1 | The Matrix Market header — type, format |
+| 2 | Comments (often metadata about the producer) |
+| 3 | Three integers: `nrows ncols nnz` (total features × total barcodes × total non-zero entries) |
+| 4+ | One non-zero entry per line: `feature_idx barcode_idx count` (1-indexed) |
+
+In the example: gene 33509 has count 1 in cell 1; gene 33510 has count 2 in cell 1; etc. With \~14k cells × \~33k genes that's potentially 460M entries — but the matrix is \~95% zero, so storing only the 4M non-zeros saves enormous space.
+
+### `*.h5` — the same matrix in HDF5
+
+`filtered_feature_bc_matrix.h5` is a single binary HDF5 file containing the same information as the three-file `filtered_feature_bc_matrix/` directory. Faster to read, smaller on disk. `Read10X_h5("path.h5")` is the Seurat function.
+
+### `fragments.tsv.gz` (scATAC-seq only)
+
+For scATAC-seq, the Cell Ranger output adds **fragments** instead of UMI counts. A gzipped, sorted TSV:
+
+```
+chr1   10068    10410    AAACGAACAAACTGAA-1    1
+chr1   10084    10271    AAACGAACAAGCAGGT-1    2
+chr1   10080    10410    AAACGAACAATCGCAT-1    1
+```
+
+| Column | Content |
+|---|---|
+| 1–3 | Chromosome, start, end of one Tn5-cut DNA fragment |
+| 4 | Cell barcode |
+| 5 | Duplicate count (PCR duplicates of the same fragment in the same cell) |
+
+A `.tbi` index file (`fragments.tsv.gz.tbi`) sits alongside it to allow random-access queries. Signac and ArchR both consume this format directly.
+
+## Single-cell-aware container formats
+
+### `.rds` — R serialization (Seurat, etc.)
+
+`saveRDS(obj, "file.rds")` writes any R object to a binary file using R's native serialization. Convenient because:
+
+-   Round-trips perfectly with `readRDS()`
+-   Smaller than re-saving every component
+-   Stores the entire Seurat / SingleCellExperiment object including reductions, graphs, metadata
+
+But:
+
+-   **Locked to the R version** (and often the Seurat version) that wrote it — Seurat 5 cannot load a Seurat 3 `.rds` cleanly
+-   Unreadable by Python tools
+-   Not a long-term archival format
+
+Use `.rds` for **between-tutorial chaining** (the workshop does this) and **work-in-progress storage**, never for archival or sharing.
+
+### `.h5ad` — AnnData (the cross-language standard)
+
+`.h5ad` is **AnnData** — Python's scverse-native single-cell container, built on HDF5. It stores:
+
+-   `X` — the main expression matrix (cells × genes; sparse or dense)
+-   `obs` — per-cell metadata (DataFrame indexed by cell barcode)
+-   `var` — per-gene metadata (DataFrame indexed by gene ID)
+-   `obsm` — per-cell embeddings (PCA, UMAP, …)
+-   `varm` — per-gene embeddings
+-   `uns` — unstructured side data (analysis parameters, plots, …)
+-   `layers` — alternative count matrices (raw, log-normalized, scran-normalized, …)
+
+Why AnnData wins as the archival / interchange format:
+
+-   Stable, **versioned schema** — readable a decade from now
+-   **Language-agnostic** — Scanpy (Python), Seurat 5 (R), `anndata-rs` (Rust)
+-   The **CELLxGENE schema** is built on AnnData
+-   Can store the equivalent of a full Seurat object
+
+To convert: `SeuratDisk::SaveH5Seurat(seu, "obj.h5Seurat"); SeuratDisk::Convert("obj.h5Seurat", dest = "h5ad")` — see [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html) for the worked example.
+
+### `SingleCellExperiment` (R / Bioconductor)
+
+The Bioconductor equivalent of AnnData. Closest mapping:
+
+| AnnData | SingleCellExperiment |
+|---|---|
+| `X` | `assay(sce, "counts")` |
+| `obs` | `colData(sce)` |
+| `var` | `rowData(sce)` |
+| `obsm["X_pca"]` | `reducedDim(sce, "PCA")` |
+| `layers["log_normalized"]` | `assay(sce, "logcounts")` |
+
+`SingleCellExperiment` is what the Bioconductor ecosystem (scran, scater, scuttle, miloR, SingleR) operates on. Convert with `as.SingleCellExperiment(seu)`.
+
+## Submission file formats
+
+### `.tsv` / `.csv` for sample metadata
+
+NCBI's BioSample / SRA / GEO portals all want `.tsv` (or `.csv`) sample sheets — see [Tutorial 13](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html).
+
+### `.json` for analysis pipeline parameters
+
+Many CWL / Nextflow / Snakemake pipelines emit a `params.json` describing the exact run config. Archive these alongside the outputs — they're the "lab notebook" entry for your computational analysis.
+
+### `.bam` / `.bai` for archived alignments
+
+Some studies submit position-sorted BAMs (`*.bam` + index `*.bai`) alongside FASTQs to skip the alignment step on re-analysis. Cell Ranger writes `possorted_genome_bam.bam`. Big (\~5–20 GB per sample) but useful.
+
+# Part 3 — A short hands-on exercise
+
+The best way to learn this is to navigate the portals yourself. Here are five tasks — each takes 5–15 minutes, no install, no code.
+
+::: {.callout-tip title="Exercise — explore the workshop's reference dataset"}
+The workshop uses **Kang *et al.* 2017** (the `ifnb` dataset) for Tutorials 01–09. Walk it through every layer of public deposit:
+
+1.  **Find the paper.** Search PubMed for *"Kang Ye 2017 Multiplexed droplet single-cell RNA-sequencing"*. Note the GEO accession in the abstract or methods (it's `GSE96583`).
+2.  **GEO record.** Open <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583>. What's listed under *Supplementary file*? How many samples (GSM IDs)? What's the BioProject ID?
+3.  **SRA.** Click through to one of the SRA links (e.g. `SRX2533751`). What's the read length? The library prep? The estimated yield?
+4.  **CELLxGENE.** Open <https://cellxgene.cziscience.com/> and search for *"Kang"*. Is the dataset there? If so, what cell-type ontology has the curators applied? Click into the UMAP — pick a B cell vs T cell differential expression and see what tops the list.
+5.  **HCA.** Search the HCA Data Portal for *"PBMC interferon"*. Is this dataset in HCA, or is it only in GEO/CELLxGENE? Why might that be?
+
+Now do the same for *your own* dataset of interest. If it's not in CELLxGENE — ask why, and could *you* be the one to put it there?
+:::
+
+::: {.callout-tip title="Exercise — pull a counts matrix from GEO into R"}
+The WGCNA tutorial ([Tutorial 11](../Exercise_Folder/Tutorial_11_WGCNA.html)) already does this for `GSE152418`. Work through the **first 30 lines** of that tutorial's source — the `getGEOSuppFiles()` call and the file inspection. You'll see the raw counts file format (`.txt.gz` with samples-as-columns, genes-as-rows).
+:::
+
+# See also
+
+-   [scNotebooks Module 01 — Notebooks & Databases](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module01/module01.html) — the original interactive walkthrough we adapted
+-   [Lecture 08 — FAIR Principles & Data Sharing](../Lecture_Folder/Lecture_08_FAIR_DataSharing.html) — the "submission" side of the same content
+-   [Tutorial 13 — FAIR Metadata & Submission](../Exercise_Folder/Tutorial_13_FAIR_Metadata.html) — the hands-on submission workflow
+-   [Datasets](../Datasets.html) — the workshop datasets and their access patterns
+-   [Additional Readings](../Additional_Readings.html) — broader reference list

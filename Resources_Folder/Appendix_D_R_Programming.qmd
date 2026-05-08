@@ -781,3 +781,247 @@ boxplot(compression ~ hydrogel_concentration, data = mydata,
 | ordered character | character | numeric | integer |
 
 `Factor` is a special type of character variable that R uses to represent categorical variables with fixed possible values.
+
+# Other R data structures
+
+The earlier sections cover **vectors** and **data frames**, which carry most of the workflow. Three other structures show up regularly in scRNA-seq code; you should recognize them on sight.
+
+## Lists — the "pocket that holds anything"
+
+A **list** is the most flexible R container: each slot can hold a different kind of thing. A vector of numbers, a string, another list, a data frame, a function — all in one object. Seurat objects, `SingleCellExperiment` objects, and most output of `lapply()` / `purrr::map()` are technically lists under the hood.
+
+```{r}
+#| label: list-example
+#| eval: false
+
+experiment <- list(
+  sample_id = "donor_01_CTRL",
+  age       = 42,
+  cell_types = c("B cell", "CD4 T", "Monocyte", "NK"),
+  qc_metrics = data.frame(
+    metric = c("nCount_RNA", "nFeature_RNA", "percent.mt"),
+    median = c(8500, 2300, 4.2)
+  )
+)
+
+# Access by name with $:
+experiment$sample_id
+experiment$cell_types
+experiment$qc_metrics$median
+
+# Or by [[index]]:
+experiment[[3]]              # third element (cell_types)
+```
+
+::: callout-note
+**`[]` vs `[[]]` on a list.** `experiment[1]` returns a length-1 list (a sub-list); `experiment[[1]]` returns the **content** of the first slot. The double-bracket form is what you usually want.
+:::
+
+## Matrices — like data frames, but one type only
+
+A **matrix** is a 2-D structure where every cell is the same type — typically all numeric. Faster than a data frame for math, more limited because you can't mix text and numbers. Most scRNA-seq counts matrices are matrices (specifically *sparse* matrices, class `dgCMatrix` from the `Matrix` package — a memory-efficient matrix that only stores non-zero values).
+
+```{r}
+#| label: matrix-example
+#| eval: false
+
+m <- matrix(1:12, nrow = 3, ncol = 4)
+m
+#      [,1] [,2] [,3] [,4]
+# [1,]    1    4    7   10
+# [2,]    2    5    8   11
+# [3,]    3    6    9   12
+
+# Indexing — same [row, col] notation as data frames
+m[2, 3]              # 8
+m[, 2]               # column 2 as a vector
+m[1, ]               # row 1 as a vector
+
+# A 10x counts matrix is a (sparse) matrix:
+# library(Seurat)
+# counts <- Read10X("data/filtered_feature_bc_matrix/")
+# class(counts)        # "dgCMatrix"
+# dim(counts)          # 33538 features × 1222 cells, mostly zero
+```
+
+::: {.callout-tip title="Why scRNA-seq uses sparse matrices"}
+A typical 10x dataset is \~95% zeros. A dense matrix of 30,000 genes × 14,000 cells in `double` precision would be \~3.4 GB. The same counts as a `dgCMatrix` (which only stores non-zero entries + their coordinates) is \~150 MB. Every Seurat / Scanpy / Bioconductor workflow uses sparse matrices internally for this reason.
+:::
+
+## Factors — categorical variables with fixed levels
+
+A **factor** is R's way of representing categorical data: a character vector with a defined, ordered set of allowed values ("levels"). Crucial for correct statistical models — without it, R treats "treatment" / "control" as arbitrary text rather than a designed comparison.
+
+```{r}
+#| label: factor-example
+#| eval: false
+
+# Plain character vector
+condition_chars <- c("CTRL", "STIM", "CTRL", "STIM", "STIM")
+
+# As a factor — explicit levels
+condition <- factor(condition_chars, levels = c("CTRL", "STIM"))
+condition
+# [1] CTRL STIM CTRL STIM STIM
+# Levels: CTRL STIM
+
+# Why levels matter: in a regression, the FIRST level is the
+# reference. ~ condition will compare STIM vs CTRL (CTRL = reference).
+# If you'd typed factor(condition_chars, levels = c("STIM","CTRL")),
+# the comparison would flip.
+
+table(condition)
+levels(condition)
+nlevels(condition)
+```
+
+In Seurat objects, `Idents()` is a factor; `meta.data$stim` is a factor; cluster assignments (`seurat_clusters`) are factors. Knowing how to manipulate them — `relevel()` to change the reference, `droplevels()` to remove unused levels, `factor(..., ordered = TRUE)` for ordinal data — is fundamental for downstream analysis.
+
+# Functions in depth
+
+You've already used many R functions (`mean()`, `c()`, `read.csv()`, ...). Two practical points worth knowing:
+
+## Named vs positional arguments
+
+```{r}
+#| label: named-vs-positional
+#| eval: false
+
+# Positional — values are assigned to arguments in declaration order
+round(3.14159, 2)            # 3.14
+round(2, 3.14159)            # 2 — argument order matters!
+
+# Named — explicit, order-independent, far more readable
+round(x = 3.14159, digits = 2)
+round(digits = 2, x = 3.14159)   # same thing
+
+# Recommended in real code: positional for the first one or two
+# obvious args, named for the rest
+seq(from = 1, to = 10, by = 0.5)
+
+# In Seurat / scRNA-seq code, almost everything uses named args
+# because the function signatures are long:
+# CreateSeuratObject(counts = mat, project = "study1",
+#                    min.cells = 3, min.features = 200)
+```
+
+The rule: **use named arguments whenever there's any ambiguity**. They're self-documenting, survive package version bumps better, and are easier for someone (including future-you) to read.
+
+## Defining your own functions
+
+```{r}
+#| label: own-function
+#| eval: false
+
+# A function that computes the coefficient of variation of a numeric vector
+cv <- function(x, na.rm = TRUE) {
+  if (na.rm) x <- x[!is.na(x)]
+  sd(x) / mean(x)
+}
+
+cv(c(1, 2, 3, 4, 5))         # 0.527
+cv(c(1, 2, NA, 4, 5))        # 0.612 (after dropping NA)
+```
+
+You'll write helper functions all the time in scRNA-seq pipelines — typically as 5–15-line wrappers around Seurat / Bioconductor calls. Tutorial 06 (Pseudobulk DE) defines a `run_de(ct)` function exactly this way.
+
+# The tidyverse — `dplyr` data manipulation
+
+Most modern R for biology is written in **tidyverse** style. Six functions cover \~80% of what you'll do with data frames:
+
+| Verb | What it does |
+|---|---|
+| `filter()` | Keep rows that match a condition |
+| `select()` | Keep / drop / reorder columns |
+| `mutate()` | Add or modify columns |
+| `arrange()` | Sort rows |
+| `summarise()` | Collapse to one row per group (paired with `group_by()`) |
+| `group_by()` | Set the grouping for downstream summarise / mutate |
+
+The **pipe** `|>` (or the older `%>%` from `magrittr`) chains these into pipelines that read top-to-bottom:
+
+```{r}
+#| label: dplyr-example
+#| eval: false
+
+library(tidyverse)
+
+# Suppose `meta` is per-cell metadata: barcode, sample, cluster, nCount_RNA, nFeature_RNA
+top10_clusters_per_sample <- meta |>
+  filter(nFeature_RNA > 200, nFeature_RNA < 2500) |>     # QC filter
+  group_by(sample, cluster) |>
+  summarise(
+    n_cells     = n(),
+    median_umi  = median(nCount_RNA),
+    .groups     = "drop"
+  ) |>
+  arrange(sample, desc(n_cells)) |>
+  group_by(sample) |>
+  slice_head(n = 10)
+```
+
+Read top-to-bottom: "take `meta`, filter by QC, group by sample × cluster, summarise to one row per group, sort, take top 10 per sample". This style — `tidyverse` verbs chained with `|>` — appears all over the workshop tutorials. If it's new to you, [R for Data Science (2e)](https://r4ds.hadley.nz/) is the canonical free reference.
+
+# Visualization with `ggplot2`
+
+The Base R `plot()` examples earlier in this appendix work but are limited. **`ggplot2`** is the standard for publication-quality figures and is what you'll see throughout the workshop. The key insight is the **grammar of graphics**: a plot is built from layered components.
+
+| Component | What it is | Examples |
+|---|---|---|
+| **Data** | The data frame | `mpg`, `seu@meta.data`, ... |
+| **Aesthetics** (`aes()`) | Mappings: which column to which visual property | `aes(x = pc1, y = pc2, color = celltype)` |
+| **Geoms** | The visual mark | `geom_point()`, `geom_bar()`, `geom_violin()`, `geom_tile()` |
+| **Stats** | Pre-plot transformations | `stat_smooth()`, `stat_summary()` |
+| **Scales** | Color, axis, size scales | `scale_color_brewer()`, `scale_x_log10()` |
+| **Facets** | Sub-plots by group | `facet_wrap(~sample)`, `facet_grid(condition ~ celltype)` |
+| **Themes** | Non-data display | `theme_minimal()`, `theme(legend.position = "bottom")` |
+
+A minimum-viable `ggplot`:
+
+```{r}
+#| label: ggplot-minimum
+#| eval: false
+
+library(ggplot2)
+
+# A scatter — one point per cell, colored by cell type
+ggplot(seu@meta.data, aes(x = nCount_RNA, y = nFeature_RNA, color = celltype)) +
+  geom_point(alpha = 0.5, size = 0.6) +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(title = "QC: counts vs features",
+       x = "Total UMI per cell (log)",
+       y = "Detected genes per cell (log)") +
+  theme_minimal()
+```
+
+Build up by **adding layers with `+`**:
+
+```{r}
+#| label: ggplot-layers
+#| eval: false
+
+# Add a smoothed regression line and facet by sample
+ggplot(seu@meta.data, aes(x = nCount_RNA, y = nFeature_RNA)) +
+  geom_point(alpha = 0.4, size = 0.6, color = "#34495e") +
+  geom_smooth(method = "lm", color = "#c0392b") +
+  facet_wrap(~ stim) +
+  scale_x_log10() +
+  scale_y_log10() +
+  labs(title = "Counts × features per sample") +
+  theme_bw(base_size = 12)
+```
+
+::: {.callout-tip title="Five geoms that cover most scRNA-seq plotting"}
+-   `geom_point()` — UMAP / PCA scatter, QC scatter
+-   `geom_violin()` + `geom_jitter()` — `VlnPlot()` is built on these
+-   `geom_tile()` — heatmaps, e.g. cell-type × marker-gene dot plots
+-   `geom_bar(stat = "identity")` / `geom_col()` — proportion bar plots
+-   `geom_smooth()` — adding regression lines to QC scatters
+:::
+
+For the canonical free reference: [`ggplot2`: Elegant Graphics for Data Analysis (Wickham et al.)](https://ggplot2-book.org/). The Cheat Sheet on the [RStudio cheatsheet collection](https://rstudio.github.io/cheatsheets/) is also gold.
+
+::: callout-note
+**Parallel reading.** [scNotebooks Module 02 — Introduction to R + ggplot2](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module02/module02.html) covers this same material as a runnable Jupyter notebook (with R kernel) on Google Colab. Open it alongside this appendix if you want a runnable companion.
+:::

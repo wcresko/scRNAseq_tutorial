@@ -1,0 +1,250 @@
+---
+title: "Talapas Advanced — Raw scATAC-seq Processing with cellranger-atac"
+subtitle: "BCL → FASTQ → fragments + peaks on a SLURM cluster"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-important
+**This is a Talapas Advanced exercise, not a laptop tutorial.** `cellranger-atac` requires a \~30 GB ATAC reference, multi-GB FASTQs, and a multi-core machine with 64+ GB RAM. Do not try to run it on your laptop. Work through the laptop sequence (Tutorials 01–12) and the [RNA Cell Ranger tutorial](Tutorial_Talapas_RawData_RNA.html) first, then come here when you have your own raw 10x scATAC FASTQs.
+:::
+
+## About this tutorial
+
+The scATAC-seq counterpart to the [RNA Cell Ranger tutorial](Tutorial_Talapas_RawData_RNA.html). The 10x scATAC pipeline is conceptually parallel to Cell Ranger for RNA — same SLURM patterns, same FASTQ-naming rules, same reference-genome model — but the **outputs are different** (fragments, peaks, gene-activity scores) because chromatin accessibility is a different measurement than transcription.
+
+You'll learn:
+
+-   How `cellranger-atac count` differs from `cellranger count` (peaks vs genes; fragments vs UMIs)
+-   How to install `cellranger-atac` and the ATAC reference on Talapas
+-   How to write a SLURM batch script for one sample and a SLURM array for many
+-   How to inspect ATAC-specific QC: TSS enrichment, fragment size, fraction of fragments overlapping peaks
+-   How to feed the outputs into **[Tutorial 10 — scATAC-seq with Signac](../Tutorial_10_scATACseq_Signac.html)**
+
+## Why scATAC processing differs from RNA
+
+| Step | scRNA-seq | scATAC-seq |
+|---|---|---|
+| Library | Captures polyA mRNA | Captures Tn5-cut DNA fragments |
+| Per-cell unit | UMI count per gene | Fragment count per peak / per genomic interval |
+| Reference | Transcriptome (genes + 3' bias) | Whole genome + motif annotations |
+| Per-cell QC | nUMI, nFeature, % mito | nFragments, TSS enrichment, nucleosome signal, blacklist ratio |
+| Cell calling | Knee-point on barcode rank | EmptyDrops-like or signal-vs-background |
+| Output of `count` | counts + BAM | **fragments.tsv.gz** + **peaks.bed** + per-barcode QC |
+
+The key file you'll see for the first time is **`fragments.tsv.gz`** — a sorted, gzipped TSV with one row per Tn5 cut fragment: chromosome, start, end, barcode, duplicate count. Signac (and ArchR) consume this file directly.
+
+## Step 1 — Install cellranger-atac on Talapas
+
+```bash
+cd /projects/<PIRG>/<your-username>/software
+
+# Get cellranger-atac from 10x. Generate a fresh signed URL from
+# https://www.10xgenomics.com/support/software/cell-ranger-atac/downloads
+wget -O cellranger-atac-2.2.0.tar.gz "https://cf.10xgenomics.com/releases/cell-atac/cellranger-atac-2.2.0.tar.gz?<token>"
+tar -xzf cellranger-atac-2.2.0.tar.gz
+
+export PATH=/projects/<PIRG>/<your-username>/software/cellranger-atac-2.2.0:$PATH
+which cellranger-atac
+cellranger-atac --version
+```
+
+::: callout-tip
+On Talapas check `module avail cellranger-atac` first — the cluster may have a maintained module.
+:::
+
+## Step 2 — Download the ATAC reference
+
+The ATAC reference is **separate** from the RNA reference because Cell Ranger ATAC indexes the whole genome (not just transcribed regions).
+
+```bash
+cd /projects/<PIRG>/<your-username>/refs
+
+# Human GRCh38 ATAC reference
+wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+tar -xzf refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+```
+
+::: callout-warning
+Note the reference is `refdata-cellranger-arc-GRCh38-2024-A`, **not** the RNA `refdata-gex-GRCh38-2024-A`. They are different builds — different STAR index, different annotations, different motif file. **Do not pass an RNA reference to cellranger-atac**, even though both have a `fasta/` and `genes/` subdirectory.
+:::
+
+If your downstream Signac analysis needs the **older hg19** annotation (because [Tutorial 10](../Tutorial_10_scATACseq_Signac.html) uses `EnsDb.Hsapiens.v75`), use the corresponding hg19 reference:
+
+```bash
+# For matching Tutorial 10's hg19 / EnsDb.Hsapiens.v75:
+wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-atac-GRCh37-1.2.0.tar.gz
+```
+
+## Step 3 — Practice with a small public dataset
+
+10x's PBMC 5k v1 ATAC dataset is the workshop default downstream. The 1k version is smaller for first runs:
+
+```bash
+cd /projects/<PIRG>/<your-username>/test_data
+
+# PBMC 1k v1 ATAC FASTQs (~3 GB)
+wget https://s3-us-west-2.amazonaws.com/10x.files/samples/cell-atac/1.2.0/atac_pbmc_1k_v1/atac_pbmc_1k_v1_fastqs.tar
+tar -xf atac_pbmc_1k_v1_fastqs.tar
+```
+
+## Step 4 — A SLURM batch script for one sample
+
+Create `run_cellranger_atac_count.sbatch`:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=cratac_pbmc1k
+#SBATCH --partition=compute
+#SBATCH --account=<your_PIRG>
+#SBATCH --time=06:00:00
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+#SBATCH --output=logs/cratac_%j.out
+#SBATCH --error=logs/cratac_%j.err
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=<your_email>@uoregon.edu
+
+export PATH=/projects/<PIRG>/<your-username>/software/cellranger-atac-2.2.0:$PATH
+
+cd /projects/<PIRG>/<your-username>/cellranger_atac_runs
+
+cellranger-atac count \
+  --id=atac_pbmc_1k_v1 \
+  --reference=/projects/<PIRG>/<your-username>/refs/refdata-cellranger-arc-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<your-username>/test_data/atac_pbmc_1k_v1_fastqs \
+  --sample=atac_pbmc_1k_v1 \
+  --localcores=16 \
+  --localmem=120
+```
+
+Submit:
+
+```bash
+mkdir -p logs
+sbatch run_cellranger_atac_count.sbatch
+```
+
+::: {.callout-important title="Think about it"}
+The runtime for `cellranger-atac count` is typically **2–3× longer** than the RNA equivalent at the same cell count. Why?
+
+<details>
+
+<summary>Show answers</summary>
+
+scATAC processing has to: (a) align fragments to the **whole genome** (not the transcriptome), (b) deduplicate at single-fragment resolution, (c) **call peaks** de novo using a MACS-style algorithm, and (d) count fragments per peak per barcode. RNA processing aligns to a smaller transcriptome and counts UMIs per gene — fewer steps, smaller search space. Plan your SLURM `--time` accordingly.
+
+</details>
+:::
+
+## Step 5 — Inspect the output
+
+```bash
+cd /projects/<PIRG>/<your-username>/cellranger_atac_runs/atac_pbmc_1k_v1/outs
+ls -la
+# web_summary.html
+# summary.csv
+# singlecell.csv               ← per-barcode QC (TSS enrichment, fragments, etc.)
+# filtered_peak_bc_matrix.h5   ← peaks × barcodes counts
+# filtered_peak_bc_matrix/     ← same in mtx format
+# raw_peak_bc_matrix.h5
+# fragments.tsv.gz (+ .tbi)    ← THE key file for Signac/ArchR
+# peaks.bed                    ← peak coordinates
+# possorted_bam.bam (+ .bai)
+# cloupe.cloupe                ← for 10x's Loupe Browser
+
+cat summary.csv | column -t -s,
+```
+
+ATAC-specific metrics worth scrutinizing in `web_summary.html`:
+
+| Metric | Worry threshold |
+|---|---|
+| Estimated number of cells | Outside expected target |
+| Median fragments per cell | < 5,000 → undersequenced or poor capture |
+| TSS enrichment score | < 4 → poor signal-to-noise (high background) |
+| Fraction fragments in peaks | < 0.4 → poor capture or wrong reference |
+| Fraction fragments in blacklist | > 0.05 → repetitive-region artefacts |
+| Fraction fragments in nucleosome-free | < 0.3 → tn5 over-tagmentation |
+
+## Step 6 — Hand off to Signac (Tutorial 10)
+
+The four files Tutorial 10 expects are exactly what `cellranger-atac` produces. Copy them to your local `data/` directory:
+
+```bash
+# From local:
+SRC=<username>@login.talapas.uoregon.edu:/projects/<PIRG>/<your-username>/cellranger_atac_runs/atac_pbmc_1k_v1/outs
+
+scp $SRC/filtered_peak_bc_matrix.h5  ~/Documents/scrnaseq_workshop/data/
+scp $SRC/singlecell.csv               ~/Documents/scrnaseq_workshop/data/
+scp $SRC/fragments.tsv.gz             ~/Documents/scrnaseq_workshop/data/
+scp $SRC/fragments.tsv.gz.tbi         ~/Documents/scrnaseq_workshop/data/
+```
+
+Then [Tutorial 10](../Tutorial_10_scATACseq_Signac.html) loads them with `Read10X_h5()` + `CreateChromatinAssay()`.
+
+## Step 7 — Scale to many samples (SLURM array)
+
+Same pattern as the RNA tutorial — one row in `samples.txt` per sample, then a SLURM array:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=cratac_array
+#SBATCH --partition=compute
+#SBATCH --account=<your_PIRG>
+#SBATCH --time=10:00:00
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+#SBATCH --output=logs/cratac_%A_%a.out
+#SBATCH --array=1-8
+
+export PATH=/projects/<PIRG>/<your-username>/software/cellranger-atac-2.2.0:$PATH
+
+SAMPLE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" samples.txt)
+
+cd /projects/<PIRG>/<your-username>/cellranger_atac_runs
+
+cellranger-atac count \
+  --id="$SAMPLE" \
+  --reference=/projects/<PIRG>/<your-username>/refs/refdata-cellranger-arc-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<your-username>/raw_fastqs/"$SAMPLE" \
+  --sample="$SAMPLE" \
+  --localcores=16 \
+  --localmem=120
+```
+
+## Common gotchas
+
+::: incremental
+1.  **Wrong reference.** Using the RNA reference (`refdata-gex-...`) instead of the ATAC reference (`refdata-cellranger-arc-...`) — Cell Ranger ATAC will refuse to start, but the error message can be cryptic.
+2.  **Missing `.tbi` index for fragments.** Signac needs both `fragments.tsv.gz` and `fragments.tsv.gz.tbi`. cellranger-atac writes both — don't lose them in transit.
+3.  **Mixed chemistries.** Don't mix scATAC v1 with v1.1 (Next GEM) FASTQs in one `--fastqs` directory — they have slightly different barcode conventions.
+4.  **OOM in peak calling.** The de-novo peak-calling step is RAM-hungry (\~80 GB for 10k cells). `--localmem 120` for a `--mem=128G` allocation is usually fine.
+:::
+
+## Going further — multiome (joint RNA + ATAC)
+
+If your library is a 10x **Multiome** (joint RNA + ATAC from the same cells), use `cellranger-arc count` instead of `cellranger-atac count`. It produces both a counts matrix (RNA) and a fragments file (ATAC), pre-paired by barcode. Same SLURM pattern; bigger reference; longer runtime.
+
+## See also
+
+-   [scNotebooks Module 03](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module03/module03.html) — RNA-side parallel walkthrough
+-   [scNotebooks Module 11](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module11/module11.html) — ArchR scATAC analysis (alternative to our Signac-based Tutorial 10)
+-   [Talapas Advanced — Raw RNA Cell Ranger](Tutorial_Talapas_RawData_RNA.html) — the RNA companion
+-   [Tutorial 10 — scATAC-seq with Signac](../Tutorial_10_scATACseq_Signac.html) — the downstream R analysis
+-   [10x Cell Ranger ATAC documentation](https://www.10xgenomics.com/support/software/cell-ranger-atac/latest)
