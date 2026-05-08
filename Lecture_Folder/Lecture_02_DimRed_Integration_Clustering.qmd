@@ -3,7 +3,7 @@ title: "Lecture 02 — Dim Reduction, Integration & Clustering"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 02 of 7
+    footer: Single Cell RNA-seq Workshop · Lecture 02 of 11
     transition: fade
     transition-speed: slow
     theme: default
@@ -71,7 +71,7 @@ ElbowPlot(seu, ndims = 50)
 
 ## Dimensionality reduction — the intuition
 
-![](images/lec01_use_dimensionality_reduction.svg){fig-align="center" width="95%"}
+![Dimensionality reduction projects high-dimensional data into 2-3D](images/lec01_use_dimensionality_reduction.svg){fig-align="center" width="95%"}
 
 -   Cells live in a very high-dimensional space (thousands of genes)
 -   Dimensionality reduction **projects** them into 2–50 dimensions while preserving the main structure
@@ -92,7 +92,7 @@ ElbowPlot(seu, ndims = 50)
 
 ## PCA finds axes of maximum variance
 
-![](images/week_10_S17_pca_variance_maximization.svg){fig-align="center" width="92%"}
+![PCA finds axes of maximum variance in the data](images/week_10_S17_pca_variance_maximization.svg){fig-align="center" width="92%"}
 
 -   PC1 = direction in gene space along which the data spread the most. PC2 = next-most variance, **orthogonal to PC1**. PC3 perpendicular to both, etc.
 -   Same algebraic object two ways: **eigendecomposition** of the covariance matrix, or **SVD** of the centered data matrix $\tilde X = U \Sigma V^T$
@@ -211,7 +211,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ## When to integrate
 
-![](images/lec01_batch_integration.svg){fig-align="center" width="88%"}
+![Batch integration: aligning shared structure across samples](images/lec01_batch_integration.svg){fig-align="center" width="88%"}
 
 -   Multiple samples / batches / donors → the same cell type can split into per-sample clusters
 -   Integration aligns shared cell types while preserving real biological differences
@@ -237,7 +237,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ## Integration strategies — visual guide
 
-![](images/lec01_use_integration_overview.svg){fig-align="center" width="98%"}
+![Overview of integration strategies — global, MNN, deep learning](images/lec01_use_integration_overview.svg){fig-align="center" width="98%"}
 
 -   **Global models** (e.g. ComBat, `sc.tl.regress_out`) fit a regression with batch as a covariate
 -   **Linear / MNN** (MNN, FastMNN, Seurat v3, Scanorama) find mutual nearest neighbours across batches and correct
@@ -245,7 +245,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ## Seurat anchors in detail
 
-![](images/lec02_seurat_anchor_integration.svg){fig-align="center" width="95%"}
+![Seurat anchor-based integration: CCA, mutual nearest neighbours, anchor scoring](images/lec02_seurat_anchor_integration.svg){fig-align="center" width="95%"}
 
 -   Project both samples by **canonical correlation analysis (CCA)** + L2 normalization into a shared low-rank space
 -   Find pairs of cells that are **mutual nearest neighbours** across the two samples — these are the **anchors**
@@ -254,7 +254,7 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ## Harmony in detail
 
-![](images/lec02_harmony_iterative.svg){fig-align="center" width="95%"}
+![Harmony's 4-step iterative batch correction in PC space](images/lec02_harmony_iterative.svg){fig-align="center" width="95%"}
 
 -   Operates in **PC space** after a normal `RunPCA()` — no extra tooling above the standard workflow
 -   Iterates four steps until convergence: (a) soft-cluster cells with a batch-diversity penalty, (b) compute a global centroid and per-batch centroids per cluster, (c) compute correction factors that pull each per-batch centroid toward the global one, (d) shift each cell using its soft-cluster-weighted correction
@@ -332,6 +332,135 @@ Three diagnostics, all of which appear in [Tutorial 04](../Exercise_Folder/Tutor
 
 These three checks generalize to any batch-integrated dataset. The third is particularly important and easy to forget.
 
+## ifnb in practice — UMAPs you'll see in Tutorials 02 and 04
+
+```{r}
+#| label: ifnb-umaps
+#| echo: false
+#| fig-width: 12
+#| fig-height: 4.6
+
+set.seed(2026)
+
+# Simulate 6 cell types × 2 conditions
+celltypes <- c("CD14 Mono", "CD16 Mono", "B", "CD4 T", "CD8 T", "NK")
+ct_centers <- tibble(
+  ct = celltypes,
+  cx = c(-3, -3, 3, 3, 0, 0),
+  cy = c( 2, -2, 2, -2, 4, -4)
+)
+
+# Each condition shifts every cluster by the same vector — that's the batch effect
+# CTRL: no shift; STIM: shift along the IFN axis
+n_per <- 200
+cells <- map_dfr(celltypes, function(ct) {
+  c <- ct_centers |> filter(ct == !!ct)
+  bind_rows(
+    tibble(ct = ct, stim = "CTRL",
+           u1 = c$cx + rnorm(n_per, 0, 0.6),
+           u2 = c$cy + rnorm(n_per, 0, 0.5)),
+    tibble(ct = ct, stim = "STIM",
+           u1 = c$cx + 4 + rnorm(n_per, 0, 0.6),
+           u2 = c$cy + 1 + rnorm(n_per, 0, 0.5))
+  )
+})
+
+p_unint_sample <- ggplot(cells, aes(u1, u2, color = stim)) +
+  geom_point(alpha = 0.6, size = 0.6) +
+  scale_color_manual(values = c(CTRL = "#34495e", STIM = "#e67e22"), name = NULL) +
+  labs(title = "Unintegrated — by sample",
+       subtitle = "two parallel islands, every cell type doubles up",
+       x = "UMAP1", y = "UMAP2") +
+  theme_minimal(base_size = 11) + theme(legend.position = "bottom")
+
+p_unint_ct <- ggplot(cells, aes(u1, u2, color = ct)) +
+  geom_point(alpha = 0.6, size = 0.6) +
+  scale_color_brewer(palette = "Set1", name = NULL) +
+  labs(title = "Unintegrated — by cell type",
+       subtitle = "each type splits in two — left/CTRL, right/STIM",
+       x = "UMAP1", y = "UMAP2") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(nrow = 2, override.aes = list(size = 3)))
+
+# After integration: collapse the per-condition shift
+cells_int <- cells |>
+  mutate(u1_int = ifelse(stim == "STIM", u1 - 4, u1),
+         u2_int = ifelse(stim == "STIM", u2 - 1, u2))
+
+p_int_sample <- ggplot(cells_int, aes(u1_int, u2_int, color = stim)) +
+  geom_point(alpha = 0.6, size = 0.6) +
+  scale_color_manual(values = c(CTRL = "#34495e", STIM = "#e67e22"), name = NULL) +
+  labs(title = "After integration — by sample",
+       subtitle = "the two colors interleave inside each cluster",
+       x = "UMAP1", y = "UMAP2") +
+  theme_minimal(base_size = 11) + theme(legend.position = "bottom")
+
+p_int_ct <- ggplot(cells_int, aes(u1_int, u2_int, color = ct)) +
+  geom_point(alpha = 0.6, size = 0.6) +
+  scale_color_brewer(palette = "Set1", name = NULL) +
+  labs(title = "After integration — by cell type",
+       subtitle = "one cluster per cell type",
+       x = "UMAP1", y = "UMAP2") +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(nrow = 2, override.aes = list(size = 3)))
+
+gridExtra::grid.arrange(p_unint_sample, p_unint_ct, p_int_sample, p_int_ct, nrow = 2)
+```
+
+The four-panel grid above is exactly what students produce in Tutorials 02 and 04. Read it as:
+
+::: incremental
+-   **Top-left** (Tut 02 unintegrated, by sample) — two clearly separated islands. The biggest source of variance is `stim`, not biology
+-   **Top-right** (Tut 02 unintegrated, by cell type) — each cell type splits in two, mirroring the sample split. Six biological cell types appear as twelve clusters
+-   **Bottom-left** (Tut 04 integrated, by sample) — colors interleave inside each cluster. This is the test of "did integration work?"
+-   **Bottom-right** (Tut 04 integrated, by cell type) — one cluster per cell type. This is the goal
+:::
+
+## ISG score gap survives integration — the over-correction check
+
+```{r}
+#| label: isg-gap-check
+#| echo: false
+#| fig-width: 9
+#| fig-height: 4
+
+set.seed(2026)
+
+# Per-cell ISG score: high in STIM monocytes, mild in T/B/NK
+isg_score <- function(stim, ct) {
+  baseline <- ifelse(stim == "CTRL", 0.05, 1)
+  multiplier <- case_when(
+    ct == "CD14 Mono" ~ 1.5,
+    ct == "CD16 Mono" ~ 1.4,
+    ct == "B"         ~ 0.8,
+    ct == "CD4 T"     ~ 1.0,
+    ct == "CD8 T"     ~ 1.1,
+    ct == "NK"        ~ 0.9
+  )
+  pmax(baseline * multiplier + rnorm(length(stim), 0, 0.25), 0)
+}
+
+cells_int$isg <- isg_score(cells_int$stim, cells_int$ct)
+
+ggplot(cells_int, aes(stim, isg, fill = stim)) +
+  geom_violin(scale = "width", trim = TRUE) +
+  geom_boxplot(width = 0.15, outlier.size = 0.5, fill = "white") +
+  facet_wrap(~ ct, nrow = 1) +
+  scale_fill_manual(values = c(CTRL = "#34495e", STIM = "#e67e22"), guide = "none") +
+  labs(title = "ISG score per cell type — STIM > CTRL within EVERY cell type",
+       subtitle = "If integration had flattened these gaps, it over-corrected.",
+       x = NULL, y = "Module score (ISG15, IFI6, IFIT1, MX1, ...)") +
+  theme_minimal(base_size = 11)
+```
+
+The integration moved cells *spatially* (the bottom panels of the previous figure) **without erasing the IFN-β biology** (ISG score still STIM > CTRL within every cluster). That's the right outcome.
+
+::: callout-tip
+**This is the most important diagnostic and the one most often skipped.** Always run a known biological signal through the post-integration object and confirm the signal survives. Pretty UMAPs are not the same as preserved biology.
+:::
+
 # Step 7 — Neighbour graph + Leiden clustering {background-color="#2c3e50"}
 
 ## SNN graph → Leiden
@@ -362,7 +491,7 @@ This is the same reason single-cell pipelines have largely abandoned hierarchica
 
 ## Leiden clustering — step by step
 
-![](images/lec01_use_leiden_clustering.svg){fig-align="center" width="98%"}
+![Leiden clustering: KNN graph -> communities -> aggregation -> refinement](images/lec01_use_leiden_clustering.svg){fig-align="center" width="98%"}
 
 -   Start with the **KNN graph** over cells in PCA space
 -   **Find communities** → initial partition; **refine** merges/splits based on modularity
@@ -404,7 +533,7 @@ sc.pl.umap(adata, color="leiden", legend_loc="on data")
 
 ## t-SNE: model neighbours as probabilities
 
-![](images/week_10_S43_kl_divergence_distances.svg){fig-align="center" width="92%"}
+![KL divergence on probabilistic neighbour distances (t-SNE)](images/week_10_S43_kl_divergence_distances.svg){fig-align="center" width="92%"}
 
 -   For each cell $i$, t-SNE turns *distances* to all other cells into a **probability distribution** $p_{j|i}$ — Gaussian in high-D, with bandwidth $\sigma_i$ chosen per cell so the effective neighbourhood size matches the user's **perplexity**
 -   In the 2D embedding, the same idea gives $q_{j|i}$ from the current 2D positions
@@ -423,7 +552,7 @@ This asymmetry is *the* most important property of t-SNE. It is why t-SNE preser
 
 ## The crowding problem → Student's t in low-D
 
-![](images/week_10_S46_sne_to_tsne.svg){fig-align="center" width="95%"}
+![From SNE to t-SNE: heavy-tailed Student-t distribution in low-D](images/week_10_S46_sne_to_tsne.svg){fig-align="center" width="95%"}
 
 -   In high-D space there's a lot of "room": each cell can have many moderately-distant neighbours
 -   When you collapse to 2D with **Gaussians**, those moderately-distant neighbours all get squashed onto each other — the **crowding problem** that broke the original SNE
@@ -443,7 +572,7 @@ This asymmetry is *the* most important property of t-SNE. It is why t-SNE preser
 
 ## UMAP: a fuzzy graph + cross-entropy
 
-![](images/week_10_S55_umap_algorithm.svg){fig-align="center" width="92%"}
+![UMAP's local fuzzy graph + global layout optimization](images/week_10_S55_umap_algorithm.svg){fig-align="center" width="92%"}
 
 -   For each cell, UMAP builds a **local weighted graph** out to its $k$ nearest neighbours, but normalises distances **per cell** — so points in sparse and dense regions of the data are still connected to *their own* local neighbours
 -   The local graphs are merged into one global **fuzzy weighted graph** ($w_{ij} = a + b - a \cdot b$)
@@ -451,7 +580,7 @@ This asymmetry is *the* most important property of t-SNE. It is why t-SNE preser
 
 ## UMAP's cross-entropy preserves more global structure
 
-![](images/week_10_S56_umap_cross_entropy_optimization.svg){fig-align="center" width="92%"}
+![UMAP's cross-entropy optimization preserves more global structure](images/week_10_S56_umap_cross_entropy_optimization.svg){fig-align="center" width="92%"}
 
 $$CE = -\sum_{i,j} \left[ w_{ij} \log v_{ij} + (1 - w_{ij}) \log(1 - v_{ij}) \right]$$
 
@@ -476,7 +605,7 @@ $$CE = -\sum_{i,j} \left[ w_{ij} \log v_{ij} + (1 - w_{ij}) \log(1 - v_{ij}) \ri
 
 ## t-SNE vs UMAP — at a glance
 
-![](images/week_10_S59_tsne_vs_umap_comparison.svg){fig-align="center" width="92%"}
+![t-SNE vs UMAP — local vs global structure trade-offs](images/week_10_S59_tsne_vs_umap_comparison.svg){fig-align="center" width="92%"}
 
 | Feature                        | t-SNE                          | UMAP                           |
 |--------------------------------|--------------------------------|--------------------------------|

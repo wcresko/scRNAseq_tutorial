@@ -3,7 +3,7 @@ title: "Lecture 00 — Bulk vs. Single-Cell RNA-seq: What & How"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 00 of 7
+    footer: Single Cell RNA-seq Workshop · Lecture 00 of 11
     transition: fade
     transition-speed: slow
     theme: default
@@ -42,9 +42,13 @@ set.seed(2026)
     -   Lec 02 ↔ Tutorials 02 (clustering) + 04 (integration)
     -   Lec 03 ↔ Tutorial 03 — Markers & manual annotation
     -   Lec 04 ↔ Tutorials 05 (DESeq2 primer) + 06 (Pseudobulk DE)
-    -   Lec 05 ↔ Tutorial 09 — Reference-based annotation
-    -   Lec 06 ↔ Tutorial 10 — Bulk + scATAC-seq
-    -   Lec 07 ↔ Tutorial 11 — WGCNA
+    -   Lec 05 ↔ Tutorial 07 — Functional analysis (GO / GSEA / Reactome)
+    -   Lec 06 ↔ Tutorial 08 — Differential abundance (miloR)
+    -   Lec 07 ↔ Tutorial 09 — Reference-based annotation
+    -   Lec 08 ↔ Tutorial 10 — Bulk + scATAC-seq
+    -   Lec 09 ↔ Tutorial 11 — WGCNA
+    -   Lec 10 ↔ Tutorial 12 — Spatial transcriptomics
+    -   Lec 11 ↔ Tutorial 13 — FAIR metadata & data sharing
 -   **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
 
 ## Goals of this lecture
@@ -83,7 +87,7 @@ Bulk is cheap, mature, and statistically well-understood. If your question is "d
 
 ## Bulk vs. single-cell — the picture
 
-![](images/lec01_bulk_vs_sc_concept.svg){fig-align="center" width="92%"}
+![Bulk RNA-seq averages over cells; scRNA-seq resolves them](images/lec01_bulk_vs_sc_concept.svg){fig-align="center" width="92%"}
 
 -   Bulk: one profile per sample
 -   Single-cell: one profile per cell — heterogeneity becomes *visible*
@@ -169,14 +173,14 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ## How we got here — a short timeline
 
-![](images/lec01_tech_timeline.svg){fig-align="center" width="98%"}
+![Single-cell technology timeline from 2009 to today](images/lec01_tech_timeline.svg){fig-align="center" width="98%"}
 
 -   Throughput went from **one cell** (Tang 2009) to **millions of cells** in a decade
 -   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** and **spatial** measurements (we revisit this in Lecture 06)
 
 ## Droplet generation on the Chromium
 
-![](images/lec01_droplet_creation.gif){fig-align="center" width="85%"}
+![Droplet creation on the 10x Chromium controller](images/lec01_droplet_creation.gif){fig-align="center" width="85%"}
 
 -   Microfluidic chip co-flows **cells**, **barcoded gel beads**, and **oil**
 -   Each droplet encapsulates (ideally) one cell + one bead → one "GEM"
@@ -184,7 +188,7 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ## Chromium library prep — the full cycle
 
-![](images/lec01_use_chromium_library_prep.svg){fig-align="center" width="96%"}
+![Chromium library prep: from cells to sequenceable library](images/lec01_use_chromium_library_prep.svg){fig-align="center" width="96%"}
 
 -   Gel beads + cells/enzyme + oil → **GEMs**
 -   Each GEM: cell lysed, barcoded cDNA synthesized inside the droplet
@@ -192,7 +196,7 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ## Droplet protocol: barcodes + UMIs
 
-![](images/lec01_droplet_barcoding.svg){fig-align="center" width="90%"}
+![Droplet barcoding: cell barcode + UMI per read](images/lec01_droplet_barcoding.svg){fig-align="center" width="90%"}
 
 -   **[Cell barcode](../Resources_Folder/Glossary.html#b)** identifies which cell a read came from
 -   **[UMI](../Resources_Folder/Glossary.html#u)** identifies the original mRNA molecule (collapses PCR duplicates)
@@ -200,7 +204,7 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ## UMIs in detail — amplification, sequencing, dedup
 
-![](images/lec01_use_umi_deduplication.svg){fig-align="center" width="96%"}
+![UMI deduplication: collapsing PCR duplicates](images/lec01_use_umi_deduplication.svg){fig-align="center" width="96%"}
 
 -   Each mRNA is tagged with a unique UMI **before** PCR
 -   After sequencing, reads sharing a cell barcode **and** UMI collapse to one molecule
@@ -224,7 +228,7 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ## Raw data processing — BCL → count matrix
 
-![](images/lec01_use_raw_data_processing.svg){fig-align="center" width="96%"}
+![Raw-data processing pipeline overview](images/lec01_use_raw_data_processing.svg){fig-align="center" width="96%"}
 
 -   **Signal processing** turns sequencer BCL files into FASTQ reads (with a first QC step)
 -   **Alignment** feeds **quantification**: CB correction → UMI resolution → count assignment
@@ -232,7 +236,7 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ## Pipelines side-by-side
 
-![](images/lec01_data_processing_pipelines.svg){fig-align="center" width="96%"}
+![Raw-data processing pipelines: BCL -> FASTQ -> count matrix](images/lec01_data_processing_pipelines.svg){fig-align="center" width="96%"}
 
 -   Three common entry points: **10x Chromium**, **Drop-seq / inDrops**, **bulk or SMART-based**
 -   Different stacks of tools, **same destination**: a counts matrix Seurat / scanpy can read
@@ -270,7 +274,7 @@ adata
 
 ## The downstream workflow at a glance
 
-![](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="92%"}
+![The Seurat workflow in 8 numbered steps](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="92%"}
 
 -   That cell × gene matrix is the **input** to every analytical step the rest of the workshop covers
 -   The eight steps fall naturally into four chunks, each with a dedicated lecture:
