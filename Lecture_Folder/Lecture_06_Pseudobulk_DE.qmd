@@ -1,9 +1,9 @@
 ---
-title: "Lecture 04 — Pseudobulk DE & DESeq2"
+title: "Lecture 06 — Pseudobulk Differential Expression"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 04 of 11
+    footer: Single Cell RNA-seq Workshop · Lecture 06 of 13
     transition: fade
     transition-speed: slow
     theme: default
@@ -22,102 +22,35 @@ editor: visual
 ---
 
 ```{r}
-#| label: setup
+#| label: setup-lec06
 #| include: false
 library(tidyverse); library(knitr)
 theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ```
 
-# Lecture 04: Pseudobulk DE & DESeq2 {background-color="#2c3e50"}
+# Lecture 06: Pseudobulk Differential Expression {background-color="#2c3e50"}
 
 ## Where this lecture fits
 
--   Previous: [Lec 03 — Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
--   **You are here:** Lec 04 — *the right way to do condition-level differential expression*
--   Next: [Lec 07 — Reference-based Annotation](Lecture_07_Reference_Annotation.html)
--   **Companion tutorials:**
-    -   [Tutorial 05 — DESeq2 Primer on `airway`](../Exercise_Folder/Tutorial_05_Primer_DESeq2_Basics.html) (do this first if you've never run DESeq2)
-    -   [Tutorial 06 — Pseudobulk DE](../Exercise_Folder/Tutorial_06_Pseudobulk_DE.html)
+-   Previous: [Lec 05 — DESeq2 Fundamentals](Lecture_05_DESeq2_Fundamentals.html)
+-   **You are here:** Lec 06 — *applying the DESeq2 model to per-cell-type aggregated single-cell counts*
+-   Next: [Lec 07 — Functional Analysis](Lecture_07_FunctionalAnalysis.html)
+-   **Companion tutorial:** [Tutorial 06 — Pseudobulk DE](../Exercise_Folder/Tutorial_06_Pseudobulk_DE.html)
+-   **Companion book chapter:** [Chapter 6 — Pseudobulk DE](../Resources_Folder/Chapter_06_Pseudobulk_DE.html)
+-   **Statistical background:** [Appendix I — Statistical Foundations](../Resources_Folder/Appendix_I_Statistical_Foundations.html)
 
 ## Goals of this lecture
 
 ::: incremental
--   Understand the **DESeq2 model** in plain terms
--   See why per-cell DE between **conditions** is statistically wrong
--   Run a **pseudobulk** workflow that uses DESeq2 correctly
--   Know when pseudobulk is and is not the right tool
+-   Understand **why per-cell DE is statistically wrong** for condition contrasts (the cardinal sin of scRNA-seq)
+-   Aggregate single-cell counts to a *(sample × cell type)* pseudobulk matrix
+-   Run DESeq2 *per cell type* with the right design and the right contrast
+-   Avoid the canonical pseudobulk pitfalls (low-cell groups, missing donors, no replication)
+-   Plug the result into downstream functional analysis (Lec 07) and differential abundance (Lec 08)
 :::
 
 ::: callout-important
 **The cardinal sin of scRNA-seq:** treating cells from one donor as independent biological replicates. We spend the whole lecture on the right alternative.
-:::
-
-# Part 1 — DESeq2 fundamentals {background-color="#2c3e50"}
-
-## What DESeq2 actually does
-
-::: incremental
--   Models **integer counts** per gene with a **negative binomial** distribution
--   Estimates a **size factor** per sample (depth normalization), independent of the design
--   **Shrinks** per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)
--   Tests each gene's coefficient with a **Wald test** (default) or LRT
-:::
-
-::: callout-note
-**Why negative binomial, not Poisson?** RNA-seq counts are **over-dispersed**: variance \> mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.
-:::
-
-## A canonical bulk DESeq2 run (Patel-style, `airway` data)
-
-``` r
-library(DESeq2); library(airway)
-data(airway)
-
-dds <- DESeqDataSetFromMatrix(
-  countData = assay(airway),
-  colData   = colData(airway),
-  design    = ~ cell + dex)        # cell line as covariate, dex as test factor
-
-# Pre-filter: drop genes with < 10 total reads (speed only — does not affect FDR)
-dds <- dds[ rowSums(counts(dds)) >= 10, ]
-
-# Set the reference level so log2FC sign is interpretable
-dds$dex <- relevel(dds$dex, ref = "untrt")
-
-dds <- DESeq(dds)
-res <- results(dds, contrast = c("dex", "trt", "untrt"))
-summary(res)
-```
-
-::: callout-tip
-**`relevel()` matters.** The reference level becomes the *denominator* in `log2FoldChange`. If you forget, your "up-regulated" and "down-regulated" labels can be backwards.
-:::
-
-## Reading DESeq2 output
-
-| Column | What it is | Watch-out |
-|----|----|----|
-| `baseMean` | mean of normalized counts across all samples | Very low values = unstable estimates |
-| `log2FoldChange` | effect size on log~2~ scale | Use **shrunk** values for ranking |
-| `lfcSE` | standard error of the LFC | |
-| `stat` | Wald statistic | |
-| `pvalue` | raw p-value | Don't filter on this directly |
-| `padj` | BH-adjusted p-value | This is your FDR — filter on `padj < 0.05` |
-
-::: callout-warning
-**`NA` in `padj`?** DESeq2 sets `padj = NA` for genes filtered by independent filtering or with extreme outliers (Cook's distance). That's intentional, not a bug.
-:::
-
-## Always shrink LFCs before ranking
-
-``` r
-res_shrunk <- lfcShrink(dds,
-                        coef = "dex_trt_vs_untrt",
-                        type = "apeglm")
-```
-
-::: callout-tip
-**Why shrink?** Genes with low counts have huge raw LFCs from sampling noise. Shrinkage (`apeglm` / `ashr`) pulls those down toward zero so a "top hits" list isn't dominated by junk genes with `baseMean = 2`.
 :::
 
 # Part 2 — Why per-cell DE goes wrong {background-color="#2c3e50"}
@@ -239,26 +172,20 @@ After DE, summarize gene lists into pathways:
 
 # Recap & what's next {background-color="#2c3e50"}
 
-## What to remember from Lecture 04
+# Recap & what's next {background-color="#2c3e50"}
+
+## What to remember from Lecture 06
 
 ::: incremental
--   DESeq2 models **negative-binomial counts**, **shrinks** dispersions, and gives you a **shrunk LFC** to rank by
--   For **condition-level DE**, default to **pseudobulk** + DESeq2 / edgeR / limma-voom
--   For **per-cell** signatures, use module scoring or AUCell — never claim DE from these
+-   For **condition-level DE**, default to **pseudobulk** + DESeq2/edgeR/limma-voom; never run per-cell DE for condition contrasts
+-   Aggregate counts per *(sample × cell type)* with `AggregateExpression`, then test each cell type separately
+-   Drop cell-type × sample combinations with **fewer than \~10 cells**
 -   You need real biological replicates (≥ 3 per group) — there is no shortcut
 :::
 
 ## Coming up next
 
-A pseudobulk DE table is the launchpad for two complementary questions:
-
--   **Lec 05** — [Functional Analysis](Lecture_05_FunctionalAnalysis.html): take the per-cell-type DE list and ask *which biological themes (GO terms, Reactome pathways, MSigDB hallmarks) are enriched?*
--   **Lec 06** — [Differential Abundance](Lecture_06_DifferentialAbundance.html): the *complement* — instead of "which genes change?", "do **proportions** of cell types/states change between conditions?" Both answers belong in the same condition-level analysis.
-
-After those, **Lec 07** picks back up with [Reference-based Annotation](Lecture_07_Reference_Annotation.html).
-
--   **Hands-on:**
-    -   [Tutorial 05 — DESeq2 Primer on `airway`](../Exercise_Folder/Tutorial_05_Primer_DESeq2_Basics.html)
-    -   [Tutorial 06 — Pseudobulk DE](../Exercise_Folder/Tutorial_06_Pseudobulk_DE.html)
-    -   [Tutorial 07 — Functional Analysis](../Exercise_Folder/Tutorial_07_FunctionalAnalysis.html) — pairs with Lec 05
-    -   [Tutorial 08 — Differential Abundance](../Exercise_Folder/Tutorial_08_DifferentialAbundance.html) — pairs with Lec 06
+-   **Lec 07** — [Functional Analysis](Lecture_07_FunctionalAnalysis.html) — turning a pseudobulk DE list into biological themes
+-   **Lec 08** — [Differential Abundance](Lecture_08_DifferentialAbundance.html) — the *complement*: do cell-type proportions change?
+-   **Hands-on:** [Tutorial 06 — Pseudobulk DE](../Exercise_Folder/Tutorial_06_Pseudobulk_DE.html)
+-   **Companion book chapter:** [Chapter 6 — Pseudobulk DE](../Resources_Folder/Chapter_06_Pseudobulk_DE.html)
