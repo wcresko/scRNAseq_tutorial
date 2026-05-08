@@ -2190,9 +2190,9 @@ vertical-align: -.125em;
   <li><a href="#step-2-choose-how-many-pcs-to-keep" id="toc-step-2-choose-how-many-pcs-to-keep" class="nav-link" data-scroll-target="#step-2-choose-how-many-pcs-to-keep">Step 2 — Choose how many PCs to keep</a></li>
   <li><a href="#step-3-build-the-neighbor-graph" id="toc-step-3-build-the-neighbor-graph" class="nav-link" data-scroll-target="#step-3-build-the-neighbor-graph">Step 3 — Build the neighbor graph</a></li>
   <li><a href="#step-4-cluster-at-several-resolutions" id="toc-step-4-cluster-at-several-resolutions" class="nav-link" data-scroll-target="#step-4-cluster-at-several-resolutions">Step 4 — Cluster at several resolutions</a></li>
-  <li><a href="#step-5-visualize-cluster-counts-across-resolutions" id="toc-step-5-visualize-cluster-counts-across-resolutions" class="nav-link" data-scroll-target="#step-5-visualize-cluster-counts-across-resolutions">Step 5 — Visualize cluster counts across resolutions</a></li>
-  <li><a href="#step-6-pick-a-resolution-set-identities-and-plot" id="toc-step-6-pick-a-resolution-set-identities-and-plot" class="nav-link" data-scroll-target="#step-6-pick-a-resolution-set-identities-and-plot">Step 6 — Pick a resolution, set identities, and plot</a></li>
-  <li><a href="#step-7-non-linear-embedding-umap" id="toc-step-7-non-linear-embedding-umap" class="nav-link" data-scroll-target="#step-7-non-linear-embedding-umap">Step 7 — Non-linear embedding (UMAP)</a></li>
+  <li><a href="#step-5-umap" id="toc-step-5-umap" class="nav-link" data-scroll-target="#step-5-umap">Step 5 — UMAP</a></li>
+  <li><a href="#step-6-diagnose-the-batch-effect" id="toc-step-6-diagnose-the-batch-effect" class="nav-link" data-scroll-target="#step-6-diagnose-the-batch-effect">Step 6 — Diagnose the batch effect</a></li>
+  <li><a href="#step-7-cross-tab-clusters-vs-cell-types-vs-samples" id="toc-step-7-cross-tab-clusters-vs-cell-types-vs-samples" class="nav-link" data-scroll-target="#step-7-cross-tab-clusters-vs-cell-types-vs-samples">Step 7 — Cross-tab clusters vs cell types vs samples</a></li>
   <li><a href="#save-and-continue-to-tutorial-03" id="toc-save-and-continue-to-tutorial-03" class="nav-link" data-scroll-target="#save-and-continue-to-tutorial-03">Save and continue to Tutorial 03</a></li>
   <li><a href="#credits" id="toc-credits" class="nav-link" data-scroll-target="#credits">Credits</a></li>
   </ul>
@@ -2203,7 +2203,7 @@ vertical-align: -.125em;
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">Tutorial 02 — scRNA-seq: Dimensionality Reduction &amp; Clustering</h1>
-<p class="subtitle lead">PCA, how many PCs, neighbor graph, Leiden at multiple resolutions, UMAP</p>
+<p class="subtitle lead">PCA, how many PCs, neighbor graph, Leiden at multiple resolutions, UMAP — and seeing the batch effect</p>
 </div>
 
 
@@ -2228,14 +2228,27 @@ vertical-align: -.125em;
 
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
-<p>Part two of the series. We start from the <strong>preprocessed object saved in Tutorial 01</strong> and walk through:</p>
+<p>Part two of the series. We start from the <strong>preprocessed object saved in Tutorial 01</strong> (the <code>ifnb</code> dataset — CTRL + STIM PBMCs joined together) and walk through:</p>
 <ul>
 <li>Linear dimensionality reduction with PCA</li>
 <li>Choosing how many PCs to keep</li>
 <li>Building the shared nearest-neighbor graph</li>
 <li>Clustering at multiple resolutions and comparing them</li>
-<li>UMAP embedding</li>
+<li>UMAP embedding — and an explicit look at the <strong>batch effect</strong> between samples</li>
 </ul>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>We deliberately do <strong>NOT</strong> run integration in this tutorial. Running PCA + clustering + UMAP on the unintegrated joint matrix lets you <strong>see</strong> what a batch effect looks like — cell types splitting into per-sample islands instead of co-clustering. Tutorial 04 will fix it. Until then, every UMAP we produce is a teaching artifact, not a final figure.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-tip callout-titled" title="How to use this page">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2249,7 +2262,7 @@ How to use this page
 <p>The rendered HTML shows the code but does <strong>not</strong> execute it. To run it:</p>
 <ol type="1">
 <li>Download the <code>.qmd</code> source: <a href="Tutorial_02_DimReduction_Clustering.qmd.txt" download="Tutorial_02_DimReduction_Clustering.qmd">Tutorial_02_DimReduction_Clustering.qmd</a>. If your browser saves the file as <code>Tutorial_02_DimReduction_Clustering.qmd.txt</code>, <strong>drop the trailing <code>.txt</code></strong> so the filename ends in <code>.qmd</code>, then open it in RStudio.</li>
-<li>Make sure you have completed <strong><a href="Tutorial_01_QC_Preprocessing.html">Tutorial 01</a></strong> — it writes the <code>nsclc_preprocessed.rds</code> that this tutorial loads.</li>
+<li>Make sure you have completed <strong><a href="Tutorial_01_QC_Preprocessing.html">Tutorial 01</a></strong> — it writes the <code>ifnb_preprocessed.rds</code> that this tutorial loads.</li>
 <li>Work through the chunks, flipping <code>eval: true</code> as you go.</li>
 </ol>
 </div>
@@ -2257,7 +2270,6 @@ How to use this page
 </section>
 <section id="dataset-resuming-from-tutorial-01" class="level2">
 <h2 class="anchored" data-anchor-id="dataset-resuming-from-tutorial-01">Dataset — resuming from Tutorial 01</h2>
-<p>This tutorial does not read the raw 10x <code>.h5</code> directly. Instead it loads the <code>.rds</code> written at the end of Tutorial 01:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -2273,9 +2285,9 @@ How to use this page
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>../data/nsclc_preprocessed.rds</code></td>
+<td><code>../data/ifnb_preprocessed.rds</code></td>
 <td>Tutorial 01</td>
-<td>A <code>Seurat</code> object with counts, per-cell QC metadata, log-normalized data, 2,000 HVGs, and scaled data.</td>
+<td>A <code>Seurat</code> object with raw + log-normalized counts for both samples (<code>stim ∈ {&quot;CTRL&quot;,&quot;STIM&quot;}</code>), 2,000 HVGs, scaled data, and the <code>seurat_annotations</code> ground-truth labels.</td>
 </tr>
 </tbody>
 </table>
@@ -2313,16 +2325,20 @@ How to use this page
 <tr class="even">
 <td><code>seu@assays$RNA@var.features</code></td>
 <td>character</td>
-<td>~2,000 highly variable gene symbols from <code>FindVariableFeatures()</code>.</td>
+<td>~2,000 highly variable gene symbols.</td>
 </tr>
 <tr class="odd">
-<td><code>seu@meta.data</code></td>
-<td>data frame</td>
-<td>Columns: <code>orig.ident</code>, <code>nCount_RNA</code>, <code>nFeature_RNA</code>, <code>percent.mt</code>. Row names are cell barcodes.</td>
+<td><code>seu@meta.data$stim</code></td>
+<td>factor</td>
+<td><code>&quot;CTRL&quot;</code> or <code>&quot;STIM&quot;</code>. The covariate we expect to see drive PC1/PC2.</td>
+</tr>
+<tr class="even">
+<td><code>seu@meta.data$seurat_annotations</code></td>
+<td>factor</td>
+<td>Author-curated cell-type labels.</td>
 </tr>
 </tbody>
 </table>
-<p>The upstream dataset is the <strong>10x 20k NSCLC DTC</strong> sample — see <a href="Tutorial_01_QC_Preprocessing.html">Tutorial 01</a> for its description and data dictionary.</p>
 </section>
 </section>
 <section id="learning-goals" class="level2">
@@ -2333,7 +2349,41 @@ How to use this page
 <li>Run <code>FindNeighbors()</code> → <code>FindClusters()</code> at several resolutions and inspect the difference</li>
 <li>Switch the active identity between clusterings with <code>Idents()</code></li>
 <li>Generate a UMAP and overlay cluster labels</li>
+<li><strong>Diagnose a batch effect</strong> by coloring the same UMAP by sample, by cluster, and by cell-type label</li>
 </ul>
+<div class="callout callout-style-default callout-warning callout-titled" title="Common errors / things that bite">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common errors / things that bite
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong><code>readRDS(&quot;../data/ifnb_preprocessed.rds&quot;)</code> fails</strong> — you didn’t complete Tutorial 01, or your working directory isn’t <code>Exercise_Folder/</code>. Run <code>getwd()</code> to check; the <code>..</code> in the path is relative to where the <code>.qmd</code> file sits. Re-run Tutorial 01 first.</p>
+<p><strong><code>FindClusters</code> is slow</strong> — install <code>presto</code> (<code>install.packages(&quot;presto&quot;)</code>); Seurat will detect it automatically and use a much faster Wilcoxon implementation throughout.</p>
+<p><strong><code>DimPlot</code> shows the wrong cluster column</strong> — <code>Idents()</code> defaults to <code>seurat_clusters</code>, which is the <em>most recent</em> <code>FindClusters()</code> resolution. To plot a different resolution, use <code>DimPlot(seu, group.by = &quot;RNA_snn_res.0.3&quot;)</code> instead of relying on <code>Idents()</code>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Solutions / instructor copy
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <em>Think about it</em> prompts on this page have inline answers (click “Show answer” / “Click for answer” to expand). For the full <strong>runnable instructor copy</strong> with every chunk pre-evaluated and outputs shown:</p>
+<ul>
+<li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
+<li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_02_DimReduction_Clustering.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
+</ul>
+<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
+</div>
+</div>
 </section>
 <section id="setup" class="level2">
 <h2 class="anchored" data-anchor-id="setup">Setup</h2>
@@ -2343,21 +2393,21 @@ How to use this page
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/nsclc_preprocessed.rds&quot;</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_preprocessed.rds&quot;</span>)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>ifnb</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <hr>
 </section>
 <section id="step-1-linear-dimensionality-reduction-pca" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-linear-dimensionality-reduction-pca">Step 1 — Linear dimensionality reduction (PCA)</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">RunPCA</span>(</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  nsclc.seurat.obj,</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">features =</span> <span class="fu">VariableFeatures</span>(<span class="at">object =</span> nsclc.seurat.obj)</span>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunPCA</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  ifnb,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">features =</span> <span class="fu">VariableFeatures</span>(<span class="at">object =</span> ifnb)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(nsclc.seurat.obj[[<span class="st">&quot;pca&quot;</span>]], <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="at">nfeatures =</span> <span class="dv">5</span>)</span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">DimHeatmap</span>(nsclc.seurat.obj, <span class="at">dims =</span> <span class="dv">1</span>, <span class="at">cells =</span> <span class="dv">500</span>, <span class="at">balanced =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(ifnb[[<span class="st">&quot;pca&quot;</span>]], <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="at">nfeatures =</span> <span class="dv">5</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">DimHeatmap</span>(ifnb, <span class="at">dims =</span> <span class="dv">1</span>, <span class="at">cells =</span> <span class="dv">500</span>, <span class="at">balanced =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2370,18 +2420,16 @@ Think about it
 </div>
 <div class="callout-body-container callout-body">
 <ol type="1">
+<li>Look at the top genes loading PC1. Do you recognize any <strong>interferon-stimulated genes</strong> (ISG15, IFI6, IFIT1, IFIT3, ISG20, MX1, OAS1)? What does that suggest about what PC1 is encoding?</li>
 <li>PCA here runs on HVGs, not all genes. What would change if we included all genes?</li>
-<li><code>DimHeatmap(dims = 1, cells = 500)</code> — why show only 500 cells per PC?</li>
-<li>What does a PC whose top loadings are all mitochondrial genes usually mean?</li>
 </ol>
 <details>
 <summary>
 Show answers
 </summary>
 <ol type="1">
+<li>PC1 in the unintegrated <code>ifnb</code> object is heavily loaded with ISGs because the IFN-β response is the largest source of variance in this dataset. <strong>PC1 is essentially <code>stim</code> (CTRL vs STIM)</strong> — i.e. the batch / condition axis, not a cell-type axis. That’s the batch effect we’ll fix in Tutorial 04.</li>
 <li>PCs would be dominated by highly-expressed housekeeping genes whose variance simply reflects sequencing depth. HVG-restricted PCA isolates biologically-variable signal.</li>
-<li>The heatmap orders cells along the PC and shows gene expression for the extreme low and high cells. 500 is enough to see the gradient; more would just smear the display and slow rendering.</li>
-<li>It’s a <strong>technical PC</strong> tracking cell quality / stress rather than biology. If it dominates, consider regressing <code>percent.mt</code> in <code>ScaleData</code>, or excluding it from downstream clustering dims.</li>
 </ol>
 </details>
 </div>
@@ -2390,7 +2438,7 @@ Show answers
 <section id="step-2-choose-how-many-pcs-to-keep" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-choose-how-many-pcs-to-keep">Step 2 — Choose how many PCs to keep</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ElbowPlot</span>(nsclc.seurat.obj, <span class="at">ndims =</span> <span class="dv">40</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ElbowPlot</span>(ifnb, <span class="at">ndims =</span> <span class="dv">40</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2404,7 +2452,6 @@ Think about it
 <div class="callout-body-container callout-body">
 <ol type="1">
 <li>Where is “the elbow” on an ElbowPlot, and why does it suggest a cutoff?</li>
-<li>What’s a principled alternative to eyeballing the elbow?</li>
 <li>Is it risky to choose too <em>few</em> PCs? Too <em>many</em>?</li>
 </ol>
 <details>
@@ -2413,20 +2460,19 @@ Show answers
 </summary>
 <ol type="1">
 <li>The elbow is where the variance explained per PC flattens out — additional PCs stop adding much signal. Picking the elbow captures most of the biological structure without the noise-heavy tail.</li>
-<li><code>JackStraw()</code> + <code>JackStrawPlot()</code> (permutation-based significance) is more principled but slow on large datasets. <code>Stuart et al. 2019</code> also showed that results are fairly robust across reasonable PC counts, so the heuristic is fine in practice.</li>
-<li><strong>Too few</strong> loses cell-type resolution (rare populations blur together). <strong>Too many</strong> pulls in noisy dimensions and inflates distances in the neighbor graph. Being slightly generous (e.g. 15–30) is usually safe.</li>
+<li><strong>Too few</strong> loses cell-type resolution (rare populations blur together). <strong>Too many</strong> pulls in noisy dimensions and inflates distances in the neighbor graph. Being slightly generous (e.g. 15–30) is usually safe; for <code>ifnb</code> the elbow sits around PC15–PC20.</li>
 </ol>
 </details>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>n_pcs <span class="ot">&lt;-</span> <span class="dv">15</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>n_pcs <span class="ot">&lt;-</span> <span class="dv">20</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="step-3-build-the-neighbor-graph" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-build-the-neighbor-graph">Step 3 — Build the neighbor graph</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(nsclc.seurat.obj, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span>n_pcs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(ifnb, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span>n_pcs)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2457,12 +2503,12 @@ Show answers
 <section id="step-4-cluster-at-several-resolutions" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-cluster-at-several-resolutions">Step 4 — Cluster at several resolutions</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  nsclc.seurat.obj,</span>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  ifnb,</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">resolution =</span> <span class="fu">c</span>(<span class="fl">0.1</span>, <span class="fl">0.3</span>, <span class="fl">0.5</span>, <span class="fl">0.7</span>, <span class="fl">1.0</span>)</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(nsclc.seurat.obj<span class="sc">@</span>meta.data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(ifnb<span class="sc">@</span>meta.data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2477,7 +2523,6 @@ Think about it
 <ol type="1">
 <li>What does <code>resolution</code> control intuitively?</li>
 <li>Each resolution creates its own <code>RNA_snn_res.XYZ</code> column in the metadata. How do you make one of them the <em>active</em> identity?</li>
-<li>Try <code>clustree::clustree(nsclc.seurat.obj, prefix = &quot;RNA_snn_res.&quot;)</code>. What does it show?</li>
 </ol>
 <details>
 <summary>
@@ -2485,20 +2530,35 @@ Show answers
 </summary>
 <ol type="1">
 <li>The granularity knob for the graph-based community detection. Higher resolution ⇒ smaller, more numerous clusters.</li>
-<li><code>Idents(nsclc.seurat.obj) &lt;- &quot;RNA_snn_res.0.3&quot;</code> — or any of the resolution columns. <code>DimPlot(..., group.by = &quot;RNA_snn_res.0.3&quot;)</code> also works without changing active idents.</li>
-<li>A <strong>clustering tree</strong>: each row is a resolution, each node is a cluster, and edges show how cells flow from one resolution to the next. Stable clusters stay as one node across levels; unstable ones fragment. It’s a great way to pick a resolution visually.</li>
+<li><code>Idents(ifnb) &lt;- &quot;RNA_snn_res.0.5&quot;</code> — or any of the resolution columns. <code>DimPlot(..., group.by = &quot;RNA_snn_res.0.5&quot;)</code> also works without changing active idents.</li>
 </ol>
 </details>
 </div>
 </div>
 </section>
-<section id="step-5-visualize-cluster-counts-across-resolutions" class="level2">
-<h2 class="anchored" data-anchor-id="step-5-visualize-cluster-counts-across-resolutions">Step 5 — Visualize cluster counts across resolutions</h2>
+<section id="step-5-umap" class="level2">
+<h2 class="anchored" data-anchor-id="step-5-umap">Step 5 — UMAP</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># quick summary of cluster counts per resolution</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="fu">starts_with</span>(<span class="st">&quot;RNA_snn_res.&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_int</span>(<span class="sc">~</span> <span class="fu">length</span>(<span class="fu">unique</span>(.x)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(ifnb, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span>n_pcs)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(ifnb) <span class="ot">&lt;-</span> <span class="st">&quot;RNA_snn_res.0.5&quot;</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">ggtitle</span>(<span class="st">&quot;Unintegrated — clusters&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="step-6-diagnose-the-batch-effect" class="level2">
+<h2 class="anchored" data-anchor-id="step-6-diagnose-the-batch-effect">Step 6 — Diagnose the batch effect</h2>
+<p>This is the key exercise. The UMAP above is colored by cluster. Now color the <em>same UMAP</em> by <strong>sample</strong> and by <strong>author cell-type label</strong> and compare.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>p_by_sample <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>) <span class="sc">+</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">&quot;Unintegrated — by sample (stim)&quot;</span>)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>p_by_celltype <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;seurat_annotations&quot;</span>,</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>                         <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">&quot;Unintegrated — by author cell-type&quot;</span>)</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>p_by_sample</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>p_by_celltype</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2511,37 +2571,34 @@ Think about it
 </div>
 <div class="callout-body-container callout-body">
 <ol type="1">
-<li>At <code>res = 0.1</code> you might see 6 clusters; at <code>res = 1.0</code> you might see 20+. Which is “right”?</li>
-<li>Does changing resolution change the <em>underlying biology</em> or just how the same biology is partitioned?</li>
+<li>In the <strong>by-sample</strong> plot, do the CTRL and STIM cells overlap, or do they form parallel islands?</li>
+<li>In the <strong>by-cell-type</strong> plot, does each cell type form one cluster or several? If a cell type splits, how does its split correlate with sample?</li>
+<li>Cross-tabulate: <code>table(ifnb$RNA_snn_res.0.5, ifnb$stim)</code>. Are any clusters mostly CTRL? Mostly STIM?</li>
+<li>Based on these three diagnostics, do you need to integrate?</li>
 </ol>
 <details>
 <summary>
 Show answers
 </summary>
 <ol type="1">
-<li>Neither is objectively right. Resolution is a <strong>knob</strong> — choose the one that matches the biological question. For a broad cell-type atlas, lower resolution is fine; to split subtypes, you need higher. Confirm with markers.</li>
-<li>Just the partitioning. The underlying graph and cell embeddings are unchanged — resolution decides where to draw the cluster boundaries.</li>
+<li>CTRL and STIM cells form <strong>largely parallel structures</strong>. Many cell-type clusters appear twice — once for CTRL, once for STIM — because the IFN-β response shifts every cell along PC1.</li>
+<li>Most cell types <strong>split into two sister clusters</strong>, with the split tracking <code>stim</code>. T cells appear once on the CTRL side and once on the STIM side; same for monocytes, B cells, NK cells, etc. This is the classic “per-sample islands” pattern — the batch / condition axis dominates the embedding.</li>
+<li>Most clusters at <code>res = 0.5</code> will be &gt;80% one sample. Some are &gt;95% one sample.</li>
+<li>Yes. The batch axis is dominating PC1 and is splitting biologically identical cell types across two clusters. <strong>Tutorial 04</strong> will integrate the data with Harmony and Seurat anchors, and you’ll see the same cells re-arrange into shared, sample-mixed clusters.</li>
 </ol>
 </details>
 </div>
 </div>
 </section>
-<section id="step-6-pick-a-resolution-set-identities-and-plot" class="level2">
-<h2 class="anchored" data-anchor-id="step-6-pick-a-resolution-set-identities-and-plot">Step 6 — Pick a resolution, set identities, and plot</h2>
+<section id="step-7-cross-tab-clusters-vs-cell-types-vs-samples" class="level2">
+<h2 class="anchored" data-anchor-id="step-7-cross-tab-clusters-vs-cell-types-vs-samples">Step 7 — Cross-tab clusters vs cell types vs samples</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(nsclc.seurat.obj) <span class="ot">&lt;-</span> <span class="st">&quot;RNA_snn_res.0.5&quot;</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  nsclc.seurat.obj,</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">group.by =</span> <span class="st">&quot;RNA_snn_res.0.5&quot;</span>,</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">label    =</span> <span class="cn">TRUE</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-</section>
-<section id="step-7-non-linear-embedding-umap" class="level2">
-<h2 class="anchored" data-anchor-id="step-7-non-linear-embedding-umap">Step 7 — Non-linear embedding (UMAP)</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>nsclc.seurat.obj <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(nsclc.seurat.obj, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span>n_pcs)</span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(nsclc.seurat.obj, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Clusters × samples — how mixed is each cluster across CTRL / STIM?</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">prop.table</span>(<span class="fu">table</span>(<span class="at">cluster =</span> ifnb<span class="sc">$</span>RNA_snn_res.<span class="fl">0.5</span>, <span class="at">sample =</span> ifnb<span class="sc">$</span>stim), <span class="at">margin =</span> <span class="dv">1</span>) <span class="sc">|&gt;</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">round</span>(<span class="dv">2</span>)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Clusters × cell types — how clean is each cluster&#39;s biological identity?</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(<span class="at">cluster =</span> ifnb<span class="sc">$</span>RNA_snn_res.<span class="fl">0.5</span>, <span class="at">celltype =</span> ifnb<span class="sc">$</span>seurat_annotations)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2554,16 +2611,16 @@ Think about it
 </div>
 <div class="callout-body-container callout-body">
 <ol type="1">
-<li>Clusters are defined on the graph, <em>not</em> on UMAP. How can clustering and UMAP disagree visually?</li>
-<li>Why shouldn’t you compare UMAP distances quantitatively between clusters?</li>
+<li>A “good” cluster on integrated data would be ~50/50 CTRL/STIM (because both samples have all cell types) and dominated by a single cell-type label. Are any of your unintegrated clusters like that already? Why might some be more sample-mixed than others?</li>
+<li>What’s the lowest-abundance cell-type label in <code>seurat_annotations</code>? Does it split across two clusters or stay together?</li>
 </ol>
 <details>
 <summary>
 Show answers
 </summary>
 <ol type="1">
-<li>UMAP is a separate non-linear projection. A cluster may occasionally split visually on UMAP while still being one graph community — and vice versa. Trust the graph-based cluster call; use UMAP as a sanity check.</li>
-<li>UMAP preserves <em>local</em> neighborhoods but distorts <em>global</em> distances to fit in 2D. A cluster that looks far away on UMAP isn’t necessarily biologically more distant than one nearby.</li>
+<li>A few clusters — typically very small populations like dendritic cells (DC) or megakaryocytes (Mk) — may already mix CTRL/STIM, because their absolute interferon response is small enough that other biology dominates their distance to PC1. Most clusters won’t.</li>
+<li>Often DC, Mk, or eryth (&lt;2% each). Whether they split tells you something about how strong the IFN response is in those cells; rare cell types with weak ISG responses sometimes survive the unintegrated UMAP intact, while big subsets like CD14 monocytes split cleanly along the CTRL/STIM axis.</li>
 </ol>
 </details>
 </div>
@@ -2572,7 +2629,7 @@ Show answers
 <section id="save-and-continue-to-tutorial-03" class="level2">
 <h2 class="anchored" data-anchor-id="save-and-continue-to-tutorial-03">Save and continue to Tutorial 03</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(nsclc.seurat.obj, <span class="at">file =</span> <span class="st">&quot;../data/nsclc_clustered.rds&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(ifnb, <span class="at">file =</span> <span class="st">&quot;../data/ifnb_clustered.rds&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -2584,15 +2641,16 @@ Tip
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Continue with <strong>Tutorial 03 — Markers &amp; Cell Type Annotation</strong>.</p>
+<p>Continue with <strong>Tutorial 03 — Markers &amp; Cell Type Annotation</strong>. We’ll do annotation on the unintegrated clusters first (it’s still possible — markers are cell-type-driven even when the embedding is sample-driven), then in <strong>Tutorial 04</strong> we’ll redo PCA + clustering on the integrated representation and watch the embedding reorganize.</p>
 </div>
 </div>
 </section>
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>
 <ul>
-<li>Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow</li>
-<li>References: <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial.html">Seurat PBMC 3k tutorial</a> · <a href="https://cran.r-project.org/package=clustree">clustree</a></li>
+<li>Dataset: <code>ifnb</code> from the <code>SeuratData</code> package — Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em> 36: 89–94</li>
+<li>Reference vignettes: <a href="https://satijalab.org/seurat/articles/integration_introduction.html">Seurat integration tutorial</a> · <a href="https://cran.r-project.org/package=clustree">clustree</a></li>
+<li>Inspiration: <a href="https://integrativebioinformatics.github.io/scNotebooks/">scNotebooks</a></li>
 </ul>
 </section>
 

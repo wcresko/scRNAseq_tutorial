@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Tutorial 05 — Reference-based Annotation (SingleR + Azimuth)</title>
+<title>Tutorial 10 — scATAC-seq with Signac</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -2179,19 +2179,30 @@ vertical-align: -.125em;
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#about-this-tutorial" id="toc-about-this-tutorial" class="nav-link active" data-scroll-target="#about-this-tutorial">About this tutorial</a></li>
-  <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a></li>
-  <li><a href="#path-1-singler-against-a-celldex-reference" id="toc-path-1-singler-against-a-celldex-reference" class="nav-link" data-scroll-target="#path-1-singler-against-a-celldex-reference">Path 1 — <code>SingleR</code> against a <code>celldex</code> reference</a>
+  <li><a href="#about-this-exercise" id="toc-about-this-exercise" class="nav-link active" data-scroll-target="#about-this-exercise">About this exercise</a></li>
+  <li><a href="#dataset-pbmc-10k-scatac-seq-v1-10x-genomics-hg19" id="toc-dataset-pbmc-10k-scatac-seq-v1-10x-genomics-hg19" class="nav-link" data-scroll-target="#dataset-pbmc-10k-scatac-seq-v1-10x-genomics-hg19">Dataset — PBMC 10k scATAC-seq v1 (10x Genomics, hg19)</a>
   <ul class="collapse">
-  <li><a href="#pick-a-reference" id="toc-pick-a-reference" class="nav-link" data-scroll-target="#pick-a-reference">Pick a reference</a></li>
-  <li><a href="#score-distribution-plot-a-built-in-confidence-check" id="toc-score-distribution-plot-a-built-in-confidence-check" class="nav-link" data-scroll-target="#score-distribution-plot-a-built-in-confidence-check">Score-distribution plot — a built-in confidence check</a></li>
+  <li><a href="#download-with-wget-or-curl" id="toc-download-with-wget-or-curl" class="nav-link" data-scroll-target="#download-with-wget-or-curl">Download with <code>wget</code> or <code>curl</code></a></li>
   </ul></li>
-  <li><a href="#path-2-azimuth-seurat-reference-mapping" id="toc-path-2-azimuth-seurat-reference-mapping" class="nav-link" data-scroll-target="#path-2-azimuth-seurat-reference-mapping">Path 2 — Azimuth (Seurat reference mapping)</a></li>
-  <li><a href="#compare-the-three-annotations" id="toc-compare-the-three-annotations" class="nav-link" data-scroll-target="#compare-the-three-annotations">Compare the three annotations</a></li>
-  <li><a href="#reconcile-disagreements" id="toc-reconcile-disagreements" class="nav-link" data-scroll-target="#reconcile-disagreements">Reconcile disagreements</a></li>
-  <li><a href="#save-the-final-annotated-object" id="toc-save-the-final-annotated-object" class="nav-link" data-scroll-target="#save-the-final-annotated-object">Save the final annotated object</a></li>
-  <li><a href="#wrap-up" id="toc-wrap-up" class="nav-link" data-scroll-target="#wrap-up">Wrap-up</a></li>
-  <li><a href="#see-also" id="toc-see-also" class="nav-link" data-scroll-target="#see-also">See also</a></li>
+  <li><a href="#learning-goals" id="toc-learning-goals" class="nav-link" data-scroll-target="#learning-goals">Learning goals</a></li>
+  <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a></li>
+  <li><a href="#data-files-and-data-dictionary" id="toc-data-files-and-data-dictionary" class="nav-link" data-scroll-target="#data-files-and-data-dictionary">Data files and data dictionary</a>
+  <ul class="collapse">
+  <li><a href="#filtered_peak_bc_matrix.h5" id="toc-filtered_peak_bc_matrix.h5" class="nav-link" data-scroll-target="#filtered_peak_bc_matrix.h5"><code>filtered_peak_bc_matrix.h5</code></a></li>
+  <li><a href="#fragments.tsv.gz-bgzipped-tabix-indexed" id="toc-fragments.tsv.gz-bgzipped-tabix-indexed" class="nav-link" data-scroll-target="#fragments.tsv.gz-bgzipped-tabix-indexed"><code>fragments.tsv.gz</code> (bgzipped, tabix-indexed)</a></li>
+  <li><a href="#singlecell.csv-per-barcode-cell-ranger-summary" id="toc-singlecell.csv-per-barcode-cell-ranger-summary" class="nav-link" data-scroll-target="#singlecell.csv-per-barcode-cell-ranger-summary"><code>singlecell.csv</code> (per-barcode Cell Ranger summary)</a></li>
+  </ul></li>
+  <li><a href="#step-1-peek-at-the-fragment-file" id="toc-step-1-peek-at-the-fragment-file" class="nav-link" data-scroll-target="#step-1-peek-at-the-fragment-file">Step 1 — Peek at the fragment file</a></li>
+  <li><a href="#step-2-load-the-peaks-matrix-and-create-the-object" id="toc-step-2-load-the-peaks-matrix-and-create-the-object" class="nav-link" data-scroll-target="#step-2-load-the-peaks-matrix-and-create-the-object">Step 2 — Load the peaks matrix and create the object</a></li>
+  <li><a href="#step-3-add-gene-annotation" id="toc-step-3-add-gene-annotation" class="nav-link" data-scroll-target="#step-3-add-gene-annotation">Step 3 — Add gene annotation</a></li>
+  <li><a href="#step-4-compute-atac-specific-qc-metrics" id="toc-step-4-compute-atac-specific-qc-metrics" class="nav-link" data-scroll-target="#step-4-compute-atac-specific-qc-metrics">Step 4 — Compute ATAC-specific QC metrics</a></li>
+  <li><a href="#step-5-visualize-qc" id="toc-step-5-visualize-qc" class="nav-link" data-scroll-target="#step-5-visualize-qc">Step 5 — Visualize QC</a></li>
+  <li><a href="#step-6-filter-low-quality-cells" id="toc-step-6-filter-low-quality-cells" class="nav-link" data-scroll-target="#step-6-filter-low-quality-cells">Step 6 — Filter low-quality cells</a></li>
+  <li><a href="#step-7-tf-idf-normalization-top-features-svd" id="toc-step-7-tf-idf-normalization-top-features-svd" class="nav-link" data-scroll-target="#step-7-tf-idf-normalization-top-features-svd">Step 7 — TF-IDF normalization, top features, SVD</a></li>
+  <li><a href="#step-8-non-linear-embedding-and-clustering" id="toc-step-8-non-linear-embedding-and-clustering" class="nav-link" data-scroll-target="#step-8-non-linear-embedding-and-clustering">Step 8 — Non-linear embedding and clustering</a></li>
+  <li><a href="#save-the-object" id="toc-save-the-object" class="nav-link" data-scroll-target="#save-the-object">Save the object</a></li>
+  <li><a href="#stretch-goals" id="toc-stretch-goals" class="nav-link" data-scroll-target="#stretch-goals">Stretch goals</a></li>
+  <li><a href="#credits" id="toc-credits" class="nav-link" data-scroll-target="#credits">Credits</a></li>
   </ul>
 </nav>
 </div>
@@ -2199,8 +2210,8 @@ vertical-align: -.125em;
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Tutorial 05 — Reference-based Annotation (SingleR + Azimuth)</h1>
-<p class="subtitle lead">Map cells against a labeled reference for fast, reproducible cell-type calls</p>
+<h1 class="title">Tutorial 10 — scATAC-seq with Signac</h1>
+<p class="subtitle lead">From peaks matrix to clustered cells (PBMC 10k v1, 10x — same dataset as Patel’s <code>scATACSeq_standard_workflow.R</code>)</p>
 </div>
 
 
@@ -2223,14 +2234,13 @@ vertical-align: -.125em;
 </header>
 
 
-<section id="about-this-tutorial" class="level2">
-<h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
-<p>A short hands-on companion to <strong><a href="../Lecture_Folder/Lecture_05_Reference_Annotation.html">Lecture 05 — Reference-based Annotation</a></strong>. We start from the <strong>clustered object saved in Tutorial 02</strong> and:</p>
+<section id="about-this-exercise" class="level2">
+<h2 class="anchored" data-anchor-id="about-this-exercise">About this exercise</h2>
+<p>A parallel to the scRNA-seq tutorial series — but for <strong>chromatin accessibility</strong> (scATAC-seq). The workflow follows the standard <strong>Signac</strong> pipeline from the Stuart Lab on the 10x PBMC 10k scATAC-seq dataset, <strong>the same dataset Patel uses in <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R"><code>scATACSeq_standard_workflow.R</code></a></strong>.</p>
 <ul>
-<li>Run <code>SingleR</code> against a built-in <code>celldex</code> reference</li>
-<li>Run <code>Azimuth</code> against the PBMC reference (workshop default; substitute <code>pbmcref</code> with another for your own data)</li>
-<li>Compare the two automatic calls against your manual labels from Tutorial 03</li>
-<li>Reconcile disagreements and save a final, reference-validated annotation</li>
+<li>Reference vignette: <a href="https://stuartlab.org/signac/articles/pbmc_vignette">Signac PBMC scATAC-seq vignette</a></li>
+<li>Companion lecture: <a href="../Lecture_Folder/Lecture_08_ATACseq.html">Lecture 08 — Bulk + scATAC-seq</a></li>
+<li>Alternative toolkit walkthrough: <a href="https://integrativebioinformatics.github.io/scNotebooks/modules/en/module11/module11.html">scNotebooks Module 11</a> does the same kind of analysis with <strong>ArchR</strong> (peak calling, motif enrichment, TF regulators, scATAC↔︎scRNA integration, trajectory) on Kumegawa <em>et al.</em> 2022 breast-cancer data — a useful cross-toolkit reference</li>
 </ul>
 <div class="callout callout-style-default callout-tip callout-titled" title="How to use this page">
 <div class="callout-header d-flex align-content-center">
@@ -2244,60 +2254,319 @@ How to use this page
 <div class="callout-body-container callout-body">
 <p>The rendered HTML shows the code but does <strong>not</strong> execute it. To run it:</p>
 <ol type="1">
-<li>Download the <code>.qmd</code> source: <a href="Tutorial_05_Reference_Annotation.qmd.txt" download="Tutorial_05_Reference_Annotation.qmd">Tutorial_05_Reference_Annotation.qmd</a>. If your browser saves the file as <code>Tutorial_05_Reference_Annotation.qmd.txt</code>, <strong>drop the trailing <code>.txt</code></strong> so the filename ends in <code>.qmd</code>, then open it in RStudio.</li>
-<li>Make sure you’ve completed <strong><a href="Tutorial_02_DimReduction_Clustering.html">Tutorial 02</a></strong> and <strong><a href="Tutorial_03_Markers_Annotation.html">Tutorial 03</a></strong> first.</li>
+<li>Download the <code>.qmd</code> source: <a href="Tutorial_10_scATACseq_Signac.qmd.txt" download="Tutorial_10_scATACseq_Signac.qmd">Tutorial_10_scATACseq_Signac.qmd</a>. If your browser saves the file as <code>Tutorial_10_scATACseq_Signac.qmd.txt</code>, <strong>drop the trailing <code>.txt</code></strong> so the filename ends in <code>.qmd</code>, then open it in RStudio.</li>
+<li>Download the data files (block below) into <code>../data/</code>.</li>
 <li>Work through the chunks, flipping <code>eval: true</code> as you go.</li>
 </ol>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="What&#39;s different about ATAC-seq?">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+What’s different about ATAC-seq?
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>ATAC-seq measures <strong>open chromatin</strong> (regions accessible to Tn5), not transcription. The raw unit is a <strong>fragment</strong> (a pair of Tn5 cut sites). The “features” are <strong>peaks</strong> — genomic intervals of accessibility — rather than genes. Most of the Seurat idioms carry over, but the <strong>normalization</strong>, <strong>dimensionality reduction</strong>, and <strong>QC metrics</strong> are ATAC-specific.</p>
+</div>
+</div>
+</section>
+<section id="dataset-pbmc-10k-scatac-seq-v1-10x-genomics-hg19" class="level2">
+<h2 class="anchored" data-anchor-id="dataset-pbmc-10k-scatac-seq-v1-10x-genomics-hg19">Dataset — PBMC 10k scATAC-seq v1 (10x Genomics, hg19)</h2>
+<p><strong>What it is.</strong> Approximately ten-thousand human <strong>peripheral blood mononuclear cells (PBMCs)</strong> from a single healthy donor, run on the 10x Chromium <strong>Single Cell ATAC v1</strong> assay. This is the canonical tutorial dataset used across Signac, ArchR, and EpiScanpy vignettes — and is the dataset referenced in Patel’s tutorial.</p>
+<ul>
+<li>Landing page: <a href="https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0">10x Genomics — PBMC 10k scATAC-seq v1 (hg19)</a></li>
+<li>Reference genome: <strong>hg19 / GRCh37</strong> (hence <code>EnsDb.Hsapiens.v75</code> below)</li>
+<li>Chemistry: 10x Chromium Single Cell ATAC v1</li>
+<li>Cell count: ~8,700 post-filter cells</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Only the <strong>v1</strong> release is pinned to hg19. The <em>Next GEM v1.1</em> re-release of the same sample is mapped to <strong>hg38</strong> and uses file names prefixed with <code>atac_v1_pbmc_10k_nextgem_*</code>. This exercise — like Patel’s tutorial — assumes the original hg19 release.</p>
+</div>
+</div>
+<section id="download-with-wget-or-curl" class="level3">
+<h3 class="anchored" data-anchor-id="download-with-wget-or-curl">Download with <code>wget</code> or <code>curl</code></h3>
+<p>Direct CDN links for the v1 hg19 release. Place all four files into <code>../data/</code> (relative to the tutorial).</p>
+<p>With <code>wget</code>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> ../data</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>With <code>curl</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> ../data</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-L</span> <span class="at">-O</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The optional <code>pre-processed scRNA-seq</code> companion (used for label transfer in the Signac vignette) lives at <a href="https://signac-objects.s3.amazonaws.com/pbmc_10k_v3.rds" class="uri">https://signac-objects.s3.amazonaws.com/pbmc_10k_v3.rds</a> — pull it the same way if you want to reproduce the RNA-anchored annotation step.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="learning-goals" class="level2">
+<h2 class="anchored" data-anchor-id="learning-goals">Learning goals</h2>
+<p>By the end of this exercise you will be able to:</p>
+<ul>
+<li>Load peak-count and fragment data into a Signac <code>ChromatinAssay</code> inside a Seurat object</li>
+<li>Compute and interpret ATAC-specific QC metrics (nucleosome signal, TSS enrichment, blacklist ratio, peak-read fraction)</li>
+<li>Run TF-IDF normalization and SVD (LSI) on accessibility data</li>
+<li>Produce a UMAP and cluster scATAC-seq cells</li>
+</ul>
+<div class="callout callout-style-default callout-warning callout-titled" title="Common errors / things that bite">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Common errors / things that bite
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong><code>EnsDb.Hsapiens.v75</code> (hg19) doesn’t match the data</strong> — the workshop’s PBMC 10k v1 dataset is on hg19. The newer “Next GEM v1.1” release of the same sample is on hg38 and has filenames prefixed <code>atac_v1_pbmc_10k_nextgem_*</code>. Mixing them produces bizarre coordinate errors. Use <code>v75</code> (hg19) with the v1 hg19 dataset, or <code>v86</code> (hg38) with the Next GEM hg38 dataset.</p>
+<p><strong><code>fragments.tsv.gz</code> is missing its <code>.tbi</code> index</strong> — Signac uses <code>Rsamtools</code> to query the fragments file by genomic region; without <code>.tbi</code> it can’t seek. Both files must be present and the <code>.tbi</code> must be newer than the <code>.tsv.gz</code>. Run <code>tabix fragments.tsv.gz</code> to regenerate.</p>
+<p><strong><code>CreateChromatinAssay</code> warns about “duplicate fragments”</strong> — usually safe to ignore; happens when the same fragment is recorded under different cell barcodes. If the warning rate is high (&gt; 5%), suspect a sample-mixing issue upstream.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Solutions / instructor copy
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <em>Think about it</em> prompts on this page have inline answers (click “Show answer” / “Click for answer” to expand). For the full <strong>runnable instructor copy</strong> with every chunk pre-evaluated and outputs shown:</p>
+<ul>
+<li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
+<li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_10_scATACseq_Signac.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
+</ul>
+<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
 </div>
 </div>
 </section>
 <section id="setup" class="level2">
 <h2 class="anchored" data-anchor-id="setup">Setup</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleR)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(celldex)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleCellExperiment)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/nsclc_annotated.rds&quot;</span>)</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;celltype&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># One-time install:</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># remotes::install_github(&quot;stuart-lab/signac&quot;, ref = &quot;develop&quot;)</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># install.packages(&quot;Matrix&quot;, type = &quot;source&quot;)</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># install.packages(&quot;irlba&quot;,  type = &quot;source&quot;)</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="co"># BiocManager::install(&quot;EnsDb.Hsapiens.v75&quot;)</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Signac)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(EnsDb.Hsapiens.v75)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
-<section id="path-1-singler-against-a-celldex-reference" class="level2">
-<h2 class="anchored" data-anchor-id="path-1-singler-against-a-celldex-reference">Path 1 — <code>SingleR</code> against a <code>celldex</code> reference</h2>
-<p><code>SingleR</code> correlates each query cell’s expression against per-label reference profiles and returns the best-matching label.</p>
-<section id="pick-a-reference" class="level3">
-<h3 class="anchored" data-anchor-id="pick-a-reference">Pick a reference</h3>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bulk reference covering 37 main cell types from purified human samples</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>ref <span class="ot">&lt;-</span> celldex<span class="sc">::</span><span class="fu">HumanPrimaryCellAtlasData</span>()</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run SingleR on the (log-)normalized counts</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>sce  <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(seu)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>pred <span class="ot">&lt;-</span> <span class="fu">SingleR</span>(<span class="at">test =</span> sce, <span class="at">ref =</span> ref,</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>                <span class="at">labels =</span> ref<span class="sc">$</span>label.main,</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>                <span class="at">assay.type.test =</span> <span class="st">&quot;logcounts&quot;</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                <span class="at">BPPARAM =</span> BiocParallel<span class="sc">::</span><span class="fu">SerialParam</span>())</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(pred<span class="sc">$</span>labels)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p>Attach the calls back to the Seurat object:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>singler_label <span class="ot">&lt;-</span> pred<span class="sc">$</span>labels</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>singler_score <span class="ot">&lt;-</span> <span class="fu">apply</span>(pred<span class="sc">$</span>scores, <span class="dv">1</span>, max)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;singler_label&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
+<section id="data-files-and-data-dictionary" class="level2">
+<h2 class="anchored" data-anchor-id="data-files-and-data-dictionary">Data files and data dictionary</h2>
+<p>You will need three files from the 10x PBMC 10k scATAC-seq release, placed under <code>../data/</code>. All three are available under “Output and supplemental files” on the <a href="https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-next-gem-v-1-1-1-1-standard-2-0-0">10x landing page</a>.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>File</th>
+<th>Size</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</code></td>
+<td>~30 MB</td>
+<td>peak × barcode counts (sparse, filtered to called cells)</td>
+</tr>
+<tr class="even">
+<td><code>atac_v1_pbmc_10k_fragments.tsv.gz</code> + <code>.tbi</code></td>
+<td>~1.8 GB + ~1 MB</td>
+<td>per-fragment record (tabix-indexed)</td>
+</tr>
+<tr class="odd">
+<td><code>atac_v1_pbmc_10k_singlecell.csv</code></td>
+<td>~20 MB</td>
+<td>per-barcode Cell Ranger ATAC summary</td>
+</tr>
+</tbody>
+</table>
+<section id="filtered_peak_bc_matrix.h5" class="level3">
+<h3 class="anchored" data-anchor-id="filtered_peak_bc_matrix.h5"><code>filtered_peak_bc_matrix.h5</code></h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dimension</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>rows</td>
+<td>character</td>
+<td><strong>Peak coordinates</strong> as <code>chrom:start-end</code> strings (e.g. <code>chr1:10279-10779</code>). Peaks are fixed-width genomic intervals called by Cell Ranger.</td>
+</tr>
+<tr class="even">
+<td>cols</td>
+<td>character</td>
+<td><strong>Cell barcodes</strong> (16 bp + <code>-1</code> GEM-well suffix).</td>
+</tr>
+<tr class="odd">
+<td>values</td>
+<td>integer</td>
+<td>Number of <strong>Tn5 fragments</strong> from that cell whose midpoint falls inside that peak.</td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="score-distribution-plot-a-built-in-confidence-check" class="level3">
-<h3 class="anchored" data-anchor-id="score-distribution-plot-a-built-in-confidence-check">Score-distribution plot — a built-in confidence check</h3>
+<section id="fragments.tsv.gz-bgzipped-tabix-indexed" class="level3">
+<h3 class="anchored" data-anchor-id="fragments.tsv.gz-bgzipped-tabix-indexed"><code>fragments.tsv.gz</code> (bgzipped, tabix-indexed)</h3>
+<p>Tab-separated, one row per unique fragment. Five columns:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>#</th>
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td><code>chrom</code></td>
+<td>Chromosome (<code>chr1</code> … <code>chrY</code>, plus contigs).</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td><code>start</code></td>
+<td>0-based start of the fragment (= position of one Tn5 cut).</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td><code>end</code></td>
+<td>0-based exclusive end of the fragment (= position of the other Tn5 cut).</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td><code>cell_barcode</code></td>
+<td>10x cell barcode (matches column names of the peak matrix).</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td><code>duplicate_count</code></td>
+<td>Number of PCR-duplicate reads collapsed into this fragment (&gt; 1 means the same fragment was sequenced multiple times).</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="singlecell.csv-per-barcode-cell-ranger-summary" class="level3">
+<h3 class="anchored" data-anchor-id="singlecell.csv-per-barcode-cell-ranger-summary"><code>singlecell.csv</code> (per-barcode Cell Ranger summary)</h3>
+<p>One row per barcode. Relevant columns (not exhaustive — 10x produces ~20 columns):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Column</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>barcode</code></td>
+<td>10x barcode string (row names in <code>read.csv(..., row.names = 1)</code>).</td>
+</tr>
+<tr class="even">
+<td><code>is__cell_barcode</code></td>
+<td>Boolean flag, Cell Ranger’s call of “this barcode is a real cell”.</td>
+</tr>
+<tr class="odd">
+<td><code>total</code></td>
+<td>Total read pairs assigned to this barcode.</td>
+</tr>
+<tr class="even">
+<td><code>passed_filters</code></td>
+<td>Reads passing all Cell Ranger ATAC QC filters.</td>
+</tr>
+<tr class="odd">
+<td><code>peak_region_fragments</code></td>
+<td>Fragments falling within a called peak. Numerator for <code>pct_reads_in_peaks</code>.</td>
+</tr>
+<tr class="even">
+<td><code>blacklist_region_fragments</code></td>
+<td>Fragments falling inside the ENCODE blacklist. Numerator for <code>blacklist_ratio</code>.</td>
+</tr>
+<tr class="odd">
+<td><code>TSS_fragments</code></td>
+<td>Fragments within ± flank of a TSS.</td>
+</tr>
+<tr class="even">
+<td><code>mitochondrial</code></td>
+<td>Fragments mapping to chrM.</td>
+</tr>
+<tr class="odd">
+<td><code>duplicate</code></td>
+<td>PCR-duplicate fragments.</td>
+</tr>
+</tbody>
+</table>
+<p>These columns feed directly into the ATAC QC metrics computed in Step 4.</p>
+<hr>
+</section>
+</section>
+<section id="step-1-peek-at-the-fragment-file" class="level2">
+<h2 class="anchored" data-anchor-id="step-1-peek-at-the-fragment-file">Step 1 — Peek at the fragment file</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plotScoreHeatmap</span>(pred)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">plotDeltaDistribution</span>(pred)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>frag.file <span class="ot">&lt;-</span> <span class="fu">read.delim</span>(</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;../data/atac_v1_pbmc_10k_fragments.tsv.gz&quot;</span>,</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">header =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">nrows  =</span> <span class="dv">10</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(frag.file)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2309,39 +2578,49 @@ Think about it
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>Some cells will get a label like <code>&quot;Macrophage&quot;</code> with <code>delta</code> close to zero. What does that mean and what should you do about it?</p>
+<ol type="1">
+<li>A fragment file has one line per Tn5 fragment. What are the five columns typically recorded?</li>
+<li>Why do we keep the fragment file around instead of just using the peak-counts matrix?</li>
+</ol>
 <details>
 <summary>
-Click for answer
+Show answers
 </summary>
-<p><code>delta</code> is the gap between the cell’s top-label score and the median score across all labels. A small <code>delta</code> means the reference can’t decide — the cell either looks ambiguous (multiple types fit equally well) or is a type the reference doesn’t contain.</p>
-<p>In practice: prune low-confidence calls (<code>pruneScores()</code> from SingleR), and trust your manual marker-based label more for those cells.</p>
+<ol type="1">
+<li><code>chrom</code>, <code>start</code>, <code>end</code>, <code>cell_barcode</code>, <code>duplicate_count</code> (number of reads collapsed to that fragment).</li>
+<li>Many ATAC analyses (TSS enrichment, nucleosome signal, coverage tracks, motif activity) work at the fragment level, not the peak level. The fragment file is the raw, peak-independent record; peaks can be recomputed later.</li>
+</ol>
 </details>
 </div>
 </div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>singler_label_pruned <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">is.na</span>(SingleR<span class="sc">::</span><span class="fu">pruneScores</span>(pred)), <span class="cn">NA</span>, pred<span class="sc">$</span>labels</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
 </section>
-</section>
-<section id="path-2-azimuth-seurat-reference-mapping" class="level2">
-<h2 class="anchored" data-anchor-id="path-2-azimuth-seurat-reference-mapping">Path 2 — Azimuth (Seurat reference mapping)</h2>
-<p>Azimuth wraps Seurat’s anchor-based reference mapping with curated atlases. The PBMC reference is the most widely tested.</p>
+<section id="step-2-load-the-peaks-matrix-and-create-the-object" class="level2">
+<h2 class="anchored" data-anchor-id="step-2-load-the-peaks-matrix-and-create-the-object">Step 2 — Load the peaks matrix and create the object</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># install if needed</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># remotes::install_github(&quot;satijalab/azimuth&quot;)</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Will download the PBMC reference on first use (~1 GB)</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(seu, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># New columns: predicted.celltype.l1 / l2 / l3 + scores</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(seu<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(seu<span class="sc">@</span>meta.data))])</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>,</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>counts <span class="ot">&lt;-</span> <span class="fu">Read10X_h5</span>(<span class="st">&quot;../data/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5&quot;</span>)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>counts[<span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>, <span class="dv">1</span><span class="sc">:</span><span class="dv">5</span>]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>chrom_assay <span class="ot">&lt;-</span> <span class="fu">CreateChromatinAssay</span>(</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts       =</span> counts,</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">sep          =</span> <span class="fu">c</span>(<span class="st">&quot;:&quot;</span>, <span class="st">&quot;-&quot;</span>),</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">fragments    =</span> <span class="st">&quot;../data/atac_v1_pbmc_10k_fragments.tsv.gz&quot;</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.cells    =</span> <span class="dv">10</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.features =</span> <span class="dv">200</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>metadata <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">file      =</span> <span class="st">&quot;../data/atac_v1_pbmc_10k_singlecell.csv&quot;</span>,</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">header    =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">row.names =</span> <span class="dv">1</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts    =</span> chrom_assay,</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">meta.data =</span> metadata,</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>  <span class="at">assay     =</span> <span class="st">&quot;ATAC&quot;</span></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true" tabindex="-1"></a>pbmc</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2353,51 +2632,28 @@ Think about it
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>The PBMC reference is for <strong>peripheral blood</strong>. The workshop dataset is <strong>NSCLC tumor cells</strong>. What does Azimuth do with cells (e.g. epithelial / tumor) that aren’t in the reference? How would you spot that?</p>
+<ol type="1">
+<li>The row names of an RNA assay are gene symbols. What do row names of a <code>ChromatinAssay</code> look like, and why?</li>
+<li>We pass both <code>counts</code> and <code>fragments</code> when building the ChromatinAssay. Why is that redundant-looking pairing actually useful?</li>
+</ol>
 <details>
 <summary>
-Click for answer
+Show answers
 </summary>
-<p>Azimuth still assigns the best-matching label, but the <strong>mapping score</strong> (<code>mapping.score</code>) and per-label <strong>prediction score</strong> drop sharply for cells outside the reference’s support. Plot <code>FeaturePlot(seu, &quot;mapping.score&quot;)</code> — low-score regions (often corresponding to tumor / non-immune cells) flag clusters where you should <em>not</em> trust Azimuth’s calls.</p>
-<p>For a tumor dataset like this, the right move is to use Azimuth on the immune compartment and rely on manual markers (or a tumor-specific reference) for the rest.</p>
+<ol type="1">
+<li>Peak coordinates — strings like <code>chr1:100234-100734</code>. Peaks are genomic intervals, not annotated features, so the natural identifier is the interval itself.</li>
+<li><code>counts</code> is the fast aggregated view (peak × cell). <code>fragments</code> retains per-fragment, per-base precision for downstream peak recomputation, coverage plots, TSS enrichment, motif accessibility, etc. You want both.</li>
+</ol>
 </details>
 </div>
 </div>
 </section>
-<section id="compare-the-three-annotations" class="level2">
-<h2 class="anchored" data-anchor-id="compare-the-three-annotations">Compare the three annotations</h2>
+<section id="step-3-add-gene-annotation" class="level2">
+<h2 class="anchored" data-anchor-id="step-3-add-gene-annotation">Step 3 — Add gene annotation</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>ann <span class="ot">&lt;-</span> seu<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(celltype,                         <span class="co"># manual (from Tutorial 03)</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>         singler_label_pruned,             <span class="co"># SingleR (pruned)</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>         predicted.celltype.l2)            <span class="co"># Azimuth</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ann<span class="sc">$</span>celltype, ann<span class="sc">$</span>singler_label_pruned, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ann<span class="sc">$</span>celltype, ann<span class="sc">$</span>predicted.celltype.l2, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p>A cleaner cross-tabulation as a heatmap:</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>ann <span class="sc">|&gt;</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(celltype, predicted.celltype.l2) <span class="sc">|&gt;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(predicted.celltype.l2, celltype, <span class="at">fill =</span> n)) <span class="sc">+</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>() <span class="sc">+</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>() <span class="sc">+</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>)) <span class="sc">+</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Manual (rows) vs. Azimuth (cols)&quot;</span>,</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-</section>
-<section id="reconcile-disagreements" class="level2">
-<h2 class="anchored" data-anchor-id="reconcile-disagreements">Reconcile disagreements</h2>
-<p>A simple “agree-or-flag” rule: keep the manual label if at least one automatic method agrees; otherwise mark for review.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>celltype_final <span class="ot">&lt;-</span> <span class="fu">with</span>(seu<span class="sc">@</span>meta.data, dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  celltype <span class="sc">==</span> singler_label_pruned     <span class="sc">~</span> celltype,</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  celltype <span class="sc">==</span> predicted.celltype.l2    <span class="sc">~</span> celltype,</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="cn">TRUE</span>                                 <span class="sc">~</span> <span class="fu">paste0</span>(<span class="st">&quot;REVIEW:&quot;</span>, celltype)</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>))</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(seu<span class="sc">$</span>celltype_final)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>annotations <span class="ot">&lt;-</span> <span class="fu">GetGRangesFromEnsDb</span>(<span class="at">ensdb =</span> EnsDb.Hsapiens.v75)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">seqlevels</span>(annotations) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;chr&quot;</span>, <span class="fu">seqlevels</span>(annotations))  <span class="co"># UCSC naming</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">Annotation</span>(pbmc) <span class="ot">&lt;-</span> annotations</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2409,56 +2665,234 @@ Think about it
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>A reviewer asks you to “use Azimuth labels instead of your manual ones because they’re more reproducible”. How do you respond?</p>
+<ol type="1">
+<li>The data is mapped to <strong>hg19</strong> (GRCh37). Why <code>EnsDb.Hsapiens.v75</code> specifically?</li>
+<li>What would you change for a dataset mapped to hg38 or to mm10?</li>
+</ol>
 <details>
 <summary>
-Click for answer
+Show answers
 </summary>
-<p>Reproducibility is necessary but not sufficient. Azimuth is reproducible <em>and</em> biased by its reference: any cell type absent from the reference will be silently re-labeled. The right answer is to use both, as the tutorial does, and document where they disagree — not to pick one because it’s mechanical.</p>
+<ol type="1">
+<li>Ensembl v75 is the last annotation release pinned to GRCh37 / hg19. Using a matching annotation is essential — otherwise TSSs and gene bodies will be in the wrong places.</li>
+<li>hg38: use a current human EnsDb (e.g. <code>EnsDb.Hsapiens.v86</code> or newer). mm10: use <code>EnsDb.Mmusculus.v79</code> or equivalent. Chromosome-name style also differs (<code>1</code> vs <code>chr1</code>); convert to match the counts.</li>
+</ol>
 </details>
 </div>
 </div>
 </section>
-<section id="save-the-final-annotated-object" class="level2">
-<h2 class="anchored" data-anchor-id="save-the-final-annotated-object">Save the final annotated object</h2>
+<section id="step-4-compute-atac-specific-qc-metrics" class="level2">
+<h2 class="anchored" data-anchor-id="step-4-compute-atac-specific-qc-metrics">Step 4 — Compute ATAC-specific QC metrics</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(seu, <span class="st">&quot;../data/nsclc_annotated_final.rds&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">NucleosomeSignal</span>(pbmc)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">TSSEnrichment</span>(<span class="at">object =</span> pbmc, <span class="at">fast =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>pbmc<span class="sc">$</span>blacklist_ratio    <span class="ot">&lt;-</span> pbmc<span class="sc">$</span>blacklist_region_fragments <span class="sc">/</span> pbmc<span class="sc">$</span>peak_region_fragments</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>pbmc<span class="sc">$</span>pct_reads_in_peaks <span class="ot">&lt;-</span> pbmc<span class="sc">$</span>peak_region_fragments <span class="sc">/</span> pbmc<span class="sc">$</span>passed_filters <span class="sc">*</span> <span class="dv">100</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(pbmc<span class="sc">@</span>meta.data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Think about it
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>What does a <strong>high nucleosome signal</strong> indicate?</li>
+<li>Why is <strong>TSS enrichment</strong> a quality metric, not a biology metric?</li>
+<li>What is the ENCODE blacklist, and why exclude it?</li>
+</ol>
+<details>
+<summary>
+Show answers
+</summary>
+<ol type="1">
+<li>High nucleosome signal means an excess of multi-nucleosome-length fragments (vs sub-nucleosomal). Good ATAC libraries show a clear bias toward sub-nucleosomal fragments in open chromatin. High signal flags over-digested or low-quality cells.</li>
+<li>Because active TSSs are <em>reliably</em> open in essentially all cells. Good cells show a sharp accessibility peak at TSSs; low enrichment at TSSs signals poor Tn5 activity or barcode contamination regardless of cell type.</li>
+<li>A curated list of regions with anomalously high signal in <em>any</em> experiment (repeats, centromeres, mappability artefacts). Reads falling there are technical noise; a high blacklist ratio indicates a problematic cell or library.</li>
+</ol>
+</details>
+</div>
 </div>
 </section>
-<section id="wrap-up" class="level2">
-<h2 class="anchored" data-anchor-id="wrap-up">Wrap-up</h2>
-<p>You now have:</p>
+<section id="step-5-visualize-qc" class="level2">
+<h2 class="anchored" data-anchor-id="step-5-visualize-qc">Step 5 — Visualize QC</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>a1 <span class="ot">&lt;-</span> <span class="fu">DensityScatter</span>(pbmc, <span class="at">x =</span> <span class="st">&quot;nCount_ATAC&quot;</span>,</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>                     <span class="at">y =</span> <span class="st">&quot;TSS.enrichment&quot;</span>, <span class="at">log_x =</span> <span class="cn">TRUE</span>, <span class="at">quantiles =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>a2 <span class="ot">&lt;-</span> <span class="fu">DensityScatter</span>(pbmc, <span class="at">x =</span> <span class="st">&quot;nucleosome_signal&quot;</span>,</span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">y =</span> <span class="st">&quot;TSS.enrichment&quot;</span>, <span class="at">log_x =</span> <span class="cn">TRUE</span>, <span class="at">quantiles =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>a1 <span class="sc">|</span> a2</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">VlnPlot</span>(</span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">object   =</span> pbmc,</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;nCount_ATAC&quot;</span>, <span class="st">&quot;nFeature_ATAC&quot;</span>, <span class="st">&quot;TSS.enrichment&quot;</span>,</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>               <span class="st">&quot;nucleosome_signal&quot;</span>, <span class="st">&quot;blacklist_ratio&quot;</span>, <span class="st">&quot;pct_reads_in_peaks&quot;</span>),</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">pt.size  =</span> <span class="fl">0.1</span>,</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">ncol     =</span> <span class="dv">6</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Think about it
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>In the <code>nCount_ATAC</code> × <code>TSS.enrichment</code> density plot, where should <em>good</em> cells sit?</li>
+<li>What would a blob at high <code>nCount_ATAC</code> and <strong>low</strong> TSS enrichment suggest?</li>
+</ol>
+<details>
+<summary>
+Show answers
+</summary>
+<ol type="1">
+<li>Middle-to-high <code>nCount_ATAC</code> with high TSS enrichment — enough reads, concentrated at bona-fide open regions.</li>
+<li>Many reads but they’re <strong>not</strong> at TSSs. Classic signature of a bad library, ambient reads, or reads from dead cells — not useful signal.</li>
+</ol>
+</details>
+</div>
+</div>
+</section>
+<section id="step-6-filter-low-quality-cells" class="level2">
+<h2 class="anchored" data-anchor-id="step-6-filter-low-quality-cells">Step 6 — Filter low-quality cells</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">subset</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">x =</span> pbmc,</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">subset =</span> nCount_ATAC       <span class="sc">&gt;</span> <span class="dv">3000</span>  <span class="sc">&amp;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>           nCount_ATAC       <span class="sc">&lt;</span> <span class="dv">30000</span> <span class="sc">&amp;</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>           pct_reads_in_peaks <span class="sc">&gt;</span> <span class="dv">15</span>   <span class="sc">&amp;</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>           blacklist_ratio   <span class="sc">&lt;</span> <span class="fl">0.05</span>  <span class="sc">&amp;</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>           nucleosome_signal <span class="sc">&lt;</span> <span class="dv">4</span>     <span class="sc">&amp;</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>           TSS.enrichment    <span class="sc">&gt;</span> <span class="dv">3</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>pbmc</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Think about it
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>These thresholds come from the Signac PBMC vignette. Would you use them as-is on another dataset?</li>
+<li>What’s the analogue of <code>percent.mt</code> in ATAC, and is it relevant?</li>
+</ol>
+<details>
+<summary>
+Show answers
+</summary>
+<ol type="1">
+<li>No — ATAC metric distributions shift with tissue, depth, and protocol version. Use the vignette thresholds as a <strong>starting point</strong> and always inspect the violins and density plots first.</li>
+<li>Direct analogue doesn’t exist (ATAC doesn’t measure RNA). The quality proxies are <strong>TSS enrichment</strong>, <strong>nucleosome signal</strong>, <strong>blacklist ratio</strong>, and <strong>pct_reads_in_peaks</strong> — each captures a different failure mode.</li>
+</ol>
+</details>
+</div>
+</div>
+</section>
+<section id="step-7-tf-idf-normalization-top-features-svd" class="level2">
+<h2 class="anchored" data-anchor-id="step-7-tf-idf-normalization-top-features-svd">Step 7 — TF-IDF normalization, top features, SVD</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">RunTFIDF</span>(pbmc)</span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">FindTopFeatures</span>(pbmc, <span class="at">min.cutoff =</span> <span class="st">&quot;q0&quot;</span>)</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">RunSVD</span>(pbmc)</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="fu">DepthCor</span>(pbmc)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Think about it
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>RNA uses <code>LogNormalize</code>. ATAC uses <strong>TF-IDF</strong>. Why the different normalization?</li>
+<li>Why is the <strong>first LSI component often discarded</strong> (see <code>DepthCor</code>)?</li>
+</ol>
+<details>
+<summary>
+Show answers
+</summary>
+<ol type="1">
+<li>ATAC data is <strong>binary-ish</strong> — most peaks are either accessible (1) or not (0) per cell. TF-IDF (term-frequency × inverse document-frequency) weighs peaks by rarity, which is well-suited to sparse binary data. LogNormalize is tuned for count RNA data.</li>
+<li>The first SVD component typically tracks <strong>sequencing depth / library size</strong> rather than biology. <code>DepthCor</code> shows correlation of each LSI component with depth; if component 1 is highly correlated, skip it and use dims 2:30 downstream.</li>
+</ol>
+</details>
+</div>
+</div>
+</section>
+<section id="step-8-non-linear-embedding-and-clustering" class="level2">
+<h2 class="anchored" data-anchor-id="step-8-non-linear-embedding-and-clustering">Step 8 — Non-linear embedding and clustering</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(pbmc, <span class="at">reduction =</span> <span class="st">&quot;lsi&quot;</span>, <span class="at">dims =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">30</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(pbmc, <span class="at">reduction =</span> <span class="st">&quot;lsi&quot;</span>, <span class="at">dims =</span> <span class="dv">2</span><span class="sc">:</span><span class="dv">30</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>pbmc <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(pbmc, <span class="at">algorithm =</span> <span class="dv">3</span>)   <span class="co"># SLM</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(pbmc, <span class="at">label =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Think about it
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ol type="1">
+<li>Why <code>dims = 2:30</code> instead of <code>1:30</code>?</li>
+<li><code>algorithm = 3</code> selects the SLM (Smart Local Moving) algorithm. Name one case when you’d use it instead of the default Louvain.</li>
+</ol>
+<details>
+<summary>
+Show answers
+</summary>
+<ol type="1">
+<li>Because LSI component 1 is the depth-confounded one we saw in <code>DepthCor</code>. Starting at <code>2</code> keeps only biologically-meaningful dimensions.</li>
+<li>SLM often produces more stable partitions than basic Louvain on large, noisy graphs (e.g. scATAC) because it allows within-cluster re-optimization. Leiden (algorithm 4) is usually the modern default; SLM remains a reasonable alternative.</li>
+</ol>
+</details>
+</div>
+</div>
+</section>
+<section id="save-the-object" class="level2">
+<h2 class="anchored" data-anchor-id="save-the-object">Save the object</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(pbmc, <span class="at">file =</span> <span class="st">&quot;../data/pbmc_atac_clustered.rds&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="stretch-goals" class="level2">
+<h2 class="anchored" data-anchor-id="stretch-goals">Stretch goals</h2>
 <ul>
-<li>A <code>SingleR</code> label per cell (with confidence pruning)</li>
-<li>An Azimuth label per cell (with a mapping score)</li>
-<li>A reconciled <code>celltype_final</code> you can carry into Tutorial 04 (pseudobulk DE) or downstream analyses</li>
+<li><strong>Gene activity</strong> — convert peaks to per-gene accessibility scores with <code>GeneActivity()</code>, then run a Seurat-style RNA-like analysis on top</li>
+<li><strong>Motif enrichment</strong> — use <code>chromVAR</code> or Signac’s <code>RunChromVAR</code> for TF-motif activity per cell</li>
+<li><strong>Multi-modal integration</strong> — integrate scRNA-seq + scATAC-seq from the same cells (multiome) using <code>FindTransferAnchors</code></li>
 </ul>
-<div class="callout callout-style-default callout-tip callout-titled" title="Going further">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-Going further
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ul>
-<li>Try a tissue-appropriate reference: <code>celldex::BlueprintEncodeData()</code>, the <a href="https://tabula-sapiens-portal.ds.czbiohub.org/">Tabula Sapiens</a> atlas, or the <a href="https://data.humancellatlas.org/">HCA Lung Cell Atlas</a>.</li>
-<li>Repeat with <strong>CellTypist</strong> (Python) for a third opinion.</li>
-<li>For tumour data, look at <strong>TumorDecon</strong> or <strong>ProjecTILs</strong> to handle the tumour/immune mix more carefully.</li>
-</ul>
-</div>
-</div>
 </section>
-<section id="see-also" class="level2">
-<h2 class="anchored" data-anchor-id="see-also">See also</h2>
+<section id="credits" class="level2">
+<h2 class="anchored" data-anchor-id="credits">Credits</h2>
 <ul>
-<li><a href="../Lecture_Folder/Lecture_05_Reference_Annotation.html">Lecture 05 — Reference-based Annotation</a></li>
-<li><a href="../Lecture_Folder/Lecture_03_Markers_Annotation.html">Lecture 03 — Markers &amp; Manual Annotation</a></li>
-<li><a href="../Resources_Folder/Glossary.html#c">Glossary — Cell type annotation</a></li>
-<li><code>SingleR</code> book: <a href="https://bioconductor.org/books/release/SingleRBook/">bioconductor.org/books/release/SingleRBook</a></li>
-<li>Azimuth web tool: <a href="https://azimuth.hubmapconsortium.org/">azimuth.hubmapconsortium.org</a></li>
+<li>Reference vignette: <a href="https://stuartlab.org/signac/articles/pbmc_vignette">Signac PBMC scATAC-seq vignette</a></li>
+<li>Workflow source: Khushbu Patel, single-cell ATAC-seq standard workflow</li>
+<li>Data: 10x Genomics PBMC 10k scATAC-seq</li>
 </ul>
 </section>
 

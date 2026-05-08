@@ -1,5 +1,5 @@
 ---
-title: "Tutorial 04 Primer — DESeq2 Basics on `airway`"
+title: "Tutorial 05 — DESeq2 Primer on `airway`"
 subtitle: "A bulk-RNA-seq DE walkthrough before we tackle pseudobulk (Patel-style)"
 author: "Single Cell RNA-seq Workshop"
 format:
@@ -20,14 +20,14 @@ editor: visual
 
 ## About this tutorial
 
-A primer that gets the DESeq2 mechanics out of the way **before** the pseudobulk DE tutorial. The dataset is `airway` (a Bioconductor-shipped 8-sample bulk RNA-seq experiment of dexamethasone-treated airway smooth muscle cells), so there is **no manual download** — installing the package gives you the data.
+A primer that gets the DESeq2 mechanics out of the way **before** the pseudobulk DE tutorial (Tutorial 06). The dataset is `airway` (a Bioconductor-shipped 8-sample bulk RNA-seq experiment of dexamethasone-treated airway smooth muscle cells), so there is **no manual download** — installing the package gives you the data.
 
 This tutorial follows [Patel's `runDESeq2.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R) and [`getData.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/getData.R), with workshop-specific call-out boxes.
 
 ::: {.callout-tip title="How to use this page"}
 The rendered HTML shows the code but does **not** execute it. To run it:
 
-1.  Download the `.qmd` source: <a href="Tutorial_04_Primer_DESeq2_Basics.qmd.txt" download="Tutorial_04_Primer_DESeq2_Basics.qmd">Tutorial_04_Primer_DESeq2_Basics.qmd</a>. If your browser saves the file as `Tutorial_04_Primer_DESeq2_Basics.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+1.  Download the `.qmd` source: <a href="Tutorial_05_Primer_DESeq2_Basics.qmd.txt" download="Tutorial_05_Primer_DESeq2_Basics.qmd">Tutorial_05_Primer_DESeq2_Basics.qmd</a>. If your browser saves the file as `Tutorial_05_Primer_DESeq2_Basics.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
 2.  Install the packages (block below) — no other download needed.
 3.  Work through the chunks, flipping `eval: true` as you go.
 :::
@@ -51,6 +51,25 @@ There's no separate download — the counts and metadata ride along with the pac
 # install.packages("BiocManager")
 # BiocManager::install(c("DESeq2", "airway", "apeglm", "tidyverse"))
 ```
+
+
+::: {.callout-warning title="Common errors / things that bite"}
+**`library(airway)` fails** — Bioconductor data package. Install with `BiocManager::install("airway")` (not `install.packages`).
+
+**Wrong sign on `log2FoldChange`** — `relevel()` matters. The reference level becomes the *denominator*. `dds$dex <- relevel(dds$dex, ref = "untrt")` makes `trt vs untrt` the comparison, with positive LFCs meaning higher in treated. Skip this and your "up" / "down" labels are reversed.
+
+**`apeglm` errors with "fitType = 'parametric'" or similar** — `apeglm` needs the design coefficient name, not the contrast vector. Use `lfcShrink(dds, coef = "dex_trt_vs_untrt", res = res, type = "apeglm")`. Run `resultsNames(dds)` to see the available coefficient names.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_05_Primer_DESeq2_Basics.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
 
 ## Setup
 
@@ -239,7 +258,7 @@ plotPCA(vsd, intgroup = c("dex", "cell"))
 -   Shrinking LFCs for honest ranking
 -   QCing samples with `vst` + PCA
 
-You're now ready for [Tutorial 04 — Pseudobulk DE](Tutorial_04_Pseudobulk_DE.html), where the same DESeq2 mechanics apply to a per-cell-type aggregated count matrix.
+You're now ready for [Tutorial 06 — Pseudobulk DE](Tutorial_06_Pseudobulk_DE.html), where the same DESeq2 mechanics apply to a per-cell-type aggregated count matrix.
 
 ## Credits
 

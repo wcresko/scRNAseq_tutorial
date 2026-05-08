@@ -1,6 +1,6 @@
 ---
 title: "Tutorial 03 — scRNA-seq: Markers & Cell Type Annotation"
-subtitle: "Find cluster markers, visualize, label by hand and with SingleR"
+subtitle: "Find cluster markers, visualize, label by hand and check against ground truth"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -20,56 +20,57 @@ editor: visual
 
 ## About this tutorial
 
-Part three of the series. We start from the **clustered object saved in Tutorial 02** and walk through:
+Part three of the series. We start from the **unintegrated clustered object saved in Tutorial 02** and walk through:
 
 -   Finding marker genes per cluster
 -   The canonical marker visualizations (Vln / Feature / Heatmap / Ridge / Dot)
 -   Manual cell-type annotation with `RenameIdents`
--   Automatic annotation with `SingleR`
--   Saving the final, annotated object
+-   Cross-checking your manual labels against the **ground-truth `seurat_annotations`** that ship with `ifnb`
+-   Saving the annotated object so Tutorial 04 (Integration) can pick it up
+
+::: callout-note
+We're annotating the **unintegrated** object. Why? Because **markers are cell-type-driven, not batch-driven** — even when an embedding is dominated by a batch effect, the genes that distinguish T cells from B cells are still T-cell genes. Working markers up before integration is a useful sanity check: if a marker gene cleanly identifies a cluster on the unintegrated data, it should still cleanly identify the *biologically equivalent* cluster after integration in Tutorial 04.
+:::
 
 ::: {.callout-tip title="How to use this page"}
 The rendered HTML shows the code but does **not** execute it. To run it:
 
 1.  Download the `.qmd` source: <a href="Tutorial_03_Markers_Annotation.qmd.txt" download="Tutorial_03_Markers_Annotation.qmd">Tutorial_03_Markers_Annotation.qmd</a>. If your browser saves the file as `Tutorial_03_Markers_Annotation.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
-2.  Make sure you have completed **[Tutorial 02](Tutorial_02_DimReduction_Clustering.html)** — it writes the `nsclc_clustered.rds` that this tutorial loads.
+2.  Make sure you have completed **[Tutorial 02](Tutorial_02_DimReduction_Clustering.html)** — it writes the `ifnb_clustered.rds` that this tutorial loads.
 3.  Work through the chunks, flipping `eval: true` as you go.
 :::
 
 ## Dataset — resuming from Tutorial 02
 
-This tutorial loads the clustered `.rds` written at the end of Tutorial 02:
-
 | File | Produced by | What it is |
 |---|---|---|
-| `../data/nsclc_clustered.rds` | Tutorial 02 | Seurat object with PCA, SNN graph, clusters at five resolutions (`RNA_snn_res.0.1/0.3/0.5/0.7/1.0`), and a UMAP embedding. |
-
-### Data dictionary — the Seurat object at this stage
-
-| Slot | Class | Contents |
-|---|---|---|
-| `seu@meta.data$RNA_snn_res.0.1 … 1.0` | factor | Cluster assignments at each resolution from `FindClusters()`. Active `Idents()` is set to `RNA_snn_res.0.5` here. |
-| `seu@reductions$pca` | `DimReduc` | Cell embeddings in PC space (`seu@reductions$pca@cell.embeddings`, dims = 1:50). |
-| `seu@reductions$umap` | `DimReduc` | 2-D UMAP embedding for visualization. |
-| `seu@graphs$RNA_nn`, `RNA_snn` | `Graph` | k-NN and SNN graphs from `FindNeighbors()`. |
-
-### Optional — external reference used by `SingleR`
-
-If you run the automatic-annotation chunk, `celldex::HumanPrimaryCellAtlasData()` downloads a bulk-RNA-seq reference compiled from [Mabbott *et al.* 2013](https://doi.org/10.1186/1471-2164-14-632). It is fetched from the `ExperimentHub` cache, not from the `data/` folder.
-
-| Label | Meaning |
-|---|---|
-| `$label.main` | 37 coarse cell types (e.g. `T_cells`, `B_cell`, `Monocyte`, `Epithelial_cells`). |
-| `$label.fine` | 157 finer subtypes (e.g. `T_cells:CD4+_Th1`, `Monocyte:CD14+`). |
-
-The upstream dataset is the **10x 20k NSCLC DTC** sample — see [Tutorial 01](Tutorial_01_QC_Preprocessing.html) for its description and data dictionary.
+| `../data/ifnb_clustered.rds` | Tutorial 02 | Seurat object with PCA, SNN graph, clusters at five resolutions, UMAP, plus the `stim` and `seurat_annotations` metadata. |
 
 ## Learning goals
 
 -   Use `FindMarkers` / `FindAllMarkers` appropriately
 -   Read each of the five standard marker-visualization plots and know when to pick which
--   Assign cell-type labels manually and with a reference-based classifier
--   Cross-check manual and automatic labels to catch ambiguity
+-   Assign cell-type labels manually using PBMC canonical markers
+-   Validate against the `seurat_annotations` ground truth and quantify agreement
+
+
+::: {.callout-warning title="Common errors / things that bite"}
+**`FindAllMarkers` takes 5+ minutes** — install `presto` (`install.packages("presto")`); Seurat detects it automatically and is \~10× faster.
+
+**Markers list is dominated by ISGs (`ISG15`, `IFI6`, `IFIT3`, `MX1`)** — that's expected on the *unintegrated* `ifnb` data because clusters here are partly driven by `stim`. Tutorial 04 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.
+
+**`Idents()` is set to the wrong column** — clusters at multiple resolutions all live in `meta.data` (`RNA_snn_res.0.1`, `_0.3`, etc.) but only one is the "active" identity. `Idents(seu) <- "RNA_snn_res.0.5"` switches; `levels(Idents(seu))` confirms.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_03_Markers_Annotation.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
 
 ## Setup
 
@@ -79,20 +80,15 @@ The upstream dataset is the **10x 20k NSCLC DTC** sample — see [Tutorial 01](T
 library(Seurat)
 library(tidyverse)
 
-# For automatic annotation
-# BiocManager::install(c("SingleR", "celldex"))
-# library(SingleR)
-# library(celldex)
-
 set.seed(2026)
 ```
 
 ```{r}
 #| label: resume
 
-nsclc.seurat.obj <- readRDS("../data/nsclc_clustered.rds")
-Idents(nsclc.seurat.obj) <- "RNA_snn_res.0.5"
-nsclc.seurat.obj
+ifnb <- readRDS("../data/ifnb_clustered.rds")
+Idents(ifnb) <- "RNA_snn_res.0.5"
+ifnb
 ```
 
 ------------------------------------------------------------------------
@@ -102,7 +98,7 @@ nsclc.seurat.obj
 ```{r}
 #| label: markers-one
 
-cluster1.markers <- FindMarkers(nsclc.seurat.obj, ident.1 = 1, min.pct = 0.25)
+cluster1.markers <- FindMarkers(ifnb, ident.1 = 1, min.pct = 0.25)
 head(cluster1.markers, 10)
 ```
 
@@ -120,112 +116,99 @@ head(cluster1.markers, 10)
 </details>
 :::
 
-## Step 2 — Markers distinguishing one cluster from a pair
-
-```{r}
-#| label: markers-vs
-
-cluster5.markers <- FindMarkers(
-  nsclc.seurat.obj,
-  ident.1 = 5,
-  ident.2 = c(0, 3),
-  min.pct = 0.25
-)
-head(cluster5.markers, 10)
-```
-
-::: {.callout-important title="Think about it"}
-1.  Why might you compare cluster 5 *only* to clusters 0 and 3, rather than to all other cells?
-2.  What's a situation where you'd want `ident.1` vs `ident.2` to be two groups of clusters (e.g. `ident.1 = c(5, 7)`)?
-
-<details>
-
-<summary>Show answers</summary>
-
-1.  If 0 and 3 look similar on UMAP or markers to cluster 5, you want genes that **specifically** separate 5 from *those neighbors* — genome-wide vs-all tests can be dominated by genes separating cluster 5 from totally unrelated populations.
-2.  When you have **biological groups** of clusters, e.g. merging two T-cell subtypes (5 + 7) to compare against NK cells (3 + 8). Grouping lets you test at the lineage level rather than the cluster level.
-
-</details>
-:::
-
-## Step 3 — Markers for every cluster
+## Step 2 — Markers for every cluster
 
 ```{r}
 #| label: markers-all
 
-nsclc.markers <- FindAllMarkers(
-  nsclc.seurat.obj,
+ifnb.markers <- FindAllMarkers(
+  ifnb,
   only.pos        = TRUE,
   min.pct         = 0.25,
   logfc.threshold = 0.25
 )
 
-top_markers <- nsclc.markers |>
+top_markers <- ifnb.markers |>
   group_by(cluster) |>
   slice_max(avg_log2FC, n = 5)
 top_markers
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  `only.pos = TRUE` — what do you lose?
-2.  For condition-level DE (treated vs control), is `FindAllMarkers` the right tool?
+1.  Many of the top markers will be **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT3`, `MX1`). Are those *cell-type* markers, or are they marking something else?
+2.  For condition-level DE (STIM vs CTRL), is `FindAllMarkers` the right tool?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  You only see genes **up** in the cluster of interest. Sometimes a gene is a strong *negative* marker (consistently *lower* than elsewhere) and also diagnostic. Rerun without `only.pos` if you want both directions.
-2.  No. `FindAllMarkers` / `FindMarkers` treat each cell as an independent observation, which is anti-conservative for condition-level comparisons across biological samples. For that, use **pseudobulk** + DESeq2/edgeR/limma (see the Pseudobulk extra lecture).
+1.  Those are **condition markers** — they distinguish IFN-β–stimulated cells from control cells, *not* cell types. They top the list because cluster identities at this stage are partly driven by `stim`. Tutorial 04 will integrate the data so cluster identities track biology, not condition.
+2.  No. `FindAllMarkers` / `FindMarkers` treat each cell as an independent observation, which is **anti-conservative** for condition-level comparisons across biological samples. For STIM vs CTRL within a cell type, use **pseudobulk** + DESeq2/edgeR/limma — that's exactly what Tutorial 06 covers, on this dataset.
 
 </details>
 :::
 
-## Step 4 — Visualizing markers
+## Step 3 — Visualizing markers
 
-### 4a. Violin plots — expression distribution per cluster
+PBMC canonical markers — useful to keep handy:
+
+| Cell type | Canonical markers |
+|---|---|
+| CD14+ Monocyte | `CD14`, `LYZ`, `S100A8`, `S100A9` |
+| CD16+ Monocyte | `FCGR3A`, `MS4A7`, `CDKN1C` |
+| Dendritic cell (DC) | `FCER1A`, `CST3`, `CLEC10A` |
+| pDC | `LILRA4`, `IL3RA`, `CLEC4C` |
+| CD4 Naive T | `IL7R`, `CCR7`, `LEF1` |
+| CD4 Memory T | `IL7R`, `S100A4` |
+| CD8 T | `CD8A`, `CD8B`, `GZMK` |
+| NK | `GNLY`, `NKG7`, `KLRD1` |
+| B | `MS4A1`, `CD79A`, `CD79B` |
+| T-activated | `CD69`, `IL2RA` |
+| Mk (megakaryocyte) | `PPBP`, `PF4` |
+| Eryth | `HBA1`, `HBB` |
+
+### 3a. Violin plots — expression distribution per cluster
 
 ```{r}
 #| label: viz-vln
 
-top_genes <- top_markers |> ungroup() |> slice_head(n = 6) |> pull(gene)
-VlnPlot(nsclc.seurat.obj, features = top_genes, pt.size = 0, ncol = 3)
+VlnPlot(ifnb,
+        features = c("CD14", "LYZ", "MS4A1", "CD79A", "CD8A", "GNLY"),
+        pt.size = 0, ncol = 3)
 ```
 
-### 4b. Feature plots — expression on UMAP
+### 3b. Feature plots — expression on UMAP
 
 ```{r}
 #| label: viz-feature
 
-FeaturePlot(nsclc.seurat.obj, features = top_genes[1:4])
+FeaturePlot(ifnb,
+            features = c("CD14", "MS4A1", "CD8A", "GNLY"),
+            ncol = 2)
 ```
 
-### 4c. Heatmap — top markers across clusters
+### 3c. Heatmap — top markers across clusters
 
 ```{r}
 #| label: viz-heatmap
 
-top10 <- nsclc.markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
-DoHeatmap(nsclc.seurat.obj, features = top10$gene) + NoLegend()
+top10 <- ifnb.markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
+DoHeatmap(ifnb, features = top10$gene) + NoLegend()
 ```
 
-### 4d. Ridge plots — expression density per cluster
-
-```{r}
-#| label: viz-ridge
-
-RidgePlot(nsclc.seurat.obj, features = top_genes[1:4], ncol = 2)
-```
-
-### 4e. Dot plot — % expressing × mean expression
+### 3d. Dot plot — % expressing × mean expression
 
 ```{r}
 #| label: viz-dot
 
-DotPlot(nsclc.seurat.obj, features = top_genes) + RotatedAxis()
+canonical_markers <- c("CD14", "LYZ", "FCGR3A", "MS4A7", "FCER1A", "CST3",
+                       "IL7R", "CCR7", "S100A4", "CD8A", "GZMK", "GNLY",
+                       "NKG7", "MS4A1", "CD79A", "PPBP")
+DotPlot(ifnb, features = canonical_markers) + RotatedAxis()
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  Which of the five plot types is best for **showing a 20-gene marker panel across 10 clusters on one page**?
+1.  Which plot is best for **showing a 16-gene marker panel across 12 clusters on one page**?
 2.  Which is best for **checking whether a single gene has spatial structure on the UMAP**?
 3.  Which is most misleading if your cluster sizes are very unequal, and why?
 
@@ -240,96 +223,110 @@ DotPlot(nsclc.seurat.obj, features = top_genes) + RotatedAxis()
 </details>
 :::
 
-## Step 5 — Manual annotation
+## Step 4 — Manual annotation
+
+Use the canonical marker table above and the dot plot to assign labels. Your cluster numbering will depend on the random seed and Seurat version, so **do not copy these labels blindly** — pick from the table that matches *your* dot plot.
 
 ```{r}
 #| label: rename
 
-# Example only — replace these with the labels appropriate for YOUR markers.
-# Work through the top markers per cluster, look them up in CellMarker 2.0
-# or PanglaoDB, and decide the biology.
-
-# new.cluster.ids <- c("T cells", "Macrophages", "Epithelial",
-#                      "Fibroblasts", "B cells", ...)
-# names(new.cluster.ids) <- levels(nsclc.seurat.obj)
-# nsclc.seurat.obj <- RenameIdents(nsclc.seurat.obj, new.cluster.ids)
-# nsclc.seurat.obj$celltype_manual <- Idents(nsclc.seurat.obj)
-
-# DimPlot(nsclc.seurat.obj, reduction = "umap", label = TRUE, repel = TRUE) +
-#   NoLegend()
+# EXAMPLE — replace each entry below with the label appropriate for YOUR
+# clusters. The order must match levels(Idents(ifnb)) at this point.
+#
+# new.cluster.ids <- c(
+#   "0" = "CD14 Mono",
+#   "1" = "CD4 Naive T",
+#   "2" = "CD4 Memory T",
+#   "3" = "B",
+#   "4" = "CD8 T",
+#   "5" = "NK",
+#   "6" = "CD16 Mono",
+#   "7" = "T activated",
+#   "8" = "DC",
+#   "9" = "Mk",
+#   "10" = "B activated",
+#   "11" = "pDC",
+#   "12" = "Eryth"
+# )
+#
+# names(new.cluster.ids) <- levels(ifnb)
+# ifnb <- RenameIdents(ifnb, new.cluster.ids)
+# ifnb$celltype_manual <- Idents(ifnb)
+#
+# DimPlot(ifnb, reduction = "umap", label = TRUE, repel = TRUE) + NoLegend()
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  Two clusters share KRT8/KRT18 as top markers. Are they the same cell type?
+1.  Two clusters share `CD3D` / `CD3E` as top markers. Are they the same cell type?
 2.  What's the risk of assigning a label from a single marker gene?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Not necessarily — KRT8/18 are broad epithelial markers. Both clusters are likely epithelial, but could be distinct subtypes (tumor vs. normal epithelium, alveolar type I vs. II, etc.). You need *discriminating* markers on top of the shared ones.
-2.  Many markers are non-specific, and biological "marker genes" are often graded rather than binary. Label from **combinations** (a marker *plus* absence of another marker) and always cross-check with an automatic method.
+1.  Not necessarily — `CD3D/E` are pan-T markers. Both clusters are likely T cells, but could be CD4 Naive vs CD4 Memory vs CD8 vs T-activated. You need *discriminating* markers (`IL7R`+`CCR7` for naive, `S100A4` for memory, `CD8A` for cytotoxic, `IL2RA` for activated) on top of the shared T-cell markers.
+2.  Many markers are non-specific, and biological "marker genes" are often graded rather than binary. Label from **combinations** (a marker *plus* absence of another marker) and always cross-check.
 
 </details>
 :::
 
-## Step 6 — Automatic annotation with SingleR
+## Step 5 — Validate against the ground-truth labels
+
+The `ifnb` dataset ships with author-curated labels in `seurat_annotations`. This is rare in real life — but it makes a beautiful teaching moment to compare your manual labels to a published ground truth.
 
 ```{r}
-#| label: singler
+#| label: validate
 
-# library(SingleR)
-# library(celldex)
-#
-# # Pick a reference appropriate for your tissue
-# ref <- celldex::HumanPrimaryCellAtlasData()
-#
-# # SingleR expects log-normalized expression
-# expr <- GetAssayData(nsclc.seurat.obj, slot = "data")
-#
-# singler.labels <- SingleR(
-#   test    = expr,
-#   ref     = ref,
-#   labels  = ref$label.main
-# )
-#
-# nsclc.seurat.obj$celltype_singler <- singler.labels$labels
-#
-# DimPlot(nsclc.seurat.obj, group.by = "celltype_singler", label = TRUE, repel = TRUE) +
-#   NoLegend()
+# Side-by-side UMAPs
+p_manual <- DimPlot(ifnb, reduction = "umap", label = TRUE, repel = TRUE) +
+  NoLegend() + ggtitle("Manual annotation (yours)")
+p_truth  <- DimPlot(ifnb, reduction = "umap", group.by = "seurat_annotations",
+                    label = TRUE, repel = TRUE) +
+  NoLegend() + ggtitle("Author labels (ground truth)")
+
+p_manual
+p_truth
+
+# Cross-tabulate. Each row should ideally concentrate on a single column.
+# table(manual = Idents(ifnb), truth = ifnb$seurat_annotations)
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  How would you check whether SingleR is *confident* about a label vs just picking the best of a bad set?
-2.  What would you do when SingleR and your manual annotation disagree on a cluster?
+1.  Where do you and the authors **agree**? Where do you **disagree**?
+2.  Which cell type was easiest to call from markers alone? Hardest?
+3.  In Tutorial 04, after integration, the same cluster numbers will mean different things. Why is `seurat_annotations` (a per-cell label) more durable than your `RNA_snn_res.0.5` manual labels (a per-cluster mapping)?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Inspect `singler.labels$scores` and the `pruned.labels` column (labels it declines to assign when score gaps are small). You can also plot `plotScoreHeatmap(singler.labels)` to see per-cell confidence.
-2.  Disagreements often flag **real ambiguity** — rare subtypes, transitional states, or references that don't include your biology (e.g. a tumor reference vs a healthy-tissue reference). Re-check markers, pick a more tissue-appropriate reference, and document the uncertainty.
+1.  Big myeloid (CD14 / CD16 / DC) and lymphoid (B / NK) clusters usually agree perfectly. T-cell subdivisions (CD4 Naive vs CD4 Memory vs T activated) and rare populations (pDC, Eryth, Mk) are the common disagreements — they require multi-gene logic and have soft boundaries.
+2.  **Easiest:** B cells (`MS4A1`+, `CD79A`+, otherwise quiet) and NK (`GNLY`+, `NKG7`+, no `CD3`). **Hardest:** the various CD4 T subsets, because they share most markers and differ in subtle, graded ways.
+3.  Per-cell labels travel with the cell — if a cell is `CD14 Mono` in `seurat_annotations` here, it stays `CD14 Mono` after integration too. Cluster numbers are recomputed every time you re-cluster (and integration recomputes), so *cluster-level* labels are tied to a specific clustering and have to be re-applied.
 
 </details>
 :::
 
-## Step 7 — Save the final object
+## Step 6 — Save the annotated object
 
 ```{r}
 #| label: save
 
-saveRDS(nsclc.seurat.obj, file = "../data/nsclc_annotated.rds")
+saveRDS(ifnb, file = "../data/ifnb_annotated.rds")
 ```
 
-## Next steps
+## Continue to Tutorial 04
 
--   **Condition-level DE** with pseudobulk (see the Pseudobulk extra lecture)
--   **Integration** across samples or batches (Harmony / CCA / scVI)
--   **Trajectory inference** with Monocle3 / Slingshot
--   **Cell–cell communication** with CellChat / LIANA
+In **[Tutorial 04 — Two-Sample Integration](Tutorial_04_Integration.html)** we'll re-do the PCA + neighbor-graph + clustering steps on an **integrated** representation that aligns CTRL and STIM, and watch what happens to:
+
+-   the UMAP (CTRL/STIM islands collapse onto each other)
+-   the clusters (cell types stop splitting in two)
+-   the markers (ISGs stop being top markers; cell-type markers reclaim the top)
+
+You'll come out of it with a clean `.rds` ready for **pseudobulk DE** in Tutorial 06.
 
 ## Credits
 
--   Dataset: 10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex
--   Workflow source: Khushbu Patel, single-cell RNA-seq standard workflow
--   Reference: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html) · [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html)
+-   Dataset: `ifnb` from `SeuratData` — Kang *et al.* (2017) *Nat Biotechnol*
+-   PBMC canonical markers: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html), [Azimuth PBMC reference](https://azimuth.hubmapconsortium.org/references/human_pbmc/), [PanglaoDB](https://panglaodb.se/)
+-   Inspiration: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/)

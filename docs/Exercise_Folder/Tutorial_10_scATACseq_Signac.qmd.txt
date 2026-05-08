@@ -1,5 +1,5 @@
 ---
-title: "Tutorial 06 — scATAC-seq with Signac"
+title: "Tutorial 10 — scATAC-seq with Signac"
 subtitle: "From peaks matrix to clustered cells (PBMC 10k v1, 10x — same dataset as Patel's `scATACSeq_standard_workflow.R`)"
 author: "Single Cell RNA-seq Workshop"
 format:
@@ -23,12 +23,13 @@ editor: visual
 A parallel to the scRNA-seq tutorial series — but for **chromatin accessibility** (scATAC-seq). The workflow follows the standard **Signac** pipeline from the Stuart Lab on the 10x PBMC 10k scATAC-seq dataset, **the same dataset Patel uses in [`scATACSeq_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R)**.
 
 -   Reference vignette: [Signac PBMC scATAC-seq vignette](https://stuartlab.org/signac/articles/pbmc_vignette)
--   Companion lecture: [Lecture 06 — Bulk + scATAC-seq](../Lecture_Folder/Lecture_06_ATACseq.html)
+-   Companion lecture: [Lecture 08 — Bulk + scATAC-seq](../Lecture_Folder/Lecture_08_ATACseq.html)
+-   Alternative toolkit walkthrough: [scNotebooks Module 11](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module11/module11.html) does the same kind of analysis with **ArchR** (peak calling, motif enrichment, TF regulators, scATAC↔scRNA integration, trajectory) on Kumegawa *et al.* 2022 breast-cancer data — a useful cross-toolkit reference
 
 ::: {.callout-tip title="How to use this page"}
 The rendered HTML shows the code but does **not** execute it. To run it:
 
-1.  Download the `.qmd` source: <a href="Tutorial_06_scATACseq_Signac.qmd.txt" download="Tutorial_06_scATACseq_Signac.qmd">Tutorial_06_scATACseq_Signac.qmd</a>. If your browser saves the file as `Tutorial_06_scATACseq_Signac.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+1.  Download the `.qmd` source: <a href="Tutorial_10_scATACseq_Signac.qmd.txt" download="Tutorial_10_scATACseq_Signac.qmd">Tutorial_10_scATACseq_Signac.qmd</a>. If your browser saves the file as `Tutorial_10_scATACseq_Signac.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
 2.  Download the data files (block below) into `../data/`.
 3.  Work through the chunks, flipping `eval: true` as you go.
 :::
@@ -88,6 +89,25 @@ By the end of this exercise you will be able to:
 -   Compute and interpret ATAC-specific QC metrics (nucleosome signal, TSS enrichment, blacklist ratio, peak-read fraction)
 -   Run TF-IDF normalization and SVD (LSI) on accessibility data
 -   Produce a UMAP and cluster scATAC-seq cells
+
+
+::: {.callout-warning title="Common errors / things that bite"}
+**`EnsDb.Hsapiens.v75` (hg19) doesn't match the data** — the workshop's PBMC 10k v1 dataset is on hg19. The newer "Next GEM v1.1" release of the same sample is on hg38 and has filenames prefixed `atac_v1_pbmc_10k_nextgem_*`. Mixing them produces bizarre coordinate errors. Use `v75` (hg19) with the v1 hg19 dataset, or `v86` (hg38) with the Next GEM hg38 dataset.
+
+**`fragments.tsv.gz` is missing its `.tbi` index** — Signac uses `Rsamtools` to query the fragments file by genomic region; without `.tbi` it can't seek. Both files must be present and the `.tbi` must be newer than the `.tsv.gz`. Run `tabix fragments.tsv.gz` to regenerate.
+
+**`CreateChromatinAssay` warns about "duplicate fragments"** — usually safe to ignore; happens when the same fragment is recorded under different cell barcodes. If the warning rate is high (> 5%), suspect a sample-mixing issue upstream.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_10_scATACseq_Signac.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
 
 ## Setup
 

@@ -1,0 +1,420 @@
+---
+title: "Tutorial 13 — FAIR Metadata & Submission"
+subtitle: "Build a CELLxGENE-conformant metadata sheet, convert Seurat → AnnData, generate GEO + BioSample upload templates"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+The hands-on companion to **[Lecture 11 — FAIR Principles & Data Sharing](../Lecture_Folder/Lecture_11_FAIR_DataSharing.html)** and the parallel of [scNotebooks Module 13](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module13/module13.html). We take the annotated `ifnb` object from Tutorial 09 and walk through what it would take to **deposit it for real** in NCBI + CELLxGENE Discover:
+
+1. Audit what metadata the Seurat object actually carries
+2. Build a **canonical sample sheet** with ontology-coded fields (Cell Ontology, Uberon, MONDO, EFO, HANCESTRO)
+3. Generate **per-cell metadata** at the CELLxGENE schema bar
+4. Convert Seurat → **AnnData** (`.h5ad`)
+5. Validate the AnnData against the CELLxGENE schema
+6. Generate **GEO** + **BioSample** upload TSVs from the canonical sheet
+7. Write a **Data Availability** statement for the manuscript
+
+The exercise is designed so you can run it on the workshop's `ifnb` object **and** re-run it on your own data later, replacing the metadata fields.
+
+::: {.callout-tip title="How to use this page"}
+1.  Download the `.qmd` source: <a href="Tutorial_13_FAIR_Metadata.qmd.txt" download="Tutorial_13_FAIR_Metadata.qmd">Tutorial_13_FAIR_Metadata.qmd</a>. If your browser saves the file as `Tutorial_13_FAIR_Metadata.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+2.  Make sure you have completed **[Tutorial 09 — Reference Annotation](Tutorial_09_Reference_Annotation.html)** — it writes `ifnb_annotated_final.rds`.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+::: callout-warning
+**You will not actually submit anything to NCBI / CELLxGENE in this tutorial.** Real submissions need a real NCBI account, an institutional contact, and an actual study. This tutorial generates the artifacts you'd upload — you can do the *file-preparation* part of submission at your laptop, validate everything, then go through the real submission portals when you have a real dataset.
+:::
+
+## Dataset — resuming from Tutorial 09
+
+| File | Produced by | What it is |
+|---|---|---|
+| `../data/ifnb_annotated_final.rds` | Tutorial 09 | Seurat object with integrated reduction, manual labels, SingleR labels, Azimuth labels, and the reconciled `celltype_final` per cell. |
+| `../Resources_Folder/metadata_templates/canonical_sample_sheet.csv` | provided | Worked example sample sheet — you'll edit this to match your real study. |
+
+
+::: {.callout-warning title="Common errors / things that bite"}
+**`SeuratDisk::SaveH5Seurat` fails with "object too large" or "wrong assay format"** — Seurat v5's `Assay5` class isn't fully supported by older `SeuratDisk` versions. Either downgrade `SeuratDisk` to its dev branch (`remotes::install_github("mojaveazure/seurat-disk")`) or use Seurat 5's built-in `writeH5AD()` if available.
+
+**`bitr()` returns an empty data frame** — your gene symbols don't match `org.Hs.eg.db`'s symbol naming convention. Check for case mismatches (gene `Cd3d` vs `CD3D`). For mouse use `org.Mm.eg.db`; some Seurat objects mix species — confirm `rownames(seu)` looks right.
+
+**`cellxgene-schema validate` reports "ontology term not found"** — the ontology IDs (`CL:`, `UBERON:`, `MONDO:`) get updated periodically. The validator pulls fresh ontology versions; an ID that worked a year ago may be deprecated. Look up the current ID at <https://www.ebi.ac.uk/ols4/>.
+
+**Validator passes locally but submission portal rejects** — the schema version updates faster than your local validator. Always check the [CELLxGENE schema doc](https://github.com/chanzuckerberg/single-cell-curation) for the version the portal currently requires before submitting.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_13_FAIR_Metadata.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
+
+## Setup
+
+```{r}
+#| label: setup
+library(Seurat)
+library(tidyverse)
+
+# Optional packages used below — install once if you don't have them.
+# install.packages("readr")
+# install.packages("jsonlite")
+# install.packages("yaml")
+# remotes::install_github("mojaveazure/seurat-disk")  # Seurat -> h5ad bridge
+library(SeuratDisk)        # SaveH5Seurat / Convert
+library(jsonlite)
+library(yaml)
+
+set.seed(2026)
+
+ifnb <- readRDS("../data/ifnb_annotated_final.rds")
+ifnb
+```
+
+## Step 1 — Audit what's actually in the object
+
+```{r}
+#| label: audit
+
+# Per-cell metadata columns
+colnames(ifnb@meta.data)
+
+# Per-sample collapsed view: what unique values are in stim?
+table(ifnb$stim)
+```
+
+Most Seurat objects you'll meet have **rich per-cell** metadata (cluster, cell-type label, QC metrics) and **almost no sample-level metadata** (just `stim` here). Submission needs both.
+
+::: {.callout-important title="Think about it"}
+Imagine someone in 2030 wants to reuse your dataset. From the `ifnb` object alone, can they answer: *what species is this? what tissue? what assay? what donor donated which sample?* If the answer is "you'd have to read the paper", your metadata is incomplete.
+
+<details>
+
+<summary>Show answers</summary>
+
+A 2030-era reanalyzer would not be able to determine species (the paper says human PBMCs but the object doesn't), tissue (PBMC ≈ blood), assay (10x 3' v1), or donor identity (the SeuratData distribution drops the per-cell donor IDs from Kang et al. 2017). All of this needs to live in machine-readable metadata, not in the methods section.
+
+</details>
+:::
+
+## Step 2 — Build a per-sample canonical sheet
+
+Load the example sheet and adapt it for the `ifnb` study. In a real study, you'd build this **at experimental design time** and version-control it alongside your code.
+
+```{r}
+#| label: canonical-sheet
+
+canonical <- read_csv("../Resources_Folder/metadata_templates/canonical_sample_sheet.csv")
+canonical
+```
+
+The sheet contains everything a downstream consumer needs. Note the **paired columns**: `tissue` (human-readable) + `tissue_uberon` (ontology ID). Always carry both — the ontology ID is what makes the metadata interoperable.
+
+::: callout-tip
+**Look up ontology terms** at [OLS at EBI](https://www.ebi.ac.uk/ols4/) or [BioPortal](https://bioportal.bioontology.org/). Search "B cell" → `CL:0000236`. Paste the ID into your sheet.
+:::
+
+## Step 3 — Per-cell metadata at the CELLxGENE bar
+
+CELLxGENE Discover requires a small set of per-cell columns to be present, with values from controlled vocabularies. The current schema (v5+) requires:
+
+| Column | Vocabulary | Example for ifnb |
+|---|---|---|
+| `cell_type_ontology_term_id` | Cell Ontology (`CL:`) | `CL:0000236` (B cell) |
+| `tissue_ontology_term_id` | Uberon (`UBERON:`) | `UBERON:0000178` (blood) |
+| `assay_ontology_term_id` | EFO (`EFO:`) | `EFO:0009922` (10x 3' v3) — for ifnb actually `EFO:0009899` (10x 3' v1) |
+| `disease_ontology_term_id` | MONDO / PATO | `PATO:0000461` (normal) |
+| `organism_ontology_term_id` | NCBITaxon | `NCBITaxon:9606` (human) |
+| `sex_ontology_term_id` | PATO | `PATO:0000383` / `PATO:0000384` |
+| `development_stage_ontology_term_id` | HsapDv | varies |
+| `self_reported_ethnicity_ontology_term_id` | HANCESTRO | `unknown` permitted |
+| `is_primary_data` | bool | `TRUE` for original; `FALSE` for re-analyzed |
+| `suspension_type` | enum | `cell` |
+| `donor_id` | study-internal | "donor1", "donor2", … |
+
+Build a per-cell metadata frame from the canonical sheet + author cell types:
+
+```{r}
+#| label: per-cell-metadata
+
+# Map seurat_annotations -> Cell Ontology IDs.
+cl_map <- tribble(
+  ~seurat_annotations,    ~cell_type_ontology_term_id,
+  "CD14 Mono",            "CL:0001054",   # CD14-positive monocyte
+  "CD16 Mono",            "CL:0002397",   # CD16-positive monocyte
+  "CD4 Naive T",          "CL:0000895",   # naive CD4-positive alpha-beta T cell
+  "CD4 Memory T",         "CL:0000897",   # CD4-positive alpha-beta memory T cell
+  "CD8 T",                "CL:0000625",   # CD8-positive alpha-beta T cell
+  "T activated",          "CL:0000084",   # T cell (broad)
+  "B",                    "CL:0000236",   # B cell
+  "B Activated",          "CL:0000236",   # B cell (subtype not in CL)
+  "NK",                   "CL:0000623",   # natural killer cell
+  "DC",                   "CL:0000451",   # dendritic cell
+  "pDC",                  "CL:0000784",   # plasmacytoid dendritic cell
+  "Mk",                   "CL:0000556",   # megakaryocyte
+  "Eryth",                "CL:0000232"    # erythrocyte
+)
+
+# Pull in study-level metadata from canonical_sheet
+study_meta <- tibble(
+  organism_ontology_term_id            = "NCBITaxon:9606",
+  tissue_ontology_term_id              = "UBERON:0000178",   # blood
+  assay_ontology_term_id               = "EFO:0009899",      # 10x 3' v1
+  is_primary_data                      = TRUE,
+  suspension_type                      = "cell",
+  development_stage_ontology_term_id   = "unknown",
+  self_reported_ethnicity_ontology_term_id = "unknown"
+)
+
+# Disease + treatment differ between CTRL and STIM
+sample_specific <- tibble(
+  stim                 = c("CTRL", "STIM"),
+  disease_ontology_term_id = c("PATO:0000461", "PATO:0000461"),  # both normal
+  treatment            = c("untreated", "IFN-beta 100U/mL 6h")
+)
+
+per_cell <- ifnb@meta.data |>
+  rownames_to_column("cell_barcode") |>
+  select(cell_barcode, stim, seurat_annotations, celltype_final) |>
+  left_join(cl_map, by = "seurat_annotations") |>
+  left_join(sample_specific, by = "stim") |>
+  bind_cols(study_meta[rep(1, nrow(ifnb@meta.data)), ])
+
+head(per_cell)
+sum(is.na(per_cell$cell_type_ontology_term_id))   # any unmapped cell types?
+```
+
+::: {.callout-important title="Think about it"}
+The CELLxGENE schema does NOT have a `condition` field — it has `disease`. How would you encode "IFN-β stimulation" in a strictly schema-conformant way?
+
+<details>
+
+<summary>Show answers</summary>
+
+CELLxGENE distinguishes between **disease state** (a clinical condition) and **experimental treatment** (an *in vitro* perturbation). For `ifnb`, both CTRL and STIM cells are biologically *normal* (`PATO:0000461`) — the IFN-β stimulation is an experimental perturbation, not a disease. Encode it in a free-text `treatment` column (CELLxGENE allows custom columns alongside the required ones) or as part of the description metadata. Don't shoehorn an experimental treatment into the `disease` field — it breaks atlas integration.
+
+</details>
+:::
+
+## Step 4 — Attach the new metadata back to the Seurat object
+
+```{r}
+#| label: attach
+
+# Make sure cell ordering matches
+stopifnot(identical(per_cell$cell_barcode, colnames(ifnb)))
+
+new_cols <- per_cell |> select(-cell_barcode, -stim, -seurat_annotations, -celltype_final)
+for (cn in colnames(new_cols)) {
+  ifnb[[cn]] <- new_cols[[cn]]
+}
+
+# Sanity-check
+table(ifnb$cell_type_ontology_term_id)
+```
+
+## Step 5 — Convert Seurat → AnnData (`.h5ad`)
+
+```{r}
+#| label: to-h5ad
+
+# SeuratDisk's two-step Seurat -> H5Seurat -> H5AD bridge
+# (Seurat 5 has built-in conversion via writeH5AD too if SeuratDisk is unavailable)
+SaveH5Seurat(ifnb, filename = "../data/ifnb_for_submission.h5Seurat", overwrite = TRUE)
+Convert("../data/ifnb_for_submission.h5Seurat", dest = "h5ad", overwrite = TRUE)
+
+file.info("../data/ifnb_for_submission.h5ad")$size / 1e6   # MB
+```
+
+## Step 6 — Validate against the CELLxGENE schema
+
+CELLxGENE provides a **Python** validator (`cellxgene-schema`) that you can run from the command line on the resulting `.h5ad`. From a shell:
+
+```bash
+# pip install cellxgene-schema
+cellxgene-schema validate ../data/ifnb_for_submission.h5ad
+```
+
+The validator reports every missing or out-of-vocabulary field. Iterate until the validator returns no errors.
+
+::: callout-tip
+You can install Python and the validator inside an R session via [`reticulate`](https://rstudio.github.io/reticulate/) and call it as `system("cellxgene-schema validate ...")`. For a real lab workflow, keep the validation as a `Makefile` rule so it runs on every metadata update.
+:::
+
+## Step 7 — Generate BioSample + SRA + GEO upload TSVs
+
+Real submissions to NCBI use the portal's online forms or batch-upload TSV templates. Your **canonical sheet** is the single source of truth that you transform into each portal's required TSV format.
+
+### 7a. BioSample TSV (one row per sample)
+
+```{r}
+#| label: biosample-tsv
+
+biosample <- canonical |>
+  transmute(
+    sample_name      = sample_id,
+    sample_title     = paste(sample_label_for_publication, "from", donor_id),
+    bioproject_accession = "PRJNA<TBD>",      # fill in after BioProject is created
+    organism,
+    isolate          = donor_id,
+    age,
+    biomaterial_provider = "<institution>",   # your institution
+    sex              = sex,
+    tissue,
+    cell_type_ontology = "CL:0000084 (T cell)",  # broad — the per-cell file has the fine-grained labels
+    disease,
+    treatment,
+    collection_date   = library_prep_date
+  )
+
+write_tsv(biosample, "../data/submission_biosample.tsv")
+biosample
+```
+
+### 7b. SRA metadata TSV (one row per sequencing run)
+
+```{r}
+#| label: sra-tsv
+
+sra <- canonical |>
+  transmute(
+    sample_name        = sample_id,
+    library_ID         = sample_id,
+    title              = paste("scRNA-seq of", sample_label_for_publication, "PBMCs", "from", donor_id),
+    library_strategy   = "RNA-Seq",
+    library_source     = "TRANSCRIPTOMIC SINGLE CELL",
+    library_selection  = "cDNA",
+    library_layout     = "PAIRED",
+    platform           = "ILLUMINA",
+    instrument_model   = sequencer,
+    design_description = "10x Chromium 3' Single Cell v3, processed with Cell Ranger 7.x",
+    filetype           = "fastq",
+    filename           = basename(fastq_R1),
+    filename2          = basename(fastq_R2)
+  )
+
+write_tsv(sra, "../data/submission_sra.tsv")
+sra
+```
+
+### 7c. GEO sample sheet (processed data)
+
+GEO's `seq_template_v2.1.xlsx` has a sample-section row per biological sample plus a processed-data row per output file. We'll generate the sample-section rows:
+
+```{r}
+#| label: geo-tsv
+
+geo_samples <- canonical |>
+  transmute(
+    `Sample name`        = sample_id,
+    title                = sample_label_for_publication,
+    `source name`        = tissue,
+    organism,
+    `characteristics: donor_id` = donor_id,
+    `characteristics: tissue`   = tissue,
+    `characteristics: disease`  = disease,
+    `characteristics: treatment` = treatment,
+    `characteristics: time_point` = time_point,
+    `characteristics: sex`      = sex,
+    molecule              = "polyA RNA",
+    `single or paired-end` = "paired-end",
+    instrument_model      = sequencer,
+    description           = paste("10x Chromium 3' Single Cell v3 of PBMCs.", treatment),
+    `processed data file` = paste0(sample_id, "_filtered_feature_bc_matrix.h5"),
+    `raw file`            = paste0(basename(fastq_R1), ", ", basename(fastq_R2))
+  )
+
+write_tsv(geo_samples, "../data/submission_geo_samples.tsv")
+geo_samples
+```
+
+::: {.callout-important title="Think about it"}
+1.  Notice that BioSample, SRA, and GEO TSVs all share `sample_id` as the join key. What goes wrong if a sample's name is "donor1_CTRL" in the BioSample sheet but "Donor1_CTRL" in the GEO sheet?
+2.  Why generate three sheets from the canonical sheet rather than three separately?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  NCBI's accession-linking is **case-sensitive** and **literal**. The two sheets won't link, the BioSample accession won't appear on the GEO record, and a downstream user querying SRA from a GEO record will hit a dead link. Always derive all sheets programmatically from one source of truth.
+2.  Same source = same names = automatic links. Manual transcription accumulates errors that compound across submissions; the more granular the metadata (cell type ontology IDs, ancestry codes), the worse manual transcription gets.
+
+</details>
+:::
+
+## Step 8 — Write the manuscript Data Availability section
+
+Generate a draft from the metadata so it's ready to drop into the methods:
+
+```{r}
+#| label: data-availability
+
+cat(glue::glue(
+"## Data Availability
+
+Raw sequencing reads have been deposited in the Sequence Read Archive (SRA)
+under BioProject accession PRJNA<TBD>. Processed gene-expression matrices
+and per-cell metadata are available at the Gene Expression Omnibus (GEO)
+under accession GSE<TBD>. An annotated AnnData object conforming to the
+CELLxGENE Discover schema (v5) is available at https://cellxgene.cziscience.com
+under dataset slug <TBD>. Analysis code and the canonical sample sheet are
+available at <github URL>.
+
+The dataset comprises {n_samples} samples from {n_donors} donors, totalling
+{n_cells} cells across two conditions (CTRL, IFN-β-stimulated). All
+samples were processed with 10x Chromium 3' Single Cell v3 chemistry on
+{sequencer}.",
+  n_samples = nrow(canonical),
+  n_donors  = n_distinct(canonical$donor_id),
+  n_cells   = ncol(ifnb),
+  sequencer = unique(canonical$sequencer)
+))
+```
+
+## Wrap-up
+
+You now have:
+
+-   A **canonical sample sheet** (versionable, single-source-of-truth) — `Resources_Folder/metadata_templates/canonical_sample_sheet.csv`
+-   A **CELLxGENE-schema-conformant** Seurat object with all per-cell ontology fields
+-   An **AnnData (`.h5ad`)** ready for CELLxGENE Discover
+-   Three NCBI **upload TSVs** for BioSample, SRA, and GEO derived from the same canonical sheet
+-   A draft **Data Availability** statement
+
+For your own work, replace the canonical sheet at experimental design time, then re-run this entire tutorial against your own annotated `.rds`. The ontology mapping in Step 3 is the part that takes the most thought — keep your `cl_map` table in version control and update it as your study expands.
+
+::: {.callout-tip title="Going further"}
+-   **Automate the validation.** Add `cellxgene-schema validate` to your project's `Makefile` or CI so every metadata change is checked.
+-   **Use a controlled workflow.** Tools like [`hcatools`](https://github.com/HumanCellAtlas/hca-data-wrangling) and [`scbase`](https://github.com/scverse) automate parts of this for HCA submissions.
+-   **For controlled-access human genomic data**, the same canonical sheet feeds **dbGaP** (US) or **EGA** (Europe) submissions; only the data-deposit endpoint changes, the metadata structure is the same.
+:::
+
+## See also
+
+-   [Lecture 11 — FAIR Principles & Data Sharing](../Lecture_Folder/Lecture_11_FAIR_DataSharing.html)
+-   [scNotebooks Module 13](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module13/module13.html) — covers the same workflow with extra detail on ArrayExpress + HCA Data Portal
+-   [CELLxGENE Discover schema documentation](https://github.com/chanzuckerberg/single-cell-curation/blob/main/schema/5.0.0/schema.md)
+-   [Wilkinson et al. 2016, *Sci Data* — the original FAIR paper](https://doi.org/10.1038/sdata.2016.18)
+-   [OLS — EBI's Ontology Lookup Service](https://www.ebi.ac.uk/ols4/) — find ontology IDs for any term
+-   [Resources_Folder/metadata_templates/](../Resources_Folder/metadata_templates/) — copy-and-edit metadata templates
