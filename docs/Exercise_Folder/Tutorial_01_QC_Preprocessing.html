@@ -2291,7 +2291,7 @@ How to use this page
 <ul>
 <li><strong>Reference:</strong> Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em> 36: 89–94. <a href="https://doi.org/10.1038/nbt.4042">doi:10.1038/nbt.4042</a></li>
 <li><strong>Origin:</strong> GEO accession <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583">GSE96583</a></li>
-<li><strong>Distributed via:</strong> the Bioconductor <a href="https://bioconductor.org/packages/scRNAseq/"><code>scRNAseq</code></a> package as <code>KangHumanPBMCData()</code> — cached locally through <code>ExperimentHub</code> on first download</li>
+<li><strong>Distributed via:</strong> the Bioconductor <a href="https://bioconductor.org/packages/muscData/"><code>muscData</code></a> package as <code>Kang18_8vs8()</code> — cached locally through <code>ExperimentHub</code> on first download</li>
 <li><strong>Used in:</strong> Tutorials 01 → 04 of this workshop, and the official <a href="https://satijalab.org/seurat/articles/integration_introduction.html">Seurat integration vignette</a></li>
 </ul>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -2377,7 +2377,7 @@ Note
 <h2 class="anchored" data-anchor-id="learning-goals">Learning goals</h2>
 <p>By the end of this tutorial you will be able to:</p>
 <ul>
-<li>Fetch a published scRNA-seq dataset from Bioconductor’s <code>scRNAseq</code> package and assemble it as a Seurat object</li>
+<li>Fetch a published scRNA-seq dataset from Bioconductor’s <code>muscData</code> package and assemble it as a Seurat object</li>
 <li>Inspect a multi-sample Seurat object and split it by sample</li>
 <li>Add per-cell QC metrics (<code>percent.mt</code>, <code>percent.rb</code>) and visualize them per sample</li>
 <li>Choose filtering thresholds that are defensible for <em>your</em> dataset</li>
@@ -2394,9 +2394,9 @@ Common errors / things that bite
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong><code>library(scRNAseq)</code> errors with “there is no package called ‘scRNAseq’”</strong> — <code>scRNAseq</code> is a Bioconductor package, not on CRAN. Install with <code>BiocManager::install(&quot;scRNAseq&quot;)</code> (which itself needs <code>install.packages(&quot;BiocManager&quot;)</code> first). The historical <code>SeuratData::InstallData(&quot;ifnb&quot;)</code> route is no longer used here — the Satija lab’s data server has been intermittently unavailable, so this tutorial pulls the same Kang <em>et al.</em> 2017 data from Bioconductor’s <code>ExperimentHub</code> instead.</p>
+<p><strong><code>library(muscData)</code> errors with “there is no package called ‘muscData’”</strong> — <code>muscData</code> is a Bioconductor experiment-data package, not on CRAN. Install with <code>BiocManager::install(&quot;muscData&quot;)</code> (which itself needs <code>install.packages(&quot;BiocManager&quot;)</code> first). The historical <code>SeuratData::InstallData(&quot;ifnb&quot;)</code> route is no longer used here — the Satija lab’s data server has been intermittently unavailable — and the <code>scRNAseq</code> package dropped its per-dataset accessor functions (e.g. <code>KangHumanPBMCData()</code>) in v2.18 in favor of a moving-target <code>fetchDataset()</code> API. <code>muscData::Kang18_8vs8()</code> bundles the same Kang <em>et al.</em> 2017 data with a stable interface.</p>
 <p><strong><code>scDblFinder</code> returns a different result than the workshop</strong> — <code>scDblFinder</code> is stochastic. The workshop uses <code>set.seed(2026)</code> <em>immediately before</em> calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.</p>
-<p><strong>SoupX errors with “no raw matrix found”</strong> — this is correct behaviour. The <code>KangHumanPBMCData()</code> download only ships the <em>filtered</em> counts. SoupX needs both. The Step 5 callout flags this — the SoupX block is illustrative on <code>ifnb</code>. Run it for real on data that has a Cell Ranger <code>raw_feature_bc_matrix/</code> folder.</p>
+<p><strong>SoupX errors with “no raw matrix found”</strong> — this is correct behaviour. The <code>Kang18_8vs8()</code> download only ships the <em>filtered</em> counts. SoupX needs both. The Step 5 callout flags this — the SoupX block is illustrative on <code>ifnb</code>. Run it for real on data that has a Cell Ranger <code>raw_feature_bc_matrix/</code> folder.</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
@@ -2423,10 +2423,10 @@ Solutions / instructor copy
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># One-time install (skip if already installed):</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># install.packages(c(&quot;Seurat&quot;, &quot;tidyverse&quot;, &quot;BiocManager&quot;))</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># BiocManager::install(c(&quot;scRNAseq&quot;, &quot;SingleCellExperiment&quot;))</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># BiocManager::install(c(&quot;muscData&quot;, &quot;SingleCellExperiment&quot;))</span></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scRNAseq)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(muscData)</span>
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleCellExperiment)</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
@@ -2442,8 +2442,8 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><code>scRNAseq</code> is a <strong>Bioconductor</strong> package (not on CRAN), so it has to go through <code>BiocManager::install()</code>. The first call to <code>KangHumanPBMCData()</code> downloads ~25 MB through <code>ExperimentHub</code> into your local cache; subsequent calls are instant.</p>
-<p>Earlier versions of this tutorial used <code>SeuratData::InstallData(&quot;ifnb&quot;)</code>. That route depends on the Satija lab’s data server (<code>seurat.nygenome.org</code>), which has been intermittently unavailable, so we’ve switched to the equivalent Bioconductor route. The underlying data — Kang <em>et al.</em> 2017 PBMCs — is the same.</p>
+<p><code>muscData</code> is a <strong>Bioconductor</strong> experiment-data package (not on CRAN), so it has to go through <code>BiocManager::install()</code>. The first call to <code>Kang18_8vs8()</code> downloads ~25 MB through <code>ExperimentHub</code> into your local cache; subsequent calls are instant.</p>
+<p>Earlier versions of this tutorial used <code>SeuratData::InstallData(&quot;ifnb&quot;)</code>. That route depends on the Satija lab’s data server (<code>seurat.nygenome.org</code>), which has been intermittently unavailable. A brief detour through <code>scRNAseq::KangHumanPBMCData()</code> also broke because <code>scRNAseq</code> v2.18 removed its per-dataset accessor functions. <code>muscData::Kang18_8vs8()</code> exposes the same Kang <em>et al.</em> 2017 PBMCs through a stable interface.</p>
 </div>
 </div>
 <hr>
@@ -2454,30 +2454,31 @@ Note
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fetch the Kang et al. 2017 PBMC dataset (CTRL + IFN-beta STIM) from</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Bioconductor&#39;s ExperimentHub. The first call downloads ~25 MB and caches it;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># every subsequent call is a no-op.</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">KangHumanPBMCData</span>(<span class="at">mode =</span> <span class="fu">c</span>(<span class="st">&quot;ctrl&quot;</span>, <span class="st">&quot;stim&quot;</span>))</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">Kang18_8vs8</span>()</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop the multiplexed multiplets so we end up with the same set of singletons</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># that the historical `ifnb` Seurat object shipped (~14k cells).</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> sce[, sce<span class="sc">$</span>multiplets <span class="sc">==</span> <span class="st">&quot;singlet&quot;</span>]</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to a Seurat object, mirroring the metadata column names the rest of</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># this tutorial series expects:</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   - `stim` as a factor with levels c(&quot;CTRL&quot;, &quot;STIM&quot;)</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   - `seurat_annotations` for the author-curated cell-type labels</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts    =</span> <span class="fu">counts</span>(sce),</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">meta.data =</span> <span class="fu">as.data.frame</span>(<span class="fu">colData</span>(sce))</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>stim <span class="ot">&lt;-</span> <span class="fu">factor</span>(<span class="fu">toupper</span>(ifnb<span class="sc">$</span>stim), <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;CTRL&quot;</span>, <span class="st">&quot;STIM&quot;</span>))</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>seurat_annotations <span class="ot">&lt;-</span> <span class="fu">factor</span>(ifnb<span class="sc">$</span>cell)</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>ifnb</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co"># What samples are in here?</span></span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>stim)</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># Author-curated cell-type labels (we&#39;ll use these as ground truth in Tut 03)</span></span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>seurat_annotations)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="co"># that the historical `ifnb` Seurat object shipped (~14k cells), and drop any</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="co"># cells without an author-assigned cell type label.</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> sce[, sce<span class="sc">$</span>multiplets <span class="sc">==</span> <span class="st">&quot;singlet&quot;</span> <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(sce<span class="sc">$</span>cell)]</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to a Seurat object, mirroring the metadata column names the rest of</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># this tutorial series expects:</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   - `stim` as a factor with levels c(&quot;CTRL&quot;, &quot;STIM&quot;)</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   - `seurat_annotations` for the author-curated cell-type labels</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">counts    =</span> <span class="fu">counts</span>(sce),</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="at">meta.data =</span> <span class="fu">as.data.frame</span>(<span class="fu">colData</span>(sce))</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>stim <span class="ot">&lt;-</span> <span class="fu">factor</span>(<span class="fu">toupper</span>(ifnb<span class="sc">$</span>stim), <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">&quot;CTRL&quot;</span>, <span class="st">&quot;STIM&quot;</span>))</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>seurat_annotations <span class="ot">&lt;-</span> <span class="fu">factor</span>(ifnb<span class="sc">$</span>cell)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>ifnb</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co"># What samples are in here?</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>stim)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Author-curated cell-type labels (we&#39;ll use these as ground truth in Tut 03)</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>seurat_annotations)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2640,7 +2641,7 @@ Warning
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>SoupX needs both the raw and filtered Cell Ranger matrices</strong> (<code>raw_feature_bc_matrix/</code> and <code>filtered_feature_bc_matrix/</code>) because it learns the soup profile from empty droplets. <code>KangHumanPBMCData()</code> only ships the <strong>filtered</strong> counts, so you cannot run SoupX on <code>ifnb</code> directly. The code below is the canonical pattern — use it on <strong>your own</strong> 10x data, or on the <a href="NSCLC_FullDataset/Tutorial_NSCLC_01_QC_Preprocessing.html">NSCLC scaling exercise</a> where the raw matrix is available.</p>
+<p><strong>SoupX needs both the raw and filtered Cell Ranger matrices</strong> (<code>raw_feature_bc_matrix/</code> and <code>filtered_feature_bc_matrix/</code>) because it learns the soup profile from empty droplets. <code>Kang18_8vs8()</code> only ships the <strong>filtered</strong> counts, so you cannot run SoupX on <code>ifnb</code> directly. The code below is the canonical pattern — use it on <strong>your own</strong> 10x data, or on the <a href="NSCLC_FullDataset/Tutorial_NSCLC_01_QC_Preprocessing.html">NSCLC scaling exercise</a> where the raw matrix is available.</p>
 </div>
 </div>
 <div class="cell">
@@ -2910,7 +2911,7 @@ Show answers
 <div class="cell">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>dim_summary <span class="ot">&lt;-</span> tibble<span class="sc">::</span><span class="fu">tribble</span>(</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="sc">~</span>step,                                                    <span class="sc">~</span>features_after,        <span class="sc">~</span>barcodes_after,</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Step 1 — KangHumanPBMCData (singlets, raw)&quot;</span>,              dim_raw[<span class="dv">1</span>],             dim_raw[<span class="dv">2</span>],</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Step 1 — Kang18_8vs8 (singlets, raw)&quot;</span>,                    dim_raw[<span class="dv">1</span>],             dim_raw[<span class="dv">2</span>],</span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Step 7 — subset() QC filter (nFeature_RNA, percent.mt)&quot;</span>,  dim_after_filter[<span class="dv">1</span>],    dim_after_filter[<span class="dv">2</span>],</span>
 <span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Step 8 — NormalizeData (no dimension change)&quot;</span>,            dim_after_normalize[<span class="dv">1</span>], dim_after_normalize[<span class="dv">2</span>]</span>
 <span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>)</span>
@@ -2932,19 +2933,19 @@ Show answers
 </thead>
 <tbody>
 <tr class="odd">
-<td>Step 1 — <code>KangHumanPBMCData</code> (singlets)</td>
-<td style="text-align: right;">~14,053</td>
-<td style="text-align: right;">~13,999</td>
+<td>Step 1 — <code>Kang18_8vs8</code> (singlets, annotated)</td>
+<td style="text-align: right;">~35,635</td>
+<td style="text-align: right;">~24,500</td>
 </tr>
 <tr class="even">
 <td>Step 7 — <code>subset()</code> QC filter (<code>nFeature_RNA</code>, <code>percent.mt</code>)</td>
-<td style="text-align: right;">~14,053</td>
-<td style="text-align: right;">~13,500</td>
+<td style="text-align: right;">~35,635</td>
+<td style="text-align: right;">~22,000</td>
 </tr>
 <tr class="odd">
 <td>Step 8 — <code>NormalizeData</code> (no dimension change)</td>
-<td style="text-align: right;">~14,053</td>
-<td style="text-align: right;">~13,500</td>
+<td style="text-align: right;">~35,635</td>
+<td style="text-align: right;">~22,000</td>
 </tr>
 </tbody>
 </table>
@@ -2975,7 +2976,7 @@ Tip
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>
 <ul>
-<li>Dataset: Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em> 36: 89–94, <a href="https://doi.org/10.1038/nbt.4042">doi:10.1038/nbt.4042</a> — fetched via Bioconductor’s <a href="https://bioconductor.org/packages/scRNAseq/"><code>scRNAseq::KangHumanPBMCData()</code></a> (same data the legacy <code>SeuratData::LoadData(&quot;ifnb&quot;)</code> route returned)</li>
+<li>Dataset: Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em> 36: 89–94, <a href="https://doi.org/10.1038/nbt.4042">doi:10.1038/nbt.4042</a> — fetched via Bioconductor’s <a href="https://bioconductor.org/packages/muscData/"><code>muscData::Kang18_8vs8()</code></a> (same data the legacy <code>SeuratData::LoadData(&quot;ifnb&quot;)</code> route returned)</li>
 <li>Reference vignettes: <a href="https://satijalab.org/seurat/articles/integration_introduction.html">Seurat integration tutorial</a> · <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial.html">Seurat PBMC 3k tutorial</a></li>
 <li>Inspiration for the multi-step QC pacing: <a href="https://integrativebioinformatics.github.io/scNotebooks/">scNotebooks</a> (Sengupta lab)</li>
 </ul>
