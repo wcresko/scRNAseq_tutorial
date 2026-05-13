@@ -66,6 +66,8 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 **Markers list is dominated by ISGs (`ISG15`, `IFI6`, `IFIT3`, `MX1`)** — that's expected on the *unintegrated* `ifnb` data because clusters here are partly driven by `stim`. Tutorial 04 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.
 
 **`Idents()` is set to the wrong column** — clusters at multiple resolutions all live in `meta.data` (`RNA_snn_res.0.1`, `_0.3`, etc.) but only one is the "active" identity. `Idents(seu) <- "RNA_snn_res.0.5"` switches; `levels(Idents(seu))` confirms.
+
+**`FindMarkers` errors with "data layers are not joined. Please run JoinLayers"** — Seurat v5 keeps per-sample split layers (`counts.CTRL`, `counts.STIM`, `data.CTRL`, `data.STIM`) after `merge()`, and `FindMarkers` refuses to run until they're collapsed. Fix with `ifnb <- JoinLayers(ifnb)` before calling `FindMarkers` / `FindAllMarkers`. The resume chunk above does this automatically. `Layers(ifnb)` shows the current layer list.
 :::
 
 
@@ -94,6 +96,14 @@ set.seed(2026)
 
 ifnb <- readRDS("../data/ifnb_clustered.rds")
 Idents(ifnb) <- "RNA_snn_res.0.5"
+
+# In Seurat v5, merging per-sample objects (as Tutorial 01 does after
+# scDblFinder) leaves the RNA assay with split layers. FindMarkers requires
+# a single joined layer, so rejoin here if it hasn't been done already.
+if (length(Layers(ifnb, search = "counts")) > 1) {
+  ifnb <- JoinLayers(ifnb)
+}
+
 ifnb
 ```
 

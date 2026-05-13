@@ -2328,6 +2328,7 @@ Common errors / things that bite
 <p><strong><code>FindAllMarkers</code> takes 5+ minutes</strong> — install <code>presto</code> (<code>install.packages(&quot;presto&quot;)</code>); Seurat detects it automatically and is ~10× faster.</p>
 <p><strong>Markers list is dominated by ISGs (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>)</strong> — that’s expected on the <em>unintegrated</em> <code>ifnb</code> data because clusters here are partly driven by <code>stim</code>. Tutorial 04 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.</p>
 <p><strong><code>Idents()</code> is set to the wrong column</strong> — clusters at multiple resolutions all live in <code>meta.data</code> (<code>RNA_snn_res.0.1</code>, <code>_0.3</code>, etc.) but only one is the “active” identity. <code>Idents(seu) &lt;- &quot;RNA_snn_res.0.5&quot;</code> switches; <code>levels(Idents(seu))</code> confirms.</p>
+<p><strong><code>FindMarkers</code> errors with “data layers are not joined. Please run JoinLayers”</strong> — Seurat v5 keeps per-sample split layers (<code>counts.CTRL</code>, <code>counts.STIM</code>, <code>data.CTRL</code>, <code>data.STIM</code>) after <code>merge()</code>, and <code>FindMarkers</code> refuses to run until they’re collapsed. Fix with <code>ifnb &lt;- JoinLayers(ifnb)</code> before calling <code>FindMarkers</code> / <code>FindAllMarkers</code>. The resume chunk above does this automatically. <code>Layers(ifnb)</code> shows the current layer list.</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
@@ -2360,7 +2361,15 @@ Solutions / instructor copy
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_clustered.rds&quot;</span>)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(ifnb) <span class="ot">&lt;-</span> <span class="st">&quot;RNA_snn_res.0.5&quot;</span></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>ifnb</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># In Seurat v5, merging per-sample objects (as Tutorial 01 does after</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># scDblFinder) leaves the RNA assay with split layers. FindMarkers requires</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># a single joined layer, so rejoin here if it hasn&#39;t been done already.</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(<span class="fu">Layers</span>(ifnb, <span class="at">search =</span> <span class="st">&quot;counts&quot;</span>)) <span class="sc">&gt;</span> <span class="dv">1</span>) {</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  ifnb <span class="ot">&lt;-</span> <span class="fu">JoinLayers</span>(ifnb)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>ifnb</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <hr>
 </section>
