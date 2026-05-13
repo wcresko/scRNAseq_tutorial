@@ -53,7 +53,7 @@ Together \~14,000 cells across two samples on the **10x Chromium 3' v1** assay. 
 
 -   **Reference:** Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94. [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
 -   **Origin:** GEO accession [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
--   **Distributed via:** `SeuratData` R package (one `InstallData()` call)
+-   **Distributed via:** the Bioconductor [`scRNAseq`](https://bioconductor.org/packages/scRNAseq/) package as `KangHumanPBMCData()` — cached locally through `ExperimentHub` on first download
 -   **Used in:** Tutorials 01 → 04 of this workshop, and the official [Seurat integration vignette](https://satijalab.org/seurat/articles/integration_introduction.html)
 
 ::: callout-note
@@ -83,7 +83,7 @@ Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01
 
 By the end of this tutorial you will be able to:
 
--   Install and load a `SeuratData` package
+-   Fetch a published scRNA-seq dataset from Bioconductor's `scRNAseq` package and assemble it as a Seurat object
 -   Inspect a multi-sample Seurat object and split it by sample
 -   Add per-cell QC metrics (`percent.mt`, `percent.rb`) and visualize them per sample
 -   Choose filtering thresholds that are defensible for *your* dataset
@@ -92,11 +92,11 @@ By the end of this tutorial you will be able to:
 
 
 ::: {.callout-warning title="Common errors / things that bite"}
-**`SeuratData::InstallData("ifnb")` errors out** — the SeuratData repo is on R-universe, not CRAN. Install `SeuratData` itself first via `install.packages("SeuratData", repos = c("https://satijalab.r-universe.dev", getOption("repos")))`. If you skipped this in [Setup](../Setup.html), do it now.
+**`library(scRNAseq)` errors with "there is no package called 'scRNAseq'"** — `scRNAseq` is a Bioconductor package, not on CRAN. Install with `BiocManager::install("scRNAseq")` (which itself needs `install.packages("BiocManager")` first). The historical `SeuratData::InstallData("ifnb")` route is no longer used here — the Satija lab's data server has been intermittently unavailable, so this tutorial pulls the same Kang *et al.* 2017 data from Bioconductor's `ExperimentHub` instead.
 
 **`scDblFinder` returns a different result than the workshop** — `scDblFinder` is stochastic. The workshop uses `set.seed(2026)` *immediately before* calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.
 
-**SoupX errors with "no raw matrix found"** — this is correct behaviour. The `ifnb` SeuratData cache only ships the *filtered* matrix. SoupX needs both. The Step 5 callout flags this — the SoupX block is illustrative on `ifnb`. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
+**SoupX errors with "no raw matrix found"** — this is correct behaviour. The `KangHumanPBMCData()` download only ships the *filtered* counts. SoupX needs both. The Step 5 callout flags this — the SoupX block is illustrative on `ifnb`. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
 :::
 
 
@@ -115,19 +115,21 @@ If you're running a graded course, link the rendered solutions page from your LM
 #| label: setup
 
 # One-time install (skip if already installed):
-# install.packages(c("Seurat", "tidyverse"))
-# install.packages("SeuratData", repos = c("https://satijalab.r-universe.dev", getOption("repos")))
-# SeuratData::InstallData("ifnb")
+# install.packages(c("Seurat", "tidyverse", "BiocManager"))
+# BiocManager::install(c("scRNAseq", "SingleCellExperiment"))
 
 library(Seurat)
-library(SeuratData)
+library(scRNAseq)
+library(SingleCellExperiment)
 library(tidyverse)
 
 set.seed(2026)
 ```
 
 ::: callout-note
-`SeuratData` is **not on CRAN**. Install it from the Satija lab's R-universe mirror as shown above. The first time you call `InstallData("ifnb")`, it downloads \~25 MB to your user library; subsequent loads are instant.
+`scRNAseq` is a **Bioconductor** package (not on CRAN), so it has to go through `BiocManager::install()`. The first call to `KangHumanPBMCData()` downloads \~25 MB through `ExperimentHub` into your local cache; subsequent calls are instant.
+
+Earlier versions of this tutorial used `SeuratData::InstallData("ifnb")`. That route depends on the Satija lab's data server (`seurat.nygenome.org`), which has been intermittently unavailable, so we've switched to the equivalent Bioconductor route. The underlying data — Kang *et al.* 2017 PBMCs — is the same.
 :::
 
 ------------------------------------------------------------------------
@@ -137,7 +139,26 @@ set.seed(2026)
 ```{r}
 #| label: load
 
-ifnb <- LoadData("ifnb")
+# Fetch the Kang et al. 2017 PBMC dataset (CTRL + IFN-beta STIM) from
+# Bioconductor's ExperimentHub. The first call downloads ~25 MB and caches it;
+# every subsequent call is a no-op.
+sce <- KangHumanPBMCData(mode = c("ctrl", "stim"))
+
+# Drop the multiplexed multiplets so we end up with the same set of singletons
+# that the historical `ifnb` Seurat object shipped (~14k cells).
+sce <- sce[, sce$multiplets == "singlet"]
+
+# Convert to a Seurat object, mirroring the metadata column names the rest of
+# this tutorial series expects:
+#   - `stim` as a factor with levels c("CTRL", "STIM")
+#   - `seurat_annotations` for the author-curated cell-type labels
+ifnb <- CreateSeuratObject(
+  counts    = counts(sce),
+  meta.data = as.data.frame(colData(sce))
+)
+ifnb$stim <- factor(toupper(ifnb$stim), levels = c("CTRL", "STIM"))
+ifnb$seurat_annotations <- factor(ifnb$cell)
+
 ifnb
 
 # What samples are in here?
@@ -253,7 +274,7 @@ FeatureScatter(ifnb,
 In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambient mRNA** into every droplet. After Cell Ranger, this shows up as a low background of "wrong" transcripts in every cell — most visibly when a cell expresses a marker for a *different* cell type at low level. **`SoupX`** estimates the ambient profile and corrects each cell's counts. It runs *before* QC filtering and replaces the counts matrix with a cleaned one.
 
 ::: callout-warning
-**SoupX needs both the raw and filtered Cell Ranger matrices** (`raw_feature_bc_matrix/` and `filtered_feature_bc_matrix/`) because it learns the soup profile from empty droplets. The `ifnb` SeuratData package only ships the **filtered** matrix, so you cannot run SoupX on `ifnb` directly. The code below is the canonical pattern — use it on **your own** 10x data, or on the [NSCLC scaling exercise](NSCLC_FullDataset/Tutorial_NSCLC_01_QC_Preprocessing.html) where the raw matrix is available.
+**SoupX needs both the raw and filtered Cell Ranger matrices** (`raw_feature_bc_matrix/` and `filtered_feature_bc_matrix/`) because it learns the soup profile from empty droplets. `KangHumanPBMCData()` only ships the **filtered** counts, so you cannot run SoupX on `ifnb` directly. The code below is the canonical pattern — use it on **your own** 10x data, or on the [NSCLC scaling exercise](NSCLC_FullDataset/Tutorial_NSCLC_01_QC_Preprocessing.html) where the raw matrix is available.
 :::
 
 ```{r}
@@ -474,7 +495,7 @@ ifnb <- ScaleData(ifnb, features = all.genes)
 
 dim_summary <- tibble::tribble(
   ~step,                                                    ~features_after,        ~barcodes_after,
-  "Step 1 — LoadData (raw)",                                 dim_raw[1],             dim_raw[2],
+  "Step 1 — KangHumanPBMCData (singlets, raw)",              dim_raw[1],             dim_raw[2],
   "Step 7 — subset() QC filter (nFeature_RNA, percent.mt)",  dim_after_filter[1],    dim_after_filter[2],
   "Step 8 — NormalizeData (no dimension change)",            dim_after_normalize[1], dim_after_normalize[2]
 )
@@ -485,7 +506,7 @@ You should see roughly:
 
 | Step | Features after | Barcodes after |
 |---|---:|---:|
-| Step 1 — LoadData                                              | ~14,053 | ~13,999 |
+| Step 1 — `KangHumanPBMCData` (singlets)                        | ~14,053 | ~13,999 |
 | Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~14,053 | ~13,500 |
 | Step 8 — `NormalizeData` (no dimension change)                  | ~14,053 | ~13,500 |
 
@@ -508,6 +529,6 @@ The saved `.rds` is the starting point for **Tutorial 02 — Dimensionality redu
 
 ## Credits
 
--   Dataset: `ifnb` from the `SeuratData` package — Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
+-   Dataset: Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042) — fetched via Bioconductor's [`scRNAseq::KangHumanPBMCData()`](https://bioconductor.org/packages/scRNAseq/) (same data the legacy `SeuratData::LoadData("ifnb")` route returned)
 -   Reference vignettes: [Seurat integration tutorial](https://satijalab.org/seurat/articles/integration_introduction.html) · [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
 -   Inspiration for the multi-step QC pacing: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) (Sengupta lab)
