@@ -1,0 +1,397 @@
+---
+title: "Tutorial 10 — WGCNA on COVID-19 PBMCs (GSE152418)"
+subtitle: "Weighted gene co-expression networks, Patel-style"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+A worked **WGCNA** pipeline that mirrors [Patel's `WGCNA.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R), with workshop-specific commentary and call-out boxes. The dataset is **GEO accession GSE152418** — bulk RNA-seq of PBMCs from COVID-19 patients across a severity gradient. We'll build a signed co-expression network and correlate the resulting modules with disease severity.
+
+
+::: callout-note
+**Companion book chapter:** [Chapter 11 — WGCNA](../Resources_Folder/Chapter_11_WGCNA.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices.
+:::
+
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it:
+
+1.  Download the `.qmd` source: <a href="Tutorial_10_WGCNA.qmd.txt" download="Tutorial_10_WGCNA.qmd">Tutorial_10_WGCNA.qmd</a>. If your browser saves the file as `Tutorial_10_WGCNA.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+2.  Download the GEO data (block below) into `../data/`.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+::: callout-note
+**Companion lecture:** [Lecture 09 — WGCNA](../Lecture_Folder/Lecture_11_WGCNA.html)
+:::
+
+## Dataset — GSE152418 (COVID-19 PBMC bulk RNA-seq)
+
+**What it is.** PBMC bulk RNA-seq from a published cross-sectional study of COVID-19 patients (Arunachalam et al. 2020, *Science* 369: 1210–1220). Roughly 34 samples spanning healthy controls, convalescent, moderate, severe, and ICU patients.
+
+-   GEO landing page: <https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418>
+-   Companion paper: Arunachalam et al. (2020) *Science* — <https://doi.org/10.1126/science.abc6261>
+-   Files we'll use:
+    -   `GSE152418_p20047_Study1_RawCounts.txt.gz` — gene × sample raw count table
+    -   GEO **soft / matrix** file for sample metadata (loaded via `GEOquery`)
+
+### Download with `wget` or `curl`
+
+Direct GEO supplementary FTP links (NCBI mirror). Place into `../data/`.
+
+With `wget`:
+
+```bash
+mkdir -p ../data && cd ../data
+
+# Raw counts (supplementary file)
+wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
+gunzip GSE152418_p20047_Study1_RawCounts.txt.gz
+```
+
+With `curl`:
+
+```bash
+mkdir -p ../data && cd ../data
+
+curl -L -O https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
+gunzip GSE152418_p20047_Study1_RawCounts.txt.gz
+```
+
+From R via `GEOquery`:
+
+```{r}
+#| label: tutorial-11-wgcna-1
+#| eval: false
+library(GEOquery)
+# This pulls the series matrix (metadata) and supplementary files into ../data/
+getGEOSuppFiles("GSE152418", baseDir = "../data")
+```
+
+::: callout-tip
+GEO link rot: if the supplementary file URL changes, get the current one from the *Supplementary file* table at the bottom of the GSE152418 GEO landing page.
+:::
+
+
+::: {.callout-warning title="Common errors / things that bite"}
+**WGCNA expects samples-as-ROWS** — most RNA-seq workflows have samples-as-COLUMNS. Transpose before passing to `pickSoftThreshold`. The tutorial does this; if you adapt for your own data, watch this.
+
+**Scale-free fit `R^2` never reaches 0.8** — your data is too noisy or has technical structure. Plot the soft-threshold scan (`pickSoftThreshold` output) — if it plateaus below 0.8, suspect batch effects or low N. Don't force a power that gives a low fit; report the issue.
+
+**`blockwiseModules` runs out of memory** — for >20k genes, blockwise analysis splits into \~5k-gene blocks. If RAM is the issue, set `maxBlockSize = 5000` and accept the loss in cross-block module assignments.
+
+**Module-trait correlations are all p > 0.05** — most often you have too few samples (<10). WGCNA's downstream tests need biological replication. With N = 5–8 the test is underpowered.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_10_WGCNA.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
+
+## Setup
+
+```{r}
+#| label: setup
+# One-time install:
+# install.packages("BiocManager")
+# BiocManager::install(c("WGCNA", "DESeq2", "GEOquery", "CorLevelPlot",
+#                        "gridExtra", "tidyverse"))
+
+library(WGCNA)
+library(DESeq2)
+library(GEOquery)
+library(tidyverse)
+library(CorLevelPlot)
+library(gridExtra)
+
+allowWGCNAThreads()    # multi-threading
+
+set.seed(2026)
+```
+
+## Step 1 — Load data and metadata
+
+```{r}
+#| label: load
+data <- read.delim("../data/GSE152418_p20047_Study1_RawCounts.txt", header = TRUE)
+
+# Pull GEO metadata
+gse       <- getGEO("GSE152418", GSEMatrix = TRUE)
+phenoData <- pData(phenoData(gse[[1]]))
+phenoData <- phenoData[, c(1, 2, 46:50)]
+head(phenoData)
+```
+
+```{r}
+#| label: tidy-counts
+# Reshape to a tidy long form, attach phenoData (matching `samples` to `title`),
+# then spread back to a counts matrix indexed by Ensembl ID.
+data <- data |>
+  gather(key = "samples", value = "counts", -ENSEMBLID) |>
+  mutate(samples = gsub("\\.", "-", samples)) |>
+  inner_join(phenoData, by = c("samples" = "title")) |>
+  select(1, 3, 4) |>
+  spread(key = "geo_accession", value = "counts") |>
+  column_to_rownames(var = "ENSEMBLID")
+
+dim(data)
+data[1:5, 1:5]
+```
+
+## Step 2 — Outlier detection
+
+::: callout-note
+**Why before normalization?** Outlying samples bias the variance-stabilizing transform and inflate the dispersion estimates downstream. Drop them first.
+:::
+
+```{r}
+#| label: gsg
+gsg <- goodSamplesGenes(t(data))
+summary(gsg)
+gsg$allOK
+
+# Drop outlier genes
+data <- data[gsg$goodGenes == TRUE, ]
+```
+
+```{r}
+#| label: hclust
+htree <- hclust(dist(t(data)), method = "average")
+plot(htree)
+```
+
+```{r}
+#| label: pca-outlier
+pca       <- prcomp(t(data))
+pca.dat   <- pca$x
+pca.var   <- pca$sdev^2
+pca.var.p <- round(pca.var / sum(pca.var) * 100, digits = 2)
+
+ggplot(as.data.frame(pca.dat), aes(PC1, PC2)) +
+  geom_point() +
+  geom_text(label = rownames(pca.dat), nudge_y = 5) +
+  labs(x = paste0("PC1: ", pca.var.p[1], "%"),
+       y = paste0("PC2: ", pca.var.p[2], "%")) +
+  theme_minimal()
+```
+
+::: {.callout-important title="Think about it"}
+The hierarchical-clustering tree and the PCA both expose outliers. Which would you trust more on a small dataset?
+
+<details>
+<summary>Show answers</summary>
+
+PCA — it gives you a continuous view of how far each sample is from the rest, in the same space the model will use. `hclust` only tells you the *order* of merging, which can hide a sample that's mildly aberrant but never gets clustered alone.
+</details>
+:::
+
+```{r}
+#| label: drop-outliers
+# Patel's example drops a couple of obvious outliers; modify to fit your eyeballed picks.
+samples.to.exclude <- c("GSM4614993", "GSM4614994", "GSM4614995")
+data.subset <- data[, !(colnames(data) %in% samples.to.exclude)]
+
+# Subset metadata accordingly
+colData <- phenoData |>
+  filter(!(geo_accession %in% samples.to.exclude)) |>
+  column_to_rownames(var = "geo_accession")
+
+# Make sure rows of colData match cols of counts
+all(rownames(colData) %in% colnames(data.subset))
+all(rownames(colData) == colnames(data.subset))
+```
+
+## Step 3 — Normalize with DESeq2 VST
+
+WGCNA expects expression values that are **roughly homoscedastic** across the mean range. Variance-stabilizing transformation does that for count data:
+
+```{r}
+#| label: vst
+dds <- DESeqDataSetFromMatrix(countData = data.subset,
+                              colData   = colData,
+                              design    = ~ 1)        # WGCNA is unsupervised
+
+# Drop genes with < 15 reads in 3/4 of samples
+dds75 <- dds[ rowSums(counts(dds) >= 15) >= 24, ]
+nrow(dds75)
+
+dds_norm <- vst(dds75)
+norm.counts <- assay(dds_norm) |> t()      # WGCNA wants samples × genes
+```
+
+::: callout-tip
+**Why `~ 1`?** WGCNA's network is unsupervised — the design should not encode the trait you're going to test against, otherwise you're "double dipping". Use `~ 1` for an unmodelled VST.
+:::
+
+## Step 4 — Pick the soft-thresholding power
+
+```{r}
+#| label: pick-power
+power <- c(1:10, seq(12, 30, by = 2))
+sft <- pickSoftThreshold(norm.counts,
+                         powerVector = power,
+                         networkType = "signed",
+                         verbose     = 5)
+sft.data <- sft$fitIndices
+
+a1 <- ggplot(sft.data, aes(Power, SFT.R.sq, label = Power)) +
+        geom_point() + geom_text(nudge_y = 0.05) +
+        geom_hline(yintercept = 0.8, color = "red") +
+        labs(x = "Power", y = "Scale-free topology fit, signed R²") +
+        theme_classic()
+a2 <- ggplot(sft.data, aes(Power, mean.k., label = Power)) +
+        geom_point() + geom_text(nudge_y = 0.1) +
+        labs(x = "Power", y = "Mean connectivity") +
+        theme_classic()
+grid.arrange(a1, a2, nrow = 2)
+```
+
+::: callout-warning
+**Pick the smallest power that crosses R² ≈ 0.8** *and* gives a reasonable mean connectivity. Patel's example lands at **β = 18** for this dataset; yours will vary.
+:::
+
+## Step 5 — Build the network
+
+```{r}
+#| label: build-network
+soft_power     <- 18
+temp_cor       <- cor                    # save base::cor before WGCNA shadows it
+cor            <- WGCNA::cor
+
+bwnet <- blockwiseModules(norm.counts,
+                          maxBlockSize     = 14000,
+                          TOMType          = "signed",
+                          power            = soft_power,
+                          mergeCutHeight   = 0.25,
+                          numericLabels    = FALSE,
+                          randomSeed       = 1234,
+                          verbose          = 3)
+
+cor <- temp_cor                          # restore base::cor
+```
+
+::: callout-warning
+**`cor` shadowing.** WGCNA replaces base R's `cor()`. If you forget to restore it (`cor <- temp_cor`), unrelated downstream code can break in confusing ways.
+:::
+
+```{r}
+#| label: dendro
+plotDendroAndColors(bwnet$dendrograms[[1]],
+                    cbind(bwnet$unmergedColors, bwnet$colors),
+                    c("unmerged", "merged"),
+                    dendroLabels = FALSE,
+                    addGuide     = TRUE,
+                    hang         = 0.03,
+                    guideHang    = 0.05)
+```
+
+## Step 6 — Module eigengenes & module–trait correlations
+
+```{r}
+#| label: MEs
+module_eigengenes <- bwnet$MEs
+head(module_eigengenes)
+table(bwnet$colors)        # genes per module
+```
+
+```{r}
+#| label: trait-binarize
+# Build a numeric trait matrix: severity (Healthy / Convalescent / ICU / Moderate / Severe).
+traits <- colData |>
+  mutate(disease_state_bin = ifelse(grepl("severe", `disease state:ch1`,
+                                          ignore.case = TRUE), 1, 0)) |>
+  select(disease_state_bin)
+
+severity.out <- binarizeCategoricalColumns(colData$`severity:ch1`,
+                                           includePairwise = FALSE,
+                                           includeLevelVsAll = TRUE,
+                                           minCount = 1)
+traits <- cbind(traits, severity.out)
+```
+
+```{r}
+#| label: cor-trait
+nSamples <- nrow(norm.counts)
+nGenes   <- ncol(norm.counts)
+
+module.trait.corr   <- cor(module_eigengenes, traits, use = "p")
+module.trait.corr.p <- corPvalueStudent(module.trait.corr, nSamples)
+
+heatmap.data <- merge(module_eigengenes, traits, by = "row.names")
+heatmap.data <- column_to_rownames(heatmap.data, var = "Row.names")
+
+CorLevelPlot(heatmap.data,
+             x      = names(traits),
+             y      = names(module_eigengenes),
+             col    = c("blue1", "skyblue", "white", "pink", "red"))
+```
+
+::: {.callout-important title="Think about it"}
+Modules with strong *|r|* and small p against the severity column are candidates for follow-up. What's the next thing you'd do with such a module?
+
+<details>
+<summary>Show answers</summary>
+
+Two things in parallel:
+
+1.  **GO / pathway enrichment** of the module's gene list (e.g. `clusterProfiler::enrichGO`) to give the module a biological label.
+2.  **Hub gene identification**: rank module members by **module membership (kME)** = correlation of each gene's expression with the module eigengene. The top-kME genes are your most representative — and the most worth following up at the bench.
+</details>
+:::
+
+## Step 7 — Hub genes within a module
+
+```{r}
+#| label: kme
+module.gene.mapping <- as.data.frame(bwnet$colors)
+module.gene.mapping |>
+  rownames_to_column("gene") |>
+  filter(`bwnet$colors` == "turquoise") |>     # change to your module of interest
+  head(20)
+
+# kME (gene–module correlation) — high values = hubs
+mm <- as.data.frame(cor(norm.counts, module_eigengenes, use = "p"))
+mm |>
+  rownames_to_column("gene") |>
+  arrange(desc(MEturquoise)) |>
+  head(15)
+```
+
+## Stretch goals
+
+-   **GO / KEGG enrichment** per module via `clusterProfiler` to label modules biologically.
+-   **Validation in a held-out cohort** — re-project the module eigengenes onto a second study (e.g. another COVID-19 PBMC GSE) and check whether the trait correlation reproduces.
+-   **Single-cell extension** — try [hdWGCNA](https://smorabit.github.io/hdWGCNA/) on a scRNA-seq object (metacells per cell type, signed network).
+
+## What you've practiced
+
+-   Outlier detection with `goodSamplesGenes` / hclust / PCA
+-   VST normalization for downstream WGCNA
+-   Picking a soft-thresholding power so the network is approximately scale-free
+-   `blockwiseModules` end-to-end and reading the dendrogram
+-   Module eigengenes, module–trait correlation, and hub genes via kME
+
+## Credits
+
+-   Patel: [`WGCNA.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R)
+-   Data: GEO **GSE152418** (Arunachalam et al. 2020, *Science*)
