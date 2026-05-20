@@ -17,7 +17,7 @@
 # Optionally produce instructor "solutions" by setting SOLUTIONS=1 in the
 # environment. That re-renders the tutorials with `eval: true` (so chunks
 # actually run) into docs/Exercise_Folder/_solutions/. Requires the
-# workshop dataset under ../data/ and all packages from Software.qmd.
+# workshop dataset under ../data/ and all packages from Software_Setup.qmd.
 #
 # Usage:
 #     bash render_all.sh                # student build
