@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 05 — DESeq2 Fundamentals</title>
+  <title>Single Cell RNA-seq Workshop – Lecture 10 — WGCNA: Weighted Gene Co-expression Network Analysis</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 05 — DESeq2 Fundamentals</h1>
+  <h1 class="title">Lecture 10 — WGCNA: Weighted Gene Co-expression Network Analysis</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,29 +1150,26 @@ Bill Cresko
 
 </section>
 <section>
-<section id="lecture-05-deseq2-fundamentals" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Lecture 05: DESeq2 Fundamentals</h1>
+<section id="lecture-10-wgcna" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Lecture 10: WGCNA</h1>
 
 </section>
 <section id="where-this-lecture-fits" class="slide level2">
 <h2>Where this lecture fits</h2>
 <ul>
-<li>Previous: <a href="Lecture_04_Integration.html">Lec 04 — Multi-Sample Integration</a></li>
-<li><strong>You are here:</strong> Lec 05 — <em>the DESeq2 model, on bulk RNA-seq, before we apply it to scRNA-seq pseudobulk</em></li>
-<li>Next: <a href="Lecture_06_Pseudobulk_DE.html">Lec 06 — Pseudobulk DE</a></li>
-<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_05_DESeq2_DE.html">Tutorial 05 — DESeq2: Bulk Primer + Pseudobulk DE</a></li>
-<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_05_DESeq2_Fundamentals.html">Chapter 5 — DESeq2 Fundamentals</a></li>
-<li><strong>Statistical background:</strong> <a href="../Resources_Folder/Appendix_I_Statistical_Foundations.html">Appendix I — Statistical Foundations</a></li>
+<li>Previous: <a href="Lecture_09_ATACseq.html">Lec 09 — Bulk + scATAC-seq</a></li>
+<li><strong>You are here:</strong> Lec 10 — <em>finding co-expressed gene modules and tying them to phenotype</em></li>
+<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_10_WGCNA.html">Tutorial 10 — WGCNA on GSE152418</a></li>
 </ul>
 </section>
 <section id="goals-of-this-lecture" class="slide level2">
 <h2>Goals of this lecture</h2>
 <ul>
-<li class="fragment">Understand the <strong>negative-binomial GLM</strong> at the heart of DESeq2 in plain terms</li>
-<li class="fragment">Read DESeq2 output: <code>baseMean</code>, <code>log2FoldChange</code>, <code>lfcSE</code>, <code>pvalue</code>, <code>padj</code></li>
-<li class="fragment">Set the reference level so the sign of LFC means what you think it means</li>
-<li class="fragment">Know <strong>why and when to shrink</strong> log-fold-changes (<code>lfcShrink</code> + <code>apeglm</code>)</li>
-<li class="fragment">Run DESeq2 end to end on a real bulk RNA-seq dataset (<code>airway</code>)</li>
+<li class="fragment">Understand what a <strong>co-expression network</strong> is and what makes it “weighted”</li>
+<li class="fragment">Pick a <strong>soft-thresholding power</strong> so the network is approximately scale-free</li>
+<li class="fragment">Build modules with <strong>dynamic tree cut</strong>, summarize them with <strong>eigengenes</strong></li>
+<li class="fragment">Correlate modules with sample traits — and read the resulting heatmap</li>
+<li class="fragment">Apply WGCNA to <strong>scRNA-seq via pseudobulk or metacells (hdWGCNA)</strong></li>
 </ul>
 <div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
@@ -1183,119 +1180,51 @@ Bill Cresko
 <p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Why DESeq2 first?</strong> Pseudobulk DE in scRNA-seq is <em>just bulk DESeq2 applied to per-cell-type aggregated counts</em>. So learn the bulk model cleanly first; the single-cell scaffolding around it (Lec 06) is then a small, well-defined wrapper.</p>
+<p><strong>Why care about modules?</strong> A DE list of 800 genes is hard to interpret. A handful of co-regulated <strong>modules</strong> — each summarized by an eigengene and tied to a trait — is easy to act on. WGCNA reframes “which genes change?” as “which programs change?”</p>
 </div>
 </div>
 </div>
 </section></section>
 <section>
-<section id="part-1-deseq2-fundamentals" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 1 — DESeq2 fundamentals</h1>
+<section id="part-1-the-idea" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 1 — The idea</h1>
 
 </section>
-<section id="what-deseq2-actually-does" class="slide level2">
-<h2>What DESeq2 actually does</h2>
-<ul>
-<li class="fragment">Models <strong>integer counts</strong> per gene with a <strong>negative binomial</strong> distribution</li>
-<li class="fragment">Estimates a <strong>size factor</strong> per sample (depth normalization), independent of the design</li>
-<li class="fragment"><strong>Shrinks</strong> per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)</li>
-<li class="fragment">Tests each gene’s coefficient with a <strong>Wald test</strong> (default) or LRT</li>
+<section id="wgcna-the-concept" class="slide level2">
+<h2>WGCNA — the concept</h2>
+
+<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NjAgMzQwIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPHN0eWxlPgogICAgLnRpdGxlIHsgZm9udC1zaXplOiAxN3B4OyBmb250LXdlaWdodDogNzAwOyBmaWxsOiAjMjIyOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAucGFuZWwgeyBmb250LXNpemU6IDEzcHg7IGZvbnQtd2VpZ2h0OiA2MDA7IGZpbGw6ICMzMzM7IHRleHQtYW5jaG9yOiBtaWRkbGU7IH0KICAgIC5sYmwgeyBmb250LXNpemU6IDExcHg7IGZpbGw6ICM1NTU7IHRleHQtYW5jaG9yOiBtaWRkbGU7IH0KICAgIC5hcnJvdyB7IHN0cm9rZTogIzU1NTsgc3Ryb2tlLXdpZHRoOiAyOyBmaWxsOiBub25lOyB9CiAgPC9zdHlsZT4KCiAgPHRleHQgY2xhc3M9InRpdGxlIiB4PSI0ODAiIHk9IjI4Ij5Dby1leHByZXNzaW9uIG1vZHVsZXMgKFdHQ05BIC8gaGRXR0NOQSk8L3RleHQ+CgogIDwhLS0gUGFuZWwgMTogY29ycmVsYXRpb24vVE9NIGhlYXRtYXAgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNDAsNjApIj4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTAwIiB5PSIwIj5HZW5lLWdlbmUgc2ltaWxhcml0eTwvdGV4dD4KICAgIDxyZWN0IHg9IjAiIHk9IjE1IiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZhZmFmYSIgc3Ryb2tlPSIjY2NjIi8+CiAgICA8IS0tIGJsb2NreSBoZWF0bWFwIC0tPgogICAgPGc+CiAgICAgIDxyZWN0IHg9IjUiICAgeT0iMjAiICB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIGZpbGw9IiNiMjE4MmIiIG9wYWNpdHk9IjAuOCIvPgogICAgICA8cmVjdCB4PSI1IiAgIHk9IjgwIiAgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZjRhNTgyIiBvcGFjaXR5PSIwLjciLz4KICAgICAgPHJlY3QgeD0iNSIgICB5PSIxNDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgZmlsbD0iI2Y3ZjdmNyIvPgogICAgICA8cmVjdCB4PSI2NSIgIHk9IjIwIiAgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZjRhNTgyIiBvcGFjaXR5PSIwLjciLz4KICAgICAgPHJlY3QgeD0iNjUiICB5PSI4MCIgIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgZmlsbD0iIzFiNzgzNyIgb3BhY2l0eT0iMC44Ii8+CiAgICAgIDxyZWN0IHg9IjY1IiAgeT0iMTQwIiB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIGZpbGw9IiNkOWYwZDMiLz4KICAgICAgPHJlY3QgeD0iMTI1IiB5PSIyMCIgIHdpZHRoPSI3MCIgaGVpZ2h0PSI2MCIgZmlsbD0iI2Y3ZjdmNyIvPgogICAgICA8cmVjdCB4PSIxMjUiIHk9IjgwIiAgd2lkdGg9IjcwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZDlmMGQzIi8+CiAgICAgIDxyZWN0IHg9IjEyNSIgeT0iMTQwIiB3aWR0aD0iNzAiIGhlaWdodD0iNjAiIGZpbGw9IiMyMTY2YWMiIG9wYWNpdHk9IjAuOCIvPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTAwIiB5PSIyMzAiPnRvcG9sb2dpY2FsIG92ZXJsYXAgbWF0cml4PC90ZXh0PgogIDwvZz4KCiAgPCEtLSBBcnJvdyAtLT4KICA8cGF0aCBjbGFzcz0iYXJyb3ciIGQ9Ik0gMjUwIDE2MCBMIDMwNSAxNjAiIG1hcmtlci1lbmQ9InVybCgjYWh3KSIvPgogIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjI3NyIgeT0iMTUwIj5jbHVzdGVyPC90ZXh0PgoKICA8IS0tIFBhbmVsIDI6IGRlbmRyb2dyYW0gd2l0aCBtb2R1bGVzIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMxNSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMjAiIHk9IjAiPk1vZHVsZXMgKGNvbG9yID0gbW9kdWxlKTwvdGV4dD4KICAgIDxyZWN0IHg9IjAiIHk9IjE1IiB3aWR0aD0iMjQwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2ZhZmFmYSIgc3Ryb2tlPSIjY2NjIi8+CiAgICA8IS0tIGRlbmRyb2dyYW0gbGluZXMgKHNjaGVtYXRpYykgLS0+CiAgICA8ZyBzdHJva2U9IiMyMjIiIHN0cm9rZS13aWR0aD0iMS4yIiBmaWxsPSJub25lIj4KICAgICAgPHBhdGggZD0iTSAyMCAxMzAgTCAyMCA2MCBMIDUwIDYwIEwgNTAgMTMwIi8+CiAgICAgIDxwYXRoIGQ9Ik0gMzUgNjAgTCAzNSA0MCBMIDEwMCA0MCBMIDEwMCA5MCIvPgogICAgICA8cGF0aCBkPSJNIDgwIDEzMCBMIDgwIDkwIEwgMTIwIDkwIi8+CiAgICAgIDxwYXRoIGQ9Ik0gMTQwIDEzMCBMIDE0MCA4MCBMIDE4MCA4MCBMIDE4MCAxMzAiLz4KICAgICAgPHBhdGggZD0iTSAxNjAgODAgTCAxNjAgNDAgTCAyMTAgNDAgTCAyMTAgMTIwIi8+CiAgICAgIDxwYXRoIGQ9Ik0gMTAwIDQwIEwgMTYwIDQwIi8+CiAgICA8L2c+CiAgICA8IS0tIG1vZHVsZSBjb2xvciBiYXJzIC0tPgogICAgPHJlY3QgeD0iMTAiICB5PSIxNDAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIxNCIgZmlsbD0iI2IyMTgyYiIvPgogICAgPHJlY3QgeD0iNTUiICB5PSIxNDAiIHdpZHRoPSI1MCIgaGVpZ2h0PSIxNCIgZmlsbD0iIzFiNzgzNyIvPgogICAgPHJlY3QgeD0iMTEwIiB5PSIxNDAiIHdpZHRoPSI0MCIgaGVpZ2h0PSIxNCIgZmlsbD0iIzc2MmE4MyIvPgogICAgPHJlY3QgeD0iMTU1IiB5PSIxNDAiIHdpZHRoPSI3MCIgaGVpZ2h0PSIxNCIgZmlsbD0iIzIxNjZhYyIvPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTIwIiB5PSIxODAiPmVhY2ggbW9kdWxlIOKJiCBhIGNvLWV4cHJlc3NlZDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjEyMCIgeT0iMTk1Ij5nZW5lIHByb2dyYW08L3RleHQ+CiAgPC9nPgoKICA8IS0tIEFycm93IC0tPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA1NzAgMTYwIEwgNjIwIDE2MCIgbWFya2VyLWVuZD0idXJsKCNhaHcpIi8+CgogIDwhLS0gUGFuZWwgMzogbW9kdWxlIGVpZ2VuZ2VuZSAmIHRyYWl0IGNvcnJlbGF0aW9uIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDYyNSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDUiIHk9IjAiPk1vZHVsZSBzdW1tYXJ5ICZhbXA7IHRyYWl0IGxpbms8L3RleHQ+CiAgICA8cmVjdCB4PSIwIiB5PSIxNSIgd2lkdGg9IjI5MCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNmYWZhZmEiIHN0cm9rZT0iI2NjYyIvPgoKICAgIDwhLS0gTW9kdWxlIGVpZ2VuZ2VuZSBiYXJzIC0tPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTQ1IiB5PSI0MiI+bW9kdWxlIGVpZ2VuZ2VuZSBhY3Jvc3Mgc2FtcGxlczwvdGV4dD4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM1LDUwKSI+CiAgICAgIDxsaW5lIHgxPSIwIiB5MT0iNjAiIHgyPSIyMzAiIHkyPSI2MCIgc3Ryb2tlPSIjODg4Ii8+CiAgICAgIDxyZWN0IHg9IjAiICAgeT0iMzAiIHdpZHRoPSIxOCIgaGVpZ2h0PSIzMCIgZmlsbD0iI2IyMTgyYiIvPgogICAgICA8cmVjdCB4PSIyNSIgIHk9IjE1IiB3aWR0aD0iMTgiIGhlaWdodD0iNDUiIGZpbGw9IiNiMjE4MmIiLz4KICAgICAgPHJlY3QgeD0iNTAiICB5PSI0MCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjIwIiBmaWxsPSIjYjIxODJiIi8+CiAgICAgIDxyZWN0IHg9IjgwIiAgeT0iNTUiIHdpZHRoPSIxOCIgaGVpZ2h0PSI1IiAgZmlsbD0iI2IyMTgyYiIvPgogICAgICA8cmVjdCB4PSIxMDUiIHk9IjY1IiB3aWR0aD0iMTgiIGhlaWdodD0iMTUiIGZpbGw9IiNiMjE4MmIiIG9wYWNpdHk9IjAuNSIvPgogICAgICA8cmVjdCB4PSIxMzAiIHk9IjYyIiB3aWR0aD0iMTgiIGhlaWdodD0iOCIgIGZpbGw9IiNiMjE4MmIiIG9wYWNpdHk9IjAuNSIvPgogICAgICA8cmVjdCB4PSIxNjAiIHk9IjcwIiB3aWR0aD0iMTgiIGhlaWdodD0iMTUiIGZpbGw9IiNiMjE4MmIiIG9wYWNpdHk9IjAuNSIvPgogICAgICA8cmVjdCB4PSIxOTAiIHk9IjY4IiB3aWR0aD0iMTgiIGhlaWdodD0iMTIiIGZpbGw9IiNiMjE4MmIiIG9wYWNpdHk9IjAuNSIvPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iODAiICB5PSIxNzUiPnRyZWF0ZWQ8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibGJsIiB4PSIyMzUiIHk9IjE3NSI+Y29udHJvbDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjE0NSIgeT0iMjAwIiBmb250LXdlaWdodD0iNzAwIj5tb2R1bGUg4oaUIHRyYWl0OiByID0gMC44MjwvdGV4dD4KICA8L2c+CgogIDxkZWZzPgogICAgPG1hcmtlciBpZD0iYWh3IiB2aWV3Qm94PSIwIDAgMTAgMTAiIHJlZlg9IjgiIHJlZlk9IjUiIG1hcmtlcldpZHRoPSI3IiBtYXJrZXJIZWlnaHQ9IjciIG9yaWVudD0iYXV0by1zdGFydC1yZXZlcnNlIj4KICAgICAgPHBhdGggZD0iTSAwIDAgTCAxMCA1IEwgMCAxMCB6IiBmaWxsPSIjNTU1Ii8+CiAgICA8L21hcmtlcj4KICA8L2RlZnM+Cjwvc3ZnPgo=" style="width:92.0%" class="r-stretch quarto-figure-center"><p class="caption">WGCNA concept — co-expression network → modules → traits</p><ul>
+<li><strong>Step back from individual genes</strong> — WGCNA groups co-expressed genes into <strong>modules</strong> that move together across samples</li>
+<li>Each module is summarized by an <strong>eigengene</strong>, then correlated with traits/conditions</li>
+<li>Outputs are <em>programs</em>, not gene lists — much easier to interpret and act on</li>
 </ul>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Why negative binomial, not Poisson?</strong> RNA-seq counts are <strong>over-dispersed</strong>: variance &gt; mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.</p>
-</div>
-</div>
-</div>
 </section>
-<section id="a-canonical-bulk-deseq2-run-patel-style-airway-data" class="slide level2">
-<h2>A canonical bulk DESeq2 run (Patel-style, <code>airway</code> data)</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(DESeq2); <span class="fu">library</span>(airway)</span>
-<span id="cb1-2"><a></a><span class="fu">data</span>(airway)</span>
-<span id="cb1-3"><a></a></span>
-<span id="cb1-4"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(</span>
-<span id="cb1-5"><a></a>  <span class="at">countData =</span> <span class="fu">assay</span>(airway),</span>
-<span id="cb1-6"><a></a>  <span class="at">colData   =</span> <span class="fu">colData</span>(airway),</span>
-<span id="cb1-7"><a></a>  <span class="at">design    =</span> <span class="sc">~</span> cell <span class="sc">+</span> dex)        <span class="co"># cell line as covariate, dex as test factor</span></span>
-<span id="cb1-8"><a></a></span>
-<span id="cb1-9"><a></a><span class="co"># Pre-filter: drop genes with &lt; 10 total reads (speed only — does not affect FDR)</span></span>
-<span id="cb1-10"><a></a>dds <span class="ot">&lt;-</span> dds[ <span class="fu">rowSums</span>(<span class="fu">counts</span>(dds)) <span class="sc">&gt;=</span> <span class="dv">10</span>, ]</span>
-<span id="cb1-11"><a></a></span>
-<span id="cb1-12"><a></a><span class="co"># Set the reference level so log2FC sign is interpretable</span></span>
-<span id="cb1-13"><a></a>dds<span class="sc">$</span>dex <span class="ot">&lt;-</span> <span class="fu">relevel</span>(dds<span class="sc">$</span>dex, <span class="at">ref =</span> <span class="st">&quot;untrt&quot;</span>)</span>
-<span id="cb1-14"><a></a></span>
-<span id="cb1-15"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb1-16"><a></a>res <span class="ot">&lt;-</span> <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;trt&quot;</span>, <span class="st">&quot;untrt&quot;</span>))</span>
-<span id="cb1-17"><a></a><span class="fu">summary</span>(res)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p><strong><code>relevel()</code> matters.</strong> The reference level becomes the <em>denominator</em> in <code>log2FoldChange</code>. If you forget, your “up-regulated” and “down-regulated” labels can be backwards.</p>
-</div>
-</div>
-</div>
+<section id="from-correlations-to-a-network" class="slide level2">
+<h2>From correlations to a network</h2>
+<ul>
+<li class="fragment">For each pair of genes (i, j) compute Pearson <strong>correlation</strong> <span class="math inline">\(r_{ij}\)</span> across samples</li>
+<li class="fragment">Raise to a soft-thresholding power <span class="math inline">\(\beta\)</span>: <span class="math inline">\(a_{ij} = |r_{ij}|^{\beta}\)</span> — emphasizes strong correlations, dampens weak ones</li>
+<li class="fragment">Result is a <strong>weighted adjacency matrix</strong> — every gene is connected to every other gene, but most edges are near zero</li>
+<li class="fragment">Convert to a <strong>topological overlap matrix (TOM)</strong> so genes that share many neighbours are clustered together</li>
+</ul>
 </section>
-<section id="reading-deseq2-output" class="slide level2">
-<h2>Reading DESeq2 output</h2>
-<table class="caption-top">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Column</th>
-<th>What it is</th>
-<th>Watch-out</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>baseMean</code></td>
-<td>mean of normalized counts across all samples</td>
-<td>Very low values = unstable estimates</td>
-</tr>
-<tr class="even">
-<td><code>log2FoldChange</code></td>
-<td>effect size on log<sub>2</sub> scale</td>
-<td>Use <strong>shrunk</strong> values for ranking</td>
-</tr>
-<tr class="odd">
-<td><code>lfcSE</code></td>
-<td>standard error of the LFC</td>
-<td></td>
-</tr>
-<tr class="even">
-<td><code>stat</code></td>
-<td>Wald statistic</td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><code>pvalue</code></td>
-<td>raw p-value</td>
-<td>Don’t filter on this directly</td>
-</tr>
-<tr class="even">
-<td><code>padj</code></td>
-<td>BH-adjusted p-value</td>
-<td>This is your FDR — filter on <code>padj &lt; 0.05</code></td>
-</tr>
-</tbody>
-</table>
+<section id="why-weighted" class="slide level2">
+<h2>Why “weighted”?</h2>
+<p>A hard threshold (binary network) loses information: any gene pair just barely above the cutoff looks identical to a perfectly correlated one. The weighted soft-thresholding preserves the gradient — and Zhang &amp; Horvath (2005) showed it produces more biologically meaningful modules.</p>
+</section>
+<section id="picking-the-soft-threshold-power-beta" class="slide level2">
+<h2>Picking the soft-threshold power <span class="math inline">\(\beta\)</span></h2>
+<ul>
+<li class="fragment">Choose the smallest <span class="math inline">\(\beta\)</span> for which the network is <strong>approximately scale-free</strong> (<span class="math inline">\(R^2 \gtrsim 0.8\)</span>)</li>
+<li class="fragment">Typical values: <strong>6 for unsigned</strong>, <strong>12 for signed</strong> networks (rule of thumb from Horvath)</li>
+<li class="fragment">Use <code>pickSoftThreshold()</code> — it returns the <span class="math inline">\(R^2\)</span> vs. <span class="math inline">\(\beta\)</span> table</li>
+</ul>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(WGCNA)</span>
+<span id="cb1-2"><a></a>sft <span class="ot">&lt;-</span> <span class="fu">pickSoftThreshold</span>(<span class="fu">t</span>(expr), <span class="at">powerVector =</span> <span class="fu">c</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">10</span>, <span class="fu">seq</span>(<span class="dv">12</span>, <span class="dv">20</span>, <span class="at">by =</span> <span class="dv">2</span>)),</span>
+<span id="cb1-3"><a></a>                         <span class="at">networkType =</span> <span class="st">&quot;signed&quot;</span>, <span class="at">verbose =</span> <span class="dv">5</span>)</span>
+<span id="cb1-4"><a></a><span class="fu">plot</span>(sft<span class="sc">$</span>fitIndices<span class="sc">$</span>Power, <span class="sc">-</span><span class="fu">sign</span>(sft<span class="sc">$</span>fitIndices<span class="sc">$</span>slope) <span class="sc">*</span> sft<span class="sc">$</span>fitIndices<span class="sc">$</span>SFT.R.sq,</span>
+<span id="cb1-5"><a></a>     <span class="at">xlab =</span> <span class="st">&quot;Soft Threshold (power)&quot;</span>, <span class="at">ylab =</span> <span class="st">&quot;Scale Free Topology Model Fit, R^2&quot;</span>)</span>
+<span id="cb1-6"><a></a><span class="fu">abline</span>(<span class="at">h =</span> <span class="fl">0.80</span>, <span class="at">col =</span> <span class="st">&quot;red&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="callout callout-warning callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1305,16 +1234,38 @@ Bill Cresko
 <p><strong>Warning</strong></p>
 </div>
 <div class="callout-content">
-<p><strong><code>NA</code> in <code>padj</code>?</strong> DESeq2 sets <code>padj = NA</code> for genes filtered by independent filtering or with extreme outliers (Cook’s distance). That’s intentional, not a bug.</p>
+<p><strong>If no β gives R² &gt; 0.8</strong> your data is probably too small (&lt; ~20 samples), or contains technical structure (batches) overwhelming the biological signal. Fix that <em>before</em> running WGCNA — increasing β will not save you.</p>
 </div>
 </div>
 </div>
+</section></section>
+<section>
+<section id="part-2-modules" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 2 — Modules</h1>
+
 </section>
-<section id="always-shrink-lfcs-before-ranking" class="slide level2">
-<h2>Always shrink LFCs before ranking</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>res_shrunk <span class="ot">&lt;-</span> <span class="fu">lfcShrink</span>(dds,</span>
-<span id="cb2-2"><a></a>                        <span class="at">coef =</span> <span class="st">&quot;dex_trt_vs_untrt&quot;</span>,</span>
-<span id="cb2-3"><a></a>                        <span class="at">type =</span> <span class="st">&quot;apeglm&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="from-tom-to-modules" class="slide level2">
+<h2>From TOM to modules</h2>
+<ol type="1">
+<li class="fragment">Compute TOM: <span class="math inline">\(\textrm{TOM}_{ij} = \frac{\sum_u a_{iu} a_{uj} + a_{ij}}{\min(k_i, k_j) + 1 - a_{ij}}\)</span></li>
+<li class="fragment">Cluster genes by <strong><code>1 - TOM</code></strong> with average linkage</li>
+<li class="fragment">Cut the dendrogram with <strong>dynamic tree cut</strong> (<code>cutreeDynamic</code>) → modules (one per “branch”)</li>
+<li class="fragment">Merge modules whose <strong>eigengenes</strong> are highly correlated (&gt; 0.75) — avoids redundant near-duplicate modules</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>bwnet <span class="ot">&lt;-</span> <span class="fu">blockwiseModules</span>(<span class="fu">t</span>(expr),</span>
+<span id="cb2-2"><a></a>                          <span class="at">power            =</span> <span class="dv">18</span>,        <span class="co"># from pickSoftThreshold</span></span>
+<span id="cb2-3"><a></a>                          <span class="at">networkType      =</span> <span class="st">&quot;signed&quot;</span>,</span>
+<span id="cb2-4"><a></a>                          <span class="at">TOMType          =</span> <span class="st">&quot;signed&quot;</span>,</span>
+<span id="cb2-5"><a></a>                          <span class="at">minModuleSize    =</span> <span class="dv">30</span>,</span>
+<span id="cb2-6"><a></a>                          <span class="at">mergeCutHeight   =</span> <span class="fl">0.25</span>,</span>
+<span id="cb2-7"><a></a>                          <span class="at">numericLabels    =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb2-8"><a></a>                          <span class="at">maxBlockSize     =</span> <span class="dv">14000</span>)</span>
+<span id="cb2-9"><a></a><span class="fu">table</span>(bwnet<span class="sc">$</span>colors)         <span class="co"># genes per module — colours are the WGCNA convention</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="module-eigengenes-the-per-module-summary-gene" class="slide level2">
+<h2>Module eigengenes — the per-module “summary gene”</h2>
+<p>For each module, the <strong>first principal component</strong> of the module’s expression matrix is the <strong>module eigengene (ME)</strong>. It’s a single number per sample per module — and that’s what you correlate with traits.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a>MEs <span class="ot">&lt;-</span> <span class="fu">moduleEigengenes</span>(<span class="fu">t</span>(expr), bwnet<span class="sc">$</span>colors)<span class="sc">$</span>eigengenes</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1324,31 +1275,169 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Why shrink?</strong> Genes with low counts have huge raw LFCs from sampling noise. Shrinkage (<code>apeglm</code> / <code>ashr</code>) pulls those down toward zero so a “top hits” list isn’t dominated by junk genes with <code>baseMean = 2</code>.</p>
+<p><strong>Eigengenes are interpretable.</strong> A high ME for <code>MEturquoise</code> in patient X means the genes of that module are coordinately <em>up</em> in X. They reduce a 200-gene module to one column you can put in any model.</p>
 </div>
 </div>
 </div>
 </section></section>
 <section>
-<section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Recap &amp; what’s next</h1>
+<section id="part-3-moduletrait-relationships" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 3 — Module–trait relationships</h1>
 
 </section>
-<section id="what-to-remember-from-lecture-05" class="slide level2">
-<h2>What to remember from Lecture 05</h2>
+<section id="correlate-modules-with-phenotypes" class="slide level2">
+<h2>Correlate modules with phenotypes</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a></a>trait <span class="ot">&lt;-</span> <span class="fu">model.matrix</span>(<span class="sc">~</span> severity, <span class="at">data =</span> phenoData)[, <span class="sc">-</span><span class="dv">1</span>]   <span class="co"># one-hot encoded</span></span>
+<span id="cb4-2"><a></a>moduleTraitCor    <span class="ot">&lt;-</span> <span class="fu">cor</span>(MEs, trait, <span class="at">use =</span> <span class="st">&quot;pairwise.complete.obs&quot;</span>)</span>
+<span id="cb4-3"><a></a>moduleTraitPvalue <span class="ot">&lt;-</span> <span class="fu">corPvalueStudent</span>(moduleTraitCor, <span class="at">n =</span> <span class="fu">nrow</span>(MEs))</span>
+<span id="cb4-4"><a></a><span class="fu">labeledHeatmap</span>(<span class="at">Matrix      =</span> moduleTraitCor,</span>
+<span id="cb4-5"><a></a>               <span class="at">xLabels     =</span> <span class="fu">colnames</span>(trait),</span>
+<span id="cb4-6"><a></a>               <span class="at">yLabels     =</span> <span class="fu">colnames</span>(MEs),</span>
+<span id="cb4-7"><a></a>               <span class="at">textMatrix  =</span> <span class="fu">signif</span>(moduleTraitPvalue, <span class="dv">2</span>),</span>
+<span id="cb4-8"><a></a>               <span class="at">colors      =</span> <span class="fu">blueWhiteRed</span>(<span class="dv">50</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="reading-the-heatmap" class="slide level2">
+<h2>Reading the heatmap</h2>
 <ul>
-<li class="fragment">DESeq2 models <strong>integer counts</strong> with a <strong>negative binomial</strong> distribution and <strong>shrinks</strong> dispersion estimates toward a fitted trend</li>
-<li class="fragment"><code>relevel()</code> your factor before running <code>DESeq</code> — the reference level determines the <strong>sign</strong> of the log-fold-change</li>
-<li class="fragment">For ranking and visualization, <strong>always shrink</strong> LFCs with <code>lfcShrink(dds, type = &quot;apeglm&quot;)</code></li>
-<li class="fragment"><code>padj</code> is the <strong>FDR</strong> — filter on <code>padj &lt; 0.05</code>, not on raw <code>pvalue</code></li>
+<li class="fragment">Each cell: a Pearson <strong>r</strong> between a module eigengene and a trait, with the p-value</li>
+<li class="fragment">Modules with <em>|r| &gt; 0.5</em> and <em>p &lt; 0.05</em> are candidates</li>
+<li class="fragment"><strong>Hub genes</strong> within a strong module = highest <strong>module membership (kME)</strong> — these are your priority candidates for follow-up</li>
+<li class="fragment">Always cross-check that hub genes make biological sense (GO / KEGG enrichment of the module)</li>
+</ul>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Multiple testing.</strong> A WGCNA grid is many tests. Prefer FDR-adjusted p-values, and always check that a “significant” module survives a permutation null on shuffled trait labels.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="part-4-wgcna-on-single-cell-data" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 4 — WGCNA on single-cell data</h1>
+
+</section>
+<section id="why-classic-wgcna-struggles-on-raw-scrna" class="slide level2">
+<h2>Why classic WGCNA struggles on raw scRNA</h2>
+<ul>
+<li class="fragment">Sparsity: ~95% zeros makes pairwise correlations dominated by joint zeros</li>
+<li class="fragment">No replicates: each cell is its own column → noise drowns the structure</li>
+<li class="fragment">Solution: <strong>aggregate first</strong>, network second</li>
 </ul>
 </section>
-<section id="coming-up-next" class="slide level2">
-<h2>Coming up next</h2>
+<section id="two-practical-strategies" class="slide level2">
+<h2>Two practical strategies</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>When to use</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Pseudobulk</strong> per (sample × cell type)</td>
+<td>You have ≥ ~20 samples × cell-types</td>
+<td><code>AggregateExpression()</code> → classic <code>WGCNA</code></td>
+</tr>
+<tr class="even">
+<td><strong>Metacells</strong> (k-NN aggregates within a cell type)</td>
+<td>Single-condition atlas; rich within-cluster structure</td>
+<td><strong>hdWGCNA</strong> (Morabito et al. 2023)</td>
+</tr>
+</tbody>
+</table>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a><span class="co"># hdWGCNA sketch (signed, per-celltype)</span></span>
+<span id="cb5-2"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">SetupForWGCNA</span>(seu, <span class="at">gene_select =</span> <span class="st">&quot;fraction&quot;</span>, <span class="at">fraction =</span> <span class="fl">0.05</span>,</span>
+<span id="cb5-3"><a></a>                     <span class="at">wgcna_name =</span> <span class="st">&quot;Tcells&quot;</span>)</span>
+<span id="cb5-4"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">MetacellsByGroups</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;celltype&quot;</span>,</span>
+<span id="cb5-5"><a></a>                         <span class="at">k =</span> <span class="dv">25</span>, <span class="at">max_shared =</span> <span class="dv">10</span>, <span class="at">ident.group =</span> <span class="st">&quot;celltype&quot;</span>)</span>
+<span id="cb5-6"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">NormalizeMetacells</span>(seu)</span>
+<span id="cb5-7"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">TestSoftPowers</span>(seu, <span class="at">networkType =</span> <span class="st">&quot;signed&quot;</span>)</span>
+<span id="cb5-8"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">ConstructNetwork</span>(seu, <span class="at">soft_power =</span> <span class="dv">9</span>, <span class="at">setDatExpr =</span> <span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>hdWGCNA’s metacells are not the same as Patel’s pseudobulk.</strong> Metacells aggregate <em>within</em> a cell type (creating “super-cells” inside the cluster), while pseudobulk aggregates <em>all</em> cells of one type per sample. Use metacells when you have <em>one</em> condition and want intra-cluster structure; use pseudobulk when you have <em>multiple</em> samples / conditions.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="part-5-a-workable-wgcna-workflow" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 5 — A workable WGCNA workflow</h1>
+
+</section>
+<section id="checklist" class="slide level2">
+<h2>Checklist</h2>
+<ol type="1">
+<li class="fragment"><strong>QC</strong>: <code>goodSamplesGenes()</code>, drop sample/gene outliers</li>
+<li class="fragment"><strong>Normalize</strong>: VST (<code>DESeq2::vst</code>) for bulk; log-normalize per cell type for pseudobulk</li>
+<li class="fragment"><strong>Cluster samples</strong> (<code>hclust</code> on Euclidean distance) — drop visible outliers before networking</li>
+<li class="fragment"><strong>Pick power</strong>: <code>pickSoftThreshold</code> to scale-free <span class="math inline">\(R^2 \gtrsim 0.8\)</span></li>
+<li class="fragment"><strong>Build network</strong>: <code>blockwiseModules</code> (signed, TOMType = “signed”)</li>
+<li class="fragment"><strong>Correlate</strong> module eigengenes with traits; flag |r| &gt; 0.5</li>
+<li class="fragment"><strong>Hub genes</strong> by <code>kME</code>; functional enrichment per module</li>
+<li class="fragment"><strong>Validate</strong> in an independent dataset before claiming biology</li>
+</ol>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Reproducibility:</strong> set the random seed (<code>set.seed(...)</code>) before <code>blockwiseModules</code> — module colour assignment is deterministic only if the seed is fixed.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="recap" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Recap</h1>
+
+</section>
+<section id="what-to-remember-from-lecture-06" class="slide level2">
+<h2>What to remember from Lecture 06</h2>
 <ul>
-<li><strong>Lec 06</strong> — <a href="Lecture_06_Pseudobulk_DE.html">Pseudobulk DE</a> — applying DESeq2 to per-cell-type aggregated single-cell counts</li>
-<li><strong>Hands-on:</strong> <a href="../Exercise_Folder/Tutorial_05_DESeq2_DE.html">Tutorial 05 — DESeq2: Bulk Primer + Pseudobulk DE</a></li>
-<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_05_DESeq2_Fundamentals.html">Chapter 5 — DESeq2 Fundamentals</a></li>
+<li class="fragment">WGCNA finds <strong>modules</strong> of co-expressed genes; eigengenes summarize them per sample</li>
+<li class="fragment">Choose <strong>β</strong> to make the network approximately scale-free, not the largest β you can fit</li>
+<li class="fragment">The interesting output is <em>module–trait correlations</em> + <em>hub genes</em></li>
+<li class="fragment">Don’t run WGCNA directly on raw single-cell counts — <strong>pseudobulk</strong> or <strong>hdWGCNA metacells</strong> first</li>
+<li class="fragment">Validate in an independent dataset</li>
+</ul>
+</section>
+<section id="companion-tutorial" class="slide level2">
+<h2>Companion tutorial</h2>
+<p><a href="../Exercise_Folder/Tutorial_10_WGCNA.html">Tutorial 10 — WGCNA on GSE152418</a> walks through Patel’s worked example: COVID-19 patient PBMC bulk RNA-seq, building a signed network, and correlating modules with disease severity.</p>
+</section>
+<section id="further-reading" class="slide level2">
+<h2>Further reading</h2>
+<ul>
+<li>Langfelder &amp; Horvath (2008) <em>BMC Bioinformatics</em> — the original WGCNA paper</li>
+<li>Morabito et al. (2023) <em>Cell Reports Methods</em> — hdWGCNA</li>
+<li><a href="https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/">WGCNA package tutorials</a> — Horvath’s official walkthroughs</li>
+<li><a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R">Patel’s <code>WGCNA.R</code></a> — the basis for our Tutorial 06</li>
 </ul>
 
 
@@ -1356,7 +1445,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Lecture 05 of 13</p>
+<p>Single Cell RNA-seq Workshop · Lecture 10 of 12</p>
 </div>
 </div></div>
 
