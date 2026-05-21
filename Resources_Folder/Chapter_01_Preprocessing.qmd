@@ -18,7 +18,7 @@ editor: visual
 ---
 
 ::: callout-note
-**Where this chapter sits.** This is the long-form companion to **[Lecture 01 — Pre-processing](../Lecture_Folder/Lecture_01_Preprocessing.html)** and **[Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)**. Read this for the deeper "why"; the lecture is the slide-deck summary; the tutorial is the runnable code. **Prerequisites:** [Appendix H — Single-Cell Biology Refresher](Appendix_H_SC_Biology_Refresher.html), [Appendix I — Statistical Foundations](Appendix_I_Statistical_Foundations.html) §§ 1–3 (Poisson/NB, mean–variance), [Appendix D — R Programming](Appendix_D_R_Programming.html) (vectors, sparse matrices).
+**Where this chapter sits.** This is the long-form companion to **[Lecture 01 — Pre-processing](../Lecture_Folder/Lecture_01_Preprocessing.html)** and **[Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)**. Read this for the deeper "why"; the lecture is the slide-deck summary; the tutorial is the runnable code. **Prerequisites:** [Appendix C — Single-Cell Biology Refresher](Appendix_C_SC_Biology_Refresher.html), [Appendix D — Statistical Foundations](Appendix_D_Statistical_Foundations.html) §§ 1–3 (Poisson/NB, mean–variance), [Appendix A — R Programming](Appendix_A_R_Programming.html) (vectors, sparse matrices).
 :::
 
 ## 1.1 Why preprocessing exists
@@ -59,7 +59,7 @@ Three numbers per cell carry most of the QC information:
 
 ### 1.3.1 `nCount_RNA` — total UMIs per cell
 
-This is just the sum of the cell's column in the counts matrix: how many distinct RNA molecules (UMIs, not reads — see [Appendix H §4](Appendix_H_SC_Biology_Refresher.html)) were captured for this barcode. It serves as a rough proxy for "how deeply was this cell sequenced?"
+This is just the sum of the cell's column in the counts matrix: how many distinct RNA molecules (UMIs, not reads — see [Appendix C §4](Appendix_C_SC_Biology_Refresher.html)) were captured for this barcode. It serves as a rough proxy for "how deeply was this cell sequenced?"
 
 The distribution across cells is typically log-normal-shaped, with a peak at 5,000–15,000 UMIs for a healthy 10x 3' v3 run. Cells in the **left tail** are either undersequenced, lysed, or empty; cells in the **right tail** are either particularly transcriptionally active *or* are doublets (two cells contributing UMIs to one barcode).
 
@@ -77,7 +77,7 @@ Compute the fraction of UMIs that map to mitochondrial-encoded genes (in human, 
 
 Healthy cells: 2–10% (tissue-dependent). Tumor cells often run higher (15–25%). Cells above 30% are nearly always damaged. The rule is **plot the distribution per sample first, then choose a threshold from the data** — there is no universal cutoff.
 
-For full statistical detail on why we use these three metrics specifically and not, say, total reads or duplication rate, see [Appendix I §1](Appendix_I_Statistical_Foundations.html) and [@Appendix_H_SC_Biology_Refresher §6].
+For full statistical detail on why we use these three metrics specifically and not, say, total reads or duplication rate, see [Appendix D §1](Appendix_D_Statistical_Foundations.html) and [Appendix C §6](Appendix_C_SC_Biology_Refresher.html).
 
 ## 1.4 The barcode-rank knee plot — empty droplets vs cells
 
@@ -109,7 +109,7 @@ When to run it:
 
 SoupX needs both the **raw** and **filtered** Cell Ranger matrices, because the soup profile is learned from empty droplets. The workshop's `ifnb` dataset only ships the filtered matrix, so the SoupX block in Tutorial 01 is illustrative; run it for real on the NSCLC scaling exercise (which has both matrices) or on your own 10x output.
 
-For the broader file-format context, see [Appendix G — Gene-Expression Databases & File Formats](Appendix_G_Databases_FileFormats.html).
+For the broader file-format context, see [Appendix I — Gene-Expression Databases & File Formats](Appendix_I_Databases_FileFormats.html).
 
 ## 1.6 Doublet detection
 
@@ -123,7 +123,7 @@ Practical notes:
 - The reported doublet rate should match your loading: 5,000 cells loaded → \~5% expected; 20,000 cells → \~20% expected. A 25% rate from a 5k-cell run is a red flag
 - Set a seed before running; `scDblFinder` is stochastic
 
-For more on why doublets specifically (and not, say, all noise) deserve a dedicated detector, see [Appendix H §11](Appendix_H_SC_Biology_Refresher.html).
+For more on why doublets specifically (and not, say, all noise) deserve a dedicated detector, see [Appendix C §11](Appendix_C_SC_Biology_Refresher.html).
 
 ## 1.7 Filtering: thresholds chosen from the distribution, not the textbook
 
@@ -131,7 +131,7 @@ The big mistake at this step: copying thresholds from a tutorial without looking
 
 1. **Plot the per-sample distributions before choosing thresholds.** A violin or histogram per sample, on log scale for `nCount` and `nFeature`. The left tail's shoulder is a defensible cutoff; the bare minimum is whatever clearly cuts away the empty-droplet remnants.
 2. **Use median ± k·MAD as a starting point.** The `scater::isOutlier` function does this automatically. For `percent.mt`, the rule "anything more than 3 MADs above the per-sample median" is conservative but data-driven.
-3. **Document your choices.** Record the exact numerical thresholds in your methods section ([Appendix J](Appendix_J_Methods_Template.html)). "We filtered low-quality cells" is not a defensible methods sentence.
+3. **Document your choices.** Record the exact numerical thresholds in your methods section ([Appendix K](Appendix_K_Methods_Template.html)). "We filtered low-quality cells" is not a defensible methods sentence.
 
 The workshop's `ifnb` filter — `nFeature_RNA > 200`, `nFeature_RNA < 2500`, `percent.mt < 5`, `scDblFinder.class == "singlet"` — is reasonable for healthy PBMCs but would over-filter a tumor or BAL fluid sample. Treat any specific thresholds as starting points.
 
@@ -147,7 +147,7 @@ where $y_{ij}$ is gene $i$'s count in cell $j$, $C_j$ is the cell's total UMI co
 
 An alternative is **`SCTransform`**, which fits a per-gene negative-binomial regression on raw counts as a function of cell depth and uses **Pearson residuals** as the normalized values. Pearson residuals have approximately constant variance across the mean-expression range, which makes downstream PCA/clustering more stable. `SCTransform` is preferred for very low-count datasets and is the default for spatial transcriptomics (Visium, where each spot pools 1–10 cells with wider count variation).
 
-For the statistical machinery behind both transformations — what variance-stabilizing means and why over-dispersion is the central issue — see [Appendix I §§2–3](Appendix_I_Statistical_Foundations.html).
+For the statistical machinery behind both transformations — what variance-stabilizing means and why over-dispersion is the central issue — see [Appendix D §§2–3](Appendix_D_Statistical_Foundations.html).
 
 ## 1.9 Highly variable genes (HVGs)
 
@@ -204,11 +204,11 @@ For a longer list of preprocessing pitfalls, see the **Common errors** callout a
 
 - **Lecture:** [Lecture 01 — Pre-processing](../Lecture_Folder/Lecture_01_Preprocessing.html)
 - **Tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
-- **Biology background:** [Appendix H — Single-Cell Biology Refresher](Appendix_H_SC_Biology_Refresher.html)
-- **Stats background:** [Appendix I — Statistical Foundations](Appendix_I_Statistical_Foundations.html), §§ 1–3
-- **File formats and what's in `filtered_feature_bc_matrix/`:** [Appendix G](Appendix_G_Databases_FileFormats.html)
-- **R basics for the code chunks:** [Appendix D — R Programming](Appendix_D_R_Programming.html)
-- **Methods-section template covering this chapter's choices:** [Appendix J](Appendix_J_Methods_Template.html)
+- **Biology background:** [Appendix C — Single-Cell Biology Refresher](Appendix_C_SC_Biology_Refresher.html)
+- **Stats background:** [Appendix D — Statistical Foundations](Appendix_D_Statistical_Foundations.html), §§ 1–3
+- **File formats and what's in `filtered_feature_bc_matrix/`:** [Appendix I](Appendix_I_Databases_FileFormats.html)
+- **R basics for the code chunks:** [Appendix A — R Programming](Appendix_A_R_Programming.html)
+- **Methods-section template covering this chapter's choices:** [Appendix K](Appendix_K_Methods_Template.html)
 
 ## 1.14 Going further
 
