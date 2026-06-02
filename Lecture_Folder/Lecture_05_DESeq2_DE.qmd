@@ -112,7 +112,7 @@ summary(res)
 **`NA` in `padj`?** DESeq2 sets `padj = NA` for genes filtered by independent filtering or with extreme outliers (Cook's distance). That's intentional, not a bug.
 :::
 
-## Always shrink LFCs before ranking
+## Shrink LFCs for ranking & visualization — *not* for testing
 
 ``` r
 res_shrunk <- lfcShrink(dds,
@@ -121,7 +121,11 @@ res_shrunk <- lfcShrink(dds,
 ```
 
 ::: callout-tip
-**Why shrink?** Genes with low counts have huge raw LFCs from sampling noise. Shrinkage (`apeglm` / `ashr`) pulls those down toward zero so a "top hits" list isn't dominated by junk genes with `baseMean = 2`.
+**Why shrink?** Weakly expressed genes have huge, noisy raw LFCs from sampling noise. Shrinkage (`apeglm` / `ashr`) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage) — so a "top hits" list or volcano plot isn't dominated by junk genes with `baseMean = 2`.
+:::
+
+::: callout-important
+**Shrinkage is decoupled from the hypothesis test.** Since the 2016 pipeline change, DESeq2 computes `pvalue` / `padj` from the **unshrunken** (MLE) log-fold-changes — shrinkage does **not** enter the Wald test. The shrunken LFCs (and their SEs) are for **ranking, volcano/MA plots, and effect-size reporting**, *after* testing. So "shrink before ranking" means *before you sort and visualize results*, **not** *before DE testing*. Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.
 :::
 
 # Part 2 — Why per-cell DE goes wrong {background-color="#2c3e50"}
@@ -248,7 +252,7 @@ After DE, summarize gene lists into pathways:
 ::: incremental
 -   DESeq2 models **integer counts** with a **negative binomial** distribution and **shrinks** dispersion estimates toward a fitted trend
 -   `relevel()` your factor before running `DESeq` — the reference level determines the **sign** of the log-fold-change
--   For ranking and visualization, **always shrink** LFCs with `lfcShrink(dds, type = "apeglm")`
+-   For ranking and visualization, **shrink** LFCs with `lfcShrink(dds, type = "apeglm")` — but the `pvalue` / `padj` come from the **unshrunken** estimates (shrinkage is not part of the test since 2016)
 -   `padj` is the **FDR** — filter on `padj < 0.05`, not on raw `pvalue`
 -   For **condition-level DE**, default to **pseudobulk** + DESeq2/edgeR/limma-voom; never run per-cell DE for condition contrasts
 -   Aggregate counts per *(sample × cell type)* with `AggregateExpression`, then test each cell type separately
