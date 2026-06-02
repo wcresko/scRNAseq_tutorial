@@ -1,5 +1,5 @@
 ---
-title: "Tutorial 08 — Reference-based Annotation (SingleR + Azimuth)"
+title: "Tutorial 04 — Reference-based Annotation (SingleR + Azimuth)"
 subtitle: "Map cells against a labeled reference for fast, reproducible cell-type calls"
 author: "Single Cell RNA-seq Workshop"
 format:
@@ -20,11 +20,11 @@ editor: visual
 
 ## About this tutorial
 
-A short hands-on companion to **[Lecture 08 — Reference-based Annotation](../Lecture_Folder/Lecture_08_Reference_Annotation.html)**. We start from the **integrated, annotated object saved at the end of Tutorial 04** (`ifnb_integrated.rds`) and:
+A short hands-on companion to **[Lecture 04 — Reference-based Annotation](../Lecture_Folder/Lecture_04_Reference_Annotation.html)**. We start from the **annotated object saved at the end of Tutorial 03** (`ifnb_annotated.rds`) — reference-based methods like SingleR and Azimuth run per cell and don't need your own integration, so this step slots in right after manual annotation and before integration. We:
 
 
 ::: callout-note
-**Companion book chapter:** [Chapter 8 — Reference Annotation](../Resources_Folder/Chapter_08_Reference_Annotation.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices.
+**Companion book chapter:** [Chapter 4 — Reference Annotation](../Resources_Folder/Chapter_04_Reference_Annotation.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices.
 :::
 
 
@@ -40,8 +40,8 @@ A short hands-on companion to **[Lecture 08 — Reference-based Annotation](../L
 ::: {.callout-tip title="How to use this page"}
 The rendered HTML shows the code but does **not** execute it. To run it:
 
-1.  Download the `.qmd` source: <a href="Tutorial_08_Reference_Annotation.qmd.txt" download="Tutorial_08_Reference_Annotation.qmd">Tutorial_08_Reference_Annotation.qmd</a>. If your browser saves the file as `Tutorial_08_Reference_Annotation.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
-2.  Make sure you've completed **[Tutorial 04](Tutorial_04_Integration.html)** first.
+1.  Download the `.qmd` source: <a href="Tutorial_04_Reference_Annotation.qmd.txt" download="Tutorial_04_Reference_Annotation.qmd">Tutorial_04_Reference_Annotation.qmd</a>. If your browser saves the file as `Tutorial_04_Reference_Annotation.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+2.  Make sure you've completed **[Tutorial 03 — Markers & Manual Annotation](Tutorial_03_Markers_Annotation.html)** first — it writes `ifnb_annotated.rds`.
 3.  Work through the chunks, flipping `eval: true` as you go.
 :::
 
@@ -59,7 +59,7 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
-- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_08_Reference_Annotation.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_04_Reference_Annotation.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
 
 If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
@@ -77,10 +77,10 @@ library(patchwork)
 
 set.seed(2026)
 
-ifnb <- readRDS("../data/ifnb_integrated.rds")
+ifnb <- readRDS("../data/ifnb_annotated.rds")
 DefaultAssay(ifnb) <- "RNA"
 
-DimPlot(ifnb, group.by = "seurat_annotations", reduction = "umap_harmony",
+DimPlot(ifnb, group.by = "seurat_annotations", reduction = "umap",
         label = TRUE, repel = TRUE) + NoLegend()
 ```
 
@@ -112,7 +112,7 @@ Attach the calls back to the Seurat object:
 ifnb$singler_label <- pred$labels
 ifnb$singler_score <- apply(pred$scores, 1, max)
 
-DimPlot(ifnb, group.by = "singler_label", reduction = "umap_harmony",
+DimPlot(ifnb, group.by = "singler_label", reduction = "umap",
         label = TRUE, repel = TRUE) + NoLegend()
 ```
 
@@ -163,7 +163,7 @@ ifnb <- RunAzimuth(ifnb, reference = "pbmcref")
 # New columns: predicted.celltype.l1 / l2 / l3 + scores
 head(ifnb@meta.data[, grep("predicted", colnames(ifnb@meta.data))])
 
-DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = "umap_harmony",
+DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = "umap",
         label = TRUE, repel = TRUE) + NoLegend()
 ```
 
@@ -252,7 +252,7 @@ You now have:
 
 -   A `SingleR` label per cell (with confidence pruning)
 -   An Azimuth label per cell (with a mapping score)
--   A reconciled `celltype_final` you can carry into Tutorial 05 (DESeq2 + pseudobulk DE) or downstream analyses
+-   A reconciled `celltype_final` you can carry into Tutorial 06 (DESeq2 + pseudobulk DE) or downstream analyses
 
 ::: {.callout-tip title="Going further"}
 -   Try a tissue-appropriate reference: `celldex::BlueprintEncodeData()`, the [Tabula Sapiens](https://tabula-sapiens-portal.ds.czbiohub.org/) atlas, or the [HCA Lung Cell Atlas](https://data.humancellatlas.org/).
@@ -262,7 +262,7 @@ You now have:
 
 ## See also
 
--   [Lecture 08 — Reference-based Annotation](../Lecture_Folder/Lecture_08_Reference_Annotation.html)
+-   [Lecture 04 — Reference-based Annotation](../Lecture_Folder/Lecture_04_Reference_Annotation.html)
 -   [Lecture 03 — Markers & Manual Annotation](../Lecture_Folder/Lecture_03_Markers_Annotation.html)
 -   [Glossary — Cell type annotation](../Resources_Folder/Glossary.html#c)
 -   `SingleR` book: [bioconductor.org/books/release/SingleRBook](https://bioconductor.org/books/release/SingleRBook/)
