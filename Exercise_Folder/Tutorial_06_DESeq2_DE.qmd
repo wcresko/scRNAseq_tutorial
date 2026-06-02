@@ -1,5 +1,5 @@
 ---
-title: "Tutorial 05 — DESeq2: From Bulk Primer to Pseudobulk DE"
+title: "Tutorial 06 — DESeq2: From Bulk Primer to Pseudobulk DE"
 subtitle: "First a clean bulk-RNA-seq walkthrough on `airway`, then pseudobulk DE on `ifnb` STIM vs CTRL"
 author: "Single Cell RNA-seq Workshop"
 format:
@@ -25,20 +25,20 @@ This tutorial covers the **full DESeq2 story** in two parts:
 - **Part A — DESeq2 primer on `airway`** (the Bioconductor-shipped 8-sample bulk RNA-seq dataset). Gets the mechanics out of the way on a clean, small bulk dataset before you confront the single-cell aggregation step.
 - **Part B — Pseudobulk DE on `ifnb`** (STIM vs CTRL within each cell type). The full single-cell DE workflow: aggregate to *(donor × condition × cell type)* counts and run a proper bulk-style test per cell type.
 
-Paired with **[Lecture 05 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Lecture_Folder/Lecture_05_DESeq2_DE.html)**.
+Paired with **[Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Lecture_Folder/Lecture_06_DESeq2_DE.html)**.
 
 ::: callout-note
-**Companion book chapters:** [Chapter 5 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_05_DESeq2_DE.html) and [Chapter 5 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_05_DESeq2_DE.html) — the long-form prose treatments of this tutorial's material.
+**Companion book chapters:** [Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_06_DESeq2_DE.html) and [Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_06_DESeq2_DE.html) — the long-form prose treatments of this tutorial's material.
 :::
 
-Part A follows [Patel's `runDESeq2.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R) and [`getData.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/getData.R). Part B starts from the integrated, annotated object saved at the end of Tutorial 04 (`ifnb_integrated.rds`).
+Part A follows [Patel's `runDESeq2.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R) and [`getData.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/getData.R). Part B starts from the integrated, annotated object saved at the end of Tutorial 05 (`ifnb_integrated.rds`).
 
 ::: {.callout-tip title="How to use this page"}
 The rendered HTML shows the code but does **not** execute it. To run it:
 
-1.  Download the `.qmd` source: <a href="Tutorial_05_DESeq2_DE.qmd.txt" download="Tutorial_05_DESeq2_DE.qmd">Tutorial_05_DESeq2_DE.qmd</a>. If your browser saves the file as `Tutorial_05_DESeq2_DE.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+1.  Download the `.qmd` source: <a href="Tutorial_06_DESeq2_DE.qmd.txt" download="Tutorial_06_DESeq2_DE.qmd">Tutorial_06_DESeq2_DE.qmd</a>. If your browser saves the file as `Tutorial_06_DESeq2_DE.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
 2.  For Part A: install the `airway` Bioconductor package — no other download needed.
-3.  For Part B: make sure you've completed **[Tutorial 04](Tutorial_04_Integration.html)** — it writes `ifnb_integrated.rds`.
+3.  For Part B: make sure you've completed **[Tutorial 05](Tutorial_05_Integration.html)** — it writes `ifnb_integrated.rds`.
 4.  Work through the chunks, flipping `eval: true` as you go.
 :::
 
@@ -46,7 +46,7 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
-- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_05_DESeq2_DE.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_06_DESeq2_DE.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
 
 If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
@@ -266,7 +266,7 @@ You're now ready for **Part B**, where the same DESeq2 mechanics apply to a per-
 
 # Part B — Pseudobulk DE on `ifnb` (STIM vs CTRL)
 
-We start from the **integrated, annotated object saved at the end of Tutorial 04** (`ifnb_integrated.rds`) and learn to:
+We start from the **integrated, annotated object saved at the end of Tutorial 05** (`ifnb_integrated.rds`) and learn to:
 
 -   Aggregate single-cell counts to a *(donor × condition × cell type)* pseudobulk matrix
 -   Run a proper, well-calibrated DE test with `DESeq2`, one cell type at a time
@@ -274,14 +274,14 @@ We start from the **integrated, annotated object saved at the end of Tutorial 04
 -   Avoid the most common pseudobulk pitfalls
 
 ::: callout-note
-**The contrast is real this time.** The `ifnb` dataset has a built-in STIM (IFN-β stimulated) vs CTRL (control) contrast. In Tutorial 04 we **integrated** to remove the STIM-vs-CTRL axis from the embedding so cell types co-cluster. Here we **measure** the STIM-vs-CTRL effect *within each cell type* — the biology that integration was careful **not** to erase.
+**The contrast is real this time.** The `ifnb` dataset has a built-in STIM (IFN-β stimulated) vs CTRL (control) contrast. In Tutorial 05 we **integrated** to remove the STIM-vs-CTRL axis from the embedding so cell types co-cluster. Here we **measure** the STIM-vs-CTRL effect *within each cell type* — the biology that integration was careful **not** to erase.
 :::
 
-## Dataset — resuming from Tutorial 04
+## Dataset — resuming from Tutorial 05
 
 | File | Produced by | What it is |
 |---|---|---|
-| `../data/ifnb_integrated.rds` | Tutorial 04 | Seurat object with integrated PCA / UMAP / clusters, the original `RNA` assay restored as default, and `seurat_annotations` cell-type labels per cell. |
+| `../data/ifnb_integrated.rds` | Tutorial 05 | Seurat object with integrated PCA / UMAP / clusters, the original `RNA` assay restored as default, and `seurat_annotations` cell-type labels per cell. |
 
 ### About donor information
 
@@ -560,15 +560,15 @@ You now have:
 -   Compare against `muscat::pbDS` (formal pseudobulk wrapper) and `glmGamPoi`.
 :::
 
-## Continue to Tutorial 06 — functional interpretation
+## Continue to Tutorial 07 — functional interpretation
 
-The DE table you wrote (`ifnb_pseudobulk_de.csv`) is the input to **[Tutorial 06 — Functional Analysis with `clusterProfiler`](Tutorial_06_FunctionalAnalysis.html)**, which runs GO over-representation, GSEA, and Reactome enrichment per cell type and shows you how to compare the biological themes across cell types.
+The DE table you wrote (`ifnb_pseudobulk_de.csv`) is the input to **[Tutorial 07 — Functional Analysis with `clusterProfiler`](Tutorial_07_FunctionalAnalysis.html)**, which runs GO over-representation, GSEA, and Reactome enrichment per cell type and shows you how to compare the biological themes across cell types.
 
-For the *complementary* condition-level question — "do cell-type **proportions** change?" rather than "which genes change?" — see **[Tutorial 07 — Differential Abundance with miloR](Tutorial_07_DifferentialAbundance.html)**.
+For the *complementary* condition-level question — "do cell-type **proportions** change?" rather than "which genes change?" — see **[Tutorial 08 — Differential Abundance with miloR](Tutorial_08_DifferentialAbundance.html)**.
 
 ## See also
 
--   [Lecture 05 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Lecture_Folder/Lecture_05_DESeq2_DE.html)
+-   [Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Lecture_Folder/Lecture_06_DESeq2_DE.html)
 -   Squair *et al.* 2021 — the paper that made pseudobulk the default ([doi](https://doi.org/10.1038/s41467-021-25960-2))
 -   Crowell *et al.* 2020 — `muscat` package paper ([doi](https://doi.org/10.1038/s41467-020-19894-4))
 
