@@ -184,12 +184,88 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 **10x Chromium 3'** is the workshop default — the assay used by both the workshop dataset (20k NSCLC DTC) and Patel's [YouTube tutorials](https://github.com/kpatel427/YouTubeTutorials). Most conceptual ideas generalize.
 :::
 
+## Two ways into the Chromium: polyA vs. probe
+
+Even within 10x, there are **two capture chemistries**, and the choice constrains what you can study:
+
+| | **3′ / 5′ gene expression** | **Flex (probe capture)** |
+|----|----|----|
+| How RNA is captured | polyA tail → reverse transcription | hybridization probes against a fixed gene panel (microarray-like) |
+| Sample state | fresh / cryopreserved (live) cells or nuclei | **fixed** cells/nuclei, incl. FFPE |
+| Species | **any** species with a transcriptome | **human & mouse only** (probe panels) |
+| Best for | non-model systems, novel/unannotated genes | banked clinical/fixed material, high multiplexing |
+
+::: callout-warning
+**Probe panels can't see what they don't target.** Flex only quantifies the genes on the panel, and panels exist only for human and mouse — so for **non-model organisms the polyA chemistry is effectively the only option** (and it carries the 3′-annotation caveat on the next slide).
+:::
+
+## A polyA-capture catch: 3′ UTR annotation
+
+-   3′ polyA capture means reads pile up at the **3′ end / 3′ UTR** of each transcript, not evenly across the gene body.
+-   Counting therefore depends on **accurate 3′ UTR annotation**. If a gene's 3′ UTR is missing or truncated in the reference, its reads land in "intergenic" space and the gene is **under-counted or invisible**.
+-   This is a **major problem in non-model systems** (3′ UTRs are often poorly annotated) and can still bite for specific genes of interest in model organisms.
+-   **Fixes:** improve/extend 3′ UTR annotations — e.g. with long-read **Iso-Seq** data — before quantifying, and sanity-check that your key markers' 3′ ends are actually annotated.
+
+::: callout-note
+Probe/Flex chemistry sidesteps this (it targets defined gene models), but only exists for human and mouse — so for non-model organisms the annotation step is part of the experiment.
+:::
+
+## Cells vs. nuclei, and multi-omic readouts
+
+-   **Cells** capture mature cytoplasmic mRNA — needed for cell-surface protein readouts; richer transcript counts.
+-   **Nuclei (snRNA-seq)** work on frozen / hard-to-dissociate tissue and large/fragile cell types, and are **required for snATAC** — but yield fewer transcripts and little cytoplasmic RNA.
+-   On the Chromium, the same partitioning chemistry can add **other modalities to the same cells**:
+    -   **ATAC** (open chromatin) — alone or jointly with RNA (**Multiome**, one nucleus → RNA + ATAC)
+    -   **Cell-surface protein** (CITE-seq / antibody-derived tags)
+    -   **Immune repertoire** (5′ V(D)J — paired TCR/BCR)
+    -   **CRISPR perturbations** (guide capture / Perturb-seq)
+-   **Sample multiplexing** (CellPlex / hashing, or natural-genotype demultiplexing) pools several samples in one run to cut per-sample cost and share a doublet/batch structure.
+
+## Beyond 10x: combinatorial-barcoding platforms
+
+Droplet microfluidics is not the only way to barcode single cells. **Combinatorial split-pool barcoding** (Rosenberg *et al.* 2018, SPLiT-seq; commercialized as **Parse Biosciences Evercode**) labels cells by **repeated rounds of split → barcode → pool** instead of one-cell-one-droplet:
+
+-   **No specialized instrument** — runs on plates with standard lab equipment.
+-   Works on **fixed cells *and* nuclei**, which simplifies sample logistics (fix now, sequence later).
+-   **Scales by adding barcode rounds/plates** — kits span ~10k cells / a handful of samples up to millions of cells / hundreds of samples.
+-   Trade-offs: **more hands-on bench labor**, needs **more input cells**, and (currently) **no ATAC kit** (immune and CRISPR kits exist).
+
+::: callout-note
+Other instrument-light approaches exist too — e.g. **Fluent BioSciences PIP-seq** (particle-templated emulsification, Clark *et al.* 2023) makes droplets without a microfluidic controller.
+:::
+
+## 10x Chromium vs. Parse Evercode — at a glance
+
+| | **10x Chromium** | **Parse Evercode** |
+|----|----|----|
+| Principle | droplet microfluidics (GEMs) | combinatorial split-pool barcoding |
+| Instrument | dedicated controller | none (plates) |
+| Input | fresh/cryo cells or nuclei; live preferred (polyA) | fixed cells **or** nuclei |
+| Scaling | per-channel; multiplex to lower cost | add barcode rounds → up to millions of cells / hundreds of samples |
+| Multi-omics | RNA, ATAC, protein, V(D)J, CRISPR | RNA, immune, CRISPR (no ATAC) |
+| Cost / labor | higher reagent cost, less bench labor | cheaper reagents, more bench labor |
+
+::: callout-tip
+**There is no single "best" platform** — match it to the question: instrument-free + fixable + many samples → Parse; multi-omics (esp. ATAC/protein) or a turnkey instrument → 10x; non-model species → polyA chemistry either way.
+:::
+
+## Platform choice changes results, not just cost
+
+-   **Cost is real and shapes design.** A single library prep at a core can run ~$120 for bulk RNA-seq vs. ~$2,000+ for a 10x lane (example UO pricing) — which is why scRNA-seq experiments often have **few biological replicates**.
+    -   ~2 biological replicates can suffice for a **descriptive atlas**; **differential-expression** questions need **more replicates** (see Lec 06); chasing **rare transcripts** needs **more sequencing depth**.
+-   **The platform is not neutral.** Benchmarks comparing platforms on matched samples (e.g. Filippov *et al.* 2024) report **different QC distributions** and, in some cases, **cell populations recovered by one platform but missed by another** — so the technology choice can change the *biological* conclusions, not just the budget.
+
+::: callout-warning
+Report your platform **and** chemistry (3′ vs 5′ vs Flex, cells vs nuclei, multiplexing scheme) in methods. Downstream defaults (ambient correction, doublet rate, mito thresholds, even whether a cluster appears) all depend on them.
+:::
+
 ## How we got here — a short timeline
 
 ![Single-cell technology timeline from 2009 to today](images/lec01_tech_timeline.svg){fig-align="center" width="98%"}
 
--   Throughput went from **one cell** (Tang 2009) to **millions of cells** in a decade
--   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** and **spatial** measurements (we revisit this in Lecture 06)
+-   Throughput went from **one cell** (Tang *et al.* 2009, plate + manual picking) to **millions of cells** in a decade
+-   Key milestones: microfluidic capture (Streets *et al.* 2014) → **Drop-seq** droplet barcoding (Macosko *et al.* 2015) → **10x Chromium** launches (2015) → **SPLiT-seq** combinatorial barcoding (Rosenberg *et al.* 2018; Parse founded 2018) → instrument-free **PIP-seq** (Clark *et al.* 2023; Fluent)
+-   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** (Lec 09 — scATAC-seq) and **spatial** (Lec 11) measurements
 
 ## Droplet generation on the Chromium
 
