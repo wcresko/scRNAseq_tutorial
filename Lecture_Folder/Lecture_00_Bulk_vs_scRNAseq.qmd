@@ -347,10 +347,27 @@ Report your platform **and** chemistry (3′ vs 5′ vs Flex, cells vs nuclei, m
 
 ![Data processing pipelines — alternative rendering](images/lec01_use_data_processing_pipelines.svg){fig-align="center" width="92%"}
 
+## Under the hood: what Cell Ranger actually does
+
+For the Talapas / raw-data track, `cellranger count` is not magic — it's a fixed sequence:
+
+1.  **Trim** read 2 (template-switch oligo off the 5′ end, polyA off the 3′)
+2.  **Align** to the genome with STAR; tag reads exonic / intronic / intergenic
+3.  **Transcriptome alignment + MAPQ**: a read mapping confidently to one gene gets MAPQ 255; recent versions **retain intronic reads** (pre-mRNA)
+4.  **Barcode correction**: fix barcodes within 1 Hamming distance of the whitelist by posterior probability
+5.  **UMI correction**: collapse UMIs within 1 bp that share a barcode + gene
+6.  **Count assignment**: group reads by (barcode, UMI, gene), resolve conflicts by read support → **unfiltered** feature-barcode matrix
+7.  **Cell calling**: **OrdMag** (high-count barcodes) **+ EmptyDrops** (lower-count cells vs. ambient) → **filtered** matrix
+
+::: callout-note
+STARsolo, alevin-fry, and kb-python reimplement the same logic with different speed/flexibility trade-offs. The **filtered** matrix is where Lecture 01 (QC) picks up — but Cell Ranger's cell-calling is **not** the last word; you still QC afterward.
+:::
+
 ## The data structure you analyze
 
 -   **[Sparse matrix](../Resources_Folder/Glossary.html#s)**: rows = genes, columns = cells (or transposed in Python)
 -   Paired with per-cell metadata (sample, batch, QC metrics) and per-gene metadata
+-   This matrix is wrapped in an **object** — Seurat's `SeuratObject` or scanpy's `AnnData` — that also holds normalized layers, **dimensional reductions** (PCA/UMAP), neighbour **graphs**, and cluster/label columns. Every later step reads and writes slots of that one object.
 
 ::: panel-tabset
 ### R / Seurat
