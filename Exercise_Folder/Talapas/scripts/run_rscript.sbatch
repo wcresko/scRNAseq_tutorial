@@ -10,9 +10,14 @@
 #SBATCH --mem=64G
 
 # Generic SLURM wrapper for the R scripts in this folder.
+#
+# PREREQUISITE: the logs/ directory must exist before you submit, or SLURM
+# cannot open --output=logs/... and the job is rejected. From this folder:
+#   mkdir -p logs
+#
 # Usage:
-#   sbatch --job-name=qc run_rscript.sbatch 03_qc_preprocess.R
-#   sbatch --job-name=de run_rscript.sbatch 07_pseudobulk_de.R
+#   sbatch --job-name=qc run_rscript.sbatch 01_qc_preprocessing.R
+#   sbatch --job-name=de run_rscript.sbatch 06_pseudobulk_de.R
 
 set -euo pipefail
 
