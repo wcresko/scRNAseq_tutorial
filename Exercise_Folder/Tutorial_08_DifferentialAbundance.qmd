@@ -59,7 +59,7 @@ The output is a per-neighbourhood log-fold change in abundance and a p-value, pl
 
 **`makeNhoods` peaks the size histogram at < 30 cells** — neighborhoods are too small. Increase `k` from 30 → 50 or 75 in `buildGraph` and re-run. Median neighbourhood size between 50 and 200 is the target.
 
-**`testNhoods` returns all `NA` p-values** — your `milo_design` has only 1 level per condition (no replicates). miloR can't fit the GLM with `n = 1`. Need biological replicates. The synthetic-donor split in the tutorial gives 4-vs-4; if you have only 2 samples, the test cannot work — this is a fundamental statistical constraint, not a code bug.
+**`testNhoods` returns all `NA` p-values** — your `milo_design` has only 1 level per condition (no replicates). miloR can't fit the GLM with `n = 1`. Need biological replicates. The real `ind` donors give eight replicates (the synthetic fallback gives 4-vs-4); if you have only 2 samples, the test cannot work — this is a fundamental statistical constraint, not a code bug.
 
 **`plotNhoodGraphDA` errors "UMAP_HARMONY not found"** — the dimred name in the milo object isn't `UMAP_HARMONY`. Try `umap_harmony` (lowercase) or pass `layout = "UMAP"`. `reducedDimNames(milo)` shows what's actually available.
 :::
@@ -93,13 +93,16 @@ DefaultAssay(ifnb) <- "RNA"
 ifnb
 ```
 
-## Step 1 — Build pseudo-replicate sample IDs (if needed)
+## Step 1 — Define donor / sample IDs
 
-Like Tutorial 06's pseudobulk DE, miloR needs **biological replicates within each condition**. The SeuratData `ifnb` distribution often lacks per-cell donor IDs, so we recreate the synthetic 4-pseudo-donor split here for consistency:
+Like Tutorial 06's pseudobulk DE, miloR needs **biological replicates within each condition**. The `muscData::Kang18_8vs8()` loader from [Tutorial 01](Tutorial_01_QC_Preprocessing.html) carries the real donor IDs in the `ind` column, so we use the **eight real donors** as replicates. A synthetic-donor fallback is kept only for objects that somehow arrive without donor metadata.
 
 ```{r}
 #| label: donor
 
+# Real donors (column `ind`, from the muscData loader) are the biological
+# replicates. Fall back to synthetic pseudo-donors only if no donor column is
+# present (e.g. an older SeuratData `ifnb`).
 if (!"donor" %in% colnames(ifnb@meta.data)) {
   if ("ind" %in% colnames(ifnb@meta.data)) {
     ifnb$donor <- ifnb$ind
@@ -115,7 +118,7 @@ table(ifnb$sample, ifnb$stim)
 ```
 
 ::: callout-warning
-On **synthetic** pseudo-donors the resulting p-values are not biologically meaningful — you'll see the workflow correctly but should not interpret the specific neighbourhood SpatialFDRs as real findings. If the SeuratData version of `ifnb` you have ships actual donor metadata (column `ind` or `donor_id`), the code above will use it and the test becomes valid.
+On the real `ind` donors — the default with the Tutorial 01 loader — the test is valid. The synthetic-donor fallback only triggers when no donor metadata is present; on synthetic donors the neighbourhood SpatialFDRs are **not** biologically meaningful, so you'll see the workflow run correctly but should not interpret them as real findings.
 :::
 
 ## Step 2 — Convert to a Milo object

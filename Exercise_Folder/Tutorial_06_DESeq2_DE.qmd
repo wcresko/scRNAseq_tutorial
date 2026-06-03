@@ -285,17 +285,19 @@ We start from the **integrated, annotated object saved at the end of Tutorial 05
 
 ### About donor information
 
-The Kang *et al.* (2017) study pooled cells from **eight lupus donors**, but the SeuratData distribution of `ifnb` does not always carry per-cell donor IDs. Pseudobulk DE needs **biological replicates within each condition**, so we'll handle this in two ways depending on what's actually in your object:
+The Kang *et al.* (2017) study profiled PBMCs from **eight lupus donors**, each split into a control and an IFN-β–stimulated aliquot. The `muscData::Kang18_8vs8()` loader we use in [Tutorial 01](Tutorial_01_QC_Preprocessing.html) **carries the real per-cell donor IDs** in the `ind` column, so we have genuine biological replicates: eight donors, each measured in both conditions.
 
--   **If `donor_id` (or `ind`) is present** — we'll use the eight real donors as biological replicates. `~ donor + stim` becomes a clean DESeq2 design with 8 vs 8.
--   **If donor is absent** — we'll create **synthetic pseudo-donors** by random cell assignment within each (`stim`, `seurat_annotations`) combination. Document this as a teaching shortcut, **not** something you'd ever do in a paper. With four pseudo-donors per condition you still get a 4-vs-4 contrast that DESeq2 can fit, and you'll see the workflow correctly even though the resulting p-values aren't biologically meaningful.
+Pseudobulk DE needs **biological replicates within each condition**, and here we have them: the eight real donors become the replicates, one pseudobulk profile per *(donor × condition × cell type)*. The per-cell-type test below is `~ condition`; because each donor appears in both conditions you can upgrade to the paired `~ donor + condition` (see *Going further*). The code detects the donor column automatically:
+
+-   **`ind` is present (the expected case)** — we use the eight real donors as biological replicates. This is what you'll see when you load `ifnb` as in Tutorial 01.
+-   **Fallback only — donor column absent** — if an object somehow reaches this step without donor metadata (e.g. an older SeuratData-sourced `ifnb`), the code creates **synthetic pseudo-donors** by random cell assignment. This is a teaching shortcut, **not** something you'd ever do in a paper: the contrast still lets DESeq2 fit, but the resulting p-values aren't biologically meaningful.
 
 ::: {.callout-warning title="Common errors / things that bite"}
 **`AggregateExpression` returns a different structure than expected** — the API changed across Seurat versions. In v5+ it returns an Assay5 object; subset with `$RNA$counts`. In v4, it returns a sparse matrix list — use `$RNA`. The tutorial's parsing handles both, but if you're on a custom branch this can bite.
 
 **Underscores in donor or cell-type names break the column-name parsing** — if your sample is `donor_03_treated`, the `sub("^[^_]+_", "", colnames(pb))` parse will get confused. Defensive parsing approach: pull the metadata directly from the Seurat object's `@meta.data` rather than parsing column names. The tutorial shows this.
 
-**No `donor_id` column → synthetic pseudo-donors** — the SeuratData `ifnb` strips per-cell donor IDs. The tutorial's `set.seed(2026)` synthetic 4-pseudo-donor split is a teaching device. The resulting p-values are not biologically meaningful — say so in any writeup. For real donor-resolved analysis, load via `scRNAseq::Kang18Combine()` from Bioconductor.
+**Synthetic pseudo-donors are a fallback, not the default** — objects loaded the way this series does (`muscData::Kang18_8vs8()`, Tutorial 01) carry real donor IDs in `ind`, so you'll take the real-donor path automatically. The synthetic `set.seed(2026)` 4-pseudo-donor split only triggers if no donor column is present (e.g. an older SeuratData `ifnb`); it's a teaching device whose p-values are not biologically meaningful — say so in any writeup.
 :::
 
 ## B.1 — Setup

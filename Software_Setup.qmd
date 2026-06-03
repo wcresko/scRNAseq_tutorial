@@ -85,6 +85,7 @@ bioc_pkgs <- c(
   "org.Hs.eg.db", "org.Mm.eg.db",
   "miloR",             # differential abundance
   "SingleR", "celldex",
+  "muscData",          # ifnb (Kang18_8vs8) loader used in Tutorials 01–08
   "Signac", "EnsDb.Hsapiens.v75"
 )
 BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
@@ -94,8 +95,10 @@ BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
 remotes::install_github("satijalab/seurat-data", quiet = TRUE, upgrade = "never")
 remotes::install_github("satijalab/azimuth",     quiet = TRUE, upgrade = "never")
 
-# Workshop datasets — these install into your R user library, no manual download
-SeuratData::InstallData("ifnb")      # ~25 MB; used in Tutorials 01–08
+# Workshop datasets — pre-warm the caches so the first tutorial run is instant.
+# ifnb now comes from muscData (Tutorials 01–08); the first call downloads
+# ~25 MB through ExperimentHub and caches it locally.
+invisible(muscData::Kang18_8vs8())
 SeuratData::InstallData("stxBrain")  # ~50 MB; used in Tutorial 11 (Spatial)
 ```
 
@@ -135,17 +138,27 @@ See the [Datasets](Datasets.qmd) page for the complete list of datasets and disk
 Open a **fresh** R session inside the workshop project and paste:
 
 ``` r
-pkgs <- c("Seurat","SeuratData","Azimuth",
+pkgs <- c("Seurat","SeuratData","Azimuth","muscData",
           "SingleCellExperiment","scran","scater","DropletUtils",
           "scDblFinder","harmony","DESeq2","fgsea","clusterProfiler",
           "miloR","SingleR","celldex","Signac",
           "tidyverse","clustree","presto")
-ok <- vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)
-cat("Package check:\n"); print(ok)
+
+# Actually *attach* each package — this surfaces broken compiled dependencies
+# that requireNamespace() would silently report as "available".
+load_ok <- function(p) tryCatch({
+  suppressPackageStartupMessages(library(p, character.only = TRUE)); TRUE
+}, error = function(e) { message(p, ": ", conditionMessage(e)); FALSE })
+ok <- vapply(pkgs, load_ok, logical(1))
+cat("Package load check:\n"); print(ok)
 stopifnot(all(ok))
 
-# Load the workshop dataset (auto-installed in Step 3)
-SeuratData::LoadData("ifnb")
+# Load the workshop dataset the same way the tutorials do (pre-warmed in Step 3)
+ifnb_sce <- muscData::Kang18_8vs8()
+cat("\nifnb loaded:", ncol(ifnb_sce), "cells\n")
+
+# Pre-warm one reference download so Tutorial 04 (annotation) starts instantly
+invisible(celldex::HumanPrimaryCellAtlasData())
 
 cat("\nsessionInfo():\n")
 sessionInfo()

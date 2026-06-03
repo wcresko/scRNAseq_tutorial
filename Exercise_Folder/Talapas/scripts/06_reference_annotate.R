@@ -42,7 +42,12 @@ seu$singler_delta  <- pred$delta.next             # margin to runner-up label
 # ---- Reconcile reference vs manual ----------------------------------------
 # Keep the manual label where SingleR is uncertain (pruned == NA) or where the
 # manual call is a tumor/epithelial type the immune reference cannot represent.
-manual_col <- if ("celltype" %in% colnames(seu@meta.data)) "celltype" else "seurat_annotations"
+# Script 05 writes the manual label to `celltype_manual`; fall back to other
+# common names only if that column is absent.
+manual_col <- intersect(c("celltype_manual", "celltype", "seurat_annotations"),
+                        colnames(seu@meta.data))[1]
+if (is.na(manual_col))
+  stop("No manual-label column found (expected 'celltype_manual' from script 05).")
 seu$celltype_final <- ifelse(is.na(seu$singler_pruned),
                              as.character(seu[[manual_col]][, 1]),
                              seu$singler_pruned)

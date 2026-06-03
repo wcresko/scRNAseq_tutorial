@@ -48,10 +48,10 @@ This appendix covers the University of Oregon's high-performance computing (HPC)
 
 ### Key Resources:
 
--   Over 14,520 CPU cores
+-   Over 14,500 CPU cores
 -   129 TB of memory
--   89 GPUs (including A100, H100, V100)
--   3+ Petabytes of storage
+-   ~89 GPUs (NVIDIA A40 through H100)
+-   ~3 Petabytes of storage
 
 ## Talapas Architecture
 
@@ -81,21 +81,23 @@ This appendix covers the University of Oregon's high-performance computing (HPC)
 
 ## Node Types
 
-| Node Type      | Cores   | Memory     | Purpose                |
-|----------------|---------|------------|------------------------|
-| Standard CPU   | 28--128 | 128--512 GB| General computation    |
-| Large Memory   | 56      | 1--4 TB    | Memory-intensive work  |
-| GPU (K80/A100) | 28--48  | 256--512 GB| Machine learning, CUDA |
-| Interactive    | Various | Various    | Testing, development   |
+| Node Type      | Cores   | Memory      | Purpose                |
+|----------------|---------|-------------|------------------------|
+| Standard CPU   | 28--128 | 128--512 GB | General computation    |
+| Large Memory   | 56+     | up to 4 TB  | Memory-intensive work  |
+| GPU (A40–H100) | 28--128 | 256 GB–1 TB | Machine learning, CUDA |
+| Interactive    | Various | Various     | Testing, development   |
 
 ### Partitions (Queues):
 
--   `compute` --- General purpose CPU partition (default)
--   `short` --- Jobs up to 24 hours
--   `long` --- Jobs up to 14 days
--   `gpu` / `longgpu` --- GPU-enabled nodes
--   `fat` / `longfat` --- High-memory nodes
--   `preempt` --- Access to all nodes (may be interrupted)
+These are the current Talapas partitions (matching the [SLURM tutorial](../Exercise_Folder/Talapas/Tutorial_Talapas_01_SLURM_Basics.html) and [VS Code & Talapas](VSCode_Talapas.html) — always confirm against `sinfo` and the [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/)):
+
+-   `compute` --- standard CPU jobs (up to 1 day)
+-   `computelong` --- long CPU jobs (up to 14 days)
+-   `gpu` / `gpulong` --- GPU jobs (1 day / 14 days)
+-   `memory` / `memorylong` --- high-memory CPU jobs, up to 4 TB RAM (1 day / 14 days)
+-   `interactive` / `interactivegpu` --- short interactive sessions (12 h / 8 h)
+-   `preempt` --- access to all nodes; jobs may be preempted
 
 ## Getting Access
 
@@ -155,7 +157,7 @@ ssh yourduckid@login1.talapas.uoregon.edu
 |-------------------------|-----------------------|-----------------------------|
 | `/home/duckid`          | 250 GB                | Config files, small scripts |
 | `/projects/PIRG/duckid` | Shared (2 TB default) | Large data, analysis        |
-| `/projects/PIRG/shared` | Shared                | Files shared with group     |
+| `/scratch/PIRG`         | 20 TB                 | High-throughput working space; **files untouched for 90 days are purged** |
 | `/tmp`                  | Local to node         | Temporary scratch space     |
 
 ### Important Notes
@@ -201,7 +203,7 @@ sbatch myscript.sh
 squeue -u $USER
 
 # Check all jobs on a partition
-squeue -p short
+squeue -p compute
 
 # Cancel a job
 scancel JOBID
@@ -217,7 +219,7 @@ scontrol show job JOBID
 sacct -j JOBID --format=JobID,Elapsed,MaxRSS
 
 # View partition information
-sinfo -p short
+sinfo -p compute
 ```
 
 ### Status Codes
@@ -283,7 +285,7 @@ Rscript my_analysis.R
 
 | Directive         | Description         | Example                           |
 |-------------------|---------------------|-----------------------------------|
-| `--partition`     | Queue to use        | `compute`, `short`, `long`, `gpu` |
+| `--partition`     | Queue to use        | `compute`, `computelong`, `gpu`, `memory` |
 | `--account`       | PIRG for accounting | `nereus`                          |
 | `--time`          | Max runtime         | `1-12:00:00` (1 day, 12 hrs)      |
 | `--nodes`         | Number of nodes     | `1`                               |

@@ -27,7 +27,7 @@ seu$celltype <- seu$celltype_manual
 
 # Aggregate
 pb <- AggregateExpression(
-  seu, assays = "RNA", slot = "counts",
+  seu, assays = "RNA", layer = "counts",
   group.by = c("donor", "condition", "celltype"),
   return.seurat = FALSE)$RNA
 

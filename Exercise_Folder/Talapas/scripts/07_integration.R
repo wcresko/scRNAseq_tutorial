@@ -13,7 +13,11 @@ suppressPackageStartupMessages({
 set.seed(2026)
 
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
-seu <- readRDS(file.path(OBJ_DIR, "nsclc_annotated.rds"))
+# Prefer the reference-reconciled object from step 06 (carries celltype_final);
+# fall back to the step-05 object if step 06 was skipped.
+in_file <- file.path(OBJ_DIR, "nsclc_annotated_final.rds")
+if (!file.exists(in_file)) in_file <- file.path(OBJ_DIR, "nsclc_annotated.rds")
+seu <- readRDS(in_file)
 
 # If the object lacks per-cell donor IDs (e.g. CMO assignment was not run),
 # synthesize 7 pseudo-donors to demonstrate the workflow.

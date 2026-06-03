@@ -12,6 +12,9 @@
 
 # Minimal SLURM demo. Submit with: sbatch 01_slurm_demo.sbatch
 # See the .qmd for what each #SBATCH directive does.
+#
+# PREREQUISITE: run `mkdir -p logs` once before submitting — SLURM will not
+# create the logs/ directory that --output/--error point to.
 
 echo "Hello from $(hostname) at $(date)"
 echo "SLURM_JOB_ID=$SLURM_JOB_ID"

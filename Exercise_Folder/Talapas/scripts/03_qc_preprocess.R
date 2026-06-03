@@ -15,8 +15,8 @@ suppressPackageStartupMessages({
 set.seed(2026)
 
 DATA_DIR <- Sys.getenv("DATA_DIR", "../data/filtered_feature_bc_matrix/")
-OUT_DIR  <- Sys.getenv("OUT_DIR",  "../objects")
-dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+OBJ_DIR  <- Sys.getenv("OBJ_DIR",  "../objects")   # every step reads/writes here
+dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 
 # Load 10x counts
 counts <- Read10X(data.dir = DATA_DIR)
@@ -39,6 +39,6 @@ seu <- NormalizeData(seu)
 seu <- FindVariableFeatures(seu, nfeatures = 2000)
 seu <- ScaleData(seu, vars.to.regress = c("nCount_RNA", "percent.mt"))
 
-saveRDS(seu, file.path(OUT_DIR, "nsclc_preprocessed.rds"))
-cat("Wrote", file.path(OUT_DIR, "nsclc_preprocessed.rds"),
+saveRDS(seu, file.path(OBJ_DIR, "nsclc_preprocessed.rds"))
+cat("Wrote", file.path(OBJ_DIR, "nsclc_preprocessed.rds"),
     "with", ncol(seu), "cells\n")

@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Talapas 09 — Functional Analysis with clusterProfiler
-# Reads nsclc_pseudobulk_de.csv (from script 07) and runs:
+# Reads nsclc_pseudobulk_de.csv (from script 08) and runs:
 #   - GO over-representation (BP) per cell type
 #   - GSEA on a ranked list per cell type
 # Writes one CSV per cell type into ../objects/functional/.
