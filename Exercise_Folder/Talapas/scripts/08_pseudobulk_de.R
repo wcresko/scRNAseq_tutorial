@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Talapas 07 — Pseudobulk DE with DESeq2
+# Talapas 08 — Pseudobulk DE with DESeq2
 # Aggregates single-cell counts to (donor x condition x cell type), then runs
 # DESeq2 per cell type. Writes nsclc_pseudobulk_de.csv.
 #
