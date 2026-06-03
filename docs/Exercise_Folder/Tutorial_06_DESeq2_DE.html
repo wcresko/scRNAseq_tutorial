@@ -2263,7 +2263,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Companion book chapters:</strong> <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a> and <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a> — the long-form prose treatments of this tutorial’s material. · <strong>HPC version (Talapas):</strong> <a href="Talapas/Tutorial_Talapas_08_Pseudobulk_DE.html">Talapas 08 — Pseudobulk DE</a></p>
+<p><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a> — the long-form prose treatment of this tutorial’s material. · <strong>HPC version (Talapas):</strong> <a href="Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html">Talapas analysis pipeline — <code>06_pseudobulk_de.R</code></a></p>
 </div>
 </div>
 <p>Part A follows <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/runDESeq2.R">Patel’s <code>runDESeq2.R</code></a> and <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/getData.R"><code>getData.R</code></a>. Part B starts from the integrated, annotated object saved at the end of Tutorial 05 (<code>ifnb_integrated.rds</code>).</p>
@@ -2310,7 +2310,7 @@ Solutions / instructor copy
 <h1>Part A — DESeq2 Primer on <code>airway</code></h1>
 <section id="dataset-airway" class="level2">
 <h2 class="anchored" data-anchor-id="dataset-airway">Dataset — <code>airway</code></h2>
-<p><strong>What it is.</strong> RNA-seq of four primary human airway smooth muscle cell lines, treated <strong>untreated</strong> vs. <strong>dexamethasone</strong>, two technical replicates each → <strong>8 samples</strong>. Standard reference dataset for teaching DESeq2.</p>
+<p><strong>What it is.</strong> RNA-seq of four primary human airway smooth muscle cell lines, each <strong>untreated</strong> vs. <strong>dexamethasone</strong>-treated → <strong>8 samples</strong>. Standard reference dataset for teaching DESeq2.</p>
 <ul>
 <li>Bioconductor landing page: <a href="https://bioconductor.org/packages/airway/" class="uri">https://bioconductor.org/packages/airway/</a></li>
 <li>Original paper: Himes et al. (2014) <em>PLoS ONE</em> 9: e99625</li>
@@ -2645,10 +2645,11 @@ Note
 </table>
 <section id="about-donor-information" class="level3">
 <h3 class="anchored" data-anchor-id="about-donor-information">About donor information</h3>
-<p>The Kang <em>et al.</em> (2017) study pooled cells from <strong>eight lupus donors</strong>, but the SeuratData distribution of <code>ifnb</code> does not always carry per-cell donor IDs. Pseudobulk DE needs <strong>biological replicates within each condition</strong>, so we’ll handle this in two ways depending on what’s actually in your object:</p>
+<p>The Kang <em>et al.</em> (2017) study profiled PBMCs from <strong>eight lupus donors</strong>, each split into a control and an IFN-β–stimulated aliquot. The <code>muscData::Kang18_8vs8()</code> loader we use in <a href="Tutorial_01_QC_Preprocessing.html">Tutorial 01</a> <strong>carries the real per-cell donor IDs</strong> in the <code>ind</code> column, so we have genuine biological replicates: eight donors, each measured in both conditions.</p>
+<p>Pseudobulk DE needs <strong>biological replicates within each condition</strong>, and here we have them: the eight real donors become the replicates, one pseudobulk profile per <em>(donor × condition × cell type)</em>. The per-cell-type test below is <code>~ condition</code>; because each donor appears in both conditions you can upgrade to the paired <code>~ donor + condition</code> (see <em>Going further</em>). The code detects the donor column automatically:</p>
 <ul>
-<li><strong>If <code>donor_id</code> (or <code>ind</code>) is present</strong> — we’ll use the eight real donors as biological replicates. <code>~ donor + stim</code> becomes a clean DESeq2 design with 8 vs 8.</li>
-<li><strong>If donor is absent</strong> — we’ll create <strong>synthetic pseudo-donors</strong> by random cell assignment within each (<code>stim</code>, <code>seurat_annotations</code>) combination. Document this as a teaching shortcut, <strong>not</strong> something you’d ever do in a paper. With four pseudo-donors per condition you still get a 4-vs-4 contrast that DESeq2 can fit, and you’ll see the workflow correctly even though the resulting p-values aren’t biologically meaningful.</li>
+<li><strong><code>ind</code> is present (the expected case)</strong> — we use the eight real donors as biological replicates. This is what you’ll see when you load <code>ifnb</code> as in Tutorial 01.</li>
+<li><strong>Fallback only — donor column absent</strong> — if an object somehow reaches this step without donor metadata (e.g. an older SeuratData-sourced <code>ifnb</code>), the code creates <strong>synthetic pseudo-donors</strong> by random cell assignment. This is a teaching shortcut, <strong>not</strong> something you’d ever do in a paper: the contrast still lets DESeq2 fit, but the resulting p-values aren’t biologically meaningful.</li>
 </ul>
 <div class="callout callout-style-default callout-warning callout-titled" title="Common errors / things that bite">
 <div class="callout-header d-flex align-content-center">
@@ -2662,7 +2663,7 @@ Common errors / things that bite
 <div class="callout-body-container callout-body">
 <p><strong><code>AggregateExpression</code> returns a different structure than expected</strong> — the API changed across Seurat versions. In v5+ it returns an Assay5 object; subset with <code>$RNA$counts</code>. In v4, it returns a sparse matrix list — use <code>$RNA</code>. The tutorial’s parsing handles both, but if you’re on a custom branch this can bite.</p>
 <p><strong>Underscores in donor or cell-type names break the column-name parsing</strong> — if your sample is <code>donor_03_treated</code>, the <code>sub(&quot;^[^_]+_&quot;, &quot;&quot;, colnames(pb))</code> parse will get confused. Defensive parsing approach: pull the metadata directly from the Seurat object’s <code>@meta.data</code> rather than parsing column names. The tutorial shows this.</p>
-<p><strong>No <code>donor_id</code> column → synthetic pseudo-donors</strong> — the SeuratData <code>ifnb</code> strips per-cell donor IDs. The tutorial’s <code>set.seed(2026)</code> synthetic 4-pseudo-donor split is a teaching device. The resulting p-values are not biologically meaningful — say so in any writeup. For real donor-resolved analysis, load via <code>scRNAseq::Kang18Combine()</code> from Bioconductor.</p>
+<p><strong>Synthetic pseudo-donors are a fallback, not the default</strong> — objects loaded the way this series does (<code>muscData::Kang18_8vs8()</code>, Tutorial 01) carry real donor IDs in <code>ind</code>, so you’ll take the real-donor path automatically. The synthetic <code>set.seed(2026)</code> 4-pseudo-donor split only triggers if no donor column is present (e.g. an older SeuratData <code>ifnb</code>); it’s a teaching device whose p-values are not biologically meaningful — say so in any writeup.</p>
 </div>
 </div>
 </section>

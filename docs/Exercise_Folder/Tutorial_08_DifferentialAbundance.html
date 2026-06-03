@@ -2182,7 +2182,7 @@ vertical-align: -.125em;
   <li><a href="#about-this-tutorial" id="toc-about-this-tutorial" class="nav-link active" data-scroll-target="#about-this-tutorial">About this tutorial</a></li>
   <li><a href="#dataset-resuming-from-tutorial-05" id="toc-dataset-resuming-from-tutorial-05" class="nav-link" data-scroll-target="#dataset-resuming-from-tutorial-05">Dataset — resuming from Tutorial 05</a></li>
   <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a></li>
-  <li><a href="#step-1-build-pseudo-replicate-sample-ids-if-needed" id="toc-step-1-build-pseudo-replicate-sample-ids-if-needed" class="nav-link" data-scroll-target="#step-1-build-pseudo-replicate-sample-ids-if-needed">Step 1 — Build pseudo-replicate sample IDs (if needed)</a></li>
+  <li><a href="#step-1-define-donor-sample-ids" id="toc-step-1-define-donor-sample-ids" class="nav-link" data-scroll-target="#step-1-define-donor-sample-ids">Step 1 — Define donor / sample IDs</a></li>
   <li><a href="#step-2-convert-to-a-milo-object" id="toc-step-2-convert-to-a-milo-object" class="nav-link" data-scroll-target="#step-2-convert-to-a-milo-object">Step 2 — Convert to a Milo object</a></li>
   <li><a href="#step-3-build-the-knn-graph-and-define-neighbourhoods" id="toc-step-3-build-the-knn-graph-and-define-neighbourhoods" class="nav-link" data-scroll-target="#step-3-build-the-knn-graph-and-define-neighbourhoods">Step 3 — Build the kNN graph and define neighbourhoods</a></li>
   <li><a href="#step-4-count-cells-per-neighbourhood-per-sample" id="toc-step-4-count-cells-per-neighbourhood-per-sample" class="nav-link" data-scroll-target="#step-4-count-cells-per-neighbourhood-per-sample">Step 4 — Count cells per neighbourhood per sample</a></li>
@@ -2237,7 +2237,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_08_DifferentialAbundance.html">Chapter 8 — Differential Abundance</a> — the long-form prose treatment of this tutorial’s material, with cross-references to the prerequisite appendices. · <strong>HPC version (Talapas):</strong> <a href="Talapas/Tutorial_Talapas_10_DifferentialAbundance.html">Talapas 10 — Differential Abundance</a></p>
+<p><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_08_DifferentialAbundance.html">Chapter 8 — Differential Abundance</a> — the long-form prose treatment of this tutorial’s material, with cross-references to the prerequisite appendices. · <strong>HPC version (Talapas):</strong> <a href="Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html">Talapas analysis pipeline — <code>08_differential_abundance.R</code></a></p>
 </div>
 </div>
 <p>We use <strong><code>miloR</code></strong> (Dann <em>et al.</em> 2022, <em>Nat Biotechnol</em>), the modern method of choice. Instead of testing on hard cluster labels, miloR:</p>
@@ -2314,7 +2314,7 @@ Common errors / things that bite
 <div class="callout-body-container callout-body">
 <p><strong><code>reducedDimNames(milo)</code> doesn’t include <code>HARMONY</code></strong> — the SCE conversion sometimes drops reductions, especially on Seurat v4 → v5 transitions. Check <code>reducedDimNames(milo)</code>; if <code>HARMONY</code> isn’t there, re-add it manually: <code>reducedDim(milo, &quot;HARMONY&quot;) &lt;- Embeddings(ifnb, &quot;harmony&quot;)</code>.</p>
 <p><strong><code>makeNhoods</code> peaks the size histogram at &lt; 30 cells</strong> — neighborhoods are too small. Increase <code>k</code> from 30 → 50 or 75 in <code>buildGraph</code> and re-run. Median neighbourhood size between 50 and 200 is the target.</p>
-<p><strong><code>testNhoods</code> returns all <code>NA</code> p-values</strong> — your <code>milo_design</code> has only 1 level per condition (no replicates). miloR can’t fit the GLM with <code>n = 1</code>. Need biological replicates. The synthetic-donor split in the tutorial gives 4-vs-4; if you have only 2 samples, the test cannot work — this is a fundamental statistical constraint, not a code bug.</p>
+<p><strong><code>testNhoods</code> returns all <code>NA</code> p-values</strong> — your <code>milo_design</code> has only 1 level per condition (no replicates). miloR can’t fit the GLM with <code>n = 1</code>. Need biological replicates. The real <code>ind</code> donors give eight replicates (the synthetic fallback gives 4-vs-4); if you have only 2 samples, the test cannot work — this is a fundamental statistical constraint, not a code bug.</p>
 <p><strong><code>plotNhoodGraphDA</code> errors “UMAP_HARMONY not found”</strong> — the dimred name in the milo object isn’t <code>UMAP_HARMONY</code>. Try <code>umap_harmony</code> (lowercase) or pass <code>layout = &quot;UMAP&quot;</code>. <code>reducedDimNames(milo)</code> shows what’s actually available.</p>
 </div>
 </div>
@@ -2355,22 +2355,25 @@ Solutions / instructor copy
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>ifnb</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
-<section id="step-1-build-pseudo-replicate-sample-ids-if-needed" class="level2">
-<h2 class="anchored" data-anchor-id="step-1-build-pseudo-replicate-sample-ids-if-needed">Step 1 — Build pseudo-replicate sample IDs (if needed)</h2>
-<p>Like Tutorial 06’s pseudobulk DE, miloR needs <strong>biological replicates within each condition</strong>. The SeuratData <code>ifnb</code> distribution often lacks per-cell donor IDs, so we recreate the synthetic 4-pseudo-donor split here for consistency:</p>
+<section id="step-1-define-donor-sample-ids" class="level2">
+<h2 class="anchored" data-anchor-id="step-1-define-donor-sample-ids">Step 1 — Define donor / sample IDs</h2>
+<p>Like Tutorial 06’s pseudobulk DE, miloR needs <strong>biological replicates within each condition</strong>. The <code>muscData::Kang18_8vs8()</code> loader from <a href="Tutorial_01_QC_Preprocessing.html">Tutorial 01</a> carries the real donor IDs in the <code>ind</code> column, so we use the <strong>eight real donors</strong> as replicates. A synthetic-donor fallback is kept only for objects that somehow arrive without donor metadata.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="st">&quot;donor&quot;</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)) {</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="st">&quot;ind&quot;</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)) {</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> ifnb<span class="sc">$</span>ind</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> <span class="fu">paste0</span>(ifnb<span class="sc">$</span>stim, <span class="st">&quot;_d&quot;</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>                         <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">size =</span> <span class="fu">ncol</span>(ifnb), <span class="at">replace =</span> <span class="cn">TRUE</span>))</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># miloR needs a single per-cell sample ID. Combine donor + stim:</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>sample <span class="ot">&lt;-</span> <span class="fu">paste</span>(ifnb<span class="sc">$</span>donor, ifnb<span class="sc">$</span>stim, <span class="at">sep =</span> <span class="st">&quot;_&quot;</span>)</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>sample, ifnb<span class="sc">$</span>stim)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Real donors (column `ind`, from the muscData loader) are the biological</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="co"># replicates. Fall back to synthetic pseudo-donors only if no donor column is</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># present (e.g. an older SeuratData `ifnb`).</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="st">&quot;donor&quot;</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)) {</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="st">&quot;ind&quot;</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)) {</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> ifnb<span class="sc">$</span>ind</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> <span class="fu">paste0</span>(ifnb<span class="sc">$</span>stim, <span class="st">&quot;_d&quot;</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                         <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">size =</span> <span class="fu">ncol</span>(ifnb), <span class="at">replace =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># miloR needs a single per-cell sample ID. Combine donor + stim:</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>sample <span class="ot">&lt;-</span> <span class="fu">paste</span>(ifnb<span class="sc">$</span>donor, ifnb<span class="sc">$</span>stim, <span class="at">sep =</span> <span class="st">&quot;_&quot;</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>sample, ifnb<span class="sc">$</span>stim)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -2382,7 +2385,7 @@ Warning
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>On <strong>synthetic</strong> pseudo-donors the resulting p-values are not biologically meaningful — you’ll see the workflow correctly but should not interpret the specific neighbourhood SpatialFDRs as real findings. If the SeuratData version of <code>ifnb</code> you have ships actual donor metadata (column <code>ind</code> or <code>donor_id</code>), the code above will use it and the test becomes valid.</p>
+<p>On the real <code>ind</code> donors — the default with the Tutorial 01 loader — the test is valid. The synthetic-donor fallback only triggers when no donor metadata is present; on synthetic donors the neighbourhood SpatialFDRs are <strong>not</strong> biologically meaningful, so you’ll see the workflow run correctly but should not interpret them as real findings.</p>
 </div>
 </div>
 </section>

@@ -6,9 +6,8 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Talapas 06 — Reference-based Annotation with SingleR</title>
+<title>Talapas 03 — The Analysis Pipeline (R scripts)</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -2179,11 +2178,13 @@ vertical-align: -.125em;
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#about-this-tutorial" id="toc-about-this-tutorial" class="nav-link active" data-scroll-target="#about-this-tutorial">About this tutorial</a></li>
-  <li><a href="#what-the-script-does" id="toc-what-the-script-does" class="nav-link" data-scroll-target="#what-the-script-does">What the script does</a></li>
-  <li><a href="#required-resources" id="toc-required-resources" class="nav-link" data-scroll-target="#required-resources">Required resources</a></li>
-  <li><a href="#code-mirror-of-the-script" id="toc-code-mirror-of-the-script" class="nav-link" data-scroll-target="#code-mirror-of-the-script">Code (mirror of the script)</a></li>
-  <li><a href="#next" id="toc-next" class="nav-link" data-scroll-target="#next">Next</a></li>
+  <li><a href="#the-scripts-notebook-mapping" id="toc-the-scripts-notebook-mapping" class="nav-link active" data-scroll-target="#the-scripts-notebook-mapping">The scripts ↔︎ notebook mapping</a>
+  <ul class="collapse">
+  <li><a href="#core-pipeline-nsclc-run-in-order" id="toc-core-pipeline-nsclc-run-in-order" class="nav-link" data-scroll-target="#core-pipeline-nsclc-run-in-order">Core pipeline (NSCLC — run in order)</a></li>
+  <li><a href="#bonus-tracks-standalone" id="toc-bonus-tracks-standalone" class="nav-link" data-scroll-target="#bonus-tracks-standalone">Bonus tracks (standalone)</a></li>
+  </ul></li>
+  <li><a href="#running-the-pipeline-on-talapas" id="toc-running-the-pipeline-on-talapas" class="nav-link" data-scroll-target="#running-the-pipeline-on-talapas">Running the pipeline on Talapas</a></li>
+  <li><a href="#a-note-on-the-nsclc-design" id="toc-a-note-on-the-nsclc-design" class="nav-link" data-scroll-target="#a-note-on-the-nsclc-design">A note on the NSCLC design</a></li>
   <li><a href="#credits" id="toc-credits" class="nav-link" data-scroll-target="#credits">Credits</a></li>
   </ul>
 </nav>
@@ -2192,20 +2193,14 @@ vertical-align: -.125em;
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Talapas 06 — Reference-based Annotation with SingleR</h1>
-<p class="subtitle lead">Add an automated cell-type label per cell on the 20k NSCLC object and reconcile it with the manual call</p>
+<h1 class="title">Talapas 03 — The Analysis Pipeline (R scripts)</h1>
+<p class="subtitle lead">Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks</p>
 </div>
 
 
 
 <div class="quarto-title-meta">
 
-    <div>
-    <div class="quarto-title-meta-heading">Author</div>
-    <div class="quarto-title-meta-contents">
-             <p>Single Cell RNA-seq Workshop </p>
-          </div>
-  </div>
     
   
     
@@ -2216,77 +2211,131 @@ vertical-align: -.125em;
 </header>
 
 
-<div class="callout callout-style-default callout-important callout-titled">
+<p>The laptop <strong><a href="../../Tutorials.html">Tutorials 01–08</a></strong> are <em>learning notebooks</em>: rich prose, “Think about it” prompts, and inline output. This page is the other half of the <strong>1:1:1:1</strong> mapping — the same workflow as <strong>streamlined R scripts</strong> you run on Talapas as SLURM jobs. The scripts carry only minimal comments that mark each step’s alignment with the matching notebook; the explanation lives in the notebook.</p>
+<p>The track runs the <strong>20k NSCLC DTC</strong> dataset (vs. the laptop <code>ifnb</code>), so it is the “scale it up on the cluster” companion to the laptop series.</p>
+<div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Important
+Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>This is the Talapas Advanced path, not a laptop tutorial.</strong> Submit each step as a SLURM job — see <a href="Tutorial_Talapas_01_SLURM_Basics.html">Talapas 01</a>. The laptop counterpart is <strong><a href="../Tutorial_04_Reference_Annotation.html">Tutorial 04 — Reference-based Annotation</a></strong>, which walks SingleR + Azimuth and the reconciliation logic in detail.</p>
+<p><strong>Prerequisites.</strong> Work through <a href="Tutorial_Talapas_01_SLURM_Basics.html">Talapas 01 — SLURM Basics</a> and (for raw reads) <a href="Tutorial_Talapas_02_RawData_Cellranger.html">Talapas 02 — Cell Ranger</a> first. They cover login, modules, <code>sbatch</code>, and producing a <code>filtered_feature_bc_matrix/</code>.</p>
 </div>
 </div>
-<section id="about-this-tutorial" class="level2">
-<h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
-<p>Pick up the <strong>manually-annotated</strong> NSCLC object (<code>nsclc_annotated.rds</code>, written by <a href="Tutorial_Talapas_05_Markers_Annotation.html">Talapas 05</a>) and add an <strong>automated, reference-based</strong> label per cell with <strong>SingleR</strong>, then reconcile it against the manual call. Reference methods run <strong>per cell</strong> and don’t need your own integration, so this step sits right after manual annotation and <strong>before</strong> integration (mirrors laptop Tutorial 04).</p>
-<p>The executable script is <strong><a href="scripts/06_reference_annotate.R"><code>06_reference_annotate.R</code></a></strong>. Submit with:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>refannot run_rscript.sbatch 06_reference_annotate.R</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-style-default callout-warning callout-titled" title="The hard regime: tumor cells outside the reference">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-The hard regime: tumor cells outside the reference
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>The 20k NSCLC sample is dissociated <strong>tumor</strong> — many cells are malignant / non-immune and fall <strong>outside</strong> immune reference atlases like <code>celldex</code>. Expect <strong>low SingleR scores and pruned (<code>NA</code>) labels</strong> in the tumor compartment. That’s the signal, not a bug: trust manual markers there, and let the reference confirm the immune cells it <em>does</em> cover. This is exactly the regime the laptop <code>ifnb</code> PBMC tutorial cannot show you.</p>
-</div>
-</div>
-</section>
-<section id="what-the-script-does" class="level2">
-<h2 class="anchored" data-anchor-id="what-the-script-does">What the script does</h2>
-<ol type="1">
-<li>Loads <code>nsclc_annotated.rds</code> and sets <code>RNA</code> as the default assay.</li>
-<li>Runs <strong><code>SingleR</code></strong> against a built-in <code>celldex</code> reference (<code>HumanPrimaryCellAtlasData</code>; <code>BlueprintEncodeData</code> is a good blood/immune alternative).</li>
-<li>Stores <code>singler_label</code>, the <strong>pruned</strong> label (<code>NA</code> where confidence is too low), and the <strong>delta</strong> margin to the runner-up.</li>
-<li><strong>Reconciles</strong>: keeps the manual label where SingleR is uncertain (pruned <code>NA</code>) — i.e. the tumor/epithelial compartment — and the SingleR label elsewhere, into <code>celltype_final</code> (+ a <code>celltype_method</code> provenance column).</li>
-<li>Writes <code>nsclc_annotated_final.rds</code> for downstream use.</li>
-</ol>
-</section>
-<section id="required-resources" class="level2">
-<h2 class="anchored" data-anchor-id="required-resources">Required resources</h2>
+<section id="the-scripts-notebook-mapping" class="level2">
+<h2 class="anchored" data-anchor-id="the-scripts-notebook-mapping">The scripts ↔︎ notebook mapping</h2>
+<p>Every analysis script lives in <a href="scripts/"><code>scripts/</code></a> and is numbered to match its laptop notebook.</p>
+<section id="core-pipeline-nsclc-run-in-order" class="level3">
+<h3 class="anchored" data-anchor-id="core-pipeline-nsclc-run-in-order">Core pipeline (NSCLC — run in order)</h3>
+<p>These eight chain together on the shared NSCLC object — each one’s output is the next one’s input.</p>
 <table class="caption-top table">
-<colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
-</colgroup>
 <thead>
 <tr class="header">
-<th>Resource</th>
-<th>Recommendation</th>
+<th>Script</th>
+<th>Parallels laptop notebook</th>
+<th>Reads</th>
+<th>Writes</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>Partition</td>
-<td><code>compute</code></td>
+<td><a href="scripts/01_qc_preprocessing.R"><code>01_qc_preprocessing.R</code></a></td>
+<td><a href="../Tutorial_01_QC_Preprocessing.html">Tutorial 01 — QC &amp; Preprocessing</a></td>
+<td><code>data/filtered_feature_bc_matrix/</code></td>
+<td><code>objects/nsclc_preprocessed.rds</code></td>
 </tr>
 <tr class="even">
-<td>Time</td>
-<td>30–60 min for 20k cells (first run downloads the <code>celldex</code> reference)</td>
+<td><a href="scripts/02_dimreduction_clustering.R"><code>02_dimreduction_clustering.R</code></a></td>
+<td><a href="../Tutorial_02_DimReduction_Clustering.html">Tutorial 02 — DimReduction &amp; Clustering</a></td>
+<td><code>nsclc_preprocessed.rds</code></td>
+<td><code>nsclc_clustered.rds</code></td>
 </tr>
 <tr class="odd">
-<td>CPUs</td>
-<td>8</td>
+<td><a href="scripts/03_markers_annotation.R"><code>03_markers_annotation.R</code></a></td>
+<td><a href="../Tutorial_03_Markers_Annotation.html">Tutorial 03 — Markers &amp; Annotation</a></td>
+<td><code>nsclc_clustered.rds</code></td>
+<td><code>nsclc_annotated.rds</code></td>
 </tr>
 <tr class="even">
-<td>Memory</td>
-<td>32 GB</td>
+<td><a href="scripts/04_reference_annotation.R"><code>04_reference_annotation.R</code></a></td>
+<td><a href="../Tutorial_04_Reference_Annotation.html">Tutorial 04 — Reference Annotation</a></td>
+<td><code>nsclc_annotated.rds</code></td>
+<td><code>nsclc_annotated_final.rds</code></td>
+</tr>
+<tr class="odd">
+<td><a href="scripts/05_integration.R"><code>05_integration.R</code></a></td>
+<td><a href="../Tutorial_05_Integration.html">Tutorial 05 — Integration</a></td>
+<td><code>nsclc_annotated_final.rds</code></td>
+<td><code>nsclc_integrated.rds</code></td>
+</tr>
+<tr class="even">
+<td><a href="scripts/06_pseudobulk_de.R"><code>06_pseudobulk_de.R</code></a></td>
+<td><a href="../Tutorial_06_DESeq2_DE.html">Tutorial 06 — Pseudobulk DE</a></td>
+<td><code>nsclc_integrated.rds</code></td>
+<td><code>nsclc_pseudobulk_de.csv</code></td>
+</tr>
+<tr class="odd">
+<td><a href="scripts/07_functional_analysis.R"><code>07_functional_analysis.R</code></a></td>
+<td><a href="../Tutorial_07_FunctionalAnalysis.html">Tutorial 07 — Functional Analysis</a></td>
+<td><code>nsclc_pseudobulk_de.csv</code></td>
+<td><code>functional/*.csv</code></td>
+</tr>
+<tr class="even">
+<td><a href="scripts/08_differential_abundance.R"><code>08_differential_abundance.R</code></a></td>
+<td><a href="../Tutorial_08_DifferentialAbundance.html">Tutorial 08 — Differential Abundance</a></td>
+<td><code>nsclc_integrated.rds</code></td>
+<td><code>nsclc_milo_da.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each step reads and writes <code>.rds</code>/<code>.csv</code> objects in <code>../objects/</code>; the only raw input is the downloaded matrix in <code>../data/</code>. The scripts run <strong>in order</strong> — each one’s output is the next one’s input.</p>
+</section>
+<section id="bonus-tracks-standalone" class="level3">
+<h3 class="anchored" data-anchor-id="bonus-tracks-standalone">Bonus tracks (standalone)</h3>
+<p>These parallel the bonus laptop tutorials. Scripts 09–11 use their <strong>own datasets</strong> (downloaded into <code>../data/</code>, not the NSCLC object); 12–13 run on the annotated object the core pipeline produces. They do not need to be run in sequence.</p>
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>Script</th>
+<th>Parallels laptop notebook</th>
+<th>Reads</th>
+<th>Writes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><a href="scripts/09_scatac_signac.R"><code>09_scatac_signac.R</code></a></td>
+<td><a href="../Tutorial_09_scATACseq_Signac.html">Tutorial 09 — scATAC-seq (Signac)</a></td>
+<td>PBMC 10k scATAC files in <code>data/</code></td>
+<td><code>pbmc_atac_clustered.rds</code></td>
+</tr>
+<tr class="even">
+<td><a href="scripts/10_wgcna.R"><code>10_wgcna.R</code></a></td>
+<td><a href="../Tutorial_10_WGCNA.html">Tutorial 10 — WGCNA</a></td>
+<td><code>GSE152418_*_RawCounts.txt</code></td>
+<td><code>wgcna_*.csv</code></td>
+</tr>
+<tr class="odd">
+<td><a href="scripts/11_spatial.R"><code>11_spatial.R</code></a></td>
+<td><a href="../Tutorial_11_Spatial_Transcriptomics.html">Tutorial 11 — Spatial Transcriptomics</a></td>
+<td><code>stxBrain</code> (SeuratData)</td>
+<td><code>brain_spatial_integrated.rds</code></td>
+</tr>
+<tr class="even">
+<td><a href="scripts/12_trajectory_cellcomm.R"><code>12_trajectory_cellcomm.R</code></a></td>
+<td><a href="../Tutorial_12_Trajectory_CellCommunication.html">Tutorial 12 — Trajectory &amp; Cell–Cell Comm</a></td>
+<td><code>nsclc_annotated.rds</code></td>
+<td><code>nsclc_slingshot_pseudotime.csv</code></td>
+</tr>
+<tr class="odd">
+<td><a href="scripts/13_fair_metadata.R"><code>13_fair_metadata.R</code></a></td>
+<td><a href="../Tutorial_13_FAIR_Metadata.html">Tutorial 13 — FAIR &amp; Metadata</a></td>
+<td><code>nsclc_annotated_final.rds</code></td>
+<td><code>nsclc_for_submission.h5ad</code></td>
 </tr>
 </tbody>
 </table>
@@ -2300,77 +2349,60 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>First use of <code>celldex::HumanPrimaryCellAtlasData()</code> downloads ~500 MB via <code>ExperimentHub</code>. On a compute node without internet, pre-cache it on a login node first, or set <code>setExperimentHubOption(&quot;PROXY&quot;, ...)</code>.</p>
+<p>The bonus scripts mirror the runnable core of each notebook. Steps that are inherently interactive or Python-based — Monocle3 root selection, scVelo, CellChat plotting, the <code>cellxgene-schema</code> validator — are kept as commented sketches in the script, exactly as in the notebook.</p>
 </div>
 </div>
 </section>
-<section id="code-mirror-of-the-script" class="level2">
-<h2 class="anchored" data-anchor-id="code-mirror-of-the-script">Code (mirror of the script)</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleR)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(celldex)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleCellExperiment)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../objects/nsclc_annotated.rds&quot;</span>)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(seu) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>ref  <span class="ot">&lt;-</span> celldex<span class="sc">::</span><span class="fu">HumanPrimaryCellAtlasData</span>()</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>sce  <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(seu)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>pred <span class="ot">&lt;-</span> <span class="fu">SingleR</span>(<span class="at">test =</span> sce, <span class="at">ref =</span> ref, <span class="at">labels =</span> ref<span class="sc">$</span>label.main)</span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>singler_label  <span class="ot">&lt;-</span> pred<span class="sc">$</span>labels</span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>singler_pruned <span class="ot">&lt;-</span> pred<span class="sc">$</span>pruned.labels   <span class="co"># NA where confidence too low</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>manual_col <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="st">&quot;celltype&quot;</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(seu<span class="sc">@</span>meta.data)) <span class="st">&quot;celltype&quot;</span> <span class="cf">else</span> <span class="st">&quot;seurat_annotations&quot;</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>celltype_final <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(seu<span class="sc">$</span>singler_pruned),</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                             <span class="fu">as.character</span>(seu[[manual_col]][, <span class="dv">1</span>]),</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                             seu<span class="sc">$</span>singler_pruned)</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>celltype_method <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(<span class="fu">is.na</span>(seu<span class="sc">$</span>singler_pruned), <span class="st">&quot;manual&quot;</span>, <span class="st">&quot;singler&quot;</span>)</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Cross-tabulate manual vs reference for the log</span></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(<span class="at">manual =</span> seu[[manual_col]][, <span class="dv">1</span>], <span class="at">singler =</span> seu<span class="sc">$</span>singler_label)</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(seu, <span class="st">&quot;../objects/nsclc_annotated_final.rds&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
+</section>
+<section id="running-the-pipeline-on-talapas" class="level2">
+<h2 class="anchored" data-anchor-id="running-the-pipeline-on-talapas">Running the pipeline on Talapas</h2>
+<p>The scripts are submitted with the generic wrapper <a href="scripts/run_rscript.sbatch"><code>run_rscript.sbatch</code></a>, which loads R and runs the script you pass it. From the <code>scripts/</code> directory:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># One-time setup: SLURM writes job logs here (it will NOT create the dir for you)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> logs</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run the pipeline in order (wait for each to finish before the next)</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>qc        run_rscript.sbatch 01_qc_preprocessing.R</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>cluster   run_rscript.sbatch 02_dimreduction_clustering.R</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>markers   run_rscript.sbatch 03_markers_annotation.R</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>refannot  run_rscript.sbatch 04_reference_annotation.R</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>integrate run_rscript.sbatch 05_integration.R</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>pb_de  <span class="at">--mem</span><span class="op">=</span>96G run_rscript.sbatch 06_pseudobulk_de.R</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>fa     <span class="at">--mem</span><span class="op">=</span>32G run_rscript.sbatch 07_functional_analysis.R</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> <span class="at">--job-name</span><span class="op">=</span>da     <span class="at">--mem</span><span class="op">=</span>96G run_rscript.sbatch 08_differential_abundance.R</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Think about it
+Tip
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>On <code>ifnb</code> (PBMCs), SingleR and Azimuth agree with the manual labels almost everywhere. On this NSCLC tumor sample, a large block of cells comes back <strong>pruned (<code>NA</code>)</strong>. Why — and what should <code>celltype_final</code> be for those cells?</p>
-<details>
-<summary>
-Show answer
-</summary>
-<p>Those are malignant / epithelial / stromal cells with no good match in an immune-cell reference, so SingleR correctly refuses to force a confident call (low score → pruned). For them, <code>celltype_final</code> should fall back to your <strong>manual</strong> marker-based label (<code>EPCAM+</code> epithelial, etc.). Reference annotation <em>complements</em> manual work in well-covered compartments; it does not replace it where the reference has no support.</p>
-</details>
+<p><strong>Confirm each step before launching the next.</strong> Check the <code>.out</code> log for the <code>Wrote ...</code> line and run <code>seff &lt;jobid&gt;</code> to confirm <code>State: COMPLETED</code> (not <code>OUT_OF_MEMORY</code>/<code>TIMEOUT</code>) — a job killed mid-write leaves a corrupt <code>.rds</code>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Relocating outputs.</strong> Set the <code>OBJ_DIR</code> (and <code>DATA_DIR</code>) environment variables to write the large objects to <code>/scratch/&lt;PIRG&gt;/...</code> instead of <code>../objects/</code>, e.g. <code>export OBJ_DIR=/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/nsclc/objects</code>.</p>
 </div>
 </div>
 </section>
-<section id="next" class="level2">
-<h2 class="anchored" data-anchor-id="next">Next</h2>
-<ul>
-<li><strong><a href="Tutorial_Talapas_07_Integration.html">Talapas 07 — Multi-Sample Integration with Harmony</a></strong> — correct donor batch effects before condition-level analyses</li>
-<li>Integration reads <code>nsclc_annotated.rds</code> (the manual object from Talapas 05); the reference-validated <code>nsclc_annotated_final.rds</code> you just wrote is what you carry into reporting / FAIR deposition</li>
-</ul>
+<section id="a-note-on-the-nsclc-design" class="level2">
+<h2 class="anchored" data-anchor-id="a-note-on-the-nsclc-design">A note on the NSCLC design</h2>
+<p>The 20k NSCLC sample is a single dissociated-tumor run with <strong>no biological condition variable and no per-cell donor IDs</strong>. Scripts 05/06/08 therefore synthesize pseudo-donors and a two-group split <em>purely to exercise the integration / DE / abundance machinery</em> — so <strong>expect near-zero significant results</strong>. That validates the plumbing, not biology. For real differential analysis you need true replicates (e.g. CMO demultiplexing to recover donor identity, or multiple samples).</p>
 </section>
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>
-<ul>
-<li>Dataset: 10x Genomics — 20k NSCLC DTC, 3’ v3.1 Multiplex</li>
-<li>Method: Aran <em>et al.</em> 2019 (SingleR); references via the Bioconductor <code>celldex</code> package</li>
-</ul>
+<p>Adapted from the laptop tutorial series for the Talapas HPC environment, building on <strong>Shannon N. Snyder’s</strong> <em>Talapas Basics</em> materials.</p>
 </section>
 
 </main>

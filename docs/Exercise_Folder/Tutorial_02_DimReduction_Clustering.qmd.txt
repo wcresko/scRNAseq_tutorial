@@ -1,6 +1,6 @@
 ---
 title: "Tutorial 02 — scRNA-seq: Dimensionality Reduction & Clustering"
-subtitle: "PCA, how many PCs, neighbor graph, Leiden at multiple resolutions, UMAP — and seeing the batch effect"
+subtitle: "PCA, how many PCs, neighbor graph, graph clustering at multiple resolutions, UMAP — and seeing the batch effect"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -24,7 +24,7 @@ Part two of the series. We start from the **preprocessed object saved in Tutoria
 
 
 ::: callout-note
-**Companion book chapter:** [Chapter 2 — Dimensionality Reduction & Clustering](../Resources_Folder/Chapter_02_DimReduction.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices. · **HPC version (Talapas):** [Talapas 04 — DimRed & Clustering](Talapas/Tutorial_Talapas_04_DimReduction_Clustering.html)
+**Companion book chapter:** [Chapter 2 — Dimensionality Reduction & Clustering](../Resources_Folder/Chapter_02_DimReduction.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices. · **HPC version (Talapas):** [Talapas analysis pipeline — `02_dimreduction_clustering.R`](Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html)
 :::
 
 
@@ -132,7 +132,7 @@ DimHeatmap(ifnb, dims = 1, cells = 500, balanced = TRUE)
 
 <summary>Show answers</summary>
 
-1.  PC1 in the unintegrated `ifnb` object is heavily loaded with ISGs because the IFN-β response is the largest source of variance in this dataset. **PC1 is essentially `stim` (CTRL vs STIM)** — i.e. the batch / condition axis, not a cell-type axis. That's the batch effect we'll fix in Tutorial 04.
+1.  PC1 in the unintegrated `ifnb` object is heavily loaded with ISGs because the IFN-β response is the largest source of variance in this dataset. **PC1 is essentially `stim` (CTRL vs STIM)** — i.e. the batch / condition axis, not a cell-type axis. That's the batch effect we'll fix in Tutorial 05.
 2.  PCs would be dominated by highly-expressed housekeeping genes whose variance simply reflects sequencing depth. HVG-restricted PCA isolates biologically-variable signal.
 
 </details>
@@ -201,6 +201,10 @@ ifnb <- FindClusters(
 head(ifnb@meta.data)
 ```
 
+::: callout-note
+`FindClusters()` here uses Seurat's default **Louvain** algorithm (`algorithm = 1`). Lecture 02 introduces **Leiden** (`algorithm = 4`) as the modern preferred method; we use the Louvain default for portability because Leiden needs the `leidenalg` Python package via `reticulate`. To switch, add `algorithm = 4` to the call above once that dependency is installed.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  What does `resolution` control intuitively?
 2.  Each resolution creates its own `RNA_snn_res.XYZ` column in the metadata. How do you make one of them the *active* identity?
@@ -258,7 +262,7 @@ p_by_celltype
 1.  CTRL and STIM cells form **largely parallel structures**. Many cell-type clusters appear twice — once for CTRL, once for STIM — because the IFN-β response shifts every cell along PC1.
 2.  Most cell types **split into two sister clusters**, with the split tracking `stim`. T cells appear once on the CTRL side and once on the STIM side; same for monocytes, B cells, NK cells, etc. This is the classic "per-sample islands" pattern — the batch / condition axis dominates the embedding.
 3.  Most clusters at `res = 0.5` will be \>80% one sample. Some are \>95% one sample.
-4.  Yes. The batch axis is dominating PC1 and is splitting biologically identical cell types across two clusters. **Tutorial 04** will integrate the data with Harmony and Seurat anchors, and you'll see the same cells re-arrange into shared, sample-mixed clusters.
+4.  Yes. The batch axis is dominating PC1 and is splitting biologically identical cell types across two clusters. **Tutorial 05** will integrate the data with Harmony and Seurat anchors, and you'll see the same cells re-arrange into shared, sample-mixed clusters.
 
 </details>
 :::
