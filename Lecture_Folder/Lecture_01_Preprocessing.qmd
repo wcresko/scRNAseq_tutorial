@@ -3,7 +3,7 @@ title: "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 01 of 12
+    footer: Single Cell RNA-seq Workshop · Lecture 01 of 13
     transition: fade
     transition-speed: slow
     theme: default
@@ -287,6 +287,7 @@ abline(v = 20000, lty = 2, col = "darkorange"); text(22000, 60, "ambient soup", 
 -   Droplets sometimes capture **two cells** → artificial "hybrid" profiles
 -   Run doublet detection on each sample **before** integration
 -   Expected doublet rate scales with loading: \~0.8% per 1,000 cells loaded on 10x Chromium → \~8% at 10k cells, \~16% at 20k
+-   **Experimental trick:** pooling samples with distinct **genotypes or species** lets you *detect* cross-sample doublets directly — genetic demultiplexing (`demuxlet` / `souporcell` / `Vireo`) or a human–mouse "barnyard" mix — and measure your true multiplet rate
 
 ![Doublet formation: two cells in one droplet](images/lec01_doublet_detection.svg){fig-align="center" width="95%"}
 
@@ -417,6 +418,14 @@ gridExtra::grid.arrange(p_raw, p_norm, nrow = 1)
 -   **Left:** raw counts for a typical gene scale with each cell's sequencing depth — a high-depth cell looks "more highly expressed" purely because it was sequenced more
 -   **Right:** after `NormalizeData()` (log1p of CPM-scaled counts), the depth correlation is gone — same biological signal, comparable across cells
 -   This is the *minimum* you need before PCA. **SCTransform** does this *and* models gene-specific overdispersion, which is why it shines on low-depth or noisy data.
+
+## Log-norm vs SCTransform — alternative schematic
+
+![Log-normalization removes depth but leaves a mean–variance trend for medium/high-expression genes; SCTransform's regularized NB-GLM residuals stay flat across expression levels — recreated in our style.](images/lec01_hope_norm_compare.svg){fig-align="center" width="96%"}
+
+::: callout-note
+**Alternative to the normalization slides above.** Original figure: **Hafemeister & Satija 2019**, *Genome Biology* — [doi.org/10.1186/s13059-019-1874-1](https://doi.org/10.1186/s13059-019-1874-1) (on Hope Healey's Lecture 2, slides ~17–19).
+:::
 
 # Step 4 — Feature selection (HVGs) {background-color="#2c3e50"}
 

@@ -1,0 +1,159 @@
+---
+title: "Tutorial 12 — Trajectory & Cell–Cell Communication"
+subtitle: "Pseudotime (Slingshot/Monocle3), RNA velocity (scVelo), and ligand–receptor inference (CellChat)"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+A bonus hands-on companion to **[Lecture 12 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_12_Trajectory_CellCommunication.html)**. These are *optional* downstream analyses; they build on the annotated, integrated object from the core workflow. We:
+
+::: callout-note
+**Companion book chapter:** [Chapter 12 — Trajectory & Cell–Cell Communication](../Resources_Folder/Chapter_12_Trajectory_CellCommunication.html) — the long-form prose treatment of this tutorial's material.
+:::
+
+-   Order cells along a **pseudotime** with `slingshot` (and the `monocle3` alternative)
+-   Sketch an **RNA velocity** run with `scVelo` (Python), noting the spliced/unspliced input requirement
+-   Predict **ligand–receptor signaling** between cell types with `CellChat`
+-   Read every result with the appropriate skepticism
+
+::: {.callout-warning title="These analyses are easy to over-interpret"}
+`ifnb` (resting + IFN-β-stimulated PBMCs) is **not** a developmental continuum, so a pseudotime on it is a *mechanics demo*, not biology. Trajectory tools always return a trajectory — only run one when a continuum is biologically plausible (development, a maturation axis, a time-course).
+:::
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it:
+
+1.  Download the `.qmd` source: <a href="Tutorial_12_Trajectory_CellCommunication.qmd.txt" download="Tutorial_12_Trajectory_CellCommunication.qmd">Tutorial_12_Trajectory_CellCommunication.qmd</a>. If your browser saves it as `….qmd.txt`, **drop the trailing `.txt`** before opening in RStudio.
+2.  Make sure you've completed **[Tutorial 04 — Reference Annotation](Tutorial_04_Reference_Annotation.html)** (or any tutorial that writes an annotated object) first.
+3.  Install the extra packages below; work through the chunks, flipping `eval: true` as you go.
+:::
+
+## Setup
+
+``` r
+# Bioconductor: slingshot, tradeSeq, CytoTRACE; CRAN/GitHub: monocle3, CellChat
+# BiocManager::install(c("slingshot", "tradeSeq", "SingleCellExperiment"))
+# remotes::install_github(c("cole-trapnell-lab/monocle3", "jinworks/CellChat"))
+library(Seurat); library(slingshot); library(SingleCellExperiment)
+library(tidyverse)
+
+seu <- readRDS("../data/ifnb_annotated.rds")
+DefaultAssay(seu) <- "RNA"
+```
+
+## Part A — Pseudotime with Slingshot
+
+`slingshot` fits smooth principal curves through your clusters in a reduced space. You give it a **start cluster** (the root) — here we *pretend* one cell type is the progenitor purely to demonstrate the mechanics.
+
+``` r
+sce <- as.SingleCellExperiment(seu)
+sce <- slingshot(sce,
+                 clusterLabels = "seurat_annotations",
+                 reducedDim    = "UMAP",
+                 start.clus    = "CD14 Mono")   # <- you must justify the root
+
+# Pseudotime values (one column per inferred lineage)
+pt <- slingPseudotime(sce)
+head(pt)
+
+# Plot lineage curves over the UMAP
+library(grDevices)
+plot(reducedDims(sce)$UMAP, pch = 16, cex = 0.5, col = "grey70")
+lines(SlingshotDataSet(sce), lwd = 2, col = "black")
+```
+
+::: {.callout-important title="Think about it"}
+The `start.clus` argument flips the direction of the whole pseudotime. What evidence (markers, prior biology, CytoTRACE) would you need before trusting "CD14 Mono" as a root for a *real* dataset?
+
+<details><summary>Answer</summary>
+You'd want an independent reason the start cells are the least-differentiated: known progenitor markers expressed there, a CytoTRACE score that's highest at that end, and ideally agreement from RNA velocity. Without that, the ordering is arbitrary — Slingshot will happily root anywhere you tell it.
+</details>
+:::
+
+### Monocle3 alternative
+
+``` r
+library(monocle3)
+cds <- as.cell_data_set(seu)                 # SeuratWrappers
+cds <- cluster_cells(cds)
+cds <- learn_graph(cds)
+cds <- order_cells(cds)                       # interactive: pick the root node
+plot_cells(cds, color_cells_by = "pseudotime")
+```
+
+## Part B — RNA velocity (scVelo, Python sketch)
+
+Velocity needs a **spliced/unspliced** count matrix, which the standard Cell Ranger *filtered* matrix does **not** contain. Generate it first with `velocyto run` or `kb count --workflow lamanno`, then:
+
+``` python
+import scvelo as scv, scanpy as sc
+adata = scv.read("ifnb_velocyto.loom")        # spliced + unspliced layers
+scv.pp.filter_and_normalize(adata, min_shared_counts=20, n_top_genes=2000)
+scv.pp.moments(adata, n_pcs=30, n_neighbors=30)
+scv.tl.velocity(adata, mode="dynamical")      # dynamical model (Bergen 2020)
+scv.tl.velocity_graph(adata)
+scv.pl.velocity_embedding_stream(adata, basis="umap")
+```
+
+::: callout-warning
+If you only have the filtered matrix, you **cannot** run velocity — there is no unspliced layer to model. This is the most common reason a velocity run "fails" silently or returns flat arrows.
+:::
+
+### CytoTRACE cross-check
+
+``` r
+library(CytoTRACE)
+cyto <- CytoTRACE(as.matrix(GetAssayData(seu, slot = "counts")))
+seu$cytotrace <- cyto$CytoTRACE
+FeaturePlot(seu, "cytotrace")   # higher = less differentiated (more genes detected)
+```
+
+## Part C — Cell–cell communication with CellChat
+
+``` r
+library(CellChat)
+cc  <- createCellChat(object = seu, group.by = "seurat_annotations")
+cc@DB <- CellChatDB.human                       # human L–R database
+cc <- subsetData(cc)
+cc <- identifyOverExpressedGenes(cc)
+cc <- identifyOverExpressedInteractions(cc)
+cc <- computeCommunProb(cc)                      # permutation-based probabilities
+cc <- filterCommunication(cc, min.cells = 10)
+cc <- aggregateNet(cc)
+
+# Network: who signals to whom, weighted by strength
+netVisual_circle(cc@net$weight, weight.scale = TRUE,
+                 title.name = "Aggregated interaction strength")
+
+# Drill into one pathway
+netVisual_aggregate(cc, signalling = "MIF", layout = "circle")
+```
+
+::: {.callout-important title="Think about it"}
+CellChat reports a strong predicted interaction between two clusters. List three reasons this might **not** reflect real signaling in the tissue.
+
+<details><summary>Answer</summary>
+(1) The two cell types may never be spatially adjacent — co-expression ignores location. (2) mRNA ≠ secreted, active protein — the ligand may not be translated/secreted. (3) The database (human/mouse-curated) may mis-map or omit the real partners, especially for non-model systems. Validate with spatial data or perturbation before claiming the circuit.
+</details>
+:::
+
+## See also
+
+-   [Lecture 12 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_12_Trajectory_CellCommunication.html)
+-   Saelens *et al.* 2019 — trajectory-method benchmark; Bergen *et al.* 2020 — [scVelo](https://scvelo.org/)
+-   Jin *et al.* 2021 — [CellChat](http://www.cellchat.org/); Armingol *et al.* 2021 — cell–cell communication review

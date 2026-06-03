@@ -3,7 +3,7 @@ title: "Lecture 00 — Bulk vs. Single-Cell RNA-seq: What & How"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: Single Cell RNA-seq Workshop · Lecture 00 of 12
+    footer: Single Cell RNA-seq Workshop · Lecture 00 of 13
     transition: fade
     transition-speed: slow
     theme: default
@@ -49,7 +49,8 @@ set.seed(2026)
     -   Lec 09 ↔ Tutorial 09 — scATAC-seq
     -   Lec 10 ↔ Tutorial 10 — WGCNA
     -   Lec 11 ↔ Tutorial 11 — Spatial Transcriptomics
-    -   Lec 12 ↔ Tutorial 12 — FAIR metadata & data sharing
+    -   Lec 12 ↔ Tutorial 12 — Trajectory & Cell–Cell Communication
+    -   Lec 13 ↔ Tutorial 13 — FAIR metadata & data sharing
 -   **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
 
 ## Goals of this lecture
@@ -169,6 +170,14 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 -   **10x 3' v3** droplet: \~90–95% zeros — most (cell, gene) pairs are zero because shallow capture + 3'-only chemistry samples a fraction of the transcriptome
 -   The implication for analysis: every step has to handle counts that are *mostly* zero. That's why we have specialized normalisation (`SCTransform`), HVG selection, and graph-based clustering instead of the bulk RNA-seq toolkit.
 
+## Dropout — alternative schematic
+
+![Each cell yields only ~10–30% of its transcripts (open circles = dropout); a cell type's transcriptome is recovered by pooling many cells — recreated in our style.](images/lec00_hope_dropout.svg){fig-align="center" width="94%"}
+
+::: callout-note
+**Alternative to the sparsity panel above.** Original figure: **Yu *et al.* 2020** (review; on Hope Healey's Lecture 1, slides ~28–36).
+:::
+
 # Part 2 — How the data are generated {background-color="#2c3e50"}
 
 ## Major scRNA-seq technologies
@@ -184,12 +193,96 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 **10x Chromium 3'** is the workshop default — the assay used by both the workshop dataset (20k NSCLC DTC) and Patel's [YouTube tutorials](https://github.com/kpatel427/YouTubeTutorials). Most conceptual ideas generalize.
 :::
 
+## Two ways into the Chromium: polyA vs. probe
+
+Even within 10x, there are **two capture chemistries**, and the choice constrains what you can study:
+
+| | **3′ / 5′ gene expression** | **Flex (probe capture)** |
+|----|----|----|
+| How RNA is captured | polyA tail → reverse transcription | hybridization probes against a fixed gene panel (microarray-like) |
+| Sample state | fresh / cryopreserved (live) cells or nuclei | **fixed** cells/nuclei, incl. FFPE |
+| Species | **any** species with a transcriptome | **human & mouse only** (probe panels) |
+| Best for | non-model systems, novel/unannotated genes | banked clinical/fixed material, high multiplexing |
+
+::: callout-warning
+**Probe panels can't see what they don't target.** Flex only quantifies the genes on the panel, and panels exist only for human and mouse — so for **non-model organisms the polyA chemistry is effectively the only option** (and it carries the 3′-annotation caveat on the next slide).
+:::
+
+## A polyA-capture catch: 3′ UTR annotation
+
+-   3′ polyA capture means reads pile up at the **3′ end / 3′ UTR** of each transcript, not evenly across the gene body.
+-   Counting therefore depends on **accurate 3′ UTR annotation**. If a gene's 3′ UTR is missing or truncated in the reference, its reads land in "intergenic" space and the gene is **under-counted or invisible**.
+-   This is a **major problem in non-model systems** (3′ UTRs are often poorly annotated) and can still bite for specific genes of interest in model organisms.
+-   **Fixes:** improve/extend 3′ UTR annotations — e.g. with long-read **Iso-Seq** data — before quantifying, and sanity-check that your key markers' 3′ ends are actually annotated.
+
+::: callout-note
+Probe/Flex chemistry sidesteps this (it targets defined gene models), but only exists for human and mouse — so for non-model organisms the annotation step is part of the experiment.
+:::
+
+## 3′ UTR annotation — alternative schematic
+
+![3′ capture piles reads at the 3′ end; a well-annotated 3′ UTR captures them, but a missing/truncated UTR sends reads to "intergenic" and the gene is under-counted — recreated in our style.](images/lec00_hope_3utr_alignment.svg){fig-align="center" width="96%"}
+
+::: callout-note
+**Visual for the 3′ UTR caveat above.** Original concept figure: **Healey *et al.* 2022** (on Hope Healey's Lecture 1, slides ~25–26) — the source to embed if you prefer her version.
+:::
+
+## Cells vs. nuclei, and multi-omic readouts
+
+-   **Cells** capture mature cytoplasmic mRNA — needed for cell-surface protein readouts; richer transcript counts.
+-   **Nuclei (snRNA-seq)** work on frozen / hard-to-dissociate tissue and large/fragile cell types, and are **required for snATAC** — but yield fewer transcripts and little cytoplasmic RNA.
+-   On the Chromium, the same partitioning chemistry can add **other modalities to the same cells**:
+    -   **ATAC** (open chromatin) — alone or jointly with RNA (**Multiome**, one nucleus → RNA + ATAC)
+    -   **Cell-surface protein** (CITE-seq / antibody-derived tags)
+    -   **Immune repertoire** (5′ V(D)J — paired TCR/BCR)
+    -   **CRISPR perturbations** (guide capture / Perturb-seq)
+-   **Sample multiplexing** (CellPlex / hashing, or natural-genotype demultiplexing) pools several samples in one run to cut per-sample cost and share a doublet/batch structure.
+
+## Beyond 10x: combinatorial-barcoding platforms
+
+Droplet microfluidics is not the only way to barcode single cells. **Combinatorial split-pool barcoding** (Rosenberg *et al.* 2018, SPLiT-seq; commercialized as **Parse Biosciences Evercode**) labels cells by **repeated rounds of split → barcode → pool** instead of one-cell-one-droplet:
+
+-   **No specialized instrument** — runs on plates with standard lab equipment.
+-   Works on **fixed cells *and* nuclei**, which simplifies sample logistics (fix now, sequence later).
+-   **Scales by adding barcode rounds/plates** — kits span ~10k cells / a handful of samples up to millions of cells / hundreds of samples.
+-   Trade-offs: **more hands-on bench labor**, needs **more input cells**, and (currently) **no ATAC kit** (immune and CRISPR kits exist).
+
+::: callout-note
+Other instrument-light approaches exist too — e.g. **Fluent BioSciences PIP-seq** (particle-templated emulsification, Clark *et al.* 2023) makes droplets without a microfluidic controller.
+:::
+
+## 10x Chromium vs. Parse Evercode — at a glance
+
+| | **10x Chromium** | **Parse Evercode** |
+|----|----|----|
+| Principle | droplet microfluidics (GEMs) | combinatorial split-pool barcoding |
+| Instrument | dedicated controller | none (plates) |
+| Input | fresh/cryo cells or nuclei; live preferred (polyA) | fixed cells **or** nuclei |
+| Scaling | per-channel; multiplex to lower cost | add barcode rounds → up to millions of cells / hundreds of samples |
+| Multi-omics | RNA, ATAC, protein, V(D)J, CRISPR | RNA, immune, CRISPR (no ATAC) |
+| Cost / labor | higher reagent cost, less bench labor | cheaper reagents, more bench labor |
+
+::: callout-tip
+**There is no single "best" platform** — match it to the question: instrument-free + fixable + many samples → Parse; multi-omics (esp. ATAC/protein) or a turnkey instrument → 10x; non-model species → polyA chemistry either way.
+:::
+
+## Platform choice changes results, not just cost
+
+-   **Cost is real and shapes design.** A single library prep at a core can run ~$120 for bulk RNA-seq vs. ~$2,000+ for a 10x lane (example UO pricing) — which is why scRNA-seq experiments often have **few biological replicates**.
+    -   ~2 biological replicates can suffice for a **descriptive atlas**; **differential-expression** questions need **more replicates** (see Lec 06); chasing **rare transcripts** needs **more sequencing depth**.
+-   **The platform is not neutral.** Benchmarks comparing platforms on matched samples (e.g. Filippov *et al.* 2024) report **different QC distributions** and, in some cases, **cell populations recovered by one platform but missed by another** — so the technology choice can change the *biological* conclusions, not just the budget.
+
+::: callout-warning
+Report your platform **and** chemistry (3′ vs 5′ vs Flex, cells vs nuclei, multiplexing scheme) in methods. Downstream defaults (ambient correction, doublet rate, mito thresholds, even whether a cluster appears) all depend on them.
+:::
+
 ## How we got here — a short timeline
 
 ![Single-cell technology timeline from 2009 to today](images/lec01_tech_timeline.svg){fig-align="center" width="98%"}
 
--   Throughput went from **one cell** (Tang 2009) to **millions of cells** in a decade
--   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** and **spatial** measurements (we revisit this in Lecture 06)
+-   Throughput went from **one cell** (Tang *et al.* 2009, plate + manual picking) to **millions of cells** in a decade
+-   Key milestones: microfluidic capture (Streets *et al.* 2014) → **Drop-seq** droplet barcoding (Macosko *et al.* 2015) → **10x Chromium** launches (2015) → **SPLiT-seq** combinatorial barcoding (Rosenberg *et al.* 2018; Parse founded 2018) → instrument-free **PIP-seq** (Clark *et al.* 2023; Fluent)
+-   The field now extends *beyond* dissociated scRNA-seq into **multi-modal** (Lec 09 — scATAC-seq) and **spatial** (Lec 11) measurements
 
 ## Droplet generation on the Chromium
 
@@ -211,6 +304,14 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ![Chromium partitioning + library prep — alternative rendering](images/chromium-partitioning-library-prep.png){fig-align="center" width="92%"}
 
+## GEM formation — alternative schematic
+
+![One cell + one barcoded gel bead + oil partition into a GEM, where lysis, barcoding, and reverse transcription happen — recreated in our style.](images/lec00_hope_gem_formation.svg){fig-align="center" width="96%"}
+
+::: callout-note
+**Alternative to the library-prep slides above**, for side-by-side comparison. Original figures: **10x Genomics** Chromium Single Cell documentation — [10xgenomics.com/support/single-cell-gene-expression](https://www.10xgenomics.com/support/single-cell-gene-expression) (on Hope Healey's Lecture 1, slides ~17–22).
+:::
+
 ## Droplet protocol: barcodes + UMIs
 
 ![Droplet barcoding: cell barcode + UMI per read](images/lec01_droplet_barcoding.svg){fig-align="center" width="90%"}
@@ -218,6 +319,14 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 -   **[Cell barcode](../Resources_Folder/Glossary.html#b)** identifies which cell a read came from
 -   **[UMI](../Resources_Folder/Glossary.html#u)** identifies the original mRNA molecule (collapses PCR duplicates)
 -   Reads are pooled and **[demultiplexed](../Resources_Folder/Glossary.html#d)** computationally
+
+## 10x read structure — alternative schematic
+
+![A 10x 3′ read pair: Read 1 carries the cell barcode + UMI; Read 2 carries the cDNA insert (3′ end) between TSO and polyA — recreated in our style.](images/lec00_hope_read_structure.svg){fig-align="center" width="96%"}
+
+::: callout-note
+**Alternative to the barcodes + UMIs slide above.** Original figure: **10x Genomics** 3′ reagent kit documentation — [10xgenomics.com/support/single-cell-gene-expression](https://www.10xgenomics.com/support/single-cell-gene-expression) (on Hope Healey's Lecture 1, slide ~23).
+:::
 
 ## UMIs in detail — amplification, sequencing, dedup
 
@@ -270,10 +379,35 @@ ggplot(dat, aes(cell, gene, fill = count)) +
 
 ![Data processing pipelines — alternative rendering](images/lec01_use_data_processing_pipelines.svg){fig-align="center" width="92%"}
 
+## Under the hood: what Cell Ranger actually does
+
+For the Talapas / raw-data track, `cellranger count` is not magic — it's a fixed sequence:
+
+1.  **Trim** read 2 (template-switch oligo off the 5′ end, polyA off the 3′)
+2.  **Align** to the genome with STAR; tag reads exonic / intronic / intergenic
+3.  **Transcriptome alignment + MAPQ**: a read mapping confidently to one gene gets MAPQ 255; recent versions **retain intronic reads** (pre-mRNA)
+4.  **Barcode correction**: fix barcodes within 1 Hamming distance of the whitelist by posterior probability
+5.  **UMI correction**: collapse UMIs within 1 bp that share a barcode + gene
+6.  **Count assignment**: group reads by (barcode, UMI, gene), resolve conflicts by read support → **unfiltered** feature-barcode matrix
+7.  **Cell calling**: **OrdMag** (high-count barcodes) **+ EmptyDrops** (lower-count cells vs. ambient) → **filtered** matrix
+
+::: callout-note
+STARsolo, alevin-fry, and kb-python reimplement the same logic with different speed/flexibility trade-offs. The **filtered** matrix is where Lecture 01 (QC) picks up — but Cell Ranger's cell-calling is **not** the last word; you still QC afterward.
+:::
+
+## Cell Ranger pipeline — alternative schematic
+
+![The fixed `cellranger count` sequence: trim → STAR align → transcriptome/MAPQ → barcode correction → UMI correction → count assignment → unfiltered matrix → OrdMag + EmptyDrops cell calling → filtered matrix — recreated in our style.](images/lec00_hope_cellranger_pipeline.svg){fig-align="center" width="98%"}
+
+::: callout-note
+**Visual for the "under the hood" slide above.** Original figures: **10x Genomics** Cell Ranger algorithms overview — [10xgenomics.com/support/software/cell-ranger/latest/algorithms-overview](https://www.10xgenomics.com/support/software/cell-ranger/latest/algorithms-overview) (on Hope Healey's Lecture 1, slides ~54–69).
+:::
+
 ## The data structure you analyze
 
 -   **[Sparse matrix](../Resources_Folder/Glossary.html#s)**: rows = genes, columns = cells (or transposed in Python)
 -   Paired with per-cell metadata (sample, batch, QC metrics) and per-gene metadata
+-   This matrix is wrapped in an **object** — Seurat's `SeuratObject` or scanpy's `AnnData` — that also holds normalized layers, **dimensional reductions** (PCA/UMAP), neighbour **graphs**, and cluster/label columns. Every later step reads and writes slots of that one object.
 
 ::: panel-tabset
 ### R / Seurat
