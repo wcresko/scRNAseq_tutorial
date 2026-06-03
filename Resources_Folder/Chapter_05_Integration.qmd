@@ -21,7 +21,7 @@ editor: visual
 **Where this chapter sits.** Companion to **[Lecture 05](../Lecture_Folder/Lecture_05_Integration.html)** and **[Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html)**. Builds on **[Chapter 2](Chapter_02_DimReduction.html)** (PCA + clustering) and **[Chapter 3](Chapter_03_Markers_Annotation.html)** (manual annotation, used here for diagnostic checks).
 :::
 
-## 4.1 The problem integration solves
+## 5.1 The problem integration solves
 
 Suppose you have two samples — say, peripheral blood from a control donor and from a patient — and you want a unified clustering and annotation. You run the [Chapter 1](Chapter_01_Preprocessing.html) → [Chapter 2](Chapter_02_DimReduction.html) workflow on the joint object. You compute a UMAP. You color it by sample.
 
@@ -31,7 +31,7 @@ If the samples form **parallel structures** — every cell type appearing twice,
 
 **Integration** is the family of methods that warp the embedding so the same cell type from different samples ends up in the same cluster, while preserving any *real* biological differences between samples (e.g. an activated state present in one sample but not another).
 
-## 4.2 The diagnostic: when do you need integration?
+## 5.2 The diagnostic: when do you need integration?
 
 Run the unintegrated PCA + UMAP from Chapter 2 and inspect three things:
 
@@ -43,7 +43,7 @@ If samples are interleaved within most clusters and a balanced fraction shows up
 
 The workshop's `ifnb` shows the second pattern dramatically: PC1 is essentially the IFN-β response axis. CTRL and STIM cells split every cell type into two sister clusters. This is the canonical "integration is needed" case.
 
-## 4.3 The conceptual taxonomy of integration methods
+## 5.3 The conceptual taxonomy of integration methods
 
 | Family | Examples | Mechanism | When to use |
 |---|---|---|---|
@@ -55,7 +55,7 @@ The workshop's `ifnb` shows the second pattern dramatically: PC1 is essentially 
 
 The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks **Harmony** and **Seurat anchors** because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy.
 
-## 4.4 Harmony in detail
+## 5.4 Harmony in detail
 
 Harmony (Korsunsky et al. 2019, *Nat Methods*) operates in PC space — *after* you've run `RunPCA` on the joint object. It iterates four steps until convergence:
 
@@ -76,11 +76,11 @@ Harmony's weaknesses:
 
 - Less effective on very heterogeneous batches (cell types absent in one but present in another); works best when most cell types are shared
 
-## 4.5 Seurat anchors in detail
+## 5.5 Seurat anchors in detail
 
 The Seurat workflow (Stuart, Butler et al. 2019, *Cell*) works in two stages:
 
-### 4.5.1 Find anchors
+### 5.5.1 Find anchors
 
 For each pair of samples:
 
@@ -90,7 +90,7 @@ For each pair of samples:
 
 The result is a list of anchored cell pairs and their confidence scores.
 
-### 4.5.2 Apply the correction
+### 5.5.2 Apply the correction
 
 Each cell in sample $B$ is moved toward its anchored partner in sample $A$, weighted by anchor score. The amount of movement is regularized so cells far from any anchor barely move.
 
@@ -107,7 +107,7 @@ Seurat anchors' weaknesses:
 - **Slow** — for atlas data, easily an hour+; Harmony is 10× faster
 - **Complex** — multiple steps each with parameters; harder to tune
 
-## 4.6 The over-correction problem
+## 5.6 The over-correction problem
 
 The cardinal failure mode of integration is **erasing real biological differences** by being too aggressive. If your two samples are *biologically* different (CTRL vs IFN-β–stimulated), and integration spatially mixes them too completely, you also erase the IFN response — which is the actual biology of the experiment.
 
@@ -121,7 +121,7 @@ This is testable. The workshop's diagnostic is the **ISG score gap**:
 
 If the gap is gone, integration over-corrected. Push *less* hard (lower Harmony `theta`, or use Seurat anchors with default settings). If the gap is preserved, integration was successful.
 
-## 4.7 The under-correction problem
+## 5.7 The under-correction problem
 
 The opposite failure: clusters *remain* sample-specific after integration. There are two interpretations and they require different responses:
 
@@ -132,7 +132,7 @@ The opposite failure: clusters *remain* sample-specific after integration. There
 
 Distinguishing them requires biological knowledge and careful inspection of cluster markers. If the sample-specific cluster's markers match an *activation state* (cytokines, ISGs) rather than a *lineage* (CD4, CD79A), it's likely real biology. If the markers are the same lineage markers as a sample-mixed cluster, it's under-correction.
 
-## 4.8 The three diagnostics, in order
+## 5.8 The three diagnostics, in order
 
 For every integrated dataset, run all three:
 
@@ -142,7 +142,7 @@ For every integrated dataset, run all three:
 
 Methods sections of integration papers virtually always report (1). Many skip (2). Most skip (3). All three are equally important.
 
-## 4.9 Pseudoreplicate caveat
+## 5.9 Pseudoreplicate caveat
 
 Some users of integration methods are tempted to treat the **integrated assay** as a fully-corrected expression matrix and run downstream analyses (DE, marker tests) on it. **This is wrong.**
 
@@ -155,7 +155,7 @@ The discipline:
 
 This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
 
-## 4.10 Common errors
+## 5.10 Common errors
 
 | You see | What's wrong | What to do |
 |---|---|---|
@@ -164,7 +164,7 @@ This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
 | Clusters after integration look identical to unintegrated | `FindNeighbors` is using `pca` not `harmony` | `FindNeighbors(seu, reduction = "harmony", dims = 1:30)` |
 | `IntegrateData` returns a 5-dim object that won't slot into `RunPCA` | Seurat v5 / v4 API mismatch | In v5, anchor integration produces a layered Assay5; consult the [Seurat v5 vignette](https://satijalab.org/seurat/articles/seurat5_integration) |
 
-## 4.11 Where this material is also discussed
+## 5.11 Where this material is also discussed
 
 - **Lecture:** [Lecture 05 — Multi-Sample Integration](../Lecture_Folder/Lecture_05_Integration.html)
 - **Tutorial:** [Tutorial 05 — Two-Sample Integration](../Exercise_Folder/Tutorial_05_Integration.html)
@@ -172,7 +172,7 @@ This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
 - **Stats background:** [Appendix D § 9](Appendix_D_Statistical_Foundations.html) on variance partitioning
 - **Methods-section template:** [Appendix K § Multi-sample integration](Appendix_K_Methods_Template.html)
 
-## 4.12 Going further
+## 5.12 Going further
 
 ::: incremental
 - **Korsunsky et al. 2019** — Harmony paper, [doi:10.1038/s41592-019-0619-0](https://doi.org/10.1038/s41592-019-0619-0)
