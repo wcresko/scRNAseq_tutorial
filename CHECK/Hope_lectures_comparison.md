@@ -124,3 +124,23 @@ Candidates (Hope slide → our slide → source she cites):
 
 If you'd like, point me at the 3–5 you care about most and I'll recreate them as
 original SVGs in our style (license-clean), or wire in your figures with attribution.
+
+---
+
+## UPDATE — implemented (commits on branch `claude/hope-lecture-comparison`)
+
+**New bonus module 12 — Trajectory Inference & Cell–Cell Communication** (lecture +
+chapter + tutorial), inserted before FAIR; **FAIR renumbered 12 → 13** across all three
+tracks; lecture count bumped to "of 13"; all indexes/crosswalk/schedule updated.
+
+**Smaller items added:** cell-level DE (MAST/nebula/glmmTMB) balance (Lec 06);
+integration mixing metrics iLISI/cLISI/kBET (Lec 05); LLM-annotation caution (Lec 04);
+genotype/species doublet spike-in (Lec 01); Cell Ranger "under the hood" + Seurat/AnnData
+object anatomy (Lec 00). (Lec 10 already covered single-cell WGCNA.)
+
+**Image upgrades — recreated as 10 original house-style SVGs**, each added as a labelled
+duplicate slide with a citation link to the original (so the source figure can be embedded):
+GEM formation, 10x read structure, 3′ UTR alignment, Cell Ranger pipeline, dropout (Lec 00);
+log-norm vs SCTransform (Lec 01); 30-vs-40 PCs (Lec 02); CCA + MNN anchors (Lec 05);
+RNA velocity + CellChat circle (new Lec 12). The SVGs are original recreations, not copies
+of Hope's third-party figures; the citation links point to the originals for embedding.
