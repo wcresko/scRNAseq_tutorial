@@ -1,0 +1,119 @@
+---
+title: "Talapas 06 — Reference-based Annotation with SingleR"
+subtitle: "Add an automated cell-type label per cell on the 20k NSCLC object and reconcile it with the manual call"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-important
+**This is the Talapas Advanced path, not a laptop tutorial.** Submit each step as a SLURM job — see [Talapas 01](Tutorial_Talapas_01_SLURM_Basics.html). The laptop counterpart is **[Tutorial 04 — Reference-based Annotation](../Tutorial_04_Reference_Annotation.html)**, which walks SingleR + Azimuth and the reconciliation logic in detail.
+:::
+
+## About this tutorial
+
+Pick up the **manually-annotated** NSCLC object (`nsclc_annotated.rds`, written by [Talapas 05](Tutorial_Talapas_05_Markers_Annotation.html)) and add an **automated, reference-based** label per cell with **SingleR**, then reconcile it against the manual call. Reference methods run **per cell** and don't need your own integration, so this step sits right after manual annotation and **before** integration (mirrors laptop Tutorial 04).
+
+The executable script is **[`06_reference_annotate.R`](scripts/06_reference_annotate.R)**. Submit with:
+
+```bash
+sbatch --job-name=refannot run_rscript.sbatch 06_reference_annotate.R
+```
+
+::: {.callout-warning title="The hard regime: tumor cells outside the reference"}
+The 20k NSCLC sample is dissociated **tumor** — many cells are malignant / non-immune and fall **outside** immune reference atlases like `celldex`. Expect **low SingleR scores and pruned (`NA`) labels** in the tumor compartment. That's the signal, not a bug: trust manual markers there, and let the reference confirm the immune cells it *does* cover. This is exactly the regime the laptop `ifnb` PBMC tutorial cannot show you.
+:::
+
+## What the script does
+
+1.  Loads `nsclc_annotated.rds` and sets `RNA` as the default assay.
+2.  Runs **`SingleR`** against a built-in `celldex` reference (`HumanPrimaryCellAtlasData`; `BlueprintEncodeData` is a good blood/immune alternative).
+3.  Stores `singler_label`, the **pruned** label (`NA` where confidence is too low), and the **delta** margin to the runner-up.
+4.  **Reconciles**: keeps the manual label where SingleR is uncertain (pruned `NA`) — i.e. the tumor/epithelial compartment — and the SingleR label elsewhere, into `celltype_final` (+ a `celltype_method` provenance column).
+5.  Writes `nsclc_annotated_final.rds` for downstream use.
+
+## Required resources
+
+| Resource | Recommendation |
+|---|---|
+| Partition | `compute` |
+| Time | 30–60 min for 20k cells (first run downloads the `celldex` reference) |
+| CPUs | 8 |
+| Memory | 32 GB |
+
+::: callout-note
+First use of `celldex::HumanPrimaryCellAtlasData()` downloads ~500 MB via `ExperimentHub`. On a compute node without internet, pre-cache it on a login node first, or set `setExperimentHubOption("PROXY", ...)`.
+:::
+
+## Code (mirror of the script)
+
+```{r}
+#| label: setup
+library(Seurat)
+library(SingleR)
+library(celldex)
+library(SingleCellExperiment)
+library(tidyverse)
+set.seed(2026)
+
+seu <- readRDS("../objects/nsclc_annotated.rds")
+DefaultAssay(seu) <- "RNA"
+```
+
+```{r}
+#| label: singler
+ref  <- celldex::HumanPrimaryCellAtlasData()
+sce  <- as.SingleCellExperiment(seu)
+pred <- SingleR(test = sce, ref = ref, labels = ref$label.main)
+
+seu$singler_label  <- pred$labels
+seu$singler_pruned <- pred$pruned.labels   # NA where confidence too low
+```
+
+```{r}
+#| label: reconcile
+manual_col <- if ("celltype" %in% colnames(seu@meta.data)) "celltype" else "seurat_annotations"
+
+seu$celltype_final <- ifelse(is.na(seu$singler_pruned),
+                             as.character(seu[[manual_col]][, 1]),
+                             seu$singler_pruned)
+seu$celltype_method <- ifelse(is.na(seu$singler_pruned), "manual", "singler")
+
+# Cross-tabulate manual vs reference for the log
+table(manual = seu[[manual_col]][, 1], singler = seu$singler_label)
+
+saveRDS(seu, "../objects/nsclc_annotated_final.rds")
+```
+
+::: {.callout-important title="Think about it"}
+On `ifnb` (PBMCs), SingleR and Azimuth agree with the manual labels almost everywhere. On this NSCLC tumor sample, a large block of cells comes back **pruned (`NA`)**. Why — and what should `celltype_final` be for those cells?
+
+<details>
+<summary>Show answer</summary>
+
+Those are malignant / epithelial / stromal cells with no good match in an immune-cell reference, so SingleR correctly refuses to force a confident call (low score → pruned). For them, `celltype_final` should fall back to your **manual** marker-based label (`EPCAM+` epithelial, etc.). Reference annotation *complements* manual work in well-covered compartments; it does not replace it where the reference has no support.
+
+</details>
+:::
+
+## Next
+
+-   **[Talapas 07 — Multi-Sample Integration with Harmony](Tutorial_Talapas_07_Integration.html)** — correct donor batch effects before condition-level analyses
+-   Integration reads `nsclc_annotated.rds` (the manual object from Talapas 05); the reference-validated `nsclc_annotated_final.rds` you just wrote is what you carry into reporting / FAIR deposition
+
+## Credits
+
+-   Dataset: 10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex
+-   Method: Aran *et al.* 2019 (SingleR); references via the Bioconductor `celldex` package

@@ -1,0 +1,326 @@
+---
+title: "Tutorial 08 — Differential Abundance with miloR"
+subtitle: "Do cell-type proportions change between STIM and CTRL? — neighbourhood-level testing"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+A short companion to **[Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](Tutorial_06_DESeq2_DE.html)**. Pseudobulk DE asks **"for cells of the same type, which genes change?"** — but a perturbation can also change the **cell-type composition** itself (e.g. expansion of activated T cells, depletion of naive subsets). That's the **differential abundance** question, and it's a different test.
+
+
+::: callout-note
+**Companion book chapter:** [Chapter 8 — Differential Abundance](../Resources_Folder/Chapter_08_DifferentialAbundance.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices. · **HPC version (Talapas):** [Talapas 10 — Differential Abundance](Talapas/Tutorial_Talapas_10_DifferentialAbundance.html)
+:::
+
+
+We use **`miloR`** (Dann *et al.* 2022, *Nat Biotechnol*), the modern method of choice. Instead of testing on hard cluster labels, miloR:
+
+1.  Builds a k-nearest-neighbour graph on the integrated PCs
+2.  Defines overlapping **neighbourhoods** of cells (\~1000 of them)
+3.  Counts how many cells from each sample fall into each neighbourhood
+4.  Tests each neighbourhood for differential abundance with a **negative binomial GLM**, using a spatial FDR correction to handle the overlap
+
+The output is a per-neighbourhood log-fold change in abundance and a p-value, plus a beautiful neighbourhood graph plot showing where the composition shifts live.
+
+::: callout-note
+**Why neighbourhoods, not clusters?** Clusters force a hard partition — every cell belongs to exactly one cluster, and cluster boundaries are arbitrary. A real composition shift along a continuum (naive → effector T cells, say) gets blurred by hard clustering. Neighbourhoods overlap, follow the underlying graph, and recover the resolution that clusters lose.
+:::
+
+::: {.callout-tip title="How to use this page"}
+1.  Download the `.qmd` source: <a href="Tutorial_08_DifferentialAbundance.qmd.txt" download="Tutorial_08_DifferentialAbundance.qmd">Tutorial_08_DifferentialAbundance.qmd</a>. If your browser saves the file as `Tutorial_08_DifferentialAbundance.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
+2.  Make sure you have completed **[Tutorial 05 — Integration](Tutorial_05_Integration.html)** — it writes `ifnb_integrated.rds`.
+3.  Work through the chunks, flipping `eval: true` as you go.
+:::
+
+## Dataset — resuming from Tutorial 05
+
+| File | Produced by | What it is |
+|---|---|---|
+| `../data/ifnb_integrated.rds` | Tutorial 05 | Seurat object with the integrated `harmony` reduction, the original `RNA` assay, the `stim` covariate, and the `seurat_annotations` ground-truth labels. |
+
+
+::: {.callout-warning title="Common errors / things that bite"}
+**`reducedDimNames(milo)` doesn't include `HARMONY`** — the SCE conversion sometimes drops reductions, especially on Seurat v4 → v5 transitions. Check `reducedDimNames(milo)`; if `HARMONY` isn't there, re-add it manually: `reducedDim(milo, "HARMONY") <- Embeddings(ifnb, "harmony")`.
+
+**`makeNhoods` peaks the size histogram at < 30 cells** — neighborhoods are too small. Increase `k` from 30 → 50 or 75 in `buildGraph` and re-run. Median neighbourhood size between 50 and 200 is the target.
+
+**`testNhoods` returns all `NA` p-values** — your `milo_design` has only 1 level per condition (no replicates). miloR can't fit the GLM with `n = 1`. Need biological replicates. The synthetic-donor split in the tutorial gives 4-vs-4; if you have only 2 samples, the test cannot work — this is a fundamental statistical constraint, not a code bug.
+
+**`plotNhoodGraphDA` errors "UMAP_HARMONY not found"** — the dimred name in the milo object isn't `UMAP_HARMONY`. Try `umap_harmony` (lowercase) or pass `layout = "UMAP"`. `reducedDimNames(milo)` shows what's actually available.
+:::
+
+
+::: {.callout-tip title="Solutions / instructor copy"}
+The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
+
+- **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_08_DifferentialAbundance.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+
+If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
+:::
+
+## Setup
+
+```{r}
+#| label: setup
+library(Seurat)
+library(SingleCellExperiment)
+library(tidyverse)
+library(patchwork)
+# install if needed:
+# BiocManager::install("miloR")
+library(miloR)
+
+set.seed(2026)
+
+ifnb <- readRDS("../data/ifnb_integrated.rds")
+DefaultAssay(ifnb) <- "RNA"
+ifnb
+```
+
+## Step 1 — Build pseudo-replicate sample IDs (if needed)
+
+Like Tutorial 06's pseudobulk DE, miloR needs **biological replicates within each condition**. The SeuratData `ifnb` distribution often lacks per-cell donor IDs, so we recreate the synthetic 4-pseudo-donor split here for consistency:
+
+```{r}
+#| label: donor
+
+if (!"donor" %in% colnames(ifnb@meta.data)) {
+  if ("ind" %in% colnames(ifnb@meta.data)) {
+    ifnb$donor <- ifnb$ind
+  } else {
+    ifnb$donor <- paste0(ifnb$stim, "_d",
+                         sample(1:4, size = ncol(ifnb), replace = TRUE))
+  }
+}
+
+# miloR needs a single per-cell sample ID. Combine donor + stim:
+ifnb$sample <- paste(ifnb$donor, ifnb$stim, sep = "_")
+table(ifnb$sample, ifnb$stim)
+```
+
+::: callout-warning
+On **synthetic** pseudo-donors the resulting p-values are not biologically meaningful — you'll see the workflow correctly but should not interpret the specific neighbourhood SpatialFDRs as real findings. If the SeuratData version of `ifnb` you have ships actual donor metadata (column `ind` or `donor_id`), the code above will use it and the test becomes valid.
+:::
+
+## Step 2 — Convert to a Milo object
+
+miloR is built on `SingleCellExperiment`, so we cast first:
+
+```{r}
+#| label: milo-build
+
+# Drop assay slots we don't need to keep memory low
+sce  <- as.SingleCellExperiment(ifnb)
+milo <- Milo(sce)
+milo
+
+# What reductions did we carry over?
+reducedDimNames(milo)
+```
+
+## Step 3 — Build the kNN graph and define neighbourhoods
+
+The kNN graph is built on the **integrated** reduction (`harmony`), so neighbourhoods reflect biological similarity *after* batch correction.
+
+```{r}
+#| label: build-graph
+
+# Build the kNN graph on the harmony reduction.
+# k = 30, d = 20 are reasonable defaults for ~14k cells.
+milo <- buildGraph(milo, k = 30, d = 20, reduced.dim = "HARMONY")
+
+# Sample ~1000 representative neighbourhoods (refined sampling for stability)
+milo <- makeNhoods(milo,
+                   prop    = 0.1,    # sample 10% of cells as neighbourhood centres
+                   k       = 30,
+                   d       = 20,
+                   refined = TRUE,
+                   reduced_dims = "HARMONY")
+
+# Diagnostic: distribution of neighbourhood sizes (want most >50, peak ~100)
+plotNhoodSizeHist(milo)
+```
+
+::: {.callout-important title="Think about it"}
+What does the neighbourhood-size histogram tell you, and what should you do if the peak is at \~10–20?
+
+<details>
+
+<summary>Show answers</summary>
+
+The histogram shows how many cells each sampled neighbourhood contains. If the peak is too small (\~10–20), individual neighbourhoods don't have enough cells per sample for the negative-binomial test to be powered, and you'll get few or no significant hits. **Increase `k`** (try k = 50 or 75) and re-run `buildGraph` + `makeNhoods` until the peak sits between 50 and 200. For `ifnb` at \~14k cells, k = 30 is usually fine.
+
+</details>
+:::
+
+## Step 4 — Count cells per neighbourhood per sample
+
+```{r}
+#| label: count-cells
+
+milo <- countCells(milo,
+                   meta.data = data.frame(colData(milo)),
+                   sample    = "sample")
+
+# Sanity check: rows = neighbourhoods, cols = samples
+head(nhoodCounts(milo))
+```
+
+## Step 5 — Build the design matrix and test
+
+```{r}
+#| label: design
+
+# One row per sample, with stim/donor metadata
+milo_design <- data.frame(colData(milo)) |>
+  distinct(sample, stim, donor)
+rownames(milo_design) <- milo_design$sample
+milo_design
+
+# Compute neighbourhood-graph distances (needed for SpatialFDR)
+milo <- calcNhoodDistance(milo, d = 20, reduced.dim = "HARMONY")
+
+# Test each neighbourhood for differential abundance.
+# The contrast is STIM vs CTRL (alphabetical reference: CTRL).
+da_results <- testNhoods(milo,
+                         design     = ~ stim,
+                         design.df  = milo_design,
+                         reduced.dim = "HARMONY")
+
+# Top hits
+da_results |>
+  arrange(SpatialFDR) |>
+  head(10)
+```
+
+The **SpatialFDR** column is miloR's analogue of `padj` — it controls the false discovery rate while accounting for the fact that overlapping neighbourhoods have correlated tests.
+
+## Step 6 — Annotate neighbourhoods with cell-type labels
+
+```{r}
+#| label: annotate
+
+# For each neighbourhood, take the most common cell type among its cells
+da_results <- annotateNhoods(milo,
+                              da_results,
+                              coldata_col = "seurat_annotations")
+
+# Per-cell-type fraction of significantly DA neighbourhoods
+da_results |>
+  filter(SpatialFDR < 0.1) |>
+  count(seurat_annotations, sign = sign(logFC)) |>
+  pivot_wider(names_from = sign, values_from = n,
+              names_prefix = "logFC_") |>
+  rename(up_in_STIM = logFC_1, up_in_CTRL = `logFC_-1`)
+```
+
+::: {.callout-important title="Think about it"}
+Pseudobulk DE (Tutorial 06) and differential abundance (this tutorial) sometimes give *opposite* answers for the same cell type. How can both be right?
+
+<details>
+
+<summary>Show answers</summary>
+
+Pseudobulk DE answers "**within** cells annotated as cell type X, which genes shift?" Differential abundance answers "do **proportions** of cell type X change?" These are independent questions. A cell type can be unchanged in proportion but every cell in it shifts its expression (DE-positive, DA-negative — common for IFN-β–stimulated mature cell types) **or** it can shift dramatically in proportion without changing per-cell expression (DA-positive, DE-negative — common for cell-cycle expansion). Most often you see a mix: e.g. STIM expands monocytes (DA-positive) *and* every monocyte expresses ISGs (DE-positive). They're complementary, not redundant.
+
+</details>
+:::
+
+## Step 7 — Visualize: neighbourhood graph
+
+The signature miloR plot. Each node is a neighbourhood, sized by the number of cells in it, coloured by log-fold-change (red = enriched in STIM, blue = enriched in CTRL):
+
+```{r}
+#| label: plot-graph
+
+milo <- buildNhoodGraph(milo)
+
+# Plot the UMAP and the DA-neighbourhood graph side by side
+um  <- plotReducedDim(milo, dimred = "UMAP_HARMONY",
+                       colour_by = "seurat_annotations",
+                       text_by   = "seurat_annotations") +
+        ggtitle("Cell types") +
+        guides(colour = "none")
+
+# Note: the DA plot uses the same UMAP layout
+da  <- plotNhoodGraphDA(milo, da_results, alpha = 0.1,
+                         layout = "UMAP_HARMONY") +
+        ggtitle("DA neighbourhoods (red = ↑ STIM, blue = ↑ CTRL)")
+
+um + da
+```
+
+::: callout-tip
+If `plotReducedDim` complains that `UMAP_HARMONY` doesn't exist, the harmony UMAP didn't make it into the SCE conversion. Run `RunUMAP(ifnb, reduction = "harmony", dims = 1:20, reduction.name = "umap_harmony")` before `as.SingleCellExperiment()`, or pass any other 2-D embedding present in `reducedDimNames(milo)`.
+:::
+
+## Step 8 — Beeswarm: DA per cell type
+
+A clean summary that strips out the spatial graph and asks "which annotated cell type is enriched / depleted on average?":
+
+```{r}
+#| label: beeswarm
+
+plotDAbeeswarm(da_results, group.by = "seurat_annotations")
+```
+
+::: {.callout-important title="Think about it"}
+The beeswarm shows each neighbourhood as a dot at its log-fold-change. A cell type with most dots above zero is enriched in STIM; below zero, depleted. What would a cell type with dots scattered widely on **both** sides of zero suggest?
+
+<details>
+
+<summary>Show answers</summary>
+
+Within-cell-type heterogeneity: a *subset* of that cell type is expanding while a *different subset* is contracting. This is exactly the kind of structure you'd miss with hard cluster-level proportions tests but recover with neighbourhood-level testing. A common example in `ifnb` is the T-cell compartment: naive T cells often shrink slightly while activated T cells expand — both labelled `T` at coarse resolution, but moving in opposite directions.
+
+</details>
+:::
+
+## Step 9 — Save the DA result
+
+```{r}
+#| label: save
+
+write_csv(da_results, "../data/ifnb_milo_da.csv")
+saveRDS(milo,         "../data/ifnb_milo.rds")
+```
+
+## Wrap-up
+
+You've now run the **two complementary** condition-level tests on the same dataset:
+
+| Question | Tool | Output |
+|---|---|---|
+| Within a cell type, which genes change? | `DESeq2` on pseudobulk (Tut 06) | per-cell-type, per-gene log2FC + padj |
+| Do cell-type / state proportions themselves change? | `miloR` (this tutorial) | per-neighbourhood log2FC + SpatialFDR |
+
+Both should be reported for any condition contrast. They tell different parts of the story.
+
+::: {.callout-tip title="Going further"}
+-   **More than two conditions:** miloR supports any DESeq2-style design. Replace `~ stim` with `~ donor + stim` (paired design), `~ batch + stim`, etc.
+-   **Continuous covariates:** if your phenotype is a gradient (severity score, dose, time), pass it as a numeric column in `design.df`.
+-   **Other DA tools:** `scCODA` (Python) tests on cluster proportions with a Bayesian framework, more conservative than miloR; `propeller` (CRAN) is a fast classical method using `limma` on cluster proportions. Cross-check your top miloR hits with `propeller` to make sure they're not artefacts of the neighbourhood definition.
+:::
+
+## See also
+
+-   Dann *et al.* 2022 — miloR paper, [doi:10.1038/s41587-021-01033-z](https://doi.org/10.1038/s41587-021-01033-z)
+-   [scNotebooks Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html) — covers miloR on COVID-19 mild vs severe BAL data
+-   [Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](Tutorial_06_DESeq2_DE.html) — the per-cell-type DE counterpart
+-   [Tutorial 07 — Functional Analysis](Tutorial_07_FunctionalAnalysis.html) — what to do with the DE table

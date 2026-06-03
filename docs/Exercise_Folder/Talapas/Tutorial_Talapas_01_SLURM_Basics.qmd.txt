@@ -24,7 +24,7 @@ This tutorial covers the **basics of using SLURM** (the job scheduler on the Uni
 
 All examples are specific to UO and Talapas. If you have not yet logged in to Talapas for the first time, see the [**VS Code & Talapas**](../../Resources_Folder/VSCode_Talapas.html) reference first.
 
-Material is adapted from the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and the [How-To articles](https://uoracs.github.io/talapas2-knowledge-base/) in the Talapas Knowledge Base.
+Material is adapted from the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and the [How-To articles](https://uoracs.github.io/talapas2-knowledge-base/) in the Talapas Knowledge Base, and from **Shannon Snyder's *Talapas Basics*** workshop guide (the `hello_world.R` / `salloc` / job-monitoring walkthroughs below). For first-time login and editing files on Talapas, pair this with the [**VS Code & Talapas**](../../Resources_Folder/VSCode_Talapas.html) reference.
 
 ::: {.callout-tip title="How to use this page"}
 Read this page top to bottom the first time. Later, treat it as a reference --- the commands here cover ~95% of what you will do in the workshop.
@@ -113,6 +113,10 @@ Run `sinfo` to see the current state of each partition on the cluster.
 
 Use an interactive session when you want a shell **on a compute node** --- for testing scripts, exploring data, or running applications like RStudio or Python interactively. This is the mode you will use most often during the workshop.
 
+::: {.callout-note title="Interactive vs. batch — which one?"}
+Use an **interactive** session (`srun` / `salloc`) when you'll **sit and watch** something run: testing or debugging a script, running a few commands by hand, exploring data, or running something very short. Use a **batch** job (`sbatch`, §6) for anything long-running, or anything you want to **start and walk away from** — a batch job keeps running after you log out.
+:::
+
 ### 5.1 A minimum interactive session
 
 From a Talapas login node, run:
@@ -136,6 +140,15 @@ What each flag does:
 -   `--pty bash` --- give me a pseudo-terminal running bash.
 
 When the resources are available, your prompt will change to show the hostname of a compute node (e.g. `n0123`). You are now running on a compute node. When you're done, type `exit` to release the resources --- do not leave idle sessions running.
+
+**`salloc` — the close cousin of `srun --pty bash`.** Run `salloc` from a **login node** to request an interactive allocation; when it's granted, your shell **prompt changes from the login node to the compute node** (e.g. `n0135`) and you work there directly:
+
+``` bash
+salloc --account=<myPIRG> --partition=compute --time=1:00:00 --mem=4G --cpus-per-task=2
+# allocation granted → prompt changes, e.g.  [duckid@n0135 ~]$
+```
+
+`srun --pty bash` does the request *and* hands you a shell in one step; `salloc` is handy when you want a persistent allocation you can launch several `srun` steps into. Either way, `exit` releases the node.
 
 ### 5.2 Using the short `interactive` partition
 
@@ -180,9 +193,39 @@ Interactive jobs reserve their resources even when you are not actively typing. 
 
 ------------------------------------------------------------------------
 
+### 5.5 Hands-on: run `hello_world.R` on an interactive node
+
+The Talapas scripts folder ships a tiny demo, [`hello_world.R`](scripts/hello_world.R) — open it in VS Code to read it (note the `#!/usr/bin/env Rscript` shebang on the first line). It uses only base R, prints which compute node it ran on, and writes a PDF plot and a summary CSV.
+
+From an interactive session (above), load R and run it:
+
+``` bash
+module load R
+Rscript hello_world.R
+```
+
+It reports the node it ran on and writes two files **in the directory you ran it from**:
+
+```
+hello_world_plot.pdf
+hello_world_summary.csv
+```
+
+::: {.callout-warning title="Be in the script's directory — or give the full path"}
+`Rscript hello_world.R` only finds the script if you are **in the same directory** as it. Otherwise supply the path, e.g. `Rscript /projects/<myPIRG>/<yourduckid>/scrnaseq/scripts/hello_world.R`. The same is true for `sbatch <script>`.
+:::
+
+::: {.callout-tip title="View the outputs in VS Code"}
+With VS Code connected to Talapas (see [VS Code & Talapas](../../Resources_Folder/VSCode_Talapas.html)) and the PDF/CSV viewer extensions installed, **double-click** `hello_world_plot.pdf` or `hello_world_summary.csv` in the file explorer to open them right in the editor — no download needed.
+:::
+
+------------------------------------------------------------------------
+
 ## 6. Batch mode --- `sbatch`
 
 For longer-running analyses (which is most real workshop work), write a **batch script** and submit it with `sbatch`. The script runs without an interactive terminal: you can log out and the job keeps running.
+
+![A batch job's lifecycle: you `sbatch` from a login node; SLURM queues it (`PD`), runs it on a compute node (`R`), and writes your results and `.out`/`.err` logs. Monitor with `squeue`, cancel with `scancel`.](images/slurm_job_lifecycle.svg){fig-align="center" width="98%"}
 
 ### 6.1 A first batch script
 
@@ -226,6 +269,10 @@ squeue -u $USER
 
 State codes you'll see: `PD` (pending), `R` (running), `CG` (completing). Once it finishes, two files appear in the directory you submitted from: `hello_123456.out` (stdout) and `hello_123456.err` (stderr).
 
+::: {.callout-note title="This exact demo ships with the workshop"}
+You don't have to type it out: the Talapas scripts folder includes [`01_slurm_demo.sbatch`](scripts/01_slurm_demo.sbatch) (the same idea). Open it in VS Code, set `--account`, and `sbatch 01_slurm_demo.sbatch`. Because it's a very short job, it may finish before you can catch it in `squeue`.
+:::
+
 ### 6.2 Anatomy of `#SBATCH` directives
 
 All `#SBATCH` lines must be at the **top** of the script, before any other commands. A few additional flags worth knowing:
@@ -262,7 +309,7 @@ module load R/4.3.2
 
 # Run the pipeline
 cd /projects/<myPIRG>/<yourduckid>/scrnaseq
-Rscript scripts/01_qc_preprocess.R
+Rscript scripts/03_qc_preprocess.R
 ```
 
 Note how `module purge` and `module load` happen *inside* the script --- modules don't survive from the login node into the job.
@@ -290,6 +337,34 @@ source ~/envs/scvi/bin/activate
 
 python scripts/train_scvi.py
 ```
+
+------------------------------------------------------------------------
+
+### 6.5 Running an R script as a batch job (the wrapper)
+
+You don't need a separate `.sbatch` file for every R script. The folder ships a generic wrapper, [`run_rscript.sbatch`](scripts/run_rscript.sbatch), whose last line is simply:
+
+``` bash
+Rscript "${SCRIPT}"
+```
+
+Pass the R script as an argument and override the job name per run:
+
+``` bash
+sbatch --job-name=hello run_rscript.sbatch hello_world.R
+# or a real analysis step:
+sbatch --job-name=qc    run_rscript.sbatch 03_qc_preprocess.R
+```
+
+Then watch the queue and, when it finishes, read the logs (or open them in VS Code):
+
+``` bash
+squeue -u $USER
+cat logs/hello_*.out      # stdout
+cat logs/hello_*.err      # stderr / R errors
+```
+
+This is exactly how the rest of the Talapas Advanced track is run — every analysis step (Talapas 03–10) is an R script submitted through this wrapper.
 
 ------------------------------------------------------------------------
 

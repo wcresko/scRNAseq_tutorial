@@ -1,0 +1,96 @@
+---
+title: "Talapas 07 — Multi-Sample Integration with Harmony"
+subtitle: "Correct donor-level batch effects on the 20k NSCLC integrated PCA embedding"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-important
+**This is the Talapas Advanced path, not a laptop tutorial.** Submit each step as a SLURM job — see [Talapas 01](Tutorial_Talapas_01_SLURM_Basics.html). The laptop counterpart is **[Tutorial 05 — Two-Sample Integration](../Tutorial_05_Integration.html)**.
+:::
+
+## About this tutorial
+
+Pick up the annotated NSCLC object (`nsclc_annotated.rds`, written by [Talapas 05](Tutorial_Talapas_05_Markers_Annotation.html)) and integrate across donors using **harmony**. The 10x 20k NSCLC dataset pools dissociated tumor cells from **seven donors** via CMO multiplexing, so each donor is a natural batch — donor-of-origin captures most of the technical and inter-individual variation we want to remove before condition-level analyses.
+
+The executable script is **[`07_integration.R`](scripts/07_integration.R)**. Submit with:
+
+```bash
+sbatch --job-name=integrate run_rscript.sbatch 07_integration.R
+```
+
+## What the script does
+
+1. Loads `nsclc_annotated.rds` and sets `RNA` as the default assay.
+2. If the object lacks a `donor` column, synthesizes seven pseudo-donors so the workflow demonstrates correctly (replace with real CMO assignments for a real analysis — see the 10x **CellPlex** demultiplexing guidance in the dataset's web summary).
+3. Re-runs PCA on the joint matrix.
+4. Calls **`harmony::RunHarmony(group.by.vars = "donor")`** to produce a donor-corrected embedding stored in the `harmony` slot.
+5. Re-runs `FindNeighbors` / `FindClusters` / `RunUMAP` on the harmony embedding.
+6. Writes `nsclc_integrated.rds` for downstream pseudobulk DE / DA.
+
+## Required resources
+
+| Resource | Recommendation |
+|---|---|
+| Partition | `compute` |
+| Time | 1–2 h for 20k cells |
+| CPUs | 8 |
+| Memory | 64 GB |
+
+## Code (mirror of the script)
+
+```{r}
+#| label: setup
+library(Seurat)
+library(harmony)
+library(tidyverse)
+set.seed(2026)
+
+seu <- readRDS("../objects/nsclc_annotated.rds")
+```
+
+```{r}
+#| label: harmony
+DefaultAssay(seu) <- "RNA"
+seu <- RunPCA(seu, npcs = 30, verbose = FALSE)
+seu <- RunHarmony(seu, group.by.vars = "donor",
+                  reduction.use = "pca", reduction.save = "harmony")
+```
+
+```{r}
+#| label: cluster-umap
+seu <- FindNeighbors(seu, reduction = "harmony", dims = 1:30)
+seu <- FindClusters(seu, resolution = 0.5)
+seu <- RunUMAP(seu, reduction = "harmony", dims = 1:30,
+               reduction.name = "umap_harmony")
+saveRDS(seu, "../objects/nsclc_integrated.rds")
+```
+
+::: {.callout-important title="Think about it"}
+After harmony, you typically see cells from different donors co-mingle in each cluster on `umap_harmony`. What would tell you that integration has **over-corrected** (i.e. removed real biology, not just batch)?
+
+<details>
+<summary>Show answer</summary>
+
+A cell-type marker that should be cell-type-specific (`CD3D` for T cells, `EPCAM` for epithelial) becoming **scattered** across multiple clusters after integration, or two cell types that should be distinct (T vs B) being merged. Always re-check `DotPlot()` of your canonical markers on the harmony clusters before continuing.
+
+</details>
+:::
+
+## Next
+
+-   **[Talapas 08 — Pseudobulk DE](Tutorial_Talapas_08_Pseudobulk_DE.html)** — DESeq2 on (donor × condition × cell type) counts
+-   **[Talapas 10 — Differential Abundance with miloR](Tutorial_Talapas_10_DifferentialAbundance.html)** — uses the harmony embedding directly

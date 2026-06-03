@@ -1,0 +1,105 @@
+---
+title: "Talapas 08 — Pseudobulk DE with DESeq2"
+subtitle: "Aggregate to (donor × condition × cell type), then DESeq2 per cell type — on 20k NSCLC"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-important
+**This is the Talapas Advanced path.** Laptop counterpart: **[Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](../Tutorial_06_DESeq2_DE.html)**, which is the place to read the DESeq2 mechanics in detail. This page just runs the same pseudobulk workflow on the 20k NSCLC object as a SLURM job.
+:::
+
+## About this tutorial
+
+Starting from `nsclc_integrated.rds` ([Talapas 07](Tutorial_Talapas_07_Integration.html)), aggregate single-cell counts to one observation per `(donor, condition, cell_type)` and run DESeq2 per cell type.
+
+The NSCLC dataset has 7 donors but **no built-in condition variable** (all 7 are NSCLC primary tumors). The script demonstrates the workflow against a **synthetic two-group split** (donors d1–d3 vs d4–d7). For real biology, replace `condition` with your own metadata (treatment, timepoint, response group, etc.).
+
+The executable script is **[`08_pseudobulk_de.R`](scripts/08_pseudobulk_de.R)**. Submit with:
+
+```bash
+sbatch --job-name=pb_de --time=04:00:00 --mem=96G run_rscript.sbatch 08_pseudobulk_de.R
+```
+
+## What the script does
+
+1. Reads `nsclc_integrated.rds`, assigns a synthetic `condition` (or uses your own).
+2. `AggregateExpression(group.by = c("donor", "condition", "celltype"))` → pseudobulk matrix.
+3. Aligns pseudobulk colnames with a metadata table parsed from the Seurat object.
+4. Drops `(donor × condition × celltype)` groups with fewer than 10 cells.
+5. Loops over cell types: builds `DESeqDataSet`, runs `DESeq()`, shrinks LFCs with `apeglm`.
+6. Concatenates results, drops `NA`-padj rows, writes `nsclc_pseudobulk_de.csv`.
+
+## Required resources
+
+| Resource | Recommendation |
+|---|---|
+| Partition | `compute` |
+| Time | 2–4 h |
+| CPUs | 8 |
+| Memory | 96 GB (DESeq2 + dense pseudobulk matrices) |
+
+## Code (mirror of the script)
+
+```{r}
+#| label: setup
+library(Seurat)
+library(DESeq2)
+library(tidyverse)
+set.seed(2026)
+
+seu <- readRDS("../objects/nsclc_integrated.rds")
+DefaultAssay(seu) <- "RNA"
+```
+
+```{r}
+#| label: condition
+# Replace with your real metadata for real DE
+if (!"condition" %in% colnames(seu@meta.data))
+  seu$condition <- ifelse(seu$donor %in% c("d1","d2","d3"), "GroupA", "GroupB")
+seu$celltype <- seu$celltype_manual
+```
+
+```{r}
+#| label: aggregate
+pb <- AggregateExpression(
+  seu, assays = "RNA", slot = "counts",
+  group.by = c("donor", "condition", "celltype"),
+  return.seurat = FALSE)$RNA
+```
+
+```{r}
+#| label: de-loop
+# See the script for the full per-cell-type loop and filter logic.
+# Output: nsclc_pseudobulk_de.csv with columns gene, baseMean, log2FoldChange,
+# lfcSE, pvalue, padj, celltype.
+```
+
+::: {.callout-important title="Think about it"}
+Why pseudobulk and not `FindMarkers(group.by = "condition")` on the cells directly?
+
+<details>
+<summary>Show answer</summary>
+
+Cells from the same donor are **not statistically independent**. Per-cell tests inflate the effective sample size, producing **anti-conservative** p-values. Pseudobulk respects the donor as the biological unit. See Squair *et al.* 2021 (Nat Commun) for the full demonstration on the `ifnb` dataset — same logic applies here.
+
+</details>
+:::
+
+## Next
+
+-   **[Talapas 09 — Functional Analysis](Tutorial_Talapas_09_FunctionalAnalysis.html)** — feed `nsclc_pseudobulk_de.csv` into clusterProfiler
+-   **[Talapas 10 — Differential Abundance](Tutorial_Talapas_10_DifferentialAbundance.html)** — the *complementary* question: do cell-type proportions change?
