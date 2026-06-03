@@ -23,13 +23,13 @@ editor: visual
 
 # Part A — DESeq2 fundamentals on bulk RNA-seq
 
-## 5.1 Why we learn DESeq2 on bulk first
+## 6.1 Why we learn DESeq2 on bulk first
 
 Pseudobulk differential expression for scRNA-seq (Part B of this chapter) is exactly bulk DESeq2 applied to per-cell-type aggregated counts. So we learn the bulk model in isolation here, on the canonical bulk dataset (`airway` from Bioconductor — 8 samples of dexamethasone-treated airway smooth muscle cells), and then in Part B we apply it almost mechanically to the single-cell aggregation.
 
 This is the most heavily used statistical model in functional genomics. Earning a working understanding of it is worth several lectures.
 
-## 5.2 The negative-binomial GLM
+## 6.2 The negative-binomial GLM
 
 DESeq2 fits, for each gene, a generalized linear model:
 
@@ -50,7 +50,7 @@ with per-gene **dispersion** $\alpha_i$ that controls how much variance exceeds 
 
 The choice of NB rather than Poisson is non-negotiable for RNA-seq counts. Poisson assumes variance = mean; real RNA-seq has variance > mean (over-dispersion), and Poisson testing is **anti-conservative** — it produces falsely-significant p-values. The NB adds a per-gene parameter to absorb the extra variance; results are honest. See [Appendix D § 1–2](Appendix_D_Statistical_Foundations.html) for the underlying distributions.
 
-## 5.3 Size factors — depth normalization
+## 6.3 Size factors — depth normalization
 
 Different samples have different sequencing depth. Without correction, a sample with twice as many total reads has twice the count for every gene, regardless of biology. The DESeq2 size factor $s_j$ corrects this:
 
@@ -60,7 +60,7 @@ This is the **median of ratios** estimator. It computes a per-gene "geometric me
 
 `DESeqDataSetFromMatrix(...)` and the subsequent `DESeq(dds)` call do this automatically; you don't typically interact with size factors directly. But knowing the formula clarifies why DESeq2 is robust to a few genes shifting wildly between samples.
 
-## 5.4 Dispersion estimation and shrinkage
+## 6.4 Dispersion estimation and shrinkage
 
 Every gene has its own dispersion $\alpha_i$, but with N = 6 or 8 samples per group, per-gene estimates are extremely noisy. DESeq2 borrows strength across genes by **shrinking** dispersion estimates toward a fitted trend (mean expression vs dispersion).
 
@@ -74,7 +74,7 @@ The result: high-confidence genes (high counts, many samples) keep their MLE est
 
 This is a **Bayesian-flavored procedure** — the trend is the prior, the per-gene MLE is the likelihood, the shrunk value is the posterior. See [Appendix D § 7](Appendix_D_Statistical_Foundations.html) for the connection.
 
-## 5.5 The design matrix and contrasts
+## 6.5 The design matrix and contrasts
 
 The `design = ~ ...` argument specifies which sample-level covariates affect expression. The simplest case:
 
@@ -108,7 +108,7 @@ dds$condition <- relevel(dds$condition, ref = "untreated")
 
 If you skip this, R's alphabetical default may pick the wrong reference, flipping the sign of every fold-change in your output. Hard to debug after the fact.
 
-## 5.6 The Wald test and p-values
+## 6.6 The Wald test and p-values
 
 DESeq2's default per-coefficient test is the **Wald test**:
 
@@ -135,7 +135,7 @@ For both tests, the output table from `results(dds)` has columns:
 | `pvalue` | raw test p-value |
 | `padj` | BH-adjusted (the FDR you should filter on) |
 
-## 5.7 LFC shrinkage — never skip
+## 6.7 LFC shrinkage — never skip
 
 Genes with very low counts (`baseMean < 5`) have huge LFC standard errors. Their raw `log2FoldChange` values are noisy and dominated by sampling luck. Sort the unshrunk results by LFC and your "top hits" will be a list of garbage low-count genes.
 
@@ -156,9 +156,9 @@ Always shrink before:
 
 The unshrunk LFC is fine for hypothesis testing (the p-value cares about the SE-scaled LFC, not the LFC itself), but for *ranking* and *visualization*, shrunk values are far more honest.
 
-The shrinkage is a Bayesian procedure with `apeglm`'s prior — see [Appendix D § 7](Appendix_D_Statistical_Foundations.html) for the connection to the dispersion shrinkage in §5.4. It's the same idea: borrow strength from all genes to stabilize each gene's estimate.
+The shrinkage is a Bayesian procedure with `apeglm`'s prior — see [Appendix D § 7](Appendix_D_Statistical_Foundations.html) for the connection to the dispersion shrinkage in §6.4. It's the same idea: borrow strength from all genes to stabilize each gene's estimate.
 
-## 5.8 The full bulk DESeq2 workflow, in one block
+## 6.8 The full bulk DESeq2 workflow, in one block
 
 ```r
 library(DESeq2); library(airway)
@@ -192,7 +192,7 @@ nrow(sig)
 
 [Tutorial 06 Part A](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) walks through this exact recipe with the `airway` dataset.
 
-## 5.9 Independent filtering — what `padj = NA` means
+## 6.9 Independent filtering — what `padj = NA` means
 
 You'll see some genes have `padj = NA` even when their `pvalue` is small. This is **independent filtering**: DESeq2 automatically excludes very-low-count genes from BH adjustment, on the grounds that they have insufficient power to ever be significant and including them dilutes the FDR for the rest.
 
@@ -200,7 +200,7 @@ The filter is selected adaptively to maximize the number of detected genes at th
 
 Cook's-distance filtering also produces NAs: extreme outlier samples in a small experiment can break the dispersion estimate for one gene, and DESeq2 NAs it. Inspect with `assays(dds)[["cooks"]]`.
 
-## 5.10 Common errors (bulk)
+## 6.10 Common errors (bulk)
 
 | You see | What's wrong | What to do |
 |---|---|---|
@@ -212,7 +212,7 @@ Cook's-distance filtering also produces NAs: extreme outlier samples in a small 
 
 # Part B — Pseudobulk DE on single-cell data
 
-## 5.11 The cardinal sin
+## 6.11 The cardinal sin
 
 The single most-violated rule in scRNA-seq:
 
@@ -226,7 +226,7 @@ This is documented empirically: Squair et al. 2021 (*Nat Commun*) showed that pe
 
 **Pseudobulk DE** fixes this. The fix is conceptually simple: aggregate per-cell counts to one observation per *(donor, condition, cell type)*, then run a standard bulk DESeq2 model (Part A) on the aggregated matrix. The unit of test is now the donor, not the cell, and inferences are honest.
 
-## 5.12 The aggregation step
+## 6.12 The aggregation step
 
 For each (donor × cell type) combination, sum the UMI counts across all cells. The result:
 
@@ -257,7 +257,7 @@ meta_pb <- data.frame(
 
 (Or build it from the original `seu@meta.data` with `distinct()` — more robust than parsing column names if your sample/cell-type names contain underscores.)
 
-## 5.13 Filter low-cell groups
+## 6.13 Filter low-cell groups
 
 A pseudobulk column built from very few cells is noise. The de-facto field default is **10 cells minimum** per (donor × condition × cell type) combination. Below that, drop the column.
 
@@ -279,7 +279,7 @@ The threshold balances signal against noise. Pseudobulk built from 1–2 cells i
 
 This is also where you discover **missing data**: a cell type may be present in some donors but not others. Pseudobulk gracefully handles this — the GLM is robust to missing combinations as long as the design is identifiable. But if a cell type appears in only one condition, you can't test condition effects in it.
 
-## 5.14 The per-cell-type DESeq2 loop
+## 6.14 The per-cell-type DESeq2 loop
 
 Run DESeq2 separately for each cell type:
 
@@ -308,7 +308,7 @@ de_all <- map_dfr(unique(meta_pb$celltype), run_de) |>
 
 Note the design: `~ donor + stim`, not just `~ stim`. This blocks on donor (a paired-sample design); the `stim` effect is now estimated *within each donor*. Much more powerful than `~ stim` alone whenever donors are paired.
 
-## 5.15 Why per-cell-type, not a single joint test?
+## 6.15 Why per-cell-type, not a single joint test?
 
 You could imagine running a *single* pseudobulk DESeq2 with `design = ~ donor + celltype + stim + celltype:stim` and reading off the `celltype:stim` interaction term. Why don't we?
 
@@ -322,7 +322,7 @@ Three reasons:
 
 The cost of per-cell-type DE is multiple tests per gene (one per cell type). FDR correction *within* each cell type is appropriate; cross-cell-type meta-correction is rarely worth it.
 
-## 5.16 What the output looks like
+## 6.16 What the output looks like
 
 Each row of `de_all` is a (gene × cell type) per-cell-type DE result. Filter:
 
@@ -338,7 +338,7 @@ The resulting per-cell-type DE table is the input to:
 - **[Chapter 7 — Functional Analysis](Chapter_07_FunctionalAnalysis.html)**: turn the gene list into biological themes
 - **[Chapter 8 — Differential Abundance](Chapter_08_DifferentialAbundance.html)**: the parallel question — do cell-type *proportions* change?
 
-## 5.17 Replication requirements
+## 6.17 Replication requirements
 
 Pseudobulk's honesty depends on having enough donors. Power scales with the number of independent biological replicates, not cells:
 
@@ -351,7 +351,7 @@ Pseudobulk's honesty depends on having enough donors. Power scales with the numb
 
 If you have only 2 vs 2, you can still run pseudobulk — it'll be honest — but you should expect few significant hits and report sample size openly. If you have only 1 vs 1, no DE method can give you valid p-values; report descriptive fold-changes only.
 
-## 5.18 The `ifnb` synthetic-donor caveat
+## 6.18 The `ifnb` synthetic-donor caveat
 
 The workshop's `ifnb` dataset, as distributed by `SeuratData`, has lost the per-cell donor IDs from the original Kang et al. 2017 paper. To run a meaningful pseudobulk demonstration, the [tutorial](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) creates **synthetic pseudo-donors** by random cell assignment — 4 pseudo-donors per condition.
 
@@ -359,7 +359,7 @@ This is a teaching shortcut. The synthetic donors are not biological replicates,
 
 For your own data with real donor IDs, the workflow gives valid inferences without modification.
 
-## 5.19 Common errors (pseudobulk)
+## 6.19 Common errors (pseudobulk)
 
 | You see | What's wrong | What to do |
 |---|---|---|
@@ -369,7 +369,7 @@ For your own data with real donor IDs, the workflow gives valid inferences witho
 | `apeglm` errors with "coefficient not found" | Coef name doesn't match | Run `resultsNames(dds)`, copy the exact name |
 | Some donor × cell type combos missing | Real biology + filter | Tabulate `n_cells` before fitting; document explicitly |
 
-## 5.20 Where this material is also discussed
+## 6.20 Where this material is also discussed
 
 - **Lecture:** [Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Lecture_Folder/Lecture_06_DESeq2_DE.html)
 - **Tutorial:** [Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](../Exercise_Folder/Tutorial_06_DESeq2_DE.html)
@@ -377,7 +377,7 @@ For your own data with real donor IDs, the workflow gives valid inferences witho
 - **Functional follow-up:** [Chapter 7 — Functional Analysis](Chapter_07_FunctionalAnalysis.html)
 - **Compositional follow-up:** [Chapter 8 — Differential Abundance](Chapter_08_DifferentialAbundance.html)
 
-## 5.21 Going further
+## 6.21 Going further
 
 ::: incremental
 - **Love, Huber & Anders 2014** — DESeq2 paper, [doi:10.1186/s13059-014-0550-8](https://doi.org/10.1186/s13059-014-0550-8)
