@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Talapas 09 — Differential Abundance with miloR
+# Talapas 10 — Differential Abundance with miloR
 # Tests for shifts in *cell-type composition* across conditions using
 # neighborhood-level abundance testing on the integrated kNN graph.
 # Writes nsclc_milo_da.csv.

@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Talapas 06 — Multi-Sample Integration with Harmony
+# Talapas 07 — Multi-Sample Integration with Harmony
 # Treats each donor (from CMO multiplexing) as a separate "sample" and
 # corrects donor-level batch effects on the PCA embedding using harmony.
 # Writes nsclc_integrated.rds.
