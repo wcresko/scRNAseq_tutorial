@@ -1,0 +1,89 @@
+---
+title: "Talapas 03 — The Analysis Pipeline (R scripts)"
+subtitle: "Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks"
+---
+
+The laptop **[Tutorials 01–08](../../Tutorials.html)** are *learning notebooks*: rich prose,
+"Think about it" prompts, and inline output. This page is the other half of the
+**1:1:1:1** mapping — the same workflow as **streamlined R scripts** you run on
+Talapas as SLURM jobs. The scripts carry only minimal comments that mark each
+step's alignment with the matching notebook; the explanation lives in the
+notebook.
+
+The track runs the **20k NSCLC DTC** dataset (vs. the laptop `ifnb`), so it is the
+"scale it up on the cluster" companion to the laptop series.
+
+::: callout-note
+**Prerequisites.** Work through [Talapas 01 — SLURM Basics](Tutorial_Talapas_01_SLURM_Basics.html)
+and (for raw reads) [Talapas 02 — Cell Ranger](Tutorial_Talapas_02_RawData_Cellranger.html)
+first. They cover login, modules, `sbatch`, and producing a
+`filtered_feature_bc_matrix/`.
+:::
+
+## The scripts ↔ notebook mapping
+
+Every analysis script lives in [`scripts/`](scripts/) and is numbered to match its
+laptop notebook.
+
+| Script | Parallels laptop notebook | Reads | Writes |
+|--------|---------------------------|-------|--------|
+| [`01_qc_preprocessing.R`](scripts/01_qc_preprocessing.R) | [Tutorial 01 — QC & Preprocessing](../Tutorial_01_QC_Preprocessing.html) | `data/filtered_feature_bc_matrix/` | `objects/nsclc_preprocessed.rds` |
+| [`02_dimreduction_clustering.R`](scripts/02_dimreduction_clustering.R) | [Tutorial 02 — DimReduction & Clustering](../Tutorial_02_DimReduction_Clustering.html) | `nsclc_preprocessed.rds` | `nsclc_clustered.rds` |
+| [`03_markers_annotation.R`](scripts/03_markers_annotation.R) | [Tutorial 03 — Markers & Annotation](../Tutorial_03_Markers_Annotation.html) | `nsclc_clustered.rds` | `nsclc_annotated.rds` |
+| [`04_reference_annotation.R`](scripts/04_reference_annotation.R) | [Tutorial 04 — Reference Annotation](../Tutorial_04_Reference_Annotation.html) | `nsclc_annotated.rds` | `nsclc_annotated_final.rds` |
+| [`05_integration.R`](scripts/05_integration.R) | [Tutorial 05 — Integration](../Tutorial_05_Integration.html) | `nsclc_annotated_final.rds` | `nsclc_integrated.rds` |
+| [`06_pseudobulk_de.R`](scripts/06_pseudobulk_de.R) | [Tutorial 06 — Pseudobulk DE](../Tutorial_06_DESeq2_DE.html) | `nsclc_integrated.rds` | `nsclc_pseudobulk_de.csv` |
+| [`07_functional_analysis.R`](scripts/07_functional_analysis.R) | [Tutorial 07 — Functional Analysis](../Tutorial_07_FunctionalAnalysis.html) | `nsclc_pseudobulk_de.csv` | `functional/*.csv` |
+| [`08_differential_abundance.R`](scripts/08_differential_abundance.R) | [Tutorial 08 — Differential Abundance](../Tutorial_08_DifferentialAbundance.html) | `nsclc_integrated.rds` | `nsclc_milo_da.csv` |
+
+Each step reads and writes `.rds`/`.csv` objects in `../objects/`; the only raw
+input is the downloaded matrix in `../data/`. The scripts run **in order** — each
+one's output is the next one's input.
+
+## Running the pipeline on Talapas
+
+The scripts are submitted with the generic wrapper
+[`run_rscript.sbatch`](scripts/run_rscript.sbatch), which loads R and runs the
+script you pass it. From the `scripts/` directory:
+
+``` bash
+# One-time setup: SLURM writes job logs here (it will NOT create the dir for you)
+mkdir -p logs
+
+# Run the pipeline in order (wait for each to finish before the next)
+sbatch --job-name=qc        run_rscript.sbatch 01_qc_preprocessing.R
+sbatch --job-name=cluster   run_rscript.sbatch 02_dimreduction_clustering.R
+sbatch --job-name=markers   run_rscript.sbatch 03_markers_annotation.R
+sbatch --job-name=refannot  run_rscript.sbatch 04_reference_annotation.R
+sbatch --job-name=integrate run_rscript.sbatch 05_integration.R
+sbatch --job-name=pb_de  --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
+sbatch --job-name=fa     --mem=32G run_rscript.sbatch 07_functional_analysis.R
+sbatch --job-name=da     --mem=96G run_rscript.sbatch 08_differential_abundance.R
+```
+
+::: callout-tip
+**Confirm each step before launching the next.** Check the `.out` log for the
+`Wrote ...` line and run `seff <jobid>` to confirm `State: COMPLETED` (not
+`OUT_OF_MEMORY`/`TIMEOUT`) — a job killed mid-write leaves a corrupt `.rds`.
+:::
+
+::: callout-note
+**Relocating outputs.** Set the `OBJ_DIR` (and `DATA_DIR`) environment variables to
+write the large objects to `/scratch/<PIRG>/...` instead of `../objects/`, e.g.
+`export OBJ_DIR=/scratch/<PIRG>/<duckid>/nsclc/objects`.
+:::
+
+## A note on the NSCLC design
+
+The 20k NSCLC sample is a single dissociated-tumor run with **no biological
+condition variable and no per-cell donor IDs**. Scripts 05/06/08 therefore
+synthesize pseudo-donors and a two-group split *purely to exercise the
+integration / DE / abundance machinery* — so **expect near-zero significant
+results**. That validates the plumbing, not biology. For real differential
+analysis you need true replicates (e.g. CMO demultiplexing to recover donor
+identity, or multiple samples).
+
+## Credits
+
+Adapted from the laptop tutorial series for the Talapas HPC environment, building
+on **Shannon N. Snyder's** *Talapas Basics* materials.

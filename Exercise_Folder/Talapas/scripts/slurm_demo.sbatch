@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=100M
 
-# Minimal SLURM demo. Submit with: sbatch 01_slurm_demo.sbatch
+# Minimal SLURM demo. Submit with: sbatch slurm_demo.sbatch
 # See the .qmd for what each #SBATCH directive does.
 #
 # PREREQUISITE: run `mkdir -p logs` once before submitting — SLURM will not

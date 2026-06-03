@@ -16,8 +16,8 @@
 #   mkdir -p logs
 #
 # Usage:
-#   sbatch --job-name=qc run_rscript.sbatch 03_qc_preprocess.R
-#   sbatch --job-name=de run_rscript.sbatch 08_pseudobulk_de.R
+#   sbatch --job-name=qc run_rscript.sbatch 01_qc_preprocessing.R
+#   sbatch --job-name=de run_rscript.sbatch 06_pseudobulk_de.R
 
 set -euo pipefail
 
