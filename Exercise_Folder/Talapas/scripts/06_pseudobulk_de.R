@@ -2,21 +2,22 @@
 # Talapas analysis pipeline 06 — parallels laptop Tutorial 06 (Pseudobulk DE, DESeq2).
 # Learning notebook: Exercise_Folder/Tutorial_06_DESeq2_DE.qmd
 # Run:  sbatch --job-name=pb_de --time=04:00:00 --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
-# In:   ../objects/nsclc_integrated.rds   Out: ../objects/nsclc_pseudobulk_de.csv
+# In:   ../objects/ifnb_integrated.rds   Out: ../objects/ifnb_pseudobulk_de.csv
 #
-# NSCLC has no real biological condition, so we split the pseudo-donors into a
-# synthetic two-group contrast purely to exercise the workflow. EXPECT ~no
-# significant hits: this validates the plumbing, not biology.
+# ifnb has a REAL biological contrast (IFN-beta STIM vs CTRL) and REAL donors
+# (8 lupus patients, `ind`), so this is genuine pseudobulk DE — expect a strong
+# interferon-stimulated-gene (ISG) signature, not a null result.
 
 suppressPackageStartupMessages({ library(Seurat); library(DESeq2); library(tidyverse) })
 set.seed(2026)
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
-seu <- readRDS(file.path(OBJ_DIR, "nsclc_integrated.rds"))
+seu <- readRDS(file.path(OBJ_DIR, "ifnb_integrated.rds"))
 DefaultAssay(seu) <- "RNA"
 
-if (!"condition" %in% colnames(seu@meta.data))
-  seu$condition <- ifelse(seu$donor %in% c("d1","d2","d3"), "GroupA", "GroupB")
-seu$celltype <- seu$celltype_manual
+# Real donor (ind) and real condition (stim)
+if (!"donor" %in% colnames(seu@meta.data)) seu$donor <- seu$ind
+seu$condition <- seu$stim                 # CTRL / STIM
+seu$celltype  <- seu$seurat_annotations
 
 # Step 3 — aggregate to (donor x condition x celltype) pseudobulk
 pb <- AggregateExpression(seu, assays = "RNA", layer = "counts",
@@ -39,20 +40,19 @@ meta_pb <- meta_pb |>
 keep <- !is.na(meta_pb$n_cells) & meta_pb$n_cells >= 10
 pb <- pb[, keep]; meta_pb <- meta_pb[keep, ]
 
-# Step 5 — DESeq2 per cell type
+# Step 5 — DESeq2 per cell type (STIM vs CTRL)
 run_de <- function(ct) {
   k <- meta_pb$celltype == ct
   if (sum(k) < 4 || length(unique(meta_pb$condition[k])) < 2) return(NULL)
-  dds <- DESeqDataSetFromMatrix(countData = pb[, k],
-                                colData = as.data.frame(meta_pb[k, ]),
-                                design = ~ condition)
+  cd <- as.data.frame(meta_pb[k, ])
+  cd$condition <- factor(cd$condition, levels = c("CTRL", "STIM"))
+  dds <- DESeqDataSetFromMatrix(countData = pb[, k], colData = cd, design = ~ condition)
   dds <- DESeq(dds, quiet = TRUE)
-  res <- results(dds, contrast = c("condition","GroupB","GroupA"))
-  res <- lfcShrink(dds, coef = "condition_GroupB_vs_GroupA", res = res, type = "apeglm")
+  res <- lfcShrink(dds, coef = "condition_STIM_vs_CTRL", type = "apeglm")
   as.data.frame(res) |> rownames_to_column("gene") |> mutate(celltype = ct)
 }
 de_all <- map_dfr(unique(meta_pb$celltype), run_de) |> filter(!is.na(padj))
 
-write_csv(de_all, file.path(OBJ_DIR, "nsclc_pseudobulk_de.csv"))
-cat("Wrote", file.path(OBJ_DIR, "nsclc_pseudobulk_de.csv"), "with", nrow(de_all),
+write_csv(de_all, file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"))
+cat("Wrote", file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"), "with", nrow(de_all),
     "rows across", length(unique(de_all$celltype)), "cell types\n")
