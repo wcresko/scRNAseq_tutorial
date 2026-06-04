@@ -35,20 +35,24 @@ Tutorials 01–08 use the **`ifnb`** dataset (Kang *et al.* 2017): \~14k cells a
 
 For the full **lecture ↔ reading ↔ tutorial** crosswalk (with chapter links), see the [Schedule](Schedule.qmd) page.
 
-## Talapas Advanced — HPC path (raw FASTQ → differential abundance) {#talapas-advanced}
+## Talapas HPC track — the same `ifnb` workflow as SLURM scripts {#talapas-advanced}
 
-The Talapas Advanced series mirrors the laptop workflow, but runs it on the **University of Oregon's Talapas HPC cluster** with **SLURM batch jobs**, starting from **raw FASTQs** rather than the pre-computed counts matrix. The dataset is the **20k NSCLC DTC** sample from 10x Genomics — \~250 MB filtered, 7 donors, 3' v3.1 multiplex.
+The fourth leg of the workshop's **1:1:1:1** mapping (lecture → reading → laptop tutorial → Talapas script): the **same `ifnb` analysis** as the laptop notebooks, packaged as **streamlined R scripts** you submit to the **University of Oregon's Talapas HPC cluster** as SLURM jobs. No raw FASTQs and no new dataset — script 01 loads `ifnb` straight from Bioconductor.
 
-The laptop `.qmd` tutorials are the **learning notebooks** (prose, prompts, explanation). The Talapas track is the same workflow as **streamlined R scripts** you submit to SLURM — minimal comments, each marking its alignment with the matching notebook step.
+The laptop `.qmd` tutorials are the **learning notebooks** (prose, prompts, explanation); the Talapas scripts are the same steps with minimal comments, each marked to its matching notebook.
 
-**Setup** — read these two HTML guides first; they cover login, modules, `sbatch`, and producing a counts matrix:
+**Start here** — these two guides cover login, modules, `sbatch`, and how the pipeline fits together:
 
-| # | Step | View | Download (`.qmd`) | Setup script |
+| # | Guide | View | Download (`.qmd`) | Setup script |
 |---|---|---|---|---|
 | 01 | SLURM Basics on Talapas (UO) | [HTML](Exercise_Folder/Talapas/Tutorial_Talapas_01_SLURM_Basics.html) | <a href="Exercise_Folder/Talapas/Tutorial_Talapas_01_SLURM_Basics.qmd.txt" download="Tutorial_Talapas_01_SLURM_Basics.qmd">Tutorial_Talapas_01_SLURM_Basics.qmd</a> | <a href="Exercise_Folder/Talapas/scripts/slurm_demo.sbatch" download>slurm_demo.sbatch</a> |
-| 02 | Raw data download + Cell Ranger `count` | [HTML](Exercise_Folder/Talapas/Tutorial_Talapas_02_RawData_Cellranger.html) | <a href="Exercise_Folder/Talapas/Tutorial_Talapas_02_RawData_Cellranger.qmd.txt" download="Tutorial_Talapas_02_RawData_Cellranger.qmd">Tutorial_Talapas_02_RawData_Cellranger.qmd</a> | <a href="Exercise_Folder/Talapas/scripts/cellranger_count.sbatch" download>cellranger_count.sbatch</a> |
+| 03 | The Analysis Pipeline (script-by-script) | [HTML](Exercise_Folder/Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html) | <a href="Exercise_Folder/Talapas/Tutorial_Talapas_03_Analysis_Pipeline.qmd.txt" download="Tutorial_Talapas_03_Analysis_Pipeline.qmd">Tutorial_Talapas_03_Analysis_Pipeline.qmd</a> | <a href="Exercise_Folder/Talapas/scripts/run_rscript.sbatch" download>run_rscript.sbatch</a> |
 
-**The analysis pipeline** — read the **[Talapas 03 — Analysis Pipeline](Exercise_Folder/Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html)** overview (data-flow + the SLURM commands), then download the scripts. Submit each with the generic wrapper <a href="Exercise_Folder/Talapas/scripts/run_rscript.sbatch" download>run_rscript.sbatch</a> (e.g. `sbatch run_rscript.sbatch 01_qc_preprocessing.R`). Each script parallels its laptop notebook:
+::: callout-note
+**Want the full pipeline from raw FASTQs** (BCL → Cell Ranger → counts → analysis) on a real 10x dataset? That's optional, self-paced material in **[Additional Resources → Full Talapas RNA-seq Run from raw FASTQs](Additional_Resources.qmd)**.
+:::
+
+**The analysis pipeline** — read the **[Talapas 03 — Analysis Pipeline](Exercise_Folder/Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html)** overview (data-flow + the SLURM commands), then download the scripts. Submit each with the generic wrapper <a href="Exercise_Folder/Talapas/scripts/run_rscript.sbatch" download>run_rscript.sbatch</a> (e.g. `sbatch run_rscript.sbatch 01_qc_preprocessing.R`). Each script runs on the shared `ifnb` object and parallels its laptop notebook:
 
 | Script | Parallels laptop notebook | Download |
 |---|---|---|
@@ -61,7 +65,7 @@ The laptop `.qmd` tutorials are the **learning notebooks** (prose, prompts, expl
 | `07_functional_analysis.R` | Tutorial 07 — Functional Analysis | <a href="Exercise_Folder/Talapas/scripts/07_functional_analysis.R" download>07_functional_analysis.R</a> |
 | `08_differential_abundance.R` | Tutorial 08 — Differential Abundance | <a href="Exercise_Folder/Talapas/scripts/08_differential_abundance.R" download>08_differential_abundance.R</a> |
 
-**Bonus tracks** — standalone scripts that parallel the bonus laptop tutorials. Scripts 09–11 use their own datasets (downloaded into `data/`); 12–13 run on the annotated NSCLC object the core pipeline produces. Run them on their own, not in sequence:
+**Bonus tracks** — standalone scripts that parallel the bonus laptop tutorials. Scripts 09–11 use their own datasets (downloaded into `data/`); 12–13 run on the annotated `ifnb` object the core pipeline produces. Run them on their own, not in sequence:
 
 | Script | Parallels laptop notebook | Download |
 |---|---|---|
@@ -74,14 +78,6 @@ The laptop `.qmd` tutorials are the **learning notebooks** (prose, prompts, expl
 ::: callout-tip
 **Workflow.** The core scripts (01–08) each read the `.rds` the previous one wrote (in `../objects/`), so they form a single pipeline — run `mkdir -p logs` once, then submit them in order (one at a time, or chained with `--dependency=afterok:<JOBID>`). The bonus scripts (09–13) are standalone.
 :::
-
-### Companion — Raw scATAC-seq processing
-
-Outside the main NSCLC pipeline, but kept in this folder for reference: the scATAC analogue of step 02 — running `cellranger-atac` on raw 10x scATAC FASTQs.
-
-| Tutorial | View | Download |
-|---|---|---|
-| Raw scATAC-seq with `cellranger-atac count` | — | <a href="Exercise_Folder/Talapas_RawData/Tutorial_Talapas_RawData_ATAC.qmd.txt" download="Tutorial_Talapas_RawData_ATAC.qmd">Tutorial_Talapas_RawData_ATAC.qmd</a> |
 
 ## Tutorial template
 
@@ -99,7 +95,7 @@ Primary sources:
 
 -   **scRNA-seq (laptop, Tutorials 01–05 + 06B + 07–08)** — [`ifnb`](https://satijalab.org/seurat/articles/integration_introduction.html) via `SeuratData::InstallData("ifnb")` (Kang *et al.* 2017, \~25 MB)
 -   **DESeq2 primer (Tutorial 06, Part A)** — `airway` Bioconductor package (no manual download)
--   **scRNA-seq (Talapas Advanced)** — [10x Genomics: 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0) (raw FASTQs and/or **filtered** matrix — \~250 MB)
+-   **scRNA-seq (Talapas HPC track)** — the **same `ifnb`** dataset as the laptop tutorials (loaded from Bioconductor). The optional [Full Talapas run from raw FASTQs](Additional_Resources.qmd) instead uses the [10x Genomics 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0) sample (raw FASTQs and/or **filtered** matrix — \~250 MB)
 -   **scATAC-seq (Tutorial 09)** — [10x Genomics: PBMC 10k scATAC-seq v1](https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-1-standard-1-1-0)
 -   **WGCNA (Tutorial 10)** — [GEO: GSE152418 (COVID-19 PBMC bulk RNA-seq)](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418)
 -   **Spatial transcriptomics (Tutorial 11)** — `stxBrain` (10x Visium adult mouse brain, anterior + posterior sections) via `SeuratData::InstallData("stxBrain")` (\~50 MB)
@@ -111,4 +107,4 @@ By convention the tutorials read from `../data/` (i.e. a `data/` folder at the r
 -   The `ifnb` workflow (Tutorials 01–03 + 05) follows the official [Seurat integration tutorial](https://satijalab.org/seurat/articles/integration_introduction.html), with workshop-specific commentary, *Think about it* prompts, and extra pacing.
 -   Tutorial 06 (DESeq2) follows the worked examples in [Khushbu Patel's YouTube Tutorials repo](https://github.com/kpatel427/YouTubeTutorials).
 -   Pedagogical inspiration on QC pacing, marker plot ordering, and integration diagnostics: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) (Sengupta lab).
--   The Talapas Advanced track follows Patel's `singleCell_standard_workflow.R` on the 20k NSCLC dataset, ported to SLURM batch scripts.
+-   The Talapas HPC track ports the laptop `ifnb` workflow to SLURM batch scripts (following Patel's `singleCell_standard_workflow.R`).
