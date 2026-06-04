@@ -2,7 +2,7 @@
 # Talapas analysis pipeline 07 — parallels laptop Tutorial 07 (Functional Analysis).
 # Learning notebook: Exercise_Folder/Tutorial_07_FunctionalAnalysis.qmd
 # Run:  sbatch --job-name=fa --time=02:00:00 --mem=32G run_rscript.sbatch 07_functional_analysis.R
-# In:   ../objects/nsclc_pseudobulk_de.csv   Out: ../objects/functional/*.csv
+# In:   ../objects/ifnb_pseudobulk_de.csv   Out: ../objects/functional/*.csv
 
 suppressPackageStartupMessages({
   library(tidyverse); library(clusterProfiler); library(org.Hs.eg.db); library(enrichplot)
@@ -12,7 +12,7 @@ OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
 OUT_DIR <- file.path(OBJ_DIR, "functional")
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 
-de <- read_csv(file.path(OBJ_DIR, "nsclc_pseudobulk_de.csv"), show_col_types = FALSE)
+de <- read_csv(file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"), show_col_types = FALSE)
 
 # Step 2 — GO over-representation (BP) per cell type
 ego_one <- function(de_ct) {

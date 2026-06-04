@@ -1,0 +1,198 @@
+---
+title: "Tutorial 00 — Get Up and Running with R, RStudio & Quarto"
+subtitle: "Install the workshop packages, learn how packages and Quarto work, and get ready for Day 1"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+A short **"get up and running"** tutorial for the very start of Day 1. It does **not** replace the Day 0 computational refresher — it's a fast reminder for participants who didn't attend Day 0, and the place where everyone installs the R packages the workshop needs.
+
+By the end you will have:
+
+- every R / Bioconductor package the workshop uses, installed
+- a working understanding of how packages are installed, loaded, and updated
+- **LaTeX** installed so Quarto can render to PDF
+- the basics of writing and rendering a **Quarto** document
+
+::: callout-note
+**Companion lecture:** [Lecture 00 — Bulk vs Single-Cell RNA-seq](../Lecture_Folder/Lecture_00_Bulk_vs_scRNAseq.html) · [Chapter 0 — Overview](../Resources_Folder/Chapter_00_Overview.html). If R or the command line are rusty, see [Appendix A — R Programming](../Resources_Folder/Appendix_A_R_Programming.html) and [Appendix B — Unix & the Command Line](../Resources_Folder/Appendix_B_Unix_Command_Line.html).
+:::
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To run it yourself, download the source — <a href="Tutorial_00_Setup_RStudio_Packages.qmd.txt" download="Tutorial_00_Setup_RStudio_Packages.qmd">Tutorial_00_Setup_RStudio_Packages.qmd</a> — then **drop the trailing `.txt`** so the filename ends in `.qmd`, open it in RStudio, and run it chunk by chunk.
+:::
+
+## 1. How packages work in R
+
+R itself is small; almost everything we do comes from **packages** — bundles of functions other people have written. The key idea:
+
+> **You install a package once; you load it every session.**
+
+- **Installing** downloads the package onto your computer. You do this *once* (and again only when you update). Installs come from **CRAN** with `install.packages()` or from **Bioconductor** with `BiocManager::install()`.
+- **Loading** makes an installed package's functions available in your *current* R session. You do this *every time you start R* and want to use that package, with `library()`.
+
+``` r
+install.packages("tidyverse")   # ONCE — downloads & installs onto your machine
+library(tidyverse)              # EVERY SESSION — makes its functions usable now
+```
+
+If you restart R (or open a fresh RStudio session) you do **not** need to re-install — but you **do** need to re-`library()` the packages your code uses. That's why every tutorial begins with a `library(...)` block.
+
+::: callout-tip
+**Loading through the RStudio window.** You can also load a package without typing: in the **Packages** pane (bottom-right of RStudio), find the package in the list and tick its checkbox — RStudio runs `library()` for you and echoes the command in the Console. Unticking it calls `detach()`. Even so, writing `library()` *in your script* is the better habit, because it makes the script reproducible: anyone (including future you) can see exactly what it needs to run.
+:::
+
+You can also call a single function without loading the whole package using `package::function()` — for example `muscData::Kang18_8vs8()`. We use this occasionally to avoid name clashes.
+
+## 2. Install the workshop packages
+
+Paste the **entire block** below into your R **Console**. The first run takes **20–60 minutes** depending on your machine and whether your platform builds from source — **do it before the workshop, not the morning of.**
+
+``` r
+# CRAN
+cran_pkgs <- c(
+  "tidyverse",     # dplyr, ggplot2, tidyr, readr, purrr, tibble, stringr, forcats
+  "Seurat",        # core scRNA-seq workflow (workshop default)
+  "remotes",       # GitHub installs
+  "BiocManager",   # Bioconductor installer
+  "patchwork",     # combining ggplots
+  "presto",        # fast Wilcoxon for FindMarkers
+  "harmony",       # batch integration
+  "clustree",      # picking clustering resolution
+  "ggrepel"        # readable labels on UMAPs
+)
+install.packages(setdiff(cran_pkgs, rownames(installed.packages())))
+
+# Bioconductor
+if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+bioc_pkgs <- c(
+  "SingleCellExperiment", "scran", "scater", "scuttle",
+  "DropletUtils",      # EmptyDrops, knee-point cell calling
+  "scDblFinder",       # doublet detection
+  "SoupX",             # ambient-RNA correction
+  "DESeq2", "edgeR", "limma",
+  "fgsea", "clusterProfiler", "ReactomePA", "enrichplot",
+  "org.Hs.eg.db", "org.Mm.eg.db",
+  "miloR",             # differential abundance
+  "SingleR", "celldex",
+  "muscData",          # ifnb (Kang18_8vs8) loader used in Tutorials 01–08
+  "Signac", "EnsDb.Hsapiens.v75"
+)
+BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
+                     update = FALSE, ask = FALSE)
+
+# GitHub / R-universe
+remotes::install_github("satijalab/seurat-data", quiet = TRUE, upgrade = "never")
+remotes::install_github("satijalab/azimuth",     quiet = TRUE, upgrade = "never")
+
+# Workshop datasets — pre-warm the caches so the first tutorial run is instant.
+# ifnb comes from muscData (Tutorials 01–08); the first call downloads
+# ~25 MB through ExperimentHub and caches it locally.
+invisible(muscData::Kang18_8vs8())
+SeuratData::InstallData("stxBrain")  # ~50 MB; used in Tutorial 11 (Spatial)
+```
+
+::: callout-note
+The first install will take 20–60 minutes depending on your machine and whether your platform is building from source. **Run it before the workshop, not the morning of.**
+:::
+
+## 3. Keeping R and your packages up to date
+
+Software moves. A package you installed last year may be several versions behind, and stale versions can collide with newer code. There are two separate things to keep current: **your packages** and **R itself**.
+
+**Update your packages (any operating system):**
+
+``` r
+update.packages(ask = FALSE)   # update CRAN packages
+BiocManager::install()         # check for / update Bioconductor packages
+BiocManager::valid()           # report packages that are out of sync
+```
+
+In RStudio you can do the CRAN part through a window: **Tools → Check for Package Updates…**, or the **Update** button in the **Packages** pane.
+
+**Updating R itself is separate from updating packages, and it differs by OS:**
+
+- **Windows** — the `installr` package automates it: `install.packages("installr"); installr::updateR()`. It can offer to copy your installed packages over to the new R version.
+- **macOS** — download the latest `.pkg` from <https://cran.r-project.org/bin/macosx/> and run the installer (or `brew install --cask r` if you use Homebrew).
+- **Linux** — use your distribution's package manager: `sudo apt update && sudo apt install --only-upgrade r-base` on Ubuntu/Debian (after enabling the CRAN APT repo for the newest release), or `sudo dnf upgrade R` on Fedora.
+
+::: callout-warning
+**Major R upgrades need package re-installs.** Moving from R 4.3 to 4.4 (a change in the *second* number) starts a fresh package library, so plan to re-run the install block in Section 2. *Minor* upgrades (4.4.0 → 4.4.1) keep your existing packages.
+:::
+
+## 4. Install LaTeX (for Quarto → PDF)
+
+Quarto renders to HTML with no extra software, but rendering to **PDF** needs a LaTeX engine. The easiest, cross-platform option is **TinyTeX**, installed from R:
+
+``` r
+install.packages("tinytex")
+tinytex::install_tinytex()   # one-time; ~1–2 min, no admin rights needed
+```
+
+This works the same on Mac, Windows, and Linux, and won't interfere with any system LaTeX you may already have. After restarting RStudio, confirm it with:
+
+``` r
+tinytex::is_tinytex()   # should return TRUE
+```
+
+## 5. Quarto in five minutes — Markdown, code, and rendering
+
+The tutorials are **Quarto** documents (files ending in `.qmd`). A Quarto file mixes plain-text **Markdown** with runnable **code chunks**, and renders to a polished document.
+
+**Markdown** is lightweight, readable formatting:
+
+``` markdown
+# A big heading
+## A smaller heading
+
+Plain text with **bold**, *italic*, and `inline code`.
+
+- a bullet
+- another bullet
+
+[a link](https://quarto.org)
+```
+
+**Code chunks** are fenced blocks tagged with a language. In RStudio, click the green ▶ "Run Current Chunk" arrow at the top-right of a chunk to run just that chunk (or press *Ctrl/Cmd + Enter* to run the current line or selection):
+
+```` markdown
+```{r}
+1 + 1
+library(tidyverse)
+```
+````
+
+**Rendering** turns the *whole* `.qmd` — prose, code, **and the code's output** (tables, plots) — into a finished document. Click the **Render** button in RStudio, or run `quarto render yourfile.qmd` in a terminal. Quarto executes every code chunk from top to bottom and stitches the results into the output.
+
+**One source, many outputs.** The same `.qmd` can produce different formats just by changing the `format:` line in the YAML header at the top of the file:
+
+``` yaml
+format: html     # a web page (what these tutorials use)
+format: pdf      # a PDF (needs LaTeX — see Section 4)
+format: docx     # a Word document
+```
+
+So you can write an analysis once and produce an HTML page for the web, a PDF for a supplement, and a Word document for a collaborator — all from the same file.
+
+::: callout-tip
+New to Quarto? The [Quarto guide](https://quarto.org/docs/guide/) is excellent, and **[Appendix A — R Programming](../Resources_Folder/Appendix_A_R_Programming.html)** covers the RStudio basics in more depth.
+:::
+
+## You're ready
+
+Once the install block has finished and TinyTeX is in place, you're set for Day 1. If anything errored, the [FAQ](../FAQ.html) covers the most common install problems — and bring anything you can't resolve to the optional [Day 0](../Schedule.html#day-0-optional-software-setup-computational-refresher) session.

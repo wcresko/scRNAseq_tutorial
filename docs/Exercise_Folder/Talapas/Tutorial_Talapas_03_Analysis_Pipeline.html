@@ -2180,11 +2180,11 @@ vertical-align: -.125em;
   <ul>
   <li><a href="#the-scripts-notebook-mapping" id="toc-the-scripts-notebook-mapping" class="nav-link active" data-scroll-target="#the-scripts-notebook-mapping">The scripts ↔︎ notebook mapping</a>
   <ul class="collapse">
-  <li><a href="#core-pipeline-nsclc-run-in-order" id="toc-core-pipeline-nsclc-run-in-order" class="nav-link" data-scroll-target="#core-pipeline-nsclc-run-in-order">Core pipeline (NSCLC — run in order)</a></li>
+  <li><a href="#core-pipeline-ifnb-run-in-order" id="toc-core-pipeline-ifnb-run-in-order" class="nav-link" data-scroll-target="#core-pipeline-ifnb-run-in-order">Core pipeline (ifnb — run in order)</a></li>
   <li><a href="#bonus-tracks-standalone" id="toc-bonus-tracks-standalone" class="nav-link" data-scroll-target="#bonus-tracks-standalone">Bonus tracks (standalone)</a></li>
   </ul></li>
   <li><a href="#running-the-pipeline-on-talapas" id="toc-running-the-pipeline-on-talapas" class="nav-link" data-scroll-target="#running-the-pipeline-on-talapas">Running the pipeline on Talapas</a></li>
-  <li><a href="#a-note-on-the-nsclc-design" id="toc-a-note-on-the-nsclc-design" class="nav-link" data-scroll-target="#a-note-on-the-nsclc-design">A note on the NSCLC design</a></li>
+  <li><a href="#why-ifnb-gives-real-results" id="toc-why-ifnb-gives-real-results" class="nav-link" data-scroll-target="#why-ifnb-gives-real-results">Why ifnb gives real results</a></li>
   <li><a href="#credits" id="toc-credits" class="nav-link" data-scroll-target="#credits">Credits</a></li>
   </ul>
 </nav>
@@ -2194,7 +2194,7 @@ vertical-align: -.125em;
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
 <h1 class="title">Talapas 03 — The Analysis Pipeline (R scripts)</h1>
-<p class="subtitle lead">Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks</p>
+<p class="subtitle lead">Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks — same ifnb dataset</p>
 </div>
 
 
@@ -2211,8 +2211,8 @@ vertical-align: -.125em;
 </header>
 
 
-<p>The laptop <strong><a href="../../Tutorials.html">Tutorials 01–08</a></strong> are <em>learning notebooks</em>: rich prose, “Think about it” prompts, and inline output. This page is the other half of the <strong>1:1:1:1</strong> mapping — the same workflow as <strong>streamlined R scripts</strong> you run on Talapas as SLURM jobs. The scripts carry only minimal comments that mark each step’s alignment with the matching notebook; the explanation lives in the notebook.</p>
-<p>The track runs the <strong>20k NSCLC DTC</strong> dataset (vs. the laptop <code>ifnb</code>), so it is the “scale it up on the cluster” companion to the laptop series.</p>
+<p>The laptop <strong><a href="../../Tutorials.html">Tutorials 01–08</a></strong> are <em>learning notebooks</em>: rich prose, “Think about it” prompts, and inline output. This page is the fourth leg of the workshop’s <strong>1:1:1:1</strong> mapping — <strong>lecture → reading → laptop tutorial → Talapas script</strong> — the <em>same</em> workflow as <strong>streamlined R scripts</strong> you run on Talapas as SLURM jobs. The scripts carry only minimal comments that mark each step’s alignment with the matching notebook; the explanation lives in the notebook.</p>
+<p>The scripts run the <strong>same <code>ifnb</code> dataset</strong> (Kang <em>et al.</em> 2017) as the laptop tutorials, so this is the “run the identical analysis on the cluster” companion to the laptop series — no new dataset to learn. <code>ifnb</code> carries a real condition (<code>stim</code>: CTRL vs IFN-β) and real donors (<code>ind</code>: 8 lupus patients), so the differential-expression and differential-abundance steps produce <strong>real biology</strong>.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2223,15 +2223,28 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Prerequisites.</strong> Work through <a href="Tutorial_Talapas_01_SLURM_Basics.html">Talapas 01 — SLURM Basics</a> and (for raw reads) <a href="Tutorial_Talapas_02_RawData_Cellranger.html">Talapas 02 — Cell Ranger</a> first. They cover login, modules, <code>sbatch</code>, and producing a <code>filtered_feature_bc_matrix/</code>.</p>
+<p><strong>Prerequisite.</strong> Work through <a href="Tutorial_Talapas_01_SLURM_Basics.html">Talapas 01 — SLURM Basics</a> first — it covers login, modules, and <code>sbatch</code>. You do <strong>not</strong> need raw FASTQs or Cell Ranger for this track: script 01 loads <code>ifnb</code> directly from Bioconductor. <strong>Want the full pipeline from raw reads instead?</strong> See <a href="../../Additional_Resources.html">Additional Resources → Full Talapas RNA-seq run from raw FASTQs</a>.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Pre-cache <code>ifnb</code> on a login node.</strong> Script 01 downloads <code>ifnb</code> (~25 MB) through <code>ExperimentHub</code> on first use. Talapas compute nodes may not have outbound internet, so run <code>Rscript -e &#39;invisible(muscData::Kang18_8vs8())&#39;</code> once on a <strong>login node</strong> (or in an interactive session with internet) to populate the cache before submitting the batch job.</p>
 </div>
 </div>
 <section id="the-scripts-notebook-mapping" class="level2">
 <h2 class="anchored" data-anchor-id="the-scripts-notebook-mapping">The scripts ↔︎ notebook mapping</h2>
 <p>Every analysis script lives in <a href="scripts/"><code>scripts/</code></a> and is numbered to match its laptop notebook.</p>
-<section id="core-pipeline-nsclc-run-in-order" class="level3">
-<h3 class="anchored" data-anchor-id="core-pipeline-nsclc-run-in-order">Core pipeline (NSCLC — run in order)</h3>
-<p>These eight chain together on the shared NSCLC object — each one’s output is the next one’s input.</p>
+<section id="core-pipeline-ifnb-run-in-order" class="level3">
+<h3 class="anchored" data-anchor-id="core-pipeline-ifnb-run-in-order">Core pipeline (ifnb — run in order)</h3>
+<p>These eight chain together on the shared <code>ifnb</code> object — each one’s output is the next one’s input.</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -2245,58 +2258,58 @@ Note
 <tr class="odd">
 <td><a href="scripts/01_qc_preprocessing.R"><code>01_qc_preprocessing.R</code></a></td>
 <td><a href="../Tutorial_01_QC_Preprocessing.html">Tutorial 01 — QC &amp; Preprocessing</a></td>
-<td><code>data/filtered_feature_bc_matrix/</code></td>
-<td><code>objects/nsclc_preprocessed.rds</code></td>
+<td><code>muscData::Kang18_8vs8()</code></td>
+<td><code>objects/ifnb_preprocessed.rds</code></td>
 </tr>
 <tr class="even">
 <td><a href="scripts/02_dimreduction_clustering.R"><code>02_dimreduction_clustering.R</code></a></td>
 <td><a href="../Tutorial_02_DimReduction_Clustering.html">Tutorial 02 — DimReduction &amp; Clustering</a></td>
-<td><code>nsclc_preprocessed.rds</code></td>
-<td><code>nsclc_clustered.rds</code></td>
+<td><code>ifnb_preprocessed.rds</code></td>
+<td><code>ifnb_clustered.rds</code></td>
 </tr>
 <tr class="odd">
 <td><a href="scripts/03_markers_annotation.R"><code>03_markers_annotation.R</code></a></td>
 <td><a href="../Tutorial_03_Markers_Annotation.html">Tutorial 03 — Markers &amp; Annotation</a></td>
-<td><code>nsclc_clustered.rds</code></td>
-<td><code>nsclc_annotated.rds</code></td>
+<td><code>ifnb_clustered.rds</code></td>
+<td><code>ifnb_annotated.rds</code></td>
 </tr>
 <tr class="even">
 <td><a href="scripts/04_reference_annotation.R"><code>04_reference_annotation.R</code></a></td>
 <td><a href="../Tutorial_04_Reference_Annotation.html">Tutorial 04 — Reference Annotation</a></td>
-<td><code>nsclc_annotated.rds</code></td>
-<td><code>nsclc_annotated_final.rds</code></td>
+<td><code>ifnb_annotated.rds</code></td>
+<td><code>ifnb_annotated_final.rds</code></td>
 </tr>
 <tr class="odd">
 <td><a href="scripts/05_integration.R"><code>05_integration.R</code></a></td>
 <td><a href="../Tutorial_05_Integration.html">Tutorial 05 — Integration</a></td>
-<td><code>nsclc_annotated_final.rds</code></td>
-<td><code>nsclc_integrated.rds</code></td>
+<td><code>ifnb_annotated_final.rds</code></td>
+<td><code>ifnb_integrated.rds</code></td>
 </tr>
 <tr class="even">
 <td><a href="scripts/06_pseudobulk_de.R"><code>06_pseudobulk_de.R</code></a></td>
 <td><a href="../Tutorial_06_DESeq2_DE.html">Tutorial 06 — Pseudobulk DE</a></td>
-<td><code>nsclc_integrated.rds</code></td>
-<td><code>nsclc_pseudobulk_de.csv</code></td>
+<td><code>ifnb_integrated.rds</code></td>
+<td><code>ifnb_pseudobulk_de.csv</code></td>
 </tr>
 <tr class="odd">
 <td><a href="scripts/07_functional_analysis.R"><code>07_functional_analysis.R</code></a></td>
 <td><a href="../Tutorial_07_FunctionalAnalysis.html">Tutorial 07 — Functional Analysis</a></td>
-<td><code>nsclc_pseudobulk_de.csv</code></td>
+<td><code>ifnb_pseudobulk_de.csv</code></td>
 <td><code>functional/*.csv</code></td>
 </tr>
 <tr class="even">
 <td><a href="scripts/08_differential_abundance.R"><code>08_differential_abundance.R</code></a></td>
 <td><a href="../Tutorial_08_DifferentialAbundance.html">Tutorial 08 — Differential Abundance</a></td>
-<td><code>nsclc_integrated.rds</code></td>
-<td><code>nsclc_milo_da.csv</code></td>
+<td><code>ifnb_integrated.rds</code></td>
+<td><code>ifnb_milo_da.csv</code></td>
 </tr>
 </tbody>
 </table>
-<p>Each step reads and writes <code>.rds</code>/<code>.csv</code> objects in <code>../objects/</code>; the only raw input is the downloaded matrix in <code>../data/</code>. The scripts run <strong>in order</strong> — each one’s output is the next one’s input.</p>
+<p>Each step reads and writes <code>.rds</code>/<code>.csv</code> objects in <code>../objects/</code>; the only external input is <code>ifnb</code>, fetched by script 01. The scripts run <strong>in order</strong> — each one’s output is the next one’s input.</p>
 </section>
 <section id="bonus-tracks-standalone" class="level3">
 <h3 class="anchored" data-anchor-id="bonus-tracks-standalone">Bonus tracks (standalone)</h3>
-<p>These parallel the bonus laptop tutorials. Scripts 09–11 use their <strong>own datasets</strong> (downloaded into <code>../data/</code>, not the NSCLC object); 12–13 run on the annotated object the core pipeline produces. They do not need to be run in sequence.</p>
+<p>These parallel the bonus laptop tutorials. Scripts 09–11 use their <strong>own datasets</strong> (downloaded into <code>../data/</code>); 12–13 run on the annotated <code>ifnb</code> object the core pipeline produces. They do not need to be run in sequence.</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -2328,14 +2341,14 @@ Note
 <tr class="even">
 <td><a href="scripts/12_trajectory_cellcomm.R"><code>12_trajectory_cellcomm.R</code></a></td>
 <td><a href="../Tutorial_12_Trajectory_CellCommunication.html">Tutorial 12 — Trajectory &amp; Cell–Cell Comm</a></td>
-<td><code>nsclc_annotated.rds</code></td>
-<td><code>nsclc_slingshot_pseudotime.csv</code></td>
+<td><code>ifnb_annotated.rds</code></td>
+<td><code>ifnb_slingshot_pseudotime.csv</code></td>
 </tr>
 <tr class="odd">
 <td><a href="scripts/13_fair_metadata.R"><code>13_fair_metadata.R</code></a></td>
 <td><a href="../Tutorial_13_FAIR_Metadata.html">Tutorial 13 — FAIR &amp; Metadata</a></td>
-<td><code>nsclc_annotated_final.rds</code></td>
-<td><code>nsclc_for_submission.h5ad</code></td>
+<td><code>ifnb_annotated_final.rds</code></td>
+<td><code>ifnb_for_submission.h5ad</code></td>
 </tr>
 </tbody>
 </table>
@@ -2392,13 +2405,13 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Relocating outputs.</strong> Set the <code>OBJ_DIR</code> (and <code>DATA_DIR</code>) environment variables to write the large objects to <code>/scratch/&lt;PIRG&gt;/...</code> instead of <code>../objects/</code>, e.g. <code>export OBJ_DIR=/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/nsclc/objects</code>.</p>
+<p><strong>Relocating outputs.</strong> Set the <code>OBJ_DIR</code> environment variable to write the objects to <code>/scratch/&lt;PIRG&gt;/...</code> instead of <code>../objects/</code>, e.g. <code>export OBJ_DIR=/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/ifnb/objects</code>.</p>
 </div>
 </div>
 </section>
-<section id="a-note-on-the-nsclc-design" class="level2">
-<h2 class="anchored" data-anchor-id="a-note-on-the-nsclc-design">A note on the NSCLC design</h2>
-<p>The 20k NSCLC sample is a single dissociated-tumor run with <strong>no biological condition variable and no per-cell donor IDs</strong>. Scripts 05/06/08 therefore synthesize pseudo-donors and a two-group split <em>purely to exercise the integration / DE / abundance machinery</em> — so <strong>expect near-zero significant results</strong>. That validates the plumbing, not biology. For real differential analysis you need true replicates (e.g. CMO demultiplexing to recover donor identity, or multiple samples).</p>
+<section id="why-ifnb-gives-real-results" class="level2">
+<h2 class="anchored" data-anchor-id="why-ifnb-gives-real-results">Why ifnb gives real results</h2>
+<p>Unlike a single dissociated-tumor run, <code>ifnb</code> has a <strong>real biological condition</strong> (<code>stim</code>: control vs IFN-β–stimulated) and <strong>real biological replicates</strong> (<code>ind</code>: 8 lupus donors, each measured in both conditions). So scripts 05/06/08 use the genuine sample and donor structure — integration corrects the CTRL/STIM batch axis, and the pseudobulk DE and differential-abundance tests recover a real <strong>interferon-stimulated gene (ISG)</strong> response rather than a null result. This is the same dataset, and the same biology, as the laptop notebooks.</p>
 </section>
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>
