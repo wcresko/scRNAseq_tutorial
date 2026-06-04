@@ -2,12 +2,12 @@
 # Talapas analysis pipeline 02 — parallels laptop Tutorial 02 (DimReduction & Clustering).
 # Learning notebook: Exercise_Folder/Tutorial_02_DimReduction_Clustering.qmd
 # Run:  sbatch --job-name=cluster run_rscript.sbatch 02_dimreduction_clustering.R
-# In:   ../objects/nsclc_preprocessed.rds   Out: ../objects/nsclc_clustered.rds
+# In:   ../objects/ifnb_preprocessed.rds   Out: ../objects/ifnb_clustered.rds
 
 suppressPackageStartupMessages({ library(Seurat); library(tidyverse) })
 set.seed(2026)
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
-seu <- readRDS(file.path(OBJ_DIR, "nsclc_preprocessed.rds"))
+seu <- readRDS(file.path(OBJ_DIR, "ifnb_preprocessed.rds"))
 
 # Step 1 — PCA
 seu <- RunPCA(seu, npcs = 50, verbose = FALSE)
@@ -28,6 +28,6 @@ Idents(seu) <- "RNA_snn_res.0.5"
 # Step 5 — UMAP
 seu <- RunUMAP(seu, dims = 1:N_PCS, verbose = FALSE)
 
-saveRDS(seu, file.path(OBJ_DIR, "nsclc_clustered.rds"))
-cat("Wrote", file.path(OBJ_DIR, "nsclc_clustered.rds"), "with",
+saveRDS(seu, file.path(OBJ_DIR, "ifnb_clustered.rds"))
+cat("Wrote", file.path(OBJ_DIR, "ifnb_clustered.rds"), "with",
     length(levels(Idents(seu))), "clusters\n")

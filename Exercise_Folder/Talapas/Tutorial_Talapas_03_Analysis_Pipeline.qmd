@@ -1,23 +1,35 @@
 ---
 title: "Talapas 03 — The Analysis Pipeline (R scripts)"
-subtitle: "Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks"
+subtitle: "Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks — same ifnb dataset"
 ---
 
 The laptop **[Tutorials 01–08](../../Tutorials.html)** are *learning notebooks*: rich prose,
-"Think about it" prompts, and inline output. This page is the other half of the
-**1:1:1:1** mapping — the same workflow as **streamlined R scripts** you run on
-Talapas as SLURM jobs. The scripts carry only minimal comments that mark each
-step's alignment with the matching notebook; the explanation lives in the
-notebook.
+"Think about it" prompts, and inline output. This page is the fourth leg of the
+workshop's **1:1:1:1** mapping — **lecture → reading → laptop tutorial → Talapas
+script** — the *same* workflow as **streamlined R scripts** you run on Talapas as
+SLURM jobs. The scripts carry only minimal comments that mark each step's alignment
+with the matching notebook; the explanation lives in the notebook.
 
-The track runs the **20k NSCLC DTC** dataset (vs. the laptop `ifnb`), so it is the
-"scale it up on the cluster" companion to the laptop series.
+The scripts run the **same `ifnb` dataset** (Kang *et al.* 2017) as the laptop
+tutorials, so this is the "run the identical analysis on the cluster" companion to
+the laptop series — no new dataset to learn. `ifnb` carries a real condition
+(`stim`: CTRL vs IFN-β) and real donors (`ind`: 8 lupus patients), so the
+differential-expression and differential-abundance steps produce **real biology**.
 
 ::: callout-note
-**Prerequisites.** Work through [Talapas 01 — SLURM Basics](Tutorial_Talapas_01_SLURM_Basics.html)
-and (for raw reads) [Talapas 02 — Cell Ranger](Tutorial_Talapas_02_RawData_Cellranger.html)
-first. They cover login, modules, `sbatch`, and producing a
-`filtered_feature_bc_matrix/`.
+**Prerequisite.** Work through [Talapas 01 — SLURM Basics](Tutorial_Talapas_01_SLURM_Basics.html)
+first — it covers login, modules, and `sbatch`. You do **not** need raw FASTQs or
+Cell Ranger for this track: script 01 loads `ifnb` directly from Bioconductor.
+**Want the full pipeline from raw reads instead?** See
+[Additional Resources → Full Talapas RNA-seq run from raw FASTQs](../../Additional_Resources.html).
+:::
+
+::: callout-tip
+**Pre-cache `ifnb` on a login node.** Script 01 downloads `ifnb` (~25 MB) through
+`ExperimentHub` on first use. Talapas compute nodes may not have outbound internet,
+so run `Rscript -e 'invisible(muscData::Kang18_8vs8())'` once on a **login node** (or
+in an interactive session with internet) to populate the cache before submitting the
+batch job.
 :::
 
 ## The scripts ↔ notebook mapping
@@ -25,39 +37,39 @@ first. They cover login, modules, `sbatch`, and producing a
 Every analysis script lives in [`scripts/`](scripts/) and is numbered to match its
 laptop notebook.
 
-### Core pipeline (NSCLC — run in order)
+### Core pipeline (ifnb — run in order)
 
-These eight chain together on the shared NSCLC object — each one's output is the
+These eight chain together on the shared `ifnb` object — each one's output is the
 next one's input.
 
 | Script | Parallels laptop notebook | Reads | Writes |
 |--------|---------------------------|-------|--------|
-| [`01_qc_preprocessing.R`](scripts/01_qc_preprocessing.R) | [Tutorial 01 — QC & Preprocessing](../Tutorial_01_QC_Preprocessing.html) | `data/filtered_feature_bc_matrix/` | `objects/nsclc_preprocessed.rds` |
-| [`02_dimreduction_clustering.R`](scripts/02_dimreduction_clustering.R) | [Tutorial 02 — DimReduction & Clustering](../Tutorial_02_DimReduction_Clustering.html) | `nsclc_preprocessed.rds` | `nsclc_clustered.rds` |
-| [`03_markers_annotation.R`](scripts/03_markers_annotation.R) | [Tutorial 03 — Markers & Annotation](../Tutorial_03_Markers_Annotation.html) | `nsclc_clustered.rds` | `nsclc_annotated.rds` |
-| [`04_reference_annotation.R`](scripts/04_reference_annotation.R) | [Tutorial 04 — Reference Annotation](../Tutorial_04_Reference_Annotation.html) | `nsclc_annotated.rds` | `nsclc_annotated_final.rds` |
-| [`05_integration.R`](scripts/05_integration.R) | [Tutorial 05 — Integration](../Tutorial_05_Integration.html) | `nsclc_annotated_final.rds` | `nsclc_integrated.rds` |
-| [`06_pseudobulk_de.R`](scripts/06_pseudobulk_de.R) | [Tutorial 06 — Pseudobulk DE](../Tutorial_06_DESeq2_DE.html) | `nsclc_integrated.rds` | `nsclc_pseudobulk_de.csv` |
-| [`07_functional_analysis.R`](scripts/07_functional_analysis.R) | [Tutorial 07 — Functional Analysis](../Tutorial_07_FunctionalAnalysis.html) | `nsclc_pseudobulk_de.csv` | `functional/*.csv` |
-| [`08_differential_abundance.R`](scripts/08_differential_abundance.R) | [Tutorial 08 — Differential Abundance](../Tutorial_08_DifferentialAbundance.html) | `nsclc_integrated.rds` | `nsclc_milo_da.csv` |
+| [`01_qc_preprocessing.R`](scripts/01_qc_preprocessing.R) | [Tutorial 01 — QC & Preprocessing](../Tutorial_01_QC_Preprocessing.html) | `muscData::Kang18_8vs8()` | `objects/ifnb_preprocessed.rds` |
+| [`02_dimreduction_clustering.R`](scripts/02_dimreduction_clustering.R) | [Tutorial 02 — DimReduction & Clustering](../Tutorial_02_DimReduction_Clustering.html) | `ifnb_preprocessed.rds` | `ifnb_clustered.rds` |
+| [`03_markers_annotation.R`](scripts/03_markers_annotation.R) | [Tutorial 03 — Markers & Annotation](../Tutorial_03_Markers_Annotation.html) | `ifnb_clustered.rds` | `ifnb_annotated.rds` |
+| [`04_reference_annotation.R`](scripts/04_reference_annotation.R) | [Tutorial 04 — Reference Annotation](../Tutorial_04_Reference_Annotation.html) | `ifnb_annotated.rds` | `ifnb_annotated_final.rds` |
+| [`05_integration.R`](scripts/05_integration.R) | [Tutorial 05 — Integration](../Tutorial_05_Integration.html) | `ifnb_annotated_final.rds` | `ifnb_integrated.rds` |
+| [`06_pseudobulk_de.R`](scripts/06_pseudobulk_de.R) | [Tutorial 06 — Pseudobulk DE](../Tutorial_06_DESeq2_DE.html) | `ifnb_integrated.rds` | `ifnb_pseudobulk_de.csv` |
+| [`07_functional_analysis.R`](scripts/07_functional_analysis.R) | [Tutorial 07 — Functional Analysis](../Tutorial_07_FunctionalAnalysis.html) | `ifnb_pseudobulk_de.csv` | `functional/*.csv` |
+| [`08_differential_abundance.R`](scripts/08_differential_abundance.R) | [Tutorial 08 — Differential Abundance](../Tutorial_08_DifferentialAbundance.html) | `ifnb_integrated.rds` | `ifnb_milo_da.csv` |
 
-Each step reads and writes `.rds`/`.csv` objects in `../objects/`; the only raw
-input is the downloaded matrix in `../data/`. The scripts run **in order** — each
-one's output is the next one's input.
+Each step reads and writes `.rds`/`.csv` objects in `../objects/`; the only external
+input is `ifnb`, fetched by script 01. The scripts run **in order** — each one's
+output is the next one's input.
 
 ### Bonus tracks (standalone)
 
 These parallel the bonus laptop tutorials. Scripts 09–11 use their **own datasets**
-(downloaded into `../data/`, not the NSCLC object); 12–13 run on the annotated
-object the core pipeline produces. They do not need to be run in sequence.
+(downloaded into `../data/`); 12–13 run on the annotated `ifnb` object the core
+pipeline produces. They do not need to be run in sequence.
 
 | Script | Parallels laptop notebook | Reads | Writes |
 |--------|---------------------------|-------|--------|
 | [`09_scatac_signac.R`](scripts/09_scatac_signac.R) | [Tutorial 09 — scATAC-seq (Signac)](../Tutorial_09_scATACseq_Signac.html) | PBMC 10k scATAC files in `data/` | `pbmc_atac_clustered.rds` |
 | [`10_wgcna.R`](scripts/10_wgcna.R) | [Tutorial 10 — WGCNA](../Tutorial_10_WGCNA.html) | `GSE152418_*_RawCounts.txt` | `wgcna_*.csv` |
 | [`11_spatial.R`](scripts/11_spatial.R) | [Tutorial 11 — Spatial Transcriptomics](../Tutorial_11_Spatial_Transcriptomics.html) | `stxBrain` (SeuratData) | `brain_spatial_integrated.rds` |
-| [`12_trajectory_cellcomm.R`](scripts/12_trajectory_cellcomm.R) | [Tutorial 12 — Trajectory & Cell–Cell Comm](../Tutorial_12_Trajectory_CellCommunication.html) | `nsclc_annotated.rds` | `nsclc_slingshot_pseudotime.csv` |
-| [`13_fair_metadata.R`](scripts/13_fair_metadata.R) | [Tutorial 13 — FAIR & Metadata](../Tutorial_13_FAIR_Metadata.html) | `nsclc_annotated_final.rds` | `nsclc_for_submission.h5ad` |
+| [`12_trajectory_cellcomm.R`](scripts/12_trajectory_cellcomm.R) | [Tutorial 12 — Trajectory & Cell–Cell Comm](../Tutorial_12_Trajectory_CellCommunication.html) | `ifnb_annotated.rds` | `ifnb_slingshot_pseudotime.csv` |
+| [`13_fair_metadata.R`](scripts/13_fair_metadata.R) | [Tutorial 13 — FAIR & Metadata](../Tutorial_13_FAIR_Metadata.html) | `ifnb_annotated_final.rds` | `ifnb_for_submission.h5ad` |
 
 ::: callout-note
 The bonus scripts mirror the runnable core of each notebook. Steps that are
@@ -94,20 +106,20 @@ sbatch --job-name=da     --mem=96G run_rscript.sbatch 08_differential_abundance.
 :::
 
 ::: callout-note
-**Relocating outputs.** Set the `OBJ_DIR` (and `DATA_DIR`) environment variables to
-write the large objects to `/scratch/<PIRG>/...` instead of `../objects/`, e.g.
-`export OBJ_DIR=/scratch/<PIRG>/<duckid>/nsclc/objects`.
+**Relocating outputs.** Set the `OBJ_DIR` environment variable to write the objects
+to `/scratch/<PIRG>/...` instead of `../objects/`, e.g.
+`export OBJ_DIR=/scratch/<PIRG>/<duckid>/ifnb/objects`.
 :::
 
-## A note on the NSCLC design
+## Why ifnb gives real results
 
-The 20k NSCLC sample is a single dissociated-tumor run with **no biological
-condition variable and no per-cell donor IDs**. Scripts 05/06/08 therefore
-synthesize pseudo-donors and a two-group split *purely to exercise the
-integration / DE / abundance machinery* — so **expect near-zero significant
-results**. That validates the plumbing, not biology. For real differential
-analysis you need true replicates (e.g. CMO demultiplexing to recover donor
-identity, or multiple samples).
+Unlike a single dissociated-tumor run, `ifnb` has a **real biological condition**
+(`stim`: control vs IFN-β–stimulated) and **real biological replicates** (`ind`: 8
+lupus donors, each measured in both conditions). So scripts 05/06/08 use the genuine
+sample and donor structure — integration corrects the CTRL/STIM batch axis, and the
+pseudobulk DE and differential-abundance tests recover a real **interferon-stimulated
+gene (ISG)** response rather than a null result. This is the same dataset, and the
+same biology, as the laptop notebooks.
 
 ## Credits
 
