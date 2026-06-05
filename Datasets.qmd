@@ -52,7 +52,7 @@ scrnaseq_workshop/
     └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 10)
 ```
 
-Tutorials 01–08 do **not** need anything in `data/` to start — `ifnb` is downloaded once into your R user library by `SeuratData`. They only write to `data/` (the chained `.rds` files between tutorials).
+Tutorials 01–08 do **not** need anything in `data/` to start — `ifnb` is downloaded once into a local cache by Bioconductor's `muscData` package (via ExperimentHub). They only write to `data/` (the chained `.rds` files between tutorials).
 
 ## Tutorials 01–08 — `ifnb` (Kang *et al.* 2017, two-sample PBMCs)
 
@@ -65,13 +65,13 @@ Total: \~13,999 cells across two samples — small enough to run end-to-end on a
 
 -   Reference: Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
 -   GEO accession: [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
--   Distribution: `SeuratData` R package (no manual download)
+-   Distribution: Bioconductor `muscData` package via `Kang18_8vs8()` (no manual download)
 -   Used by: Tutorials 01 → 08
 
 ### Why `ifnb` for teaching
 
 -   **Tiny.** \~25 MB compressed cache, vs \~250 MB for NSCLC. Fits on a laptop with room to spare.
--   **No 10x click-through.** It's distributed via `SeuratData::InstallData("ifnb")`, not from `cf.10xgenomics.com`, so you skip the TOS dance entirely.
+-   **No 10x click-through.** It's distributed via Bioconductor's `muscData::Kang18_8vs8()`, not from `cf.10xgenomics.com`, so you skip the TOS dance entirely.
 -   **Two real biological samples.** CTRL vs STIM is exactly the structure integration is built to handle — a strong batch-style axis (the IFN response) overlaid on a shared cell-type structure (PBMC subtypes present in both samples).
 -   **Cell-type ground truth included.** The `seurat_annotations` metadata column carries author-curated PBMC subtype labels, so you can sanity-check your manual marker-based annotation in Tutorial 03 against a real published call.
 -   **Real condition contrast for pseudobulk DE.** Tutorial 06 (pseudobulk DESeq2) uses `STIM` vs `CTRL` as a real biological contrast — no synthetic group splits needed.
@@ -81,13 +81,12 @@ Total: \~13,999 cells across two samples — small enough to run end-to-end on a
 From R:
 
 ```r
-install.packages(c("Seurat", "tidyverse"))
-install.packages("SeuratData",
-                 repos = c("https://satijalab.r-universe.dev", getOption("repos")))
-SeuratData::InstallData("ifnb")
+install.packages(c("Seurat", "tidyverse", "BiocManager"))
+BiocManager::install("muscData")
+invisible(muscData::Kang18_8vs8())   # first call downloads ~25 MB via ExperimentHub and caches it
 ```
 
-That's it — there's no separate `wget` / `curl` step. The data lands in your R user library (\~/Library/R/... on macOS, \~/.local/lib/R/... on Linux) and `LoadData("ifnb")` returns the Seurat object instantly on every subsequent run.
+That's it — there's no separate `wget` / `curl` step. The first `Kang18_8vs8()` call downloads \~25 MB through `ExperimentHub` into your local cache; every subsequent call is instant. Tutorial 01 converts the returned `SingleCellExperiment` into the Seurat object used throughout the series.
 
 ### Disk-space budget — laptop path
 
