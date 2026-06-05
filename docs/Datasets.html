@@ -4137,7 +4137,7 @@ z-index: 1;
     ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 09)
     ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 09)
     └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 10)</code></pre>
-<p>Tutorials 01–08 do <strong>not</strong> need anything in <code>data/</code> to start — <code>ifnb</code> is downloaded once into your R user library by <code>SeuratData</code>. They only write to <code>data/</code> (the chained <code>.rds</code> files between tutorials).</p>
+<p>Tutorials 01–08 do <strong>not</strong> need anything in <code>data/</code> to start — <code>ifnb</code> is downloaded once into a local cache by Bioconductor’s <code>muscData</code> package (via ExperimentHub). They only write to <code>data/</code> (the chained <code>.rds</code> files between tutorials).</p>
 </section>
 <section id="tutorials-0108-ifnb-kang-et-al.-2017-two-sample-pbmcs" class="level2">
 <h2 class="anchored" data-anchor-id="tutorials-0108-ifnb-kang-et-al.-2017-two-sample-pbmcs">Tutorials 01–08 — <code>ifnb</code> (Kang <em>et al.</em> 2017, two-sample PBMCs)</h2>
@@ -4150,14 +4150,14 @@ z-index: 1;
 <ul>
 <li>Reference: Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em> 36: 89–94, <a href="https://doi.org/10.1038/nbt.4042">doi:10.1038/nbt.4042</a></li>
 <li>GEO accession: <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583">GSE96583</a></li>
-<li>Distribution: <code>SeuratData</code> R package (no manual download)</li>
+<li>Distribution: Bioconductor <code>muscData</code> package via <code>Kang18_8vs8()</code> (no manual download)</li>
 <li>Used by: Tutorials 01 → 08</li>
 </ul>
 <section id="why-ifnb-for-teaching" class="level3">
 <h3 class="anchored" data-anchor-id="why-ifnb-for-teaching">Why <code>ifnb</code> for teaching</h3>
 <ul>
 <li><strong>Tiny.</strong> ~25 MB compressed cache, vs ~250 MB for NSCLC. Fits on a laptop with room to spare.</li>
-<li><strong>No 10x click-through.</strong> It’s distributed via <code>SeuratData::InstallData(&quot;ifnb&quot;)</code>, not from <code>cf.10xgenomics.com</code>, so you skip the TOS dance entirely.</li>
+<li><strong>No 10x click-through.</strong> It’s distributed via Bioconductor’s <code>muscData::Kang18_8vs8()</code>, not from <code>cf.10xgenomics.com</code>, so you skip the TOS dance entirely.</li>
 <li><strong>Two real biological samples.</strong> CTRL vs STIM is exactly the structure integration is built to handle — a strong batch-style axis (the IFN response) overlaid on a shared cell-type structure (PBMC subtypes present in both samples).</li>
 <li><strong>Cell-type ground truth included.</strong> The <code>seurat_annotations</code> metadata column carries author-curated PBMC subtype labels, so you can sanity-check your manual marker-based annotation in Tutorial 03 against a real published call.</li>
 <li><strong>Real condition contrast for pseudobulk DE.</strong> Tutorial 06 (pseudobulk DESeq2) uses <code>STIM</code> vs <code>CTRL</code> as a real biological contrast — no synthetic group splits needed.</li>
@@ -4166,11 +4166,10 @@ z-index: 1;
 <section id="install-one-time" class="level3">
 <h3 class="anchored" data-anchor-id="install-one-time">Install (one-time)</h3>
 <p>From R:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">&quot;Seurat&quot;</span>, <span class="st">&quot;tidyverse&quot;</span>))</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;SeuratData&quot;</span>,</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">repos =</span> <span class="fu">c</span>(<span class="st">&quot;https://satijalab.r-universe.dev&quot;</span>, <span class="fu">getOption</span>(<span class="st">&quot;repos&quot;</span>)))</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>SeuratData<span class="sc">::</span><span class="fu">InstallData</span>(<span class="st">&quot;ifnb&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>That’s it — there’s no separate <code>wget</code> / <code>curl</code> step. The data lands in your R user library (~/Library/R/… on macOS, ~/.local/lib/R/… on Linux) and <code>LoadData(&quot;ifnb&quot;)</code> returns the Seurat object instantly on every subsequent run.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">&quot;Seurat&quot;</span>, <span class="st">&quot;tidyverse&quot;</span>, <span class="st">&quot;BiocManager&quot;</span>))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>BiocManager<span class="sc">::</span><span class="fu">install</span>(<span class="st">&quot;muscData&quot;</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">invisible</span>(muscData<span class="sc">::</span><span class="fu">Kang18_8vs8</span>())   <span class="co"># first call downloads ~25 MB via ExperimentHub and caches it</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>That’s it — there’s no separate <code>wget</code> / <code>curl</code> step. The first <code>Kang18_8vs8()</code> call downloads ~25 MB through <code>ExperimentHub</code> into your local cache; every subsequent call is instant. Tutorial 01 converts the returned <code>SingleCellExperiment</code> into the Seurat object used throughout the series.</p>
 </section>
 <section id="disk-space-budget-laptop-path" class="level3">
 <h3 class="anchored" data-anchor-id="disk-space-budget-laptop-path">Disk-space budget — laptop path</h3>
