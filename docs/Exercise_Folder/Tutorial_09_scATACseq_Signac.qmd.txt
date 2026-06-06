@@ -151,8 +151,18 @@ library(Signac)
 library(Seurat)
 library(EnsDb.Hsapiens.v75)
 library(tidyverse)
+library(patchwork)   # combine + annotate multi-panel Signac/Seurat plots
 
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod9_C<chunk>_<name>
+# into ../output/Mod9/ so it can be cross-referenced from the rest of the site.
+#   Mod9 = Module 9 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod9"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ## Data files and data dictionary
@@ -216,6 +226,13 @@ frag.file <- read.delim(
   nrows  = 10
 )
 head(frag.file)
+
+# --- Table out: first rows of the raw fragment file ------------------------
+frag_preview <- frag.file
+colnames(frag_preview) <- c("chrom", "start", "end",
+                            "cell_barcode", "duplicate_count")
+readr::write_csv(tibble::as_tibble(frag_preview),
+                 file.path(out_dir, "Mod9_C2_fragment_preview.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -335,20 +352,51 @@ colnames(pbmc@meta.data)
 
 ```{r}
 #| label: qc-viz
+#| fig-cap: "ATAC QC density scatters (depth/nucleosome signal vs TSS enrichment) and per-metric violins for the PBMC 10k cells."
 
 a1 <- DensityScatter(pbmc, x = "nCount_ATAC",
-                     y = "TSS.enrichment", log_x = TRUE, quantiles = TRUE)
+                     y = "TSS.enrichment", log_x = TRUE, quantiles = TRUE) +
+  labs(
+    title = "Depth vs TSS enrichment",
+    x     = "nCount_ATAC (fragments per cell, log scale)",
+    y     = "TSS enrichment score"
+  )
 a2 <- DensityScatter(pbmc, x = "nucleosome_signal",
-                     y = "TSS.enrichment", log_x = TRUE, quantiles = TRUE)
-a1 | a2
+                     y = "TSS.enrichment", log_x = TRUE, quantiles = TRUE) +
+  labs(
+    title = "Nucleosome signal vs TSS enrichment",
+    x     = "Nucleosome signal (log scale)",
+    y     = "TSS enrichment score"
+  )
+p_qc_density <- (a1 | a2) +
+  patchwork::plot_annotation(
+    title    = "scATAC-seq QC density scatters — PBMC 10k v1",
+    subtitle = "Good cells: sufficient depth, high TSS enrichment, low nucleosome signal",
+    caption  = "Module 9 · scATAC-seq with Signac"
+  )
+p_qc_density
 
-VlnPlot(
+p_qc_vln <- VlnPlot(
   object   = pbmc,
   features = c("nCount_ATAC", "nFeature_ATAC", "TSS.enrichment",
                "nucleosome_signal", "blacklist_ratio", "pct_reads_in_peaks"),
   pt.size  = 0.1,
   ncol     = 6
-)
+) &
+  theme(plot.title = element_text(size = 10))
+p_qc_vln <- p_qc_vln +
+  patchwork::plot_annotation(
+    title    = "Per-cell ATAC QC metric distributions — PBMC 10k v1",
+    subtitle = "Depth, complexity, TSS enrichment, nucleosome signal, blacklist ratio and peak-read fraction",
+    caption  = "Module 9 · scATAC-seq with Signac"
+  )
+p_qc_vln
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod9_C6_qc_density_scatter.png"), p_qc_density,
+       width = 10, height = 5, dpi = 300)
+ggsave(file.path(out_dir, "Mod9_C6_qc_violins.png"),         p_qc_vln,
+       width = 14, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -400,12 +448,24 @@ pbmc
 
 ```{r}
 #| label: lsi
+#| fig-cap: "Correlation between each LSI component and sequencing depth; component 1 is the depth-confounded one to drop."
 
 pbmc <- RunTFIDF(pbmc)
 pbmc <- FindTopFeatures(pbmc, min.cutoff = "q0")
 pbmc <- RunSVD(pbmc)
 
-DepthCor(pbmc)
+p_depthcor <- DepthCor(pbmc) +
+  labs(
+    title    = "LSI component correlation with sequencing depth",
+    subtitle = "Component 1 typically tracks depth, not biology — exclude it downstream",
+    x        = "LSI component",
+    y        = "Correlation with depth"
+  )
+p_depthcor
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod9_C8_depthcor.png"), p_depthcor,
+       width = 7, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -426,12 +486,25 @@ DepthCor(pbmc)
 
 ```{r}
 #| label: umap-cluster
+#| fig-cap: "UMAP of the PBMC 10k scATAC-seq cells coloured by SLM cluster (LSI dims 2:30)."
 
 pbmc <- RunUMAP(pbmc, reduction = "lsi", dims = 2:30)
 pbmc <- FindNeighbors(pbmc, reduction = "lsi", dims = 2:30)
 pbmc <- FindClusters(pbmc, algorithm = 3)   # SLM
 
-DimPlot(pbmc, label = TRUE) + NoLegend()
+p_umap <- DimPlot(pbmc, label = TRUE) +
+  NoLegend() +
+  labs(
+    title    = "scATAC-seq clusters — PBMC 10k v1",
+    subtitle = "UMAP on LSI components 2:30, clustered with SLM (algorithm 3)",
+    x        = "UMAP 1",
+    y        = "UMAP 2"
+  )
+p_umap
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod9_C9_umap_clusters.png"), p_umap,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}

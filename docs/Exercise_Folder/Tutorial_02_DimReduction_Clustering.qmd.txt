@@ -98,7 +98,17 @@ If you're running a graded course, link the rendered solutions page from your LM
 
 library(Seurat)
 library(tidyverse)
+library(patchwork)   # combine + annotate multi-panel Seurat plots
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod2_C<chunk>_<name>
+# into ../output/Mod2/ so it can be cross-referenced from the rest of the site.
+#   Mod2 = Module 2 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod2"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ```{r}
@@ -114,6 +124,7 @@ ifnb
 
 ```{r}
 #| label: pca
+#| fig-cap: "PC1 gene-loading heatmap on 500 cells — the axis is dominated by interferon-stimulated genes (the batch/condition signal)."
 
 ifnb <- RunPCA(
   ifnb,
@@ -121,7 +132,38 @@ ifnb <- RunPCA(
 )
 
 print(ifnb[["pca"]], dims = 1:5, nfeatures = 5)
-DimHeatmap(ifnb, dims = 1, cells = 500, balanced = TRUE)
+
+# --- Table out: top +/- gene loadings for the first five PCs ---------------
+pca_loadings <- Loadings(ifnb[["pca"]])[, 1:5]
+top_pc_loadings <- purrr::map_dfr(1:5, function(d) {
+  ord <- order(pca_loadings[, d])
+  tibble::tibble(
+    PC        = paste0("PC", d),
+    direction = c(rep("negative", 5), rep("positive", 5)),
+    gene      = c(rownames(pca_loadings)[head(ord, 5)],
+                  rownames(pca_loadings)[tail(ord, 5)]),
+    loading   = c(pca_loadings[head(ord, 5), d],
+                  pca_loadings[tail(ord, 5), d])
+  )
+})
+readr::write_csv(top_pc_loadings, file.path(out_dir, "Mod2_C3_pca_loadings.csv"))
+
+# PC1 loadings heatmap (DimHeatmap draws to the active device); add a title and
+# capture it as a patchwork element so it can be annotated and saved.
+p_pca_heatmap <- DimHeatmap(ifnb, dims = 1, cells = 500, balanced = TRUE,
+                            fast = FALSE) +
+  ggtitle("PC1 loadings — top genes across 500 cells")
+p_pca_heatmap <- patchwork::wrap_elements(p_pca_heatmap) +
+  patchwork::plot_annotation(
+    title    = "PCA diagnostic — PC1 gene-loading heatmap",
+    subtitle = "Cells ordered by PC1 score; expect interferon-stimulated genes to dominate",
+    caption  = "Module 2 · Dimensionality Reduction & Clustering"
+  )
+p_pca_heatmap
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -142,8 +184,20 @@ DimHeatmap(ifnb, dims = 1, cells = 500, balanced = TRUE)
 
 ```{r}
 #| label: elbow
+#| fig-cap: "Elbow plot of per-PC standard deviation — used to pick a defensible number of PCs (the elbow sits around PC15–20)."
 
-ElbowPlot(ifnb, ndims = 40)
+p_elbow <- ElbowPlot(ifnb, ndims = 40) +
+  labs(
+    title    = "PCA elbow plot — variance captured per principal component",
+    subtitle = "The elbow (~PC15–20) marks where additional PCs stop adding signal",
+    x        = "Principal component",
+    y        = "Standard deviation"
+  )
+p_elbow
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod2_C4_elbow.png"), p_elbow,
+       width = 7, height = 5, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -223,11 +277,24 @@ head(ifnb@meta.data)
 
 ```{r}
 #| label: umap
+#| fig-cap: "UMAP of the unintegrated ifnb cells coloured by graph cluster (resolution 0.5)."
 
 ifnb <- RunUMAP(ifnb, dims = 1:n_pcs)
 
 Idents(ifnb) <- "RNA_snn_res.0.5"
-DimPlot(ifnb, reduction = "umap", label = TRUE) + ggtitle("Unintegrated — clusters")
+p_umap_clusters <- DimPlot(ifnb, reduction = "umap", label = TRUE) +
+  labs(
+    title    = "Unintegrated UMAP — graph clusters (res = 0.5)",
+    subtitle = "Clusters computed on the joint CTRL + STIM matrix without integration",
+    x        = "UMAP 1",
+    y        = "UMAP 2",
+    colour   = "Cluster"
+  )
+p_umap_clusters
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod2_C8_umap_clusters.png"), p_umap_clusters,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ## Step 6 — Diagnose the batch effect
@@ -236,17 +303,45 @@ This is the key exercise. The UMAP above is colored by cluster. Now color the *s
 
 ```{r}
 #| label: batch-diagnostic
+#| fig-cap: "The same unintegrated UMAP coloured by sample (left/top) and by author cell-type label — revealing per-sample islands driven by the batch effect."
 
 p_by_sample <- DimPlot(ifnb, reduction = "umap", group.by = "stim") +
-  ggtitle("Unintegrated — by sample (stim)")
+  labs(
+    title    = "Unintegrated UMAP — coloured by sample (stim)",
+    subtitle = "CTRL and STIM cells form largely parallel islands",
+    x        = "UMAP 1",
+    y        = "UMAP 2",
+    colour   = "Sample"
+  )
 
 p_by_celltype <- DimPlot(ifnb, reduction = "umap", group.by = "seurat_annotations",
                          label = TRUE, repel = TRUE) +
   NoLegend() +
-  ggtitle("Unintegrated — by author cell-type")
+  labs(
+    title    = "Unintegrated UMAP — coloured by author cell-type",
+    subtitle = "Most cell types split into two sister clusters, tracking stim",
+    x        = "UMAP 1",
+    y        = "UMAP 2"
+  )
 
 p_by_sample
 p_by_celltype
+
+# Combined two-panel batch-effect diagnostic, shared annotation
+p_batch <- (p_by_sample | p_by_celltype) +
+  patchwork::plot_annotation(
+    title    = "Batch-effect diagnostic — sample vs cell-type on the same embedding",
+    subtitle = "If cell types co-clustered, the two panels would overlay; here they don't",
+    caption  = "Module 2 · Dimensionality Reduction & Clustering"
+  )
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod2_C9_umap_by_sample.png"),   p_by_sample,
+       width = 7, height = 6, dpi = 300)
+ggsave(file.path(out_dir, "Mod2_C9_umap_by_celltype.png"), p_by_celltype,
+       width = 7, height = 6, dpi = 300)
+ggsave(file.path(out_dir, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,
+       width = 13, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -273,11 +368,22 @@ p_by_celltype
 #| label: crosstab
 
 # Clusters × samples — how mixed is each cluster across CTRL / STIM?
-prop.table(table(cluster = ifnb$RNA_snn_res.0.5, sample = ifnb$stim), margin = 1) |>
+cluster_by_sample <- prop.table(
+  table(cluster = ifnb$RNA_snn_res.0.5, sample = ifnb$stim), margin = 1) |>
   round(2)
+cluster_by_sample
 
 # Clusters × cell types — how clean is each cluster's biological identity?
-table(cluster = ifnb$RNA_snn_res.0.5, celltype = ifnb$seurat_annotations)
+cluster_by_celltype <- table(cluster = ifnb$RNA_snn_res.0.5,
+                             celltype = ifnb$seurat_annotations)
+cluster_by_celltype
+
+# --- Tables out: cluster composition by sample and by cell type ------------
+as.data.frame(cluster_by_sample) |>
+  readr::write_csv(file.path(out_dir, "Mod2_C10_cluster_by_sample.csv"))
+
+as.data.frame(cluster_by_celltype) |>
+  readr::write_csv(file.path(out_dir, "Mod2_C10_cluster_by_celltype.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
