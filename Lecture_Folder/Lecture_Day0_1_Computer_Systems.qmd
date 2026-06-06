@@ -1,0 +1,327 @@
+---
+title: "Day 0 · Module 1 — Computer System Fundamentals"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: "Single Cell RNA-seq Workshop · Day 0 · Module 1 — Computer System Fundamentals"
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+# Day 0 · Module 1 — Computer System Fundamentals {background-color="#2c3e50"}
+
+## Where this fits
+
+::: incremental
+-   **Day 0 (optional Tuesday refresher)** — a relaxed primer before the workshop proper begins on Day 1.
+-   This is **Module 1 of 2**:
+    -   **Module 1 (now):** Computer System Fundamentals — hardware, OS, HPC, Talapas.
+    -   **Module 2 (next):** [R & the Command Line](Lecture_Day0_2_R_and_CommandLine.html).
+-   Pairs with the reading: [Day 0 · Module 1 — Computer System Fundamentals](../Resources_Folder/Chapter_Day0_1_Computer_Systems.html).
+-   Goal: build a shared mental model so the analysis days (Day 1+) make sense.
+:::
+
+## Goals for this hour
+
+::: incremental
+-   Know the parts of a computer that matter for data analysis: **CPU, RAM, disk**.
+-   Understand what an **operating system** does for you.
+-   Know what an **HPC cluster** is and *when you actually need one*.
+-   Be able to **log in to Talapas** and find your way around.
+-   Understand **modules** and the **SLURM** scheduler at a high level.
+-   See how **VS Code** and **reproducible environments** make this comfortable.
+:::
+
+# How computers & operating systems work {background-color="#2c3e50"}
+
+## The three things that matter most
+
+::: incremental
+-   **CPU** — does the work. Made of **cores** (independent workers) and runs at some **clock speed** (GHz). More cores = more tasks at once.
+-   **RAM** — fast, *volatile* working memory. Your data must fit here while you analyze it. **Lost when power is off.**
+-   **Disk** — slow, *persistent* storage. SSDs are fast (~0.1 ms); spinning HDDs are slow (~10 ms) but cheap and large.
+:::
+
+::: {.callout-tip}
+The #1 single-cell bottleneck is **RAM**: a big count matrix must fit in memory. "Out of memory" usually means *get more RAM*, not a faster CPU.
+:::
+
+## CPU vs GPU (one slide)
+
+::::: columns
+::: {.column width="50%"}
+**CPU**
+
+-   A few powerful cores (4–64)
+-   Great at sequential, branching logic
+-   Runs your OS and most R/Bioconductor code
+:::
+
+::: {.column width="50%"}
+**GPU**
+
+-   Thousands of small cores
+-   Massive parallelism
+-   Machine learning, some scRNA-seq tools
+:::
+:::::
+
+::: {.callout-note}
+Most of this workshop runs on the **CPU**. GPUs matter for deep-learning steps and a few accelerated tools.
+:::
+
+## What an operating system does
+
+::: incremental
+-   The OS is the **manager** sitting between you and the hardware.
+-   **Process management** — schedules many running programs across cores.
+-   **Memory management** — hands out RAM, protects programs from each other.
+-   **File system** — organizes files into directories with permissions.
+-   **Security** — users, groups, and the *least-privilege* principle.
+:::
+
+## The filesystem & processes
+
+::: incremental
+-   Files live in a **tree** of directories; you navigate with paths (`/home/you/data`).
+-   A **process** is a running program; the OS gives each a slice of CPU time and a chunk of RAM.
+-   On a shared machine, *many users' processes coexist* — so being a good citizen matters (especially on a cluster).
+-   Unix/Linux is the lingua franca of scientific computing — the same commands work on your laptop and on Talapas.
+:::
+
+# What is an HPC cluster? {background-color="#2c3e50"}
+
+## A cluster, in one picture
+
+::: incremental
+-   A **cluster** is many computers ("nodes") wired together to act as one big system.
+-   **Login (head) node** — where you land; for light work only (editing, submitting jobs).
+-   **Compute nodes** — the workhorses where your jobs actually run.
+-   **Shared storage** — a parallel filesystem every node can see.
+-   **Scheduler** (SLURM) — decides whose job runs where and when.
+:::
+
+## When do you actually need one?
+
+::::: columns
+::: {.column width="50%"}
+**Laptop is fine when...**
+
+-   Data fits in your RAM
+-   One sample / small dataset
+-   Quick exploration & plotting
+:::
+
+::: {.column width="50%"}
+**Reach for HPC when...**
+
+-   Data exceeds laptop RAM (many samples)
+-   Long-running jobs (hours/days)
+-   Many jobs in parallel
+-   You need GPUs or huge memory nodes
+:::
+:::::
+
+::: {.callout-tip}
+Rule of thumb: prototype small on your laptop, then scale the *same* workflow up on Talapas.
+:::
+
+# UO Talapas {background-color="#2c3e50"}
+
+## Meet Talapas
+
+::: incremental
+-   UO's flagship HPC cluster, run by **Research Advanced Computing Services (RACS)**.
+-   Named from the Chinook word for *coyote* — educator and keeper of knowledge.
+-   Scale: **~14,500 CPU cores, 129 TB RAM, ~89 GPUs (A40–H100), ~3 PB storage.**
+-   Docs: [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/).
+:::
+
+## Getting access: a PIRG + an account
+
+::: incremental
+-   Access is tied to a **PIRG** (Principal Investigator Research Group).
+-   Ask your **PI** to add you, or have RACS create a new PIRG.
+-   Request access at [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access).
+-   Your **username = your Duck ID**; your **password = your UO password**.
+:::
+
+## Logging in: SSH + Duo
+
+``` bash
+# Connect with SSH (off campus: connect to UO VPN first)
+ssh yourduckid@login.talapas.uoregon.edu
+```
+
+::: incremental
+-   No characters appear while you type your password — that's normal.
+-   Logins require **Duo** two-factor: type `1` and Enter for a push.
+-   You land on a **login node** — light tasks only. Heavy jobs there get killed.
+:::
+
+## File systems: where things go
+
+| Location | Quota | Purpose |
+|--------------------------|-----------|------------------------------------|
+| `/home/<duckid>` | 250 GB | Config files, scripts, small installs |
+| `/projects/<PIRG>` | 2 TB | Shared project data & analysis |
+| `/scratch/<PIRG>` | 20 TB | High-throughput working space — **purged after 90 days idle** |
+
+::: {.callout-warning}
+**Talapas is NOT backed up.** You are responsible for your own backups. Keep large data in `/projects`; clean up `/scratch`.
+:::
+
+## Software: modules (Lmod)
+
+Talapas software is loaded on demand with **Lmod** — per shell, so reload it in every session/job.
+
+``` bash
+module spider R          # search for software
+module avail             # list loadable modules
+module load R/4.4.1      # load a specific version (reproducible!)
+module list              # what's loaded now
+module purge             # unload everything
+```
+
+::: {.callout-note}
+Always pin a version (`R/4.4.1`, not just `R`) so your analysis is reproducible later.
+:::
+
+## Partitions & SLURM
+
+Jobs go to **partitions** (queues) via the **SLURM** scheduler. Every job must name its **`--account`** (your PIRG).
+
+| Partition | Typical use | Max wall time |
+|-----------------------------|--------------------------------|---------------|
+| `compute` | Standard CPU jobs | 1 day |
+| `computelong` | Long CPU jobs | 14 days |
+| `gpu` / `gpulong` | GPU jobs (short / long) | 1 day / 14 d |
+| `memory` / `memorylong` | High-memory CPU (up to 4 TB) | 1 day / 14 d |
+| `interactive` / `interactivegpu` | Short interactive sessions | 12 h / 8 h |
+| `preempt` | All nodes; may be preempted | Variable |
+
+## Submitting work to SLURM
+
+``` bash
+# Batch job (the normal way to run real work)
+sbatch my_script.sh
+
+# Interactive session (testing / debugging)
+srun --pty --partition=interactive --account=myPIRG \
+     --time=2:00:00 --cpus-per-task=4 --mem=8G /bin/bash
+
+squeue -u $USER     # your jobs in the queue
+scancel JOBID       # cancel a job
+```
+
+::: {.callout-tip}
+Golden rule: **never run heavy computation on a login node.** Anything longer than a few seconds belongs in `srun` or `sbatch`.
+:::
+
+## Anatomy of a batch script
+
+``` bash
+#!/bin/bash
+#SBATCH --job-name=my_analysis   # name
+#SBATCH --partition=compute      # queue
+#SBATCH --account=myPIRG         # your PIRG (required)
+#SBATCH --time=04:00:00          # HH:MM:SS
+#SBATCH --cpus-per-task=4        # cores
+#SBATCH --mem=16G                # memory
+#SBATCH --output=out_%j.log      # %j = job ID
+
+module load R/4.4.1              # load modules AFTER #SBATCH lines
+Rscript my_analysis.R            # do the work
+```
+
+::: incremental
+-   `#SBATCH` lines are scheduler directives, not run by bash.
+-   Request only what you need — smaller jobs start sooner.
+:::
+
+# Working interactively {background-color="#2c3e50"}
+
+## VS Code + Remote-SSH
+
+::: incremental
+-   **VS Code** is a free editor that can connect *into* Talapas over SSH.
+-   Install the **Remote – SSH** and **Remote Explorer** extensions.
+-   Add the host `login.talapas.uoregon.edu`, connect (password + Duo), and a green banner confirms you're on Talapas.
+-   Browse remote files, edit scripts, and use the **integrated terminal** — all in one window.
+-   The **Quarto extension** lets you edit and render `.qmd` documents right there.
+:::
+
+## Open OnDemand (browser, no SSH)
+
+::: incremental
+-   Web portal: [ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu) — Chrome or Firefox.
+-   No SSH client needed; great for beginners.
+-   File browser for uploads/downloads.
+-   Launch **interactive apps**: JupyterLab, RStudio, MATLAB, remote desktop.
+-   Easiest way to get an RStudio or Jupyter session on Talapas.
+:::
+
+# Reproducible environments {background-color="#2c3e50"}
+
+## Why pin your environment?
+
+::: incremental
+-   So you can **reproduce a result six months later**.
+-   So a co-author runs the **same package versions**.
+-   So you avoid days of dependency debugging on Talapas.
+-   Two layers cover most cases: **`renv`** (R packages) and **containers** (everything).
+:::
+
+## renv + containers (brief)
+
+``` r
+# renv: pin exact R-package versions (reads renv.lock)
+install.packages("renv")
+renv::restore()
+```
+
+``` bash
+# Container: a self-contained image (R + Bioconductor + system deps)
+# Laptop uses Docker; Talapas uses Apptainer (Docker isn't allowed there)
+module load apptainer
+apptainer pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest
+apptainer exec scrnaseq_tutorial_latest.sif R
+```
+
+::: {.callout-note}
+**Docker** on your laptop, **Apptainer** on Talapas — same image, reproducible either way.
+:::
+
+# Recap & what's next {background-color="#2c3e50"}
+
+## Recap
+
+::: incremental
+-   **CPU / RAM / disk** — RAM is usually the limiting resource for single-cell work.
+-   The **OS** manages processes, memory, files, and security for you.
+-   An **HPC cluster** = many nodes + shared storage + a scheduler; use it when your laptop runs out of room or time.
+-   On **Talapas**: PIRG + account, SSH + Duo, mind your file systems, `module load`, and submit jobs with **SLURM** — never on the login node.
+-   **VS Code / Open OnDemand** make remote work comfortable; **renv + containers** make it reproducible.
+:::
+
+## What's next
+
+::: incremental
+-   **Module 2 (next):** [R & the Command Line](Lecture_Day0_2_R_and_CommandLine.html) — the tools you'll type into every day.
+-   **Day 1 onward:** the single-cell analysis workflow itself.
+-   Optional refresher reading: [Day 0 · Module 1 — Computer System Fundamentals](../Resources_Folder/Chapter_Day0_1_Computer_Systems.html).
+-   Need help on Talapas? [Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/) · [Service Desk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) · racs@uoregon.edu.
+:::

@@ -1,0 +1,413 @@
+---
+title: "Day 0 · Module 2 — R & the Command Line"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: "Single Cell RNA-seq Workshop · Day 0 · Module 2 — R & the Command Line"
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+# Day 0 · Module 2 — R & the Command Line {background-color="#2c3e50"}
+
+## Where this fits
+
+::: incremental
+-   **Day 0 (optional Tuesday refresher)** — for getting everyone up and running before the core workshop
+-   **Module 2 of 2** — follows **Module 1 (Computer Systems)**
+-   Goal today: just enough **shell** and **R** to be productive on Day 1, not a full course
+-   Pairs with the reading: [Day 0 · Module 2 — R & the Command Line](../Resources_Folder/Chapter_Day0_2_R_and_CommandLine.html)
+:::
+
+## What you'll walk away with
+
+::: incremental
+-   Open a terminal and **move around the filesystem** with confidence
+-   Create, view, move, and delete files; combine tools with **pipes & redirection**
+-   Download data with `wget` / `curl`, and **get help** when stuck
+-   Launch **RStudio**, assign variables, and work with vectors, data frames, and lists
+-   Install and load packages; read & write data; write **tidyverse** pipelines
+:::
+
+# Part 1 — The Command Line {background-color="#2c3e50"}
+
+## Why the shell first?
+
+::: incremental
+-   The **shell** is the gateway: it runs everything else (R, aligners, HPC jobs)
+-   A program that takes typed **commands** and hands them to the operating system
+-   **Bash** is the shell on Mac, Linux, and Windows (via WSL)
+-   You reach it through a **terminal window**
+-   Bioinformatics data is big — these tools scale to gigabytes effortlessly
+:::
+
+## Anatomy of a command
+
+``` bash
+ls -l Documents
+```
+
+::: incremental
+-   **Prompt** — the shell signaling it's ready for input
+-   **Command** — the action (`ls`)
+-   **Options / flags** — change behavior (`-l` = long format)
+-   **Argument** — what it operates on (`Documents`)
+:::
+
+## How a computer is organized
+
+::: incremental
+-   A tree of **directories** (folders) and **files**
+-   `/` = the **root** — holds everything else
+-   `~` = your **home** directory (e.g. `/Users/yourname`)
+-   A **path** is a location in the tree (`/Users/wcresko/Documents`)
+-   Navigating = jumping up and down between directories
+:::
+
+## Where am I? Navigating
+
+``` bash
+pwd            # print working directory — where am I?
+ls             # list contents of current directory
+ls -l          # long format: sizes, dates, permissions
+ls -la         # also show hidden files (start with .)
+cd Documents   # change into Documents
+```
+
+::: incremental
+-   `pwd` tells you where you are
+-   `ls` shows what's there (`-l` long, `-a` all, `-t` by time, `-S` by size)
+-   `cd` moves you around
+:::
+
+## Paths: absolute vs. relative
+
+``` bash
+cd /Users/wcresko/Documents   # absolute — full path from /
+cd data                       # relative — from where I am now
+cd ..                         # up one directory (parent)
+cd ../scripts                 # up one, then into scripts
+cd ~                          # home directory
+cd -                          # back to previous directory
+```
+
+::: incremental
+-   **Absolute** = full path starting at `/`
+-   **Relative** = from your current location
+-   `.` = here · `..` = parent · `~` = home
+:::
+
+## Making, moving, removing
+
+``` bash
+mkdir project          # make a new directory
+touch notes.txt        # make a new empty file
+mv notes.txt README    # rename (or move) a file
+cp README README.bak   # copy a file
+rm README.bak          # delete a file
+rmdir project          # delete an (empty) directory
+```
+
+::: incremental
+-   **The shell trusts you** — `rm` deletes immediately, no trash bin
+-   Naming: avoid spaces, don't start with `-`, stick to letters/numbers/`.`/`-`/`_`
+-   Use meaningful extensions (`.txt`, `.csv`, `.fasta`)
+:::
+
+## Viewing files
+
+``` bash
+cat small.txt          # dump a whole (small) file
+less large.txt         # page through: space=fwd, b=back, /=search, q=quit
+head data.txt          # first 10 lines
+head -n 20 data.txt    # first 20 lines
+tail data.txt          # last 10 lines
+tail -f log.txt        # follow a growing file in real time
+wc -l data.txt         # count lines
+```
+
+::: {.callout-important title="Never cat a huge file"}
+A 3 GB genome will freeze your session. Use `head`, `tail`, or `less` instead.
+:::
+
+## Wildcards
+
+``` bash
+ls *.csv               # everything ending in .csv
+ls sample_*.fastq      # sample_1.fastq, sample_2.fastq, ...
+ls data_?.txt          # ? matches exactly one character
+rm tmp_*               # careful! deletes everything matching
+```
+
+::: incremental
+-   `*` matches **any number** of characters
+-   `?` matches **exactly one** character
+-   Lets one command act on many files at once
+:::
+
+## Pipes & redirection
+
+``` bash
+ls -l > files.txt          # > send output to a file (overwrites!)
+echo "more" >> files.txt   # >> append to a file
+ls /nope 2> errors.txt     # 2> capture error messages
+sort names.txt | uniq      # | feed one command's output into the next
+```
+
+::: incremental
+-   `>` writes to a file (**overwrites**), `>>` **appends**
+-   `|` chains commands — no intermediate files needed
+-   Three streams: **stdin (0)**, **stdout (1)**, **stderr (2)**
+:::
+
+## Pipes: small tools, combined
+
+``` bash
+# Count how many lines match a pattern
+grep "pattern" file.txt | wc -l
+
+# Sort, find unique values, count them, rank by frequency
+cat data.csv | cut -d',' -f2 | sort | uniq -c | sort -rn
+
+# Count sequences in a FASTA file
+grep "^>" genome.fa | wc -l
+```
+
+::: incremental
+-   **Unix philosophy**: small tools that each do one thing well
+-   Build complex pipelines one stage at a time, checking output as you go
+-   Filter early to keep the data flowing through small
+:::
+
+## Downloading data
+
+::: panel-tabset
+### wget
+
+``` bash
+wget https://example.org/genome.fna.gz
+```
+
+### curl
+
+``` bash
+curl -o genome.fa.gz https://example.org/genome.fna.gz
+```
+
+### Notes
+
+-   Both download files from a URL
+-   `curl -o` lets you name the saved file
+-   `.gz` = compressed — work with it directly via `zcat`, `zless`, `zgrep`
+:::
+
+## Getting help
+
+``` bash
+man ls          # full manual page (q to quit)
+ls --help       # quick usage summary
+```
+
+::: incremental
+-   `man command` opens the manual; press `q` to exit
+-   `command --help` gives a fast summary
+-   And of course: the internet and generative AI (Claude, ChatGPT)
+:::
+
+# Part 2 — R & RStudio {background-color="#2c3e50"}
+
+## Why R?
+
+::: incremental
+-   Powerful, flexible, **free**, runs everywhere
+-   Superb data management, statistics, and graphics
+-   **Reproducibility** — your scripts record exactly what you did
+-   Write your own functions; huge online help and community
+-   Nice front end (**RStudio**) and dynamic documents (**Quarto**)
+:::
+
+## The R interpreter & RStudio panes
+
+::: incremental
+-   **R** is the engine that runs your commands; **RStudio** is the comfortable cockpit around it
+-   **Source** (top-left) — your scripts and Quarto docs you edit and save
+-   **Console** (bottom-left) — where commands actually run
+-   **Environment / History** (top-right) — the objects you've created
+-   **Files / Plots / Packages / Help** (bottom-right) — everything else
+:::
+
+## Assignment & basic math
+
+``` r
+x <- 2          # assign with <-
+x * 3           # 6
+y <- x * 3      # store a result
+log(x)          # built-in functions: object goes in parentheses
+sqrt(16)        # 4
+```
+
+::: incremental
+-   Assign with `<-`; names start with a letter; R is **case sensitive** (`x` ≠ `X`)
+-   Normal math precedence (PEMDAS); parentheses control order
+-   Comment with `#`
+:::
+
+## Vectors — R thinks in vectors
+
+``` r
+x <- c(2, 3, 4, 2, 1, 5)   # c() = concatenate into a vector
+y <- x^2                   # operations are element-wise
+mean(x); median(x); sd(x)  # built-in summaries
+length(x)                  # how many elements
+seq(0, 10, by = 0.5)       # a regular sequence
+```
+
+::: incremental
+-   A **vector** is a list of values of one type
+-   Math applies to **every element at once**
+-   Types: `int`, `dbl` (numeric), `chr`, `lgl`, plus **factors** for categories
+:::
+
+## Data frames — tabular data
+
+``` r
+conc    <- factor(c("low", "high", "high", "med"))
+stiff   <- c(3.4, 8.4, 3.0, 5.6)
+mydata  <- data.frame(conc, stiff)
+
+mydata$stiff        # a column by name (preferred)
+mydata[, 2]         # column 2
+mydata[1, ]         # row 1
+mydata[mydata$stiff > 4, ]   # rows meeting a condition
+```
+
+::: incremental
+-   The primary structure for tabular data; vectors become **columns**
+-   `[row, column]` indexing; `$` grabs a column by name
+-   `factor()` marks a column as categorical
+:::
+
+## Lists — the pocket that holds anything
+
+``` r
+experiment <- list(
+  sample_id  = "donor_01_CTRL",
+  age        = 42,
+  cell_types = c("B cell", "CD4 T", "NK")
+)
+
+experiment$sample_id     # access a slot by name
+experiment[[3]]          # the contents of the 3rd slot
+```
+
+::: incremental
+-   Each slot can hold a **different kind of thing** — even another list
+-   `[[ ]]` returns the *contents*; `[ ]` returns a sub-list
+-   **Seurat** and **SingleCellExperiment** objects are lists under the hood
+:::
+
+## Functions
+
+``` r
+round(3.14159, 2)              # positional args — order matters
+round(x = 3.14159, digits = 2) # named args — order-independent, clearer
+
+# Define your own
+cv <- function(x, na.rm = TRUE) {
+  if (na.rm) x <- x[!is.na(x)]
+  sd(x) / mean(x)
+}
+cv(c(1, 2, 3, 4, 5))
+```
+
+::: incremental
+-   Use **named arguments** whenever there's ambiguity — self-documenting
+-   scRNA-seq functions have long signatures, so almost everything is named
+-   You'll write small helper functions all the time
+:::
+
+## Packages: `install.packages()` vs `library()`
+
+``` r
+install.packages("tidyverse")   # download & install — ONCE per machine
+library(tidyverse)              # load — EVERY new R session
+```
+
+::: incremental
+-   **`install.packages()`** = get it onto your computer (do once)
+-   **`library()`** = make it available in this session (do every time)
+-   Bioconductor packages (Seurat ecosystem, DESeq2) use `BiocManager::install()`
+:::
+
+## The tidyverse & the pipe
+
+``` r
+library(tidyverse)
+
+result <- meta |>
+  filter(nFeature_RNA > 200, nFeature_RNA < 2500) |>
+  group_by(sample, cluster) |>
+  summarise(n_cells = n(),
+            median_umi = median(nCount_RNA),
+            .groups = "drop") |>
+  arrange(sample, desc(n_cells))
+```
+
+::: incremental
+-   Six verbs cover most work: `filter`, `select`, `mutate`, `arrange`, `group_by`, `summarise`
+-   The pipe **`|>`** chains steps — read top-to-bottom, left-to-right
+-   This style appears throughout the workshop tutorials
+:::
+
+## Reading & writing data
+
+``` r
+# Read
+df <- read_csv("data.csv")     # tidyverse — returns a tibble
+df <- read_tsv("data.txt")     # tab-separated
+df <- read.csv("data.csv")     # base R equivalent
+
+# Write
+write_csv(df, "results.csv")
+```
+
+::: incremental
+-   `read_csv()` / `read_tsv()` (tidyverse) return tibbles; `read.csv()` is base R
+-   Store data in plain text; keep an **untouched original**; include a header row
+-   One column = one data type
+:::
+
+# You're ready for Day 1 {background-color="#2c3e50"}
+
+## You're ready for Day 1
+
+::: incremental
+-   **Shell:** navigate (`pwd`/`ls`/`cd`), manage files, view with `head`/`less`, combine with `|`, `>`, `>>`, get help with `man`
+-   **R:** assign with `<-`, work with vectors / data frames / lists, write functions, `install.packages()` once + `library()` each session, pipe with `|>`, read/write data
+-   These are the everyday tools under every analysis step ahead
+:::
+
+## What's next
+
+::: incremental
+-   **Day 1 core modules** build directly on this:
+    -   Tutorial 00 — Setup: R, RStudio, Quarto
+    -   Lec/Tut 01 — QC & Preprocessing
+    -   Lec/Tut 02 — Dimension Reduction & Clustering
+    -   Lec/Tut 03+ — Annotation, Integration, DE, and beyond
+-   Revisit the reading: [Day 0 · Module 2 — R & the Command Line](../Resources_Folder/Chapter_Day0_2_R_and_CommandLine.html)
+-   Keep a cheat sheet open — fluency comes from doing. See you Day 1!
+:::
