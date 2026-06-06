@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE</title>
+  <title>Single Cell RNA-seq Workshop – Day 0 · Module 1 — Computer System Fundamentals</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE</h1>
+  <h1 class="title">Day 0 · Module 1 — Computer System Fundamentals</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,93 +1150,46 @@ Bill Cresko
 
 </section>
 <section>
-<section id="lecture-06-deseq2-bulk-fundamentals-pseudobulk-de" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Lecture 06: DESeq2 — Bulk Fundamentals + Pseudobulk DE</h1>
+<section id="day-0-module-1-computer-system-fundamentals" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Day 0 · Module 1 — Computer System Fundamentals</h1>
 
 </section>
-<section id="where-this-lecture-fits" class="slide level2">
-<h2>Where this lecture fits</h2>
+<section id="where-this-fits" class="slide level2">
+<h2>Where this fits</h2>
 <ul>
-<li>Previous: <a href="Lecture_05_Integration.html">Lec 05 — Multi-Sample Integration</a></li>
-<li><strong>You are here:</strong> Lec 06 — <em>the DESeq2 model on bulk RNA-seq, then applied to scRNA-seq pseudobulk</em></li>
-<li>Next: <a href="Lecture_07_FunctionalAnalysis.html">Lec 07 — Functional Analysis</a></li>
-<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_06_DESeq2_DE.html">Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE</a></li>
-<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a></li>
-<li><strong>Statistical background:</strong> <a href="../Resources_Folder/Appendix_B_Statistical_Foundations.html">Appendix B — Statistical Foundations</a></li>
+<li class="fragment"><strong>Day 0 (optional Tuesday refresher)</strong> — a relaxed primer before the workshop proper begins on Day 1.</li>
+<li class="fragment">This is <strong>Module 1 of 2</strong>:
+<ul>
+<li class="fragment"><strong>Module 1 (now):</strong> Computer System Fundamentals — hardware, OS, HPC, Talapas.</li>
+<li class="fragment"><strong>Module 2 (next):</strong> <a href="Lecture_Day0_2_R_and_CommandLine.html">R &amp; the Command Line</a>.</li>
+</ul></li>
+<li class="fragment">Pairs with the reading: <a href="../Resources_Folder/Chapter_Day0_1_Computer_Systems.html">Day 0 · Module 1 — Computer System Fundamentals</a>.</li>
+<li class="fragment">Goal: build a shared mental model so the analysis days (Day 1+) make sense.</li>
 </ul>
 </section>
-<section id="goals-of-this-lecture" class="slide level2">
-<h2>Goals of this lecture</h2>
+<section id="goals-for-this-hour" class="slide level2">
+<h2>Goals for this hour</h2>
 <ul>
-<li class="fragment">Understand the <strong>negative-binomial GLM</strong> at the heart of DESeq2 in plain terms</li>
-<li class="fragment">Read DESeq2 output: <code>baseMean</code>, <code>log2FoldChange</code>, <code>lfcSE</code>, <code>pvalue</code>, <code>padj</code></li>
-<li class="fragment">Set the reference level so the sign of LFC means what you think it means</li>
-<li class="fragment">Know <strong>why and when to shrink</strong> log-fold-changes (<code>lfcShrink</code> + <code>apeglm</code>)</li>
-<li class="fragment">Run DESeq2 end to end on a real bulk RNA-seq dataset (<code>airway</code>)</li>
-<li class="fragment">Understand <strong>why per-cell DE is statistically wrong</strong> for condition contrasts</li>
-<li class="fragment">Aggregate single-cell counts to a <em>(sample × cell type)</em> pseudobulk matrix</li>
-<li class="fragment">Run DESeq2 <em>per cell type</em> with the right design and contrast</li>
+<li class="fragment">Know the parts of a computer that matter for data analysis: <strong>CPU, RAM, disk</strong>.</li>
+<li class="fragment">Understand what an <strong>operating system</strong> does for you.</li>
+<li class="fragment">Know what an <strong>HPC cluster</strong> is and <em>when you actually need one</em>.</li>
+<li class="fragment">Be able to <strong>log in to Talapas</strong> and find your way around.</li>
+<li class="fragment">Understand <strong>modules</strong> and the <strong>SLURM</strong> scheduler at a high level.</li>
+<li class="fragment">See how <strong>VS Code</strong> and <strong>reproducible environments</strong> make this comfortable.</li>
 </ul>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Why bulk DESeq2 first?</strong> Pseudobulk DE in scRNA-seq is <em>just bulk DESeq2 applied to per-cell-type aggregated counts</em>. So learn the bulk model cleanly first (Part 1); the single-cell scaffolding around it (Part 2) is then a small, well-defined wrapper.</p>
-</div>
-</div>
-</div>
 </section></section>
 <section>
-<section id="part-1-deseq2-fundamentals-on-bulk-rna-seq" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 1 — DESeq2 fundamentals on bulk RNA-seq</h1>
+<section id="how-computers-operating-systems-work" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>How computers &amp; operating systems work</h1>
 
 </section>
-<section id="what-deseq2-actually-does" class="slide level2">
-<h2>What DESeq2 actually does</h2>
+<section id="the-three-things-that-matter-most" class="slide level2">
+<h2>The three things that matter most</h2>
 <ul>
-<li class="fragment">Models <strong>integer counts</strong> per gene with a <strong>negative binomial</strong> distribution</li>
-<li class="fragment">Estimates a <strong>size factor</strong> per sample (depth normalization), independent of the design</li>
-<li class="fragment"><strong>Shrinks</strong> per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)</li>
-<li class="fragment">Tests each gene’s coefficient with a <strong>Wald test</strong> (default) or LRT</li>
+<li class="fragment"><strong>CPU</strong> — does the work. Made of <strong>cores</strong> (independent workers) and runs at some <strong>clock speed</strong> (GHz). More cores = more tasks at once.</li>
+<li class="fragment"><strong>RAM</strong> — fast, <em>volatile</em> working memory. Your data must fit here while you analyze it. <strong>Lost when power is off.</strong></li>
+<li class="fragment"><strong>Disk</strong> — slow, <em>persistent</em> storage. SSDs are fast (~0.1 ms); spinning HDDs are slow (~10 ms) but cheap and large.</li>
 </ul>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Why negative binomial, not Poisson?</strong> RNA-seq counts are <strong>over-dispersed</strong>: variance &gt; mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="a-canonical-bulk-deseq2-run-patel-style-airway-data" class="slide level2">
-<h2>A canonical bulk DESeq2 run (Patel-style, <code>airway</code> data)</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(DESeq2); <span class="fu">library</span>(airway)</span>
-<span id="cb1-2"><a></a><span class="fu">data</span>(airway)</span>
-<span id="cb1-3"><a></a></span>
-<span id="cb1-4"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(</span>
-<span id="cb1-5"><a></a>  <span class="at">countData =</span> <span class="fu">assay</span>(airway),</span>
-<span id="cb1-6"><a></a>  <span class="at">colData   =</span> <span class="fu">colData</span>(airway),</span>
-<span id="cb1-7"><a></a>  <span class="at">design    =</span> <span class="sc">~</span> cell <span class="sc">+</span> dex)        <span class="co"># cell line as covariate, dex as test factor</span></span>
-<span id="cb1-8"><a></a></span>
-<span id="cb1-9"><a></a><span class="co"># Pre-filter: drop genes with &lt; 10 total reads (speed only — does not affect FDR)</span></span>
-<span id="cb1-10"><a></a>dds <span class="ot">&lt;-</span> dds[ <span class="fu">rowSums</span>(<span class="fu">counts</span>(dds)) <span class="sc">&gt;=</span> <span class="dv">10</span>, ]</span>
-<span id="cb1-11"><a></a></span>
-<span id="cb1-12"><a></a><span class="co"># Set the reference level so log2FC sign is interpretable</span></span>
-<span id="cb1-13"><a></a>dds<span class="sc">$</span>dex <span class="ot">&lt;-</span> <span class="fu">relevel</span>(dds<span class="sc">$</span>dex, <span class="at">ref =</span> <span class="st">&quot;untrt&quot;</span>)</span>
-<span id="cb1-14"><a></a></span>
-<span id="cb1-15"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb1-16"><a></a>res <span class="ot">&lt;-</span> <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;trt&quot;</span>, <span class="st">&quot;untrt&quot;</span>))</span>
-<span id="cb1-17"><a></a><span class="fu">summary</span>(res)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1246,56 +1199,173 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p><strong><code>relevel()</code> matters.</strong> The reference level becomes the <em>denominator</em> in <code>log2FoldChange</code>. If you forget, your “up-regulated” and “down-regulated” labels can be backwards.</p>
+<p>The #1 single-cell bottleneck is <strong>RAM</strong>: a big count matrix must fit in memory. “Out of memory” usually means <em>get more RAM</em>, not a faster CPU.</p>
 </div>
 </div>
 </div>
 </section>
-<section id="reading-deseq2-output" class="slide level2">
-<h2>Reading DESeq2 output</h2>
+<section id="cpu-vs-gpu-one-slide" class="slide level2">
+<h2>CPU vs GPU (one slide)</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>CPU</strong></p>
+<ul>
+<li>A few powerful cores (4–64)</li>
+<li>Great at sequential, branching logic</li>
+<li>Runs your OS and most R/Bioconductor code</li>
+</ul>
+</div><div class="column" style="width:50%;">
+<p><strong>GPU</strong></p>
+<ul>
+<li>Thousands of small cores</li>
+<li>Massive parallelism</li>
+<li>Machine learning, some scRNA-seq tools</li>
+</ul>
+</div></div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>Most of this workshop runs on the <strong>CPU</strong>. GPUs matter for deep-learning steps and a few accelerated tools.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="what-an-operating-system-does" class="slide level2">
+<h2>What an operating system does</h2>
+<ul>
+<li class="fragment">The OS is the <strong>manager</strong> sitting between you and the hardware.</li>
+<li class="fragment"><strong>Process management</strong> — schedules many running programs across cores.</li>
+<li class="fragment"><strong>Memory management</strong> — hands out RAM, protects programs from each other.</li>
+<li class="fragment"><strong>File system</strong> — organizes files into directories with permissions.</li>
+<li class="fragment"><strong>Security</strong> — users, groups, and the <em>least-privilege</em> principle.</li>
+</ul>
+</section>
+<section id="the-filesystem-processes" class="slide level2">
+<h2>The filesystem &amp; processes</h2>
+<ul>
+<li class="fragment">Files live in a <strong>tree</strong> of directories; you navigate with paths (<code>/home/you/data</code>).</li>
+<li class="fragment">A <strong>process</strong> is a running program; the OS gives each a slice of CPU time and a chunk of RAM.</li>
+<li class="fragment">On a shared machine, <em>many users’ processes coexist</em> — so being a good citizen matters (especially on a cluster).</li>
+<li class="fragment">Unix/Linux is the lingua franca of scientific computing — the same commands work on your laptop and on Talapas.</li>
+</ul>
+</section></section>
+<section>
+<section id="what-is-an-hpc-cluster" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>What is an HPC cluster?</h1>
+
+</section>
+<section id="a-cluster-in-one-picture" class="slide level2">
+<h2>A cluster, in one picture</h2>
+<ul>
+<li class="fragment">A <strong>cluster</strong> is many computers (“nodes”) wired together to act as one big system.</li>
+<li class="fragment"><strong>Login (head) node</strong> — where you land; for light work only (editing, submitting jobs).</li>
+<li class="fragment"><strong>Compute nodes</strong> — the workhorses where your jobs actually run.</li>
+<li class="fragment"><strong>Shared storage</strong> — a parallel filesystem every node can see.</li>
+<li class="fragment"><strong>Scheduler</strong> (SLURM) — decides whose job runs where and when.</li>
+</ul>
+</section>
+<section id="when-do-you-actually-need-one" class="slide level2">
+<h2>When do you actually need one?</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Laptop is fine when…</strong></p>
+<ul>
+<li>Data fits in your RAM</li>
+<li>One sample / small dataset</li>
+<li>Quick exploration &amp; plotting</li>
+</ul>
+</div><div class="column" style="width:50%;">
+<p><strong>Reach for HPC when…</strong></p>
+<ul>
+<li>Data exceeds laptop RAM (many samples)</li>
+<li>Long-running jobs (hours/days)</li>
+<li>Many jobs in parallel</li>
+<li>You need GPUs or huge memory nodes</li>
+</ul>
+</div></div>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>Rule of thumb: prototype small on your laptop, then scale the <em>same</em> workflow up on Talapas.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="uo-talapas" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>UO Talapas</h1>
+
+</section>
+<section id="meet-talapas" class="slide level2">
+<h2>Meet Talapas</h2>
+<ul>
+<li class="fragment">UO’s flagship HPC cluster, run by <strong>Research Advanced Computing Services (RACS)</strong>.</li>
+<li class="fragment">Named from the Chinook word for <em>coyote</em> — educator and keeper of knowledge.</li>
+<li class="fragment">Scale: <strong>~14,500 CPU cores, 129 TB RAM, ~89 GPUs (A40–H100), ~3 PB storage.</strong></li>
+<li class="fragment">Docs: <a href="https://uoracs.github.io/talapas2-knowledge-base/">Talapas Knowledge Base</a>.</li>
+</ul>
+</section>
+<section id="getting-access-a-pirg-an-account" class="slide level2">
+<h2>Getting access: a PIRG + an account</h2>
+<ul>
+<li class="fragment">Access is tied to a <strong>PIRG</strong> (Principal Investigator Research Group).</li>
+<li class="fragment">Ask your <strong>PI</strong> to add you, or have RACS create a new PIRG.</li>
+<li class="fragment">Request access at <a href="https://racs.uoregon.edu/request-access">racs.uoregon.edu/request-access</a>.</li>
+<li class="fragment">Your <strong>username = your Duck ID</strong>; your <strong>password = your UO password</strong>.</li>
+</ul>
+</section>
+<section id="logging-in-ssh-duo" class="slide level2">
+<h2>Logging in: SSH + Duo</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="co"># Connect with SSH (off campus: connect to UO VPN first)</span></span>
+<span id="cb1-2"><a></a><span class="fu">ssh</span> yourduckid@login.talapas.uoregon.edu</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">No characters appear while you type your password — that’s normal.</li>
+<li class="fragment">Logins require <strong>Duo</strong> two-factor: type <code>1</code> and Enter for a push.</li>
+<li class="fragment">You land on a <strong>login node</strong> — light tasks only. Heavy jobs there get killed.</li>
+</ul>
+</section>
+<section id="file-systems-where-things-go" class="slide level2">
+<h2>File systems: where things go</h2>
 <table class="caption-top">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 35%">
+<col style="width: 15%">
+<col style="width: 49%">
 </colgroup>
 <thead>
 <tr class="header">
-<th>Column</th>
-<th>What it is</th>
-<th>Watch-out</th>
+<th>Location</th>
+<th>Quota</th>
+<th>Purpose</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>baseMean</code></td>
-<td>mean of normalized counts across all samples</td>
-<td>Very low values = unstable estimates</td>
+<td><code>/home/&lt;duckid&gt;</code></td>
+<td>250 GB</td>
+<td>Config files, scripts, small installs</td>
 </tr>
 <tr class="even">
-<td><code>log2FoldChange</code></td>
-<td>effect size on log<sub>2</sub> scale</td>
-<td>Use <strong>shrunk</strong> values for ranking</td>
+<td><code>/projects/&lt;PIRG&gt;</code></td>
+<td>2 TB</td>
+<td>Shared project data &amp; analysis</td>
 </tr>
 <tr class="odd">
-<td><code>lfcSE</code></td>
-<td>standard error of the LFC</td>
-<td></td>
-</tr>
-<tr class="even">
-<td><code>stat</code></td>
-<td>Wald statistic</td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><code>pvalue</code></td>
-<td>raw p-value</td>
-<td>Don’t filter on this directly</td>
-</tr>
-<tr class="even">
-<td><code>padj</code></td>
-<td>BH-adjusted p-value</td>
-<td>This is your FDR — filter on <code>padj &lt; 0.05</code></td>
+<td><code>/scratch/&lt;PIRG&gt;</code></td>
+<td>20 TB</td>
+<td>High-throughput working space — <strong>purged after 90 days idle</strong></td>
 </tr>
 </tbody>
 </table>
@@ -1308,16 +1378,94 @@ Bill Cresko
 <p><strong>Warning</strong></p>
 </div>
 <div class="callout-content">
-<p><strong><code>NA</code> in <code>padj</code>?</strong> DESeq2 sets <code>padj = NA</code> for genes filtered by independent filtering or with extreme outliers (Cook’s distance). That’s intentional, not a bug.</p>
+<p><strong>Talapas is NOT backed up.</strong> You are responsible for your own backups. Keep large data in <code>/projects</code>; clean up <code>/scratch</code>.</p>
 </div>
 </div>
 </div>
 </section>
-<section id="shrink-lfcs-for-ranking-visualization-not-for-testing" class="slide level2">
-<h2>Shrink LFCs for ranking &amp; visualization — <em>not</em> for testing</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>res_shrunk <span class="ot">&lt;-</span> <span class="fu">lfcShrink</span>(dds,</span>
-<span id="cb2-2"><a></a>                        <span class="at">coef =</span> <span class="st">&quot;dex_trt_vs_untrt&quot;</span>,</span>
-<span id="cb2-3"><a></a>                        <span class="at">type =</span> <span class="st">&quot;apeglm&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<section id="software-modules-lmod" class="slide level2">
+<h2>Software: modules (Lmod)</h2>
+<p>Talapas software is loaded on demand with <strong>Lmod</strong> — per shell, so reload it in every session/job.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="ex">module</span> spider R          <span class="co"># search for software</span></span>
+<span id="cb2-2"><a></a><span class="ex">module</span> avail             <span class="co"># list loadable modules</span></span>
+<span id="cb2-3"><a></a><span class="ex">module</span> load R/4.4.1      <span class="co"># load a specific version (reproducible!)</span></span>
+<span id="cb2-4"><a></a><span class="ex">module</span> list              <span class="co"># what&#39;s loaded now</span></span>
+<span id="cb2-5"><a></a><span class="ex">module</span> purge             <span class="co"># unload everything</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>Always pin a version (<code>R/4.4.1</code>, not just <code>R</code>) so your analysis is reproducible later.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="partitions-slurm" class="slide level2">
+<h2>Partitions &amp; SLURM</h2>
+<p>Jobs go to <strong>partitions</strong> (queues) via the <strong>SLURM</strong> scheduler. Every job must name its <strong><code>--account</code></strong> (your PIRG).</p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 38%">
+<col style="width: 42%">
+<col style="width: 19%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Partition</th>
+<th>Typical use</th>
+<th>Max wall time</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>compute</code></td>
+<td>Standard CPU jobs</td>
+<td>1 day</td>
+</tr>
+<tr class="even">
+<td><code>computelong</code></td>
+<td>Long CPU jobs</td>
+<td>14 days</td>
+</tr>
+<tr class="odd">
+<td><code>gpu</code> / <code>gpulong</code></td>
+<td>GPU jobs (short / long)</td>
+<td>1 day / 14 d</td>
+</tr>
+<tr class="even">
+<td><code>memory</code> / <code>memorylong</code></td>
+<td>High-memory CPU (up to 4 TB)</td>
+<td>1 day / 14 d</td>
+</tr>
+<tr class="odd">
+<td><code>interactive</code> / <code>interactivegpu</code></td>
+<td>Short interactive sessions</td>
+<td>12 h / 8 h</td>
+</tr>
+<tr class="even">
+<td><code>preempt</code></td>
+<td>All nodes; may be preempted</td>
+<td>Variable</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="submitting-work-to-slurm" class="slide level2">
+<h2>Submitting work to SLURM</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="co"># Batch job (the normal way to run real work)</span></span>
+<span id="cb3-2"><a></a><span class="ex">sbatch</span> my_script.sh</span>
+<span id="cb3-3"><a></a></span>
+<span id="cb3-4"><a></a><span class="co"># Interactive session (testing / debugging)</span></span>
+<span id="cb3-5"><a></a><span class="ex">srun</span> <span class="at">--pty</span> <span class="at">--partition</span><span class="op">=</span>interactive <span class="at">--account</span><span class="op">=</span>myPIRG <span class="dt">\</span></span>
+<span id="cb3-6"><a></a>     <span class="at">--time</span><span class="op">=</span>2:00:00 <span class="at">--cpus-per-task</span><span class="op">=</span>4 <span class="at">--mem</span><span class="op">=</span>8G /bin/bash</span>
+<span id="cb3-7"><a></a></span>
+<span id="cb3-8"><a></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span>     <span class="co"># your jobs in the queue</span></span>
+<span id="cb3-9"><a></a><span class="ex">scancel</span> JOBID       <span class="co"># cancel a job</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1327,220 +1475,114 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Why shrink?</strong> Weakly expressed genes have huge, noisy raw LFCs from sampling noise. Shrinkage (<code>apeglm</code> / <code>ashr</code>) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage) — so a “top hits” list or volcano plot isn’t dominated by junk genes with <code>baseMean = 2</code>.</p>
-</div>
-</div>
-</div>
-<div class="callout callout-important callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Important</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Shrinkage is decoupled from the hypothesis test.</strong> Since the 2016 pipeline change, DESeq2 computes <code>pvalue</code> / <code>padj</code> from the <strong>unshrunken</strong> (MLE) log-fold-changes — shrinkage does <strong>not</strong> enter the Wald test. The shrunken LFCs (and their SEs) are for <strong>ranking, volcano/MA plots, and effect-size reporting</strong>, <em>after</em> testing. So “shrink before ranking” means <em>before you sort and visualize results</em>, <strong>not</strong> <em>before DE testing</em>. Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.</p>
-</div>
-</div>
-</div>
-</section></section>
-<section>
-<section id="part-2-why-per-cell-de-goes-wrong" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 2 — Why per-cell DE goes wrong</h1>
-
-</section>
-<section id="the-scientific-question" class="slide level2">
-<h2>The scientific question</h2>
-<blockquote>
-<p>In <em>cell type X</em>, which genes differ between <strong>treated</strong> and <strong>control</strong> subjects?</p>
-</blockquote>
-</section>
-<section id="why-naïve-per-cell-tests-fail" class="slide level2">
-<h2>Why naïve per-cell tests fail</h2>
-<ul>
-<li class="fragment">Cells from one subject share genetics, library prep, batch, treatment — they are <strong>not independent</strong></li>
-<li class="fragment">Treating each cell as an independent replicate inflates the effective N by 100×–10,000×</li>
-<li class="fragment">Result: <strong>anti-conservative p-values</strong> — thousands of spurious “significant” genes</li>
-<li class="fragment">Documented in benchmarks: Squair et al. 2021 (<em>Nat Commun</em>), Zimmerman et al. 2021</li>
-</ul>
-<div class="callout callout-important callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Important</strong></p>
-</div>
-<div class="callout-content">
-<p>If your experimental unit is the <strong>subject</strong>, your statistical unit should be the <strong>subject</strong>. Within-cell methods (<code>FindMarkers</code>, <code>wilcox</code>, MAST) are fine for <em>exploratory marker discovery</em>; they are <strong>not</strong> condition-level DE.</p>
+<p>Golden rule: <strong>never run heavy computation on a login node.</strong> Anything longer than a few seconds belongs in <code>srun</code> or <code>sbatch</code>.</p>
 </div>
 </div>
 </div>
 </section>
-<section id="cell-level-de-the-model-based-camp" class="slide level2">
-<h2>Cell-level DE — the model-based camp</h2>
-<p>Pseudobulk is our default, but a second family models <strong>each cell</strong> while still respecting non-independence:</p>
-<ul>
-<li><strong>Mixed-effects / GLMM methods</strong> (<code>nebula</code>, <code>glmmTMB</code>, MAST with a random effect) add a <strong>per-sample random effect</strong>, so the subject remains the unit of replication even though the model fits at cell level</li>
-<li><strong>MAST</strong> uses a two-part (hurdle) model tailored to scRNA-seq zero-inflation</li>
-</ul>
-<p>The literature is genuinely split — some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).</p>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Practical stance:</strong> default to <strong>pseudobulk</strong> (simple, robust, hard to fool). Reach for a <strong>mixed-effects cell-level model</strong> when you have many cells per subject, need the extra power, and will check the random-effect specification. The cardinal sin isn’t picking one — it’s the <strong>naïve per-cell test with no subject term</strong>.</p>
-</div>
-</div>
-</div>
-</section></section>
-<section>
-<section id="part-3-pseudobulk-in-practice" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 3 — Pseudobulk in practice</h1>
-
-</section>
-<section id="what-pseudobulk-does" class="slide level2">
-<h2>What pseudobulk does</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDQ2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC50aXRsZSB7IGZvbnQtc2l6ZTogMThweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLnBhbmVsIHsgZm9udC1zaXplOiAxNHB4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjMzMzOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubGJsIHsgZm9udC1zaXplOiAxMXB4OyBmaWxsOiAjNTU1OyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAudHh0IHsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMzMzOyB9CiAgICAuY2VsbEhkciB7IGZvbnQtc2l6ZTogMTFweDsgZm9udC13ZWlnaHQ6IDYwMDsgZmlsbDogIzIyMjsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjNTU1OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjUwMCIgeT0iMjgiPlBzZXVkb2J1bGs6IGFnZ3JlZ2F0ZSBjZWxscyDihpIgc2FtcGxlLWxldmVsIGNvdW50cyDihpIgYnVsayBERSBmcmFtZXdvcms8L3RleHQ+CgogIDwhLS0gUGFuZWwgMTogYW5ub3RhdGVkIGNlbGxzIGJ5IGNsdXN0ZXIgw5cgc2FtcGxlIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLDYwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMCI+MS4gU2luZ2xlIGNlbGxzIGxhYmVsZWQgYnk8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMTgiPihjbHVzdGVyLCBzYW1wbGUpPC90ZXh0PgogICAgPHJlY3QgeD0iMCIgeT0iMzAiIHdpZHRoPSIyODAiIGhlaWdodD0iMjkwIiBmaWxsPSIjZmFmYWZhIiBzdHJva2U9IiNjY2MiLz4KCiAgICA8IS0tIENsdXN0ZXIgQSAtLT4KICAgIDxnPgogICAgICA8IS0tIHNhbXBsZSBTMSAtLT4KICAgICAgPGNpcmNsZSBjeD0iNTAiICBjeT0iODAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjUiICBjeT0iNzUiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNzIiICBjeT0iMTAwIiByPSI1IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDwhLS0gc2FtcGxlIFMyIC0tPgogICAgICA8Y2lyY2xlIGN4PSI5MCIgIGN5PSI4MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI5MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIxMDIiIHI9IjUiIGZpbGw9IiMyYzdmYjgiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgIDwvZz4KICAgIDwhLS0gQ2x1c3RlciBCIC0tPgogICAgPGc+CiAgICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIxODAiIGN5PSIxODAiIHI9IjUiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTc1IiBjeT0iMTYwIiByPSI1IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIyMDUiIGN5PSIxNjUiIHI9IjUiIGZpbGw9IiNlNjYxMDEiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgICAgPGNpcmNsZSBjeD0iMjE1IiBjeT0iMTc1IiByPSI1IiBmaWxsPSIjZTY2MTAxIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjIyNSIgY3k9IjE2MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEMgLS0+CiAgICA8Zz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iMjQwIiByPSI1IiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjcwIiAgY3k9IjI1MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIvPgogICAgICA8Y2lyY2xlIGN4PSI4MCIgIGN5PSIyNDUiIHI9IjUiIGZpbGw9IiMxYjllNzciLz4KICAgICAgPGNpcmNsZSBjeD0iMTEwIiBjeT0iMjUwIiByPSI1IiBmaWxsPSIjMWI5ZTc3IiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjEyMCIgY3k9IjI0MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgoKICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjE0MCIgeT0iMzQwIj5jb2xvciA9IGNsdXN0ZXIgwrcgb3V0bGluZSA9IHNhbXBsZSBTMjwvdGV4dD4KICA8L2c+CgogIDwhLS0gQXJyb3cgLS0+CiAgPHBhdGggY2xhc3M9ImFycm93IiBkPSJNIDMyMCAyMTAgTCAzODAgMjEwIiBtYXJrZXItZW5kPSJ1cmwoI2FocCkiLz4KICA8dGV4dCBjbGFzcz0ibGJsIiB4PSIzNTAiIHk9IjIwMCI+c3VtPC90ZXh0PgoKICA8IS0tIFBhbmVsIDI6IHBzZXVkb2J1bGsgbWF0cml4IC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM5NSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjIuIFBlciAoY2x1c3Rlciwgc2FtcGxlKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTQwIiB5PSIxOCI+c3VtIG9mIGNvdW50czwvdGV4dD4KCiAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLDQwKSI+CiAgICAgIDwhLS0gaGVhZGVyIHJvdyAtLT4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9Ijc1IiAgeT0iMTUiPlMxwrdBPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMTI1IiB5PSIxNSI+UzLCt0E8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJjZWxsSGRyIiB4PSIxNzUiIHk9IjE1Ij5TMcK3QjwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9IjIyNSIgeT0iMTUiPlMywrdCPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMjc1IiB5PSIxNSI+UzHCt0M8L3RleHQ+CgogICAgICA8IS0tIHJvd3M6IGdlbmVzIC0tPgogICAgICA8ZyBmb250LWZhbWlseT0iTWVubG8sQ29uc29sYXMsbW9ub3NwYWNlIiBmb250LXNpemU9IjExIiBmaWxsPSIjMjIyIj4KICAgICAgICA8dGV4dCB4PSIwIiB5PSI0MCI+R2VuZTE8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE0MjwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIxMDAiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSIxMTciIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xNjg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NjI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Nzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjIxPC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSI2NSI+R2VuZTI8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjMzPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjEwMCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjExNyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjQxPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjE1MCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2ZmZDRhNiIvPjx0ZXh0IHg9IjE2NyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIwNTwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNmZmQ0YTYiLz48dGV4dCB4PSIyMTciIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI1MiIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTg8L3RleHQ+CgogICAgICAgIDx0ZXh0IHg9IjAiIHk9IjkwIj5HZW5lMzwvdGV4dD48cmVjdCB4PSI1NSIgeT0iNzciIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjcyIiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ODc8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYzZkYmVmIi8+PHRleHQgeD0iMTE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OTI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTQ8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTk8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTA3PC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSIxMTUiPuKApjwvdGV4dD4KICAgICAgPC9nPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTQwIiB5PSIxNzUiPmxvb2tzIGxpa2UgYSBidWxrIFJOQS1zZXEgY291bnQgbWF0cml4PC90ZXh0PgogIDwvZz4KCiAgPCEtLSBBcnJvdyBkb3duIC0tPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA1MjAgMjkwIEwgNTIwIDMzNSIgbWFya2VyLWVuZD0idXJsKCNhaHApIi8+CgogIDwhLS0gUGFuZWwgMzogREUgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzk1LDM0MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjMuIEZpdCBERSBwZXIgY2x1c3RlcjwvdGV4dD4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIwLDIwKSI+CiAgICAgIDxyZWN0IHg9IjAiICB5PSIwIiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc1IiByeD0iMTAiIGZpbGw9IiNlZWYzZmEiIHN0cm9rZT0iIzJjN2ZiOCIvPgogICAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxMCIgeT0iMjAiIGZvbnQtd2VpZ2h0PSI3MDAiPkRFU2VxMiAvIGVkZ2VSIC8gbGltbWEtdm9vbTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjQwIj5kZXNpZ24gPSB+IGNvbmRpdGlvbiAoKyBjb3ZhcmlhdGVzKTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjU4Ij5zaHJpbmthZ2UsIHByb3BlciByZXBsaWNhdGlvbiw8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjEwIiB5PSI3MyI+d2VsbC1jYWxpYnJhdGVkIHAtdmFsdWVzPC90ZXh0PgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBSaWdodCBwYW5lbDogd2h5IHBzZXVkb2J1bGsgbWF0dGVycyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MjAsNjApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNjAiIGhlaWdodD0iMzcwIiByeD0iMTAiIGZpbGw9IiNmZmY3ZDYiIHN0cm9rZT0iI2Q5YjQxYSIvPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMzAiIHk9IjI1Ij5XaHkgcHNldWRvYnVsaz88L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjU1IiBmb250LXdlaWdodD0iNzAwIj5QZXItY2VsbCBERSBwaXRmYWxsPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9Ijc1Ij5jZWxscyBmcm9tIG9uZSBzdWJqZWN0IGFyZSBub3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iOTEiPmluZGVwZW5kZW50IOKGkiBwLXZhbHVlcyB0b28gc21hbGw8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjEyMCIgZm9udC13ZWlnaHQ9IjcwMCI+UHNldWRvYnVsayBmaXhlcyB0aGlzPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE0MCI+c2FtcGxlcyBBUkUgaW5kZXBlbmRlbnQ7IGJ1bGs8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMTU2Ij5tZXRob2RzIGFyZSB3ZWxsLWNhbGlicmF0ZWQ8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE4NSIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiB0byB1c2UgaXQ8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjA1Ij7CtyBjb21wYXJpbmcgY29uZGl0aW9ucyBhY3Jvc3M8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjIxIj4gIGJpb2xvZ2ljYWwgcmVwbGljYXRlczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIyNDEiPsK3IOKJpSAzIHNhbXBsZXMgcGVyIGdyb3VwLCBpZGVhbGx5IG1vcmU8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjI3MCIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiBOT1Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjkwIj7CtyBmaW5kaW5nIGNsdXN0ZXIgbWFya2VyczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMDYiPiAgKHVzZSB3aXRoaW4tY2VsbCBtZXRob2RzKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMjYiPsK3IG9ubHkgMeKAkzIgc2FtcGxlcyB0b3RhbDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzNDYiPiAgKG5vIHJlcGxpY2F0aW9uIGF2YWlsYWJsZSk8L3RleHQ+CiAgPC9nPgoKICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImFocCIgdmlld0JveD0iMCAwIDEwIDEwIiByZWZYPSI4IiByZWZZPSI1IiBtYXJrZXJXaWR0aD0iNyIgbWFya2VySGVpZ2h0PSI3IiBvcmllbnQ9ImF1dG8tc3RhcnQtcmV2ZXJzZSI+CiAgICAgIDxwYXRoIGQ9Ik0gMCAwIEwgMTAgNSBMIDAgMTAgeiIgZmlsbD0iIzU1NSIvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgo8L3N2Zz4K" style="width:95.0%" class="r-stretch quarto-figure-center"><p class="caption">Pseudobulk aggregation: cells -&gt; per-sample-per-celltype</p><ul>
-<li><strong>Aggregate</strong> (sum) UMI counts per <em>(sample, cell type)</em> → a classic bulk-looking matrix</li>
-<li>One column per (sample × cell type) replicate, one row per gene</li>
-<li>Run a separate DE test <strong>per cell type</strong> with DESeq2 / edgeR / limma-voom</li>
-</ul>
-</section>
-<section id="deseq2-on-pseudobulk-in-r" class="slide level2">
-<h2>DESeq2 on pseudobulk in R</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(Seurat); <span class="fu">library</span>(DESeq2)</span>
-<span id="cb3-2"><a></a></span>
-<span id="cb3-3"><a></a>pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(seu, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>,</span>
-<span id="cb3-4"><a></a>                          <span class="at">group.by =</span> <span class="fu">c</span>(<span class="st">&quot;sample_id&quot;</span>, <span class="st">&quot;celltype&quot;</span>),</span>
-<span id="cb3-5"><a></a>                          <span class="at">return.seurat =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>RNA</span>
-<span id="cb3-6"><a></a></span>
-<span id="cb3-7"><a></a>meta <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb3-8"><a></a>  <span class="at">sample_id =</span> <span class="fu">sub</span>(<span class="st">&quot;_.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb)),</span>
-<span id="cb3-9"><a></a>  <span class="at">celltype  =</span> <span class="fu">sub</span>(<span class="st">&quot;^[^_]+_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
-<span id="cb3-10"><a></a>) <span class="sc">|&gt;</span></span>
-<span id="cb3-11"><a></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sample_meta, <span class="at">by =</span> <span class="st">&quot;sample_id&quot;</span>)</span>
-<span id="cb3-12"><a></a></span>
-<span id="cb3-13"><a></a>run_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct) {</span>
-<span id="cb3-14"><a></a>  keep <span class="ot">&lt;-</span> meta<span class="sc">$</span>celltype <span class="sc">==</span> ct</span>
-<span id="cb3-15"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> pb[, keep],</span>
-<span id="cb3-16"><a></a>                                 <span class="at">colData   =</span> meta[keep, ],</span>
-<span id="cb3-17"><a></a>                                 <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
-<span id="cb3-18"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb3-19"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-20"><a></a>    <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb3-21"><a></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">celltype =</span> ct)</span>
-<span id="cb3-22"><a></a>}</span>
-<span id="cb3-23"><a></a></span>
-<span id="cb3-24"><a></a>de_all <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(<span class="fu">unique</span>(meta<span class="sc">$</span>celltype), run_de)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="deseq2-on-pseudobulk-in-python" class="slide level2">
-<h2>DESeq2 on pseudobulk in Python</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a></a><span class="im">import</span> decoupler <span class="im">as</span> dc</span>
-<span id="cb4-2"><a></a><span class="im">import</span> pydeseq2.dds <span class="im">as</span> dds_mod</span>
-<span id="cb4-3"><a></a><span class="im">from</span> pydeseq2.ds <span class="im">import</span> DeseqStats</span>
-<span id="cb4-4"><a></a></span>
-<span id="cb4-5"><a></a>pdata <span class="op">=</span> dc.get_pseudobulk(adata, sample_col<span class="op">=</span><span class="st">&quot;sample_id&quot;</span>,</span>
-<span id="cb4-6"><a></a>                          groups_col<span class="op">=</span><span class="st">&quot;celltype&quot;</span>,</span>
-<span id="cb4-7"><a></a>                          layer<span class="op">=</span><span class="st">&quot;counts&quot;</span>, mode<span class="op">=</span><span class="st">&quot;sum&quot;</span>,</span>
-<span id="cb4-8"><a></a>                          min_cells<span class="op">=</span><span class="dv">10</span>, min_counts<span class="op">=</span><span class="dv">1000</span>)</span>
+<section id="anatomy-of-a-batch-script" class="slide level2">
+<h2>Anatomy of a batch script</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="co">#!/bin/bash</span></span>
+<span id="cb4-2"><a></a><span class="co">#SBATCH --job-name=my_analysis   # name</span></span>
+<span id="cb4-3"><a></a><span class="co">#SBATCH --partition=compute      # queue</span></span>
+<span id="cb4-4"><a></a><span class="co">#SBATCH --account=myPIRG         # your PIRG (required)</span></span>
+<span id="cb4-5"><a></a><span class="co">#SBATCH --time=04:00:00          # HH:MM:SS</span></span>
+<span id="cb4-6"><a></a><span class="co">#SBATCH --cpus-per-task=4        # cores</span></span>
+<span id="cb4-7"><a></a><span class="co">#SBATCH --mem=16G                # memory</span></span>
+<span id="cb4-8"><a></a><span class="co">#SBATCH --output=out_%j.log      # %j = job ID</span></span>
 <span id="cb4-9"><a></a></span>
-<span id="cb4-10"><a></a>ct <span class="op">=</span> <span class="st">&quot;T_CD4&quot;</span></span>
-<span id="cb4-11"><a></a>mask <span class="op">=</span> pdata.obs[<span class="st">&quot;celltype&quot;</span>] <span class="op">==</span> ct</span>
-<span id="cb4-12"><a></a>dds <span class="op">=</span> dds_mod.DeseqDataSet(</span>
-<span id="cb4-13"><a></a>    counts <span class="op">=</span> pdata.layers[<span class="st">&quot;counts&quot;</span>][mask].T,</span>
-<span id="cb4-14"><a></a>    metadata <span class="op">=</span> pdata.obs[mask],</span>
-<span id="cb4-15"><a></a>    design_factors <span class="op">=</span> <span class="st">&quot;condition&quot;</span>)</span>
-<span id="cb4-16"><a></a>dds.deseq2()</span>
-<span id="cb4-17"><a></a>DeseqStats(dds, contrast<span class="op">=</span>[<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>]).summary()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-10"><a></a><span class="ex">module</span> load R/4.4.1              <span class="co"># load modules AFTER #SBATCH lines</span></span>
+<span id="cb4-11"><a></a><span class="ex">Rscript</span> my_analysis.R            <span class="co"># do the work</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><code>#SBATCH</code> lines are scheduler directives, not run by bash.</li>
+<li class="fragment">Request only what you need — smaller jobs start sooner.</li>
+</ul>
+</section></section>
+<section>
+<section id="working-interactively" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Working interactively</h1>
+
 </section>
-<section id="gotchas-good-practice" class="slide level2">
-<h2>Gotchas &amp; good practice</h2>
-<div class="callout callout-warning callout-titled callout-style-default">
+<section id="vs-code-remote-ssh" class="slide level2">
+<h2>VS Code + Remote-SSH</h2>
+<ul>
+<li class="fragment"><strong>VS Code</strong> is a free editor that can connect <em>into</em> Talapas over SSH.</li>
+<li class="fragment">Install the <strong>Remote – SSH</strong> and <strong>Remote Explorer</strong> extensions.</li>
+<li class="fragment">Add the host <code>login.talapas.uoregon.edu</code>, connect (password + Duo), and a green banner confirms you’re on Talapas.</li>
+<li class="fragment">Browse remote files, edit scripts, and use the <strong>integrated terminal</strong> — all in one window.</li>
+<li class="fragment">The <strong>Quarto extension</strong> lets you edit and render <code>.qmd</code> documents right there.</li>
+</ul>
+</section>
+<section id="open-ondemand-browser-no-ssh" class="slide level2">
+<h2>Open OnDemand (browser, no SSH)</h2>
+<ul>
+<li class="fragment">Web portal: <a href="https://ondemand.talapas.uoregon.edu">ondemand.talapas.uoregon.edu</a> — Chrome or Firefox.</li>
+<li class="fragment">No SSH client needed; great for beginners.</li>
+<li class="fragment">File browser for uploads/downloads.</li>
+<li class="fragment">Launch <strong>interactive apps</strong>: JupyterLab, RStudio, MATLAB, remote desktop.</li>
+<li class="fragment">Easiest way to get an RStudio or Jupyter session on Talapas.</li>
+</ul>
+</section></section>
+<section>
+<section id="reproducible-environments" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Reproducible environments</h1>
+
+</section>
+<section id="why-pin-your-environment" class="slide level2">
+<h2>Why pin your environment?</h2>
+<ul>
+<li class="fragment">So you can <strong>reproduce a result six months later</strong>.</li>
+<li class="fragment">So a co-author runs the <strong>same package versions</strong>.</li>
+<li class="fragment">So you avoid days of dependency debugging on Talapas.</li>
+<li class="fragment">Two layers cover most cases: <strong><code>renv</code></strong> (R packages) and <strong>containers</strong> (everything).</li>
+</ul>
+</section>
+<section id="renv-containers-brief" class="slide level2">
+<h2>renv + containers (brief)</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a><span class="co"># renv: pin exact R-package versions (reads renv.lock)</span></span>
+<span id="cb5-2"><a></a><span class="fu">install.packages</span>(<span class="st">&quot;renv&quot;</span>)</span>
+<span id="cb5-3"><a></a>renv<span class="sc">::</span><span class="fu">restore</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="co"># Container: a self-contained image (R + Bioconductor + system deps)</span></span>
+<span id="cb6-2"><a></a><span class="co"># Laptop uses Docker; Talapas uses Apptainer (Docker isn&#39;t allowed there)</span></span>
+<span id="cb6-3"><a></a><span class="ex">module</span> load apptainer</span>
+<span id="cb6-4"><a></a><span class="ex">apptainer</span> pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest</span>
+<span id="cb6-5"><a></a><span class="ex">apptainer</span> exec scrnaseq_tutorial_latest.sif R</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>Warning</strong></p>
+<p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Common pitfalls.</strong></p>
-<ul>
-<li><strong>Filter low-cell groups</strong> — drop (sample × cell type) combos with <code>&lt; 10</code> cells before DE; the pseudobulk profile is too noisy.</li>
-<li><strong>Include covariates</strong> in the design (batch, sex, age) just like bulk RNA-seq.</li>
-<li><strong>Need ≥ 3 samples per condition.</strong> With 1–2 samples per group, no test is honest — say so in the paper.</li>
-<li>Prefer <strong>shrinkage LFCs</strong> (<code>lfcShrink()</code> with <code>apeglm</code>) for ranking.</li>
-<li>Apply BH / IHW <strong>within</strong> each cell-type run, not across all results pooled — the null distributions differ.</li>
-</ul>
+<p><strong>Docker</strong> on your laptop, <strong>Apptainer</strong> on Talapas — same image, reproducible either way.</p>
 </div>
 </div>
 </div>
-</section>
-<section id="when-not-to-use-pseudobulk" class="slide level2">
-<h2>When <em>not</em> to use pseudobulk</h2>
-<ul>
-<li>Questions about <strong>within-cell-type heterogeneity</strong> (subpopulations defined by a marker)</li>
-<li>Samples with only one or two biological replicates per condition — no test will save you</li>
-<li>Rare cell types with too few cells per sample to aggregate meaningfully</li>
-</ul>
-</section></section>
-<section>
-<section id="part-4-where-de-lands-in-the-bigger-picture" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 4 — Where DE lands in the bigger picture</h1>
-
-</section>
-<section id="the-annotated-object-as-a-launchpad" class="slide level2">
-<h2>The annotated object as a launchpad</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NjAgNTAwIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPHN0eWxlPgogICAgLnRpdGxlIHsgZm9udC1zaXplOiAxOHB4OyBmb250LXdlaWdodDogNzAwOyBmaWxsOiAjMjIyOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubm9kZVRpdGxlIHsgZm9udC1zaXplOiAxM3B4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjZmZmOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubm9kZVN1YiB7IGZvbnQtc2l6ZTogMTFweDsgZmlsbDogI2ZmZjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLmNlbnRlciB7IGZvbnQtc2l6ZTogMTRweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogI2ZmZjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLmNlbnRlclN1YiB7IGZvbnQtc2l6ZTogMTFweDsgZmlsbDogI2ZmZjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjODg4OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjQ4MCIgeT0iMzAiPkRvd25zdHJlYW0gYW5hbHlzZXMgYWZ0ZXIgY2x1c3RlcmluZyAmYW1wOyBhbm5vdGF0aW9uPC90ZXh0PgoKICA8IS0tIGNlbnRyYWwgaHViOiBhbm5vdGF0ZWQgVU1BUCAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzODAsMjEwKSI+CiAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI2MCIgcj0iOTAiIGZpbGw9IiM0NDQiLz4KICAgIDx0ZXh0IGNsYXNzPSJjZW50ZXIiIHg9IjEwMCIgeT0iNTIiPkFubm90YXRlZDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJjZW50ZXIiIHg9IjEwMCIgeT0iNzAiPmNlbGxzICsgVU1BUDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJjZW50ZXJTdWIiIHg9IjEwMCIgeT0iOTAiPihTZXVyYXQgb2JqZWN0IC88L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iY2VudGVyU3ViIiB4PSIxMDAiIHk9IjEwNCI+QW5uRGF0YSk8L3RleHQ+CiAgPC9nPgoKICA8IS0tIDYgc2F0ZWxsaXRlIG5vZGVzIGFyb3VuZCB0aGUgaHViIC0tPgogIDwhLS0gREUgY29uZGl0aW9ucyAodG9wLWxlZnQpIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDEwMCw5MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMDAiIHk9IjIyIj5ERSBiZXR3ZWVuIGNvbmRpdGlvbnM8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVN1YiIgeD0iMTAwIiB5PSI0MCI+cHNldWRvYnVsayArIERFU2VxMiDCtyBNQVNUPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjEwMCIgeT0iNTUiPkZpbmRNYXJrZXJzIMK3IHJhbmtfZ2VuZXNfZ3JvdXBzPC90ZXh0PgogIDwvZz4KICA8cGF0aCBjbGFzcz0iYXJyb3ciIGQ9Ik0gMzAwIDEzMCBMIDQ2MCAyMzAiLz4KCiAgPCEtLSBFbnJpY2htZW50ICh0b3AtcmlnaHQpIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDY2MCw5MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjZTY2MTAxIi8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMTAiIHk9IjIyIj5QYXRod2F5IC8gZW5yaWNobWVudDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMTAiIHk9IjQwIj5mZ3NlYSDCtyBjbHVzdGVyUHJvZmlsZXIgwrcgZW5yaWNoUjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMTAiIHk9IjU1Ij5kZWNvdXBsZVIgwrcgR1NWQSDCtyBBVUNlbGw8L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA2NjAgMTMwIEwgNTIwIDIzMCIvPgoKICA8IS0tIFdHQ05BIChyaWdodCkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzMwLDIzMCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMDAiIHk9IjIyIj5Dby1leHByZXNzaW9uIG1vZHVsZXM8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVN1YiIgeD0iMTAwIiB5PSI0MCI+aGRXR0NOQSAoc2luZ2xlLWNlbGwpPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjEwMCIgeT0iNTUiPldHQ05BIG9uIHBzZXVkb2J1bGs8L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA3MzAgMjYwIEwgNTgwIDI4MCIvPgoKICA8IS0tIFRyYWplY3RvcnkgKGJvdHRvbS1yaWdodCkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjYwLDM4MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjNzU2YmIxIi8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMTAiIHk9IjIyIj5UcmFqZWN0b3J5IC8gcHNldWRvdGltZTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMTAiIHk9IjQwIj5Nb25vY2xlMyDCtyBTbGluZ3Nob3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVN1YiIgeD0iMTEwIiB5PSI1NSI+UEFHQSDCtyBzY1ZlbG8gKFJOQSB2ZWxvY2l0eSk8L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA2NjAgNDAwIEwgNTQwIDM0MCIvPgoKICA8IS0tIENlbGwtY2VsbCBjb21tdW5pY2F0aW9uIChib3R0b20tbGVmdCkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTAwLDM4MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjZDk1ZjAyIi8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMTAiIHk9IjIyIj5DZWxs4oCTY2VsbCBjb21tdW5pY2F0aW9uPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjExMCIgeT0iNDAiPkNlbGxDaGF0IMK3IExJQU5BPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjExMCIgeT0iNTUiPk5pY2hlTmV0IMK3IENlbGxQaG9uZURCPC90ZXh0PgogIDwvZz4KICA8cGF0aCBjbGFzcz0iYXJyb3ciIGQ9Ik0gMzIwIDQwMCBMIDQ1MCAzNDAiLz4KCiAgPCEtLSBQc2V1ZG9idWxrIChsZWZ0KSAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMCwyMzApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyMDAiIGhlaWdodD0iNzAiIHJ4PSIxMCIgZmlsbD0iI2NhMDAyMCIvPgogICAgPHRleHQgY2xhc3M9Im5vZGVUaXRsZSIgeD0iMTAwIiB5PSIyMiI+UHNldWRvYnVsayBhbmFseXNpczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMDAiIHk9IjQwIj5hZ2dyZWdhdGUg4oaSIERFU2VxMi9lZGdlUjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMDAiIHk9IjU1Ij5zYW1wbGUtbGV2ZWwgcmVwbGljYXRpb248L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSAyMzAgMjYwIEwgMzgwIDI4MCIvPgo8L3N2Zz4K" style="width:95.0%" class="r-stretch quarto-figure-center"><p class="caption">Downstream analysis hub: from annotated object to claims</p><ul>
-<li><strong>Within-cluster:</strong> marker genes, signatures, module scores</li>
-<li><strong>Between conditions:</strong> pseudobulk DE per cell type <em>(this lecture)</em></li>
-<li><strong>Across cells:</strong> gene modules → WGCNA (bonus), trajectory inference, ligand-receptor</li>
-<li><strong>Across samples:</strong> composition shifts (scCODA, propeller, milo)</li>
-</ul>
-</section>
-<section id="pathway-enrichment-follow-up" class="slide level2">
-<h2>Pathway / enrichment follow-up</h2>
-<p>After DE, summarize gene lists into pathways:</p>
-<ul>
-<li><strong>Over-representation</strong> (hypergeometric): <code>enrichR</code>, <code>clusterProfiler</code></li>
-<li><strong>Rank-based GSEA</strong>: <code>fgsea</code>, <code>clusterProfiler::gseGO</code></li>
-<li><strong>Per-cell scoring</strong> (alternative to gene lists): <code>decoupleR</code>, <code>AUCell</code>, <code>AddModuleScore</code></li>
-</ul>
 </section></section>
 <section>
 <section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">
 <h1>Recap &amp; what’s next</h1>
 
 </section>
-<section id="what-to-remember-from-lecture-06" class="slide level2">
-<h2>What to remember from Lecture 06</h2>
+<section id="recap" class="slide level2">
+<h2>Recap</h2>
 <ul>
-<li class="fragment">DESeq2 models <strong>integer counts</strong> with a <strong>negative binomial</strong> distribution and <strong>shrinks</strong> dispersion estimates toward a fitted trend</li>
-<li class="fragment"><code>relevel()</code> your factor before running <code>DESeq</code> — the reference level determines the <strong>sign</strong> of the log-fold-change</li>
-<li class="fragment">For ranking and visualization, <strong>shrink</strong> LFCs with <code>lfcShrink(dds, type = &quot;apeglm&quot;)</code> — but the <code>pvalue</code> / <code>padj</code> come from the <strong>unshrunken</strong> estimates (shrinkage is not part of the test since 2016)</li>
-<li class="fragment"><code>padj</code> is the <strong>FDR</strong> — filter on <code>padj &lt; 0.05</code>, not on raw <code>pvalue</code></li>
-<li class="fragment">For <strong>condition-level DE</strong>, default to <strong>pseudobulk</strong> + DESeq2/edgeR/limma-voom; never run per-cell DE for condition contrasts</li>
-<li class="fragment">Aggregate counts per <em>(sample × cell type)</em> with <code>AggregateExpression</code>, then test each cell type separately</li>
-<li class="fragment">Drop cell-type × sample combinations with <strong>fewer than ~10 cells</strong></li>
-<li class="fragment">You need real biological replicates (≥ 3 per group) — there is no shortcut</li>
+<li class="fragment"><strong>CPU / RAM / disk</strong> — RAM is usually the limiting resource for single-cell work.</li>
+<li class="fragment">The <strong>OS</strong> manages processes, memory, files, and security for you.</li>
+<li class="fragment">An <strong>HPC cluster</strong> = many nodes + shared storage + a scheduler; use it when your laptop runs out of room or time.</li>
+<li class="fragment">On <strong>Talapas</strong>: PIRG + account, SSH + Duo, mind your file systems, <code>module load</code>, and submit jobs with <strong>SLURM</strong> — never on the login node.</li>
+<li class="fragment"><strong>VS Code / Open OnDemand</strong> make remote work comfortable; <strong>renv + containers</strong> make it reproducible.</li>
 </ul>
 </section>
-<section id="coming-up-next" class="slide level2">
-<h2>Coming up next</h2>
+<section id="whats-next" class="slide level2">
+<h2>What’s next</h2>
 <ul>
-<li><strong>Lec 07</strong> — <a href="Lecture_07_FunctionalAnalysis.html">Functional Analysis</a> — turning a pseudobulk DE list into biological themes</li>
-<li><strong>Lec 08</strong> — <a href="Lecture_08_DifferentialAbundance.html">Differential Abundance</a> — the <em>complement</em>: do cell-type proportions change?</li>
-<li><strong>Hands-on:</strong> <a href="../Exercise_Folder/Tutorial_06_DESeq2_DE.html">Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE</a></li>
-<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a></li>
+<li class="fragment"><strong>Module 2 (next):</strong> <a href="Lecture_Day0_2_R_and_CommandLine.html">R &amp; the Command Line</a> — the tools you’ll type into every day.</li>
+<li class="fragment"><strong>Day 1 onward:</strong> the single-cell analysis workflow itself.</li>
+<li class="fragment">Optional refresher reading: <a href="../Resources_Folder/Chapter_Day0_1_Computer_Systems.html">Day 0 · Module 1 — Computer System Fundamentals</a>.</li>
+<li class="fragment">Need help on Talapas? <a href="https://uoracs.github.io/talapas2-knowledge-base/">Knowledge Base</a> · <a href="https://hpcrcf.atlassian.net/servicedesk/customer/portal/1">Service Desk</a> · racs@uoregon.edu.</li>
 </ul>
 
 
@@ -1548,7 +1590,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Lecture 06</p>
+<p>Single Cell RNA-seq Workshop · Day 0 · Module 1 — Computer System Fundamentals</p>
 </div>
 </div></div>
 
@@ -2721,44 +2763,6 @@ window.QuartoSupport = function () {
         ]
       });
     </script>
-    
-    <script>
-      // htmlwidgets need to know to resize themselves when slides are shown/hidden.
-      // Fire the "slideenter" event (handled by htmlwidgets.js) when the current
-      // slide changes (different for each slide format).
-      (function () {
-        // dispatch for htmlwidgets
-        function fireSlideEnter() {
-          const event = window.document.createEvent("Event");
-          event.initEvent("slideenter", true, true);
-          window.document.dispatchEvent(event);
-        }
-
-        function fireSlideChanged(previousSlide, currentSlide) {
-          fireSlideEnter();
-
-          // dispatch for shiny
-          if (window.jQuery) {
-            if (previousSlide) {
-              window.jQuery(previousSlide).trigger("hidden");
-            }
-            if (currentSlide) {
-              window.jQuery(currentSlide).trigger("shown");
-            }
-          }
-        }
-
-        // hookup for slidy
-        if (window.w3c_slidy) {
-          window.w3c_slidy.add_observer(function (slide_num) {
-            // slide_num starts at position 1
-            fireSlideChanged(null, w3c_slidy.slides[slide_num - 1]);
-          });
-        }
-
-      })();
-    </script>
-
     <script id="quarto-html-after-body" type="application/javascript">
       window.document.addEventListener("DOMContentLoaded", function (event) {
         const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")

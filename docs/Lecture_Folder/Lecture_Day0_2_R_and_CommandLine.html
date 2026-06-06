@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE</title>
+  <title>Single Cell RNA-seq Workshop – Day 0 · Module 2 — R &amp; the Command Line</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE</h1>
+  <h1 class="title">Day 0 · Module 2 — R &amp; the Command Line</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,397 +1150,368 @@ Bill Cresko
 
 </section>
 <section>
-<section id="lecture-06-deseq2-bulk-fundamentals-pseudobulk-de" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Lecture 06: DESeq2 — Bulk Fundamentals + Pseudobulk DE</h1>
+<section id="day-0-module-2-r-the-command-line" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Day 0 · Module 2 — R &amp; the Command Line</h1>
 
 </section>
-<section id="where-this-lecture-fits" class="slide level2">
-<h2>Where this lecture fits</h2>
+<section id="where-this-fits" class="slide level2">
+<h2>Where this fits</h2>
 <ul>
-<li>Previous: <a href="Lecture_05_Integration.html">Lec 05 — Multi-Sample Integration</a></li>
-<li><strong>You are here:</strong> Lec 06 — <em>the DESeq2 model on bulk RNA-seq, then applied to scRNA-seq pseudobulk</em></li>
-<li>Next: <a href="Lecture_07_FunctionalAnalysis.html">Lec 07 — Functional Analysis</a></li>
-<li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_06_DESeq2_DE.html">Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE</a></li>
-<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a></li>
-<li><strong>Statistical background:</strong> <a href="../Resources_Folder/Appendix_B_Statistical_Foundations.html">Appendix B — Statistical Foundations</a></li>
+<li class="fragment"><strong>Day 0 (optional Tuesday refresher)</strong> — for getting everyone up and running before the core workshop</li>
+<li class="fragment"><strong>Module 2 of 2</strong> — follows <strong>Module 1 (Computer Systems)</strong></li>
+<li class="fragment">Goal today: just enough <strong>shell</strong> and <strong>R</strong> to be productive on Day 1, not a full course</li>
+<li class="fragment">Pairs with the reading: <a href="../Resources_Folder/Chapter_Day0_2_R_and_CommandLine.html">Day 0 · Module 2 — R &amp; the Command Line</a></li>
 </ul>
 </section>
-<section id="goals-of-this-lecture" class="slide level2">
-<h2>Goals of this lecture</h2>
+<section id="what-youll-walk-away-with" class="slide level2">
+<h2>What you’ll walk away with</h2>
 <ul>
-<li class="fragment">Understand the <strong>negative-binomial GLM</strong> at the heart of DESeq2 in plain terms</li>
-<li class="fragment">Read DESeq2 output: <code>baseMean</code>, <code>log2FoldChange</code>, <code>lfcSE</code>, <code>pvalue</code>, <code>padj</code></li>
-<li class="fragment">Set the reference level so the sign of LFC means what you think it means</li>
-<li class="fragment">Know <strong>why and when to shrink</strong> log-fold-changes (<code>lfcShrink</code> + <code>apeglm</code>)</li>
-<li class="fragment">Run DESeq2 end to end on a real bulk RNA-seq dataset (<code>airway</code>)</li>
-<li class="fragment">Understand <strong>why per-cell DE is statistically wrong</strong> for condition contrasts</li>
-<li class="fragment">Aggregate single-cell counts to a <em>(sample × cell type)</em> pseudobulk matrix</li>
-<li class="fragment">Run DESeq2 <em>per cell type</em> with the right design and contrast</li>
+<li class="fragment">Open a terminal and <strong>move around the filesystem</strong> with confidence</li>
+<li class="fragment">Create, view, move, and delete files; combine tools with <strong>pipes &amp; redirection</strong></li>
+<li class="fragment">Download data with <code>wget</code> / <code>curl</code>, and <strong>get help</strong> when stuck</li>
+<li class="fragment">Launch <strong>RStudio</strong>, assign variables, and work with vectors, data frames, and lists</li>
+<li class="fragment">Install and load packages; read &amp; write data; write <strong>tidyverse</strong> pipelines</li>
 </ul>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Why bulk DESeq2 first?</strong> Pseudobulk DE in scRNA-seq is <em>just bulk DESeq2 applied to per-cell-type aggregated counts</em>. So learn the bulk model cleanly first (Part 1); the single-cell scaffolding around it (Part 2) is then a small, well-defined wrapper.</p>
-</div>
-</div>
-</div>
 </section></section>
 <section>
-<section id="part-1-deseq2-fundamentals-on-bulk-rna-seq" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 1 — DESeq2 fundamentals on bulk RNA-seq</h1>
+<section id="part-1-the-command-line" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 1 — The Command Line</h1>
 
 </section>
-<section id="what-deseq2-actually-does" class="slide level2">
-<h2>What DESeq2 actually does</h2>
+<section id="why-the-shell-first" class="slide level2">
+<h2>Why the shell first?</h2>
 <ul>
-<li class="fragment">Models <strong>integer counts</strong> per gene with a <strong>negative binomial</strong> distribution</li>
-<li class="fragment">Estimates a <strong>size factor</strong> per sample (depth normalization), independent of the design</li>
-<li class="fragment"><strong>Shrinks</strong> per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)</li>
-<li class="fragment">Tests each gene’s coefficient with a <strong>Wald test</strong> (default) or LRT</li>
+<li class="fragment">The <strong>shell</strong> is the gateway: it runs everything else (R, aligners, HPC jobs)</li>
+<li class="fragment">A program that takes typed <strong>commands</strong> and hands them to the operating system</li>
+<li class="fragment"><strong>Bash</strong> is the shell on Mac, Linux, and Windows (via WSL)</li>
+<li class="fragment">You reach it through a <strong>terminal window</strong></li>
+<li class="fragment">Bioinformatics data is big — these tools scale to gigabytes effortlessly</li>
 </ul>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Why negative binomial, not Poisson?</strong> RNA-seq counts are <strong>over-dispersed</strong>: variance &gt; mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.</p>
-</div>
-</div>
-</div>
 </section>
-<section id="a-canonical-bulk-deseq2-run-patel-style-airway-data" class="slide level2">
-<h2>A canonical bulk DESeq2 run (Patel-style, <code>airway</code> data)</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(DESeq2); <span class="fu">library</span>(airway)</span>
-<span id="cb1-2"><a></a><span class="fu">data</span>(airway)</span>
-<span id="cb1-3"><a></a></span>
-<span id="cb1-4"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(</span>
-<span id="cb1-5"><a></a>  <span class="at">countData =</span> <span class="fu">assay</span>(airway),</span>
-<span id="cb1-6"><a></a>  <span class="at">colData   =</span> <span class="fu">colData</span>(airway),</span>
-<span id="cb1-7"><a></a>  <span class="at">design    =</span> <span class="sc">~</span> cell <span class="sc">+</span> dex)        <span class="co"># cell line as covariate, dex as test factor</span></span>
-<span id="cb1-8"><a></a></span>
-<span id="cb1-9"><a></a><span class="co"># Pre-filter: drop genes with &lt; 10 total reads (speed only — does not affect FDR)</span></span>
-<span id="cb1-10"><a></a>dds <span class="ot">&lt;-</span> dds[ <span class="fu">rowSums</span>(<span class="fu">counts</span>(dds)) <span class="sc">&gt;=</span> <span class="dv">10</span>, ]</span>
-<span id="cb1-11"><a></a></span>
-<span id="cb1-12"><a></a><span class="co"># Set the reference level so log2FC sign is interpretable</span></span>
-<span id="cb1-13"><a></a>dds<span class="sc">$</span>dex <span class="ot">&lt;-</span> <span class="fu">relevel</span>(dds<span class="sc">$</span>dex, <span class="at">ref =</span> <span class="st">&quot;untrt&quot;</span>)</span>
-<span id="cb1-14"><a></a></span>
-<span id="cb1-15"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb1-16"><a></a>res <span class="ot">&lt;-</span> <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;trt&quot;</span>, <span class="st">&quot;untrt&quot;</span>))</span>
-<span id="cb1-17"><a></a><span class="fu">summary</span>(res)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p><strong><code>relevel()</code> matters.</strong> The reference level becomes the <em>denominator</em> in <code>log2FoldChange</code>. If you forget, your “up-regulated” and “down-regulated” labels can be backwards.</p>
-</div>
-</div>
-</div>
+<section id="anatomy-of-a-command" class="slide level2">
+<h2>Anatomy of a command</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="fu">ls</span> <span class="at">-l</span> Documents</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><strong>Prompt</strong> — the shell signaling it’s ready for input</li>
+<li class="fragment"><strong>Command</strong> — the action (<code>ls</code>)</li>
+<li class="fragment"><strong>Options / flags</strong> — change behavior (<code>-l</code> = long format)</li>
+<li class="fragment"><strong>Argument</strong> — what it operates on (<code>Documents</code>)</li>
+</ul>
 </section>
-<section id="reading-deseq2-output" class="slide level2">
-<h2>Reading DESeq2 output</h2>
-<table class="caption-top">
-<colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Column</th>
-<th>What it is</th>
-<th>Watch-out</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>baseMean</code></td>
-<td>mean of normalized counts across all samples</td>
-<td>Very low values = unstable estimates</td>
-</tr>
-<tr class="even">
-<td><code>log2FoldChange</code></td>
-<td>effect size on log<sub>2</sub> scale</td>
-<td>Use <strong>shrunk</strong> values for ranking</td>
-</tr>
-<tr class="odd">
-<td><code>lfcSE</code></td>
-<td>standard error of the LFC</td>
-<td></td>
-</tr>
-<tr class="even">
-<td><code>stat</code></td>
-<td>Wald statistic</td>
-<td></td>
-</tr>
-<tr class="odd">
-<td><code>pvalue</code></td>
-<td>raw p-value</td>
-<td>Don’t filter on this directly</td>
-</tr>
-<tr class="even">
-<td><code>padj</code></td>
-<td>BH-adjusted p-value</td>
-<td>This is your FDR — filter on <code>padj &lt; 0.05</code></td>
-</tr>
-</tbody>
-</table>
-<div class="callout callout-warning callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Warning</strong></p>
-</div>
-<div class="callout-content">
-<p><strong><code>NA</code> in <code>padj</code>?</strong> DESeq2 sets <code>padj = NA</code> for genes filtered by independent filtering or with extreme outliers (Cook’s distance). That’s intentional, not a bug.</p>
-</div>
-</div>
-</div>
+<section id="how-a-computer-is-organized" class="slide level2">
+<h2>How a computer is organized</h2>
+<ul>
+<li class="fragment">A tree of <strong>directories</strong> (folders) and <strong>files</strong></li>
+<li class="fragment"><code>/</code> = the <strong>root</strong> — holds everything else</li>
+<li class="fragment"><code>~</code> = your <strong>home</strong> directory (e.g. <code>/Users/yourname</code>)</li>
+<li class="fragment">A <strong>path</strong> is a location in the tree (<code>/Users/wcresko/Documents</code>)</li>
+<li class="fragment">Navigating = jumping up and down between directories</li>
+</ul>
 </section>
-<section id="shrink-lfcs-for-ranking-visualization-not-for-testing" class="slide level2">
-<h2>Shrink LFCs for ranking &amp; visualization — <em>not</em> for testing</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>res_shrunk <span class="ot">&lt;-</span> <span class="fu">lfcShrink</span>(dds,</span>
-<span id="cb2-2"><a></a>                        <span class="at">coef =</span> <span class="st">&quot;dex_trt_vs_untrt&quot;</span>,</span>
-<span id="cb2-3"><a></a>                        <span class="at">type =</span> <span class="st">&quot;apeglm&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Why shrink?</strong> Weakly expressed genes have huge, noisy raw LFCs from sampling noise. Shrinkage (<code>apeglm</code> / <code>ashr</code>) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage) — so a “top hits” list or volcano plot isn’t dominated by junk genes with <code>baseMean = 2</code>.</p>
-</div>
-</div>
-</div>
+<section id="where-am-i-navigating" class="slide level2">
+<h2>Where am I? Navigating</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="bu">pwd</span>            <span class="co"># print working directory — where am I?</span></span>
+<span id="cb2-2"><a></a><span class="fu">ls</span>             <span class="co"># list contents of current directory</span></span>
+<span id="cb2-3"><a></a><span class="fu">ls</span> <span class="at">-l</span>          <span class="co"># long format: sizes, dates, permissions</span></span>
+<span id="cb2-4"><a></a><span class="fu">ls</span> <span class="at">-la</span>         <span class="co"># also show hidden files (start with .)</span></span>
+<span id="cb2-5"><a></a><span class="bu">cd</span> Documents   <span class="co"># change into Documents</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><code>pwd</code> tells you where you are</li>
+<li class="fragment"><code>ls</code> shows what’s there (<code>-l</code> long, <code>-a</code> all, <code>-t</code> by time, <code>-S</code> by size)</li>
+<li class="fragment"><code>cd</code> moves you around</li>
+</ul>
+</section>
+<section id="paths-absolute-vs.-relative" class="slide level2">
+<h2>Paths: absolute vs. relative</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="bu">cd</span> /Users/wcresko/Documents   <span class="co"># absolute — full path from /</span></span>
+<span id="cb3-2"><a></a><span class="bu">cd</span> data                       <span class="co"># relative — from where I am now</span></span>
+<span id="cb3-3"><a></a><span class="bu">cd</span> ..                         <span class="co"># up one directory (parent)</span></span>
+<span id="cb3-4"><a></a><span class="bu">cd</span> ../scripts                 <span class="co"># up one, then into scripts</span></span>
+<span id="cb3-5"><a></a><span class="bu">cd</span> ~                          <span class="co"># home directory</span></span>
+<span id="cb3-6"><a></a><span class="bu">cd</span> <span class="at">-</span>                          <span class="co"># back to previous directory</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><strong>Absolute</strong> = full path starting at <code>/</code></li>
+<li class="fragment"><strong>Relative</strong> = from your current location</li>
+<li class="fragment"><code>.</code> = here · <code>..</code> = parent · <code>~</code> = home</li>
+</ul>
+</section>
+<section id="making-moving-removing" class="slide level2">
+<h2>Making, moving, removing</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="fu">mkdir</span> project          <span class="co"># make a new directory</span></span>
+<span id="cb4-2"><a></a><span class="fu">touch</span> notes.txt        <span class="co"># make a new empty file</span></span>
+<span id="cb4-3"><a></a><span class="fu">mv</span> notes.txt README    <span class="co"># rename (or move) a file</span></span>
+<span id="cb4-4"><a></a><span class="fu">cp</span> README README.bak   <span class="co"># copy a file</span></span>
+<span id="cb4-5"><a></a><span class="fu">rm</span> README.bak          <span class="co"># delete a file</span></span>
+<span id="cb4-6"><a></a><span class="fu">rmdir</span> project          <span class="co"># delete an (empty) directory</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><strong>The shell trusts you</strong> — <code>rm</code> deletes immediately, no trash bin</li>
+<li class="fragment">Naming: avoid spaces, don’t start with <code>-</code>, stick to letters/numbers/<code>.</code>/<code>-</code>/<code>_</code></li>
+<li class="fragment">Use meaningful extensions (<code>.txt</code>, <code>.csv</code>, <code>.fasta</code>)</li>
+</ul>
+</section>
+<section id="viewing-files" class="slide level2">
+<h2>Viewing files</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a></a><span class="fu">cat</span> small.txt          <span class="co"># dump a whole (small) file</span></span>
+<span id="cb5-2"><a></a><span class="fu">less</span> large.txt         <span class="co"># page through: space=fwd, b=back, /=search, q=quit</span></span>
+<span id="cb5-3"><a></a><span class="fu">head</span> data.txt          <span class="co"># first 10 lines</span></span>
+<span id="cb5-4"><a></a><span class="fu">head</span> <span class="at">-n</span> 20 data.txt    <span class="co"># first 20 lines</span></span>
+<span id="cb5-5"><a></a><span class="fu">tail</span> data.txt          <span class="co"># last 10 lines</span></span>
+<span id="cb5-6"><a></a><span class="fu">tail</span> <span class="at">-f</span> log.txt        <span class="co"># follow a growing file in real time</span></span>
+<span id="cb5-7"><a></a><span class="fu">wc</span> <span class="at">-l</span> data.txt         <span class="co"># count lines</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div title="Never cat a huge file">
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>Important</strong></p>
+<p><strong>Never cat a huge file</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Shrinkage is decoupled from the hypothesis test.</strong> Since the 2016 pipeline change, DESeq2 computes <code>pvalue</code> / <code>padj</code> from the <strong>unshrunken</strong> (MLE) log-fold-changes — shrinkage does <strong>not</strong> enter the Wald test. The shrunken LFCs (and their SEs) are for <strong>ranking, volcano/MA plots, and effect-size reporting</strong>, <em>after</em> testing. So “shrink before ranking” means <em>before you sort and visualize results</em>, <strong>not</strong> <em>before DE testing</em>. Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.</p>
+<p>A 3 GB genome will freeze your session. Use <code>head</code>, <code>tail</code>, or <code>less</code> instead.</p>
 </div>
 </div>
 </div>
-</section></section>
-<section>
-<section id="part-2-why-per-cell-de-goes-wrong" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 2 — Why per-cell DE goes wrong</h1>
-
+</div>
 </section>
-<section id="the-scientific-question" class="slide level2">
-<h2>The scientific question</h2>
-<blockquote>
-<p>In <em>cell type X</em>, which genes differ between <strong>treated</strong> and <strong>control</strong> subjects?</p>
-</blockquote>
-</section>
-<section id="why-naïve-per-cell-tests-fail" class="slide level2">
-<h2>Why naïve per-cell tests fail</h2>
+<section id="wildcards" class="slide level2">
+<h2>Wildcards</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="fu">ls</span> <span class="pp">*</span>.csv               <span class="co"># everything ending in .csv</span></span>
+<span id="cb6-2"><a></a><span class="fu">ls</span> sample_<span class="pp">*</span>.fastq      <span class="co"># sample_1.fastq, sample_2.fastq, ...</span></span>
+<span id="cb6-3"><a></a><span class="fu">ls</span> data_<span class="pp">?</span>.txt          <span class="co"># ? matches exactly one character</span></span>
+<span id="cb6-4"><a></a><span class="fu">rm</span> tmp_<span class="pp">*</span>               <span class="co"># careful! deletes everything matching</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li class="fragment">Cells from one subject share genetics, library prep, batch, treatment — they are <strong>not independent</strong></li>
-<li class="fragment">Treating each cell as an independent replicate inflates the effective N by 100×–10,000×</li>
-<li class="fragment">Result: <strong>anti-conservative p-values</strong> — thousands of spurious “significant” genes</li>
-<li class="fragment">Documented in benchmarks: Squair et al. 2021 (<em>Nat Commun</em>), Zimmerman et al. 2021</li>
-</ul>
-<div class="callout callout-important callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Important</strong></p>
-</div>
-<div class="callout-content">
-<p>If your experimental unit is the <strong>subject</strong>, your statistical unit should be the <strong>subject</strong>. Within-cell methods (<code>FindMarkers</code>, <code>wilcox</code>, MAST) are fine for <em>exploratory marker discovery</em>; they are <strong>not</strong> condition-level DE.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="cell-level-de-the-model-based-camp" class="slide level2">
-<h2>Cell-level DE — the model-based camp</h2>
-<p>Pseudobulk is our default, but a second family models <strong>each cell</strong> while still respecting non-independence:</p>
-<ul>
-<li><strong>Mixed-effects / GLMM methods</strong> (<code>nebula</code>, <code>glmmTMB</code>, MAST with a random effect) add a <strong>per-sample random effect</strong>, so the subject remains the unit of replication even though the model fits at cell level</li>
-<li><strong>MAST</strong> uses a two-part (hurdle) model tailored to scRNA-seq zero-inflation</li>
-</ul>
-<p>The literature is genuinely split — some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).</p>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Practical stance:</strong> default to <strong>pseudobulk</strong> (simple, robust, hard to fool). Reach for a <strong>mixed-effects cell-level model</strong> when you have many cells per subject, need the extra power, and will check the random-effect specification. The cardinal sin isn’t picking one — it’s the <strong>naïve per-cell test with no subject term</strong>.</p>
-</div>
-</div>
-</div>
-</section></section>
-<section>
-<section id="part-3-pseudobulk-in-practice" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 3 — Pseudobulk in practice</h1>
-
-</section>
-<section id="what-pseudobulk-does" class="slide level2">
-<h2>What pseudobulk does</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDQ2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC50aXRsZSB7IGZvbnQtc2l6ZTogMThweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLnBhbmVsIHsgZm9udC1zaXplOiAxNHB4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjMzMzOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubGJsIHsgZm9udC1zaXplOiAxMXB4OyBmaWxsOiAjNTU1OyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAudHh0IHsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMzMzOyB9CiAgICAuY2VsbEhkciB7IGZvbnQtc2l6ZTogMTFweDsgZm9udC13ZWlnaHQ6IDYwMDsgZmlsbDogIzIyMjsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjNTU1OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjUwMCIgeT0iMjgiPlBzZXVkb2J1bGs6IGFnZ3JlZ2F0ZSBjZWxscyDihpIgc2FtcGxlLWxldmVsIGNvdW50cyDihpIgYnVsayBERSBmcmFtZXdvcms8L3RleHQ+CgogIDwhLS0gUGFuZWwgMTogYW5ub3RhdGVkIGNlbGxzIGJ5IGNsdXN0ZXIgw5cgc2FtcGxlIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLDYwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMCI+MS4gU2luZ2xlIGNlbGxzIGxhYmVsZWQgYnk8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMTgiPihjbHVzdGVyLCBzYW1wbGUpPC90ZXh0PgogICAgPHJlY3QgeD0iMCIgeT0iMzAiIHdpZHRoPSIyODAiIGhlaWdodD0iMjkwIiBmaWxsPSIjZmFmYWZhIiBzdHJva2U9IiNjY2MiLz4KCiAgICA8IS0tIENsdXN0ZXIgQSAtLT4KICAgIDxnPgogICAgICA8IS0tIHNhbXBsZSBTMSAtLT4KICAgICAgPGNpcmNsZSBjeD0iNTAiICBjeT0iODAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjUiICBjeT0iNzUiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNzIiICBjeT0iMTAwIiByPSI1IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDwhLS0gc2FtcGxlIFMyIC0tPgogICAgICA8Y2lyY2xlIGN4PSI5MCIgIGN5PSI4MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI5MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIxMDIiIHI9IjUiIGZpbGw9IiMyYzdmYjgiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgIDwvZz4KICAgIDwhLS0gQ2x1c3RlciBCIC0tPgogICAgPGc+CiAgICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIxODAiIGN5PSIxODAiIHI9IjUiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTc1IiBjeT0iMTYwIiByPSI1IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIyMDUiIGN5PSIxNjUiIHI9IjUiIGZpbGw9IiNlNjYxMDEiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgICAgPGNpcmNsZSBjeD0iMjE1IiBjeT0iMTc1IiByPSI1IiBmaWxsPSIjZTY2MTAxIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjIyNSIgY3k9IjE2MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEMgLS0+CiAgICA8Zz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iMjQwIiByPSI1IiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjcwIiAgY3k9IjI1MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIvPgogICAgICA8Y2lyY2xlIGN4PSI4MCIgIGN5PSIyNDUiIHI9IjUiIGZpbGw9IiMxYjllNzciLz4KICAgICAgPGNpcmNsZSBjeD0iMTEwIiBjeT0iMjUwIiByPSI1IiBmaWxsPSIjMWI5ZTc3IiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjEyMCIgY3k9IjI0MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgoKICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjE0MCIgeT0iMzQwIj5jb2xvciA9IGNsdXN0ZXIgwrcgb3V0bGluZSA9IHNhbXBsZSBTMjwvdGV4dD4KICA8L2c+CgogIDwhLS0gQXJyb3cgLS0+CiAgPHBhdGggY2xhc3M9ImFycm93IiBkPSJNIDMyMCAyMTAgTCAzODAgMjEwIiBtYXJrZXItZW5kPSJ1cmwoI2FocCkiLz4KICA8dGV4dCBjbGFzcz0ibGJsIiB4PSIzNTAiIHk9IjIwMCI+c3VtPC90ZXh0PgoKICA8IS0tIFBhbmVsIDI6IHBzZXVkb2J1bGsgbWF0cml4IC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM5NSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjIuIFBlciAoY2x1c3Rlciwgc2FtcGxlKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTQwIiB5PSIxOCI+c3VtIG9mIGNvdW50czwvdGV4dD4KCiAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLDQwKSI+CiAgICAgIDwhLS0gaGVhZGVyIHJvdyAtLT4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9Ijc1IiAgeT0iMTUiPlMxwrdBPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMTI1IiB5PSIxNSI+UzLCt0E8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJjZWxsSGRyIiB4PSIxNzUiIHk9IjE1Ij5TMcK3QjwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9IjIyNSIgeT0iMTUiPlMywrdCPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMjc1IiB5PSIxNSI+UzHCt0M8L3RleHQ+CgogICAgICA8IS0tIHJvd3M6IGdlbmVzIC0tPgogICAgICA8ZyBmb250LWZhbWlseT0iTWVubG8sQ29uc29sYXMsbW9ub3NwYWNlIiBmb250LXNpemU9IjExIiBmaWxsPSIjMjIyIj4KICAgICAgICA8dGV4dCB4PSIwIiB5PSI0MCI+R2VuZTE8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE0MjwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIxMDAiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSIxMTciIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xNjg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NjI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Nzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjIxPC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSI2NSI+R2VuZTI8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjMzPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjEwMCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjExNyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjQxPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjE1MCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2ZmZDRhNiIvPjx0ZXh0IHg9IjE2NyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIwNTwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNmZmQ0YTYiLz48dGV4dCB4PSIyMTciIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI1MiIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTg8L3RleHQ+CgogICAgICAgIDx0ZXh0IHg9IjAiIHk9IjkwIj5HZW5lMzwvdGV4dD48cmVjdCB4PSI1NSIgeT0iNzciIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjcyIiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ODc8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYzZkYmVmIi8+PHRleHQgeD0iMTE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OTI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTQ8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTk8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTA3PC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSIxMTUiPuKApjwvdGV4dD4KICAgICAgPC9nPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTQwIiB5PSIxNzUiPmxvb2tzIGxpa2UgYSBidWxrIFJOQS1zZXEgY291bnQgbWF0cml4PC90ZXh0PgogIDwvZz4KCiAgPCEtLSBBcnJvdyBkb3duIC0tPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA1MjAgMjkwIEwgNTIwIDMzNSIgbWFya2VyLWVuZD0idXJsKCNhaHApIi8+CgogIDwhLS0gUGFuZWwgMzogREUgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzk1LDM0MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjMuIEZpdCBERSBwZXIgY2x1c3RlcjwvdGV4dD4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIwLDIwKSI+CiAgICAgIDxyZWN0IHg9IjAiICB5PSIwIiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc1IiByeD0iMTAiIGZpbGw9IiNlZWYzZmEiIHN0cm9rZT0iIzJjN2ZiOCIvPgogICAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxMCIgeT0iMjAiIGZvbnQtd2VpZ2h0PSI3MDAiPkRFU2VxMiAvIGVkZ2VSIC8gbGltbWEtdm9vbTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjQwIj5kZXNpZ24gPSB+IGNvbmRpdGlvbiAoKyBjb3ZhcmlhdGVzKTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjU4Ij5zaHJpbmthZ2UsIHByb3BlciByZXBsaWNhdGlvbiw8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjEwIiB5PSI3MyI+d2VsbC1jYWxpYnJhdGVkIHAtdmFsdWVzPC90ZXh0PgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBSaWdodCBwYW5lbDogd2h5IHBzZXVkb2J1bGsgbWF0dGVycyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MjAsNjApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNjAiIGhlaWdodD0iMzcwIiByeD0iMTAiIGZpbGw9IiNmZmY3ZDYiIHN0cm9rZT0iI2Q5YjQxYSIvPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMzAiIHk9IjI1Ij5XaHkgcHNldWRvYnVsaz88L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjU1IiBmb250LXdlaWdodD0iNzAwIj5QZXItY2VsbCBERSBwaXRmYWxsPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9Ijc1Ij5jZWxscyBmcm9tIG9uZSBzdWJqZWN0IGFyZSBub3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iOTEiPmluZGVwZW5kZW50IOKGkiBwLXZhbHVlcyB0b28gc21hbGw8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjEyMCIgZm9udC13ZWlnaHQ9IjcwMCI+UHNldWRvYnVsayBmaXhlcyB0aGlzPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE0MCI+c2FtcGxlcyBBUkUgaW5kZXBlbmRlbnQ7IGJ1bGs8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMTU2Ij5tZXRob2RzIGFyZSB3ZWxsLWNhbGlicmF0ZWQ8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE4NSIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiB0byB1c2UgaXQ8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjA1Ij7CtyBjb21wYXJpbmcgY29uZGl0aW9ucyBhY3Jvc3M8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjIxIj4gIGJpb2xvZ2ljYWwgcmVwbGljYXRlczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIyNDEiPsK3IOKJpSAzIHNhbXBsZXMgcGVyIGdyb3VwLCBpZGVhbGx5IG1vcmU8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjI3MCIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiBOT1Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjkwIj7CtyBmaW5kaW5nIGNsdXN0ZXIgbWFya2VyczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMDYiPiAgKHVzZSB3aXRoaW4tY2VsbCBtZXRob2RzKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMjYiPsK3IG9ubHkgMeKAkzIgc2FtcGxlcyB0b3RhbDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzNDYiPiAgKG5vIHJlcGxpY2F0aW9uIGF2YWlsYWJsZSk8L3RleHQ+CiAgPC9nPgoKICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImFocCIgdmlld0JveD0iMCAwIDEwIDEwIiByZWZYPSI4IiByZWZZPSI1IiBtYXJrZXJXaWR0aD0iNyIgbWFya2VySGVpZ2h0PSI3IiBvcmllbnQ9ImF1dG8tc3RhcnQtcmV2ZXJzZSI+CiAgICAgIDxwYXRoIGQ9Ik0gMCAwIEwgMTAgNSBMIDAgMTAgeiIgZmlsbD0iIzU1NSIvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgo8L3N2Zz4K" style="width:95.0%" class="r-stretch quarto-figure-center"><p class="caption">Pseudobulk aggregation: cells -&gt; per-sample-per-celltype</p><ul>
-<li><strong>Aggregate</strong> (sum) UMI counts per <em>(sample, cell type)</em> → a classic bulk-looking matrix</li>
-<li>One column per (sample × cell type) replicate, one row per gene</li>
-<li>Run a separate DE test <strong>per cell type</strong> with DESeq2 / edgeR / limma-voom</li>
+<li class="fragment"><code>*</code> matches <strong>any number</strong> of characters</li>
+<li class="fragment"><code>?</code> matches <strong>exactly one</strong> character</li>
+<li class="fragment">Lets one command act on many files at once</li>
 </ul>
 </section>
-<section id="deseq2-on-pseudobulk-in-r" class="slide level2">
-<h2>DESeq2 on pseudobulk in R</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(Seurat); <span class="fu">library</span>(DESeq2)</span>
-<span id="cb3-2"><a></a></span>
-<span id="cb3-3"><a></a>pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(seu, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>,</span>
-<span id="cb3-4"><a></a>                          <span class="at">group.by =</span> <span class="fu">c</span>(<span class="st">&quot;sample_id&quot;</span>, <span class="st">&quot;celltype&quot;</span>),</span>
-<span id="cb3-5"><a></a>                          <span class="at">return.seurat =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>RNA</span>
-<span id="cb3-6"><a></a></span>
-<span id="cb3-7"><a></a>meta <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb3-8"><a></a>  <span class="at">sample_id =</span> <span class="fu">sub</span>(<span class="st">&quot;_.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb)),</span>
-<span id="cb3-9"><a></a>  <span class="at">celltype  =</span> <span class="fu">sub</span>(<span class="st">&quot;^[^_]+_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
-<span id="cb3-10"><a></a>) <span class="sc">|&gt;</span></span>
-<span id="cb3-11"><a></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sample_meta, <span class="at">by =</span> <span class="st">&quot;sample_id&quot;</span>)</span>
-<span id="cb3-12"><a></a></span>
-<span id="cb3-13"><a></a>run_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct) {</span>
-<span id="cb3-14"><a></a>  keep <span class="ot">&lt;-</span> meta<span class="sc">$</span>celltype <span class="sc">==</span> ct</span>
-<span id="cb3-15"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> pb[, keep],</span>
-<span id="cb3-16"><a></a>                                 <span class="at">colData   =</span> meta[keep, ],</span>
-<span id="cb3-17"><a></a>                                 <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
-<span id="cb3-18"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb3-19"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-20"><a></a>    <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb3-21"><a></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">celltype =</span> ct)</span>
-<span id="cb3-22"><a></a>}</span>
-<span id="cb3-23"><a></a></span>
-<span id="cb3-24"><a></a>de_all <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(<span class="fu">unique</span>(meta<span class="sc">$</span>celltype), run_de)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="deseq2-on-pseudobulk-in-python" class="slide level2">
-<h2>DESeq2 on pseudobulk in Python</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a></a><span class="im">import</span> decoupler <span class="im">as</span> dc</span>
-<span id="cb4-2"><a></a><span class="im">import</span> pydeseq2.dds <span class="im">as</span> dds_mod</span>
-<span id="cb4-3"><a></a><span class="im">from</span> pydeseq2.ds <span class="im">import</span> DeseqStats</span>
-<span id="cb4-4"><a></a></span>
-<span id="cb4-5"><a></a>pdata <span class="op">=</span> dc.get_pseudobulk(adata, sample_col<span class="op">=</span><span class="st">&quot;sample_id&quot;</span>,</span>
-<span id="cb4-6"><a></a>                          groups_col<span class="op">=</span><span class="st">&quot;celltype&quot;</span>,</span>
-<span id="cb4-7"><a></a>                          layer<span class="op">=</span><span class="st">&quot;counts&quot;</span>, mode<span class="op">=</span><span class="st">&quot;sum&quot;</span>,</span>
-<span id="cb4-8"><a></a>                          min_cells<span class="op">=</span><span class="dv">10</span>, min_counts<span class="op">=</span><span class="dv">1000</span>)</span>
-<span id="cb4-9"><a></a></span>
-<span id="cb4-10"><a></a>ct <span class="op">=</span> <span class="st">&quot;T_CD4&quot;</span></span>
-<span id="cb4-11"><a></a>mask <span class="op">=</span> pdata.obs[<span class="st">&quot;celltype&quot;</span>] <span class="op">==</span> ct</span>
-<span id="cb4-12"><a></a>dds <span class="op">=</span> dds_mod.DeseqDataSet(</span>
-<span id="cb4-13"><a></a>    counts <span class="op">=</span> pdata.layers[<span class="st">&quot;counts&quot;</span>][mask].T,</span>
-<span id="cb4-14"><a></a>    metadata <span class="op">=</span> pdata.obs[mask],</span>
-<span id="cb4-15"><a></a>    design_factors <span class="op">=</span> <span class="st">&quot;condition&quot;</span>)</span>
-<span id="cb4-16"><a></a>dds.deseq2()</span>
-<span id="cb4-17"><a></a>DeseqStats(dds, contrast<span class="op">=</span>[<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>]).summary()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</section>
-<section id="gotchas-good-practice" class="slide level2">
-<h2>Gotchas &amp; good practice</h2>
-<div class="callout callout-warning callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Warning</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Common pitfalls.</strong></p>
+<section id="pipes-redirection" class="slide level2">
+<h2>Pipes &amp; redirection</h2>
+<div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="fu">ls</span> <span class="at">-l</span> <span class="op">&gt;</span> files.txt          <span class="co"># &gt; send output to a file (overwrites!)</span></span>
+<span id="cb7-2"><a></a><span class="bu">echo</span> <span class="st">&quot;more&quot;</span> <span class="op">&gt;&gt;</span> files.txt   <span class="co"># &gt;&gt; append to a file</span></span>
+<span id="cb7-3"><a></a><span class="fu">ls</span> /nope <span class="dv">2</span><span class="op">&gt;</span> errors.txt     <span class="co"># 2&gt; capture error messages</span></span>
+<span id="cb7-4"><a></a><span class="fu">sort</span> names.txt <span class="kw">|</span> <span class="fu">uniq</span>      <span class="co"># | feed one command&#39;s output into the next</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li><strong>Filter low-cell groups</strong> — drop (sample × cell type) combos with <code>&lt; 10</code> cells before DE; the pseudobulk profile is too noisy.</li>
-<li><strong>Include covariates</strong> in the design (batch, sex, age) just like bulk RNA-seq.</li>
-<li><strong>Need ≥ 3 samples per condition.</strong> With 1–2 samples per group, no test is honest — say so in the paper.</li>
-<li>Prefer <strong>shrinkage LFCs</strong> (<code>lfcShrink()</code> with <code>apeglm</code>) for ranking.</li>
-<li>Apply BH / IHW <strong>within</strong> each cell-type run, not across all results pooled — the null distributions differ.</li>
+<li class="fragment"><code>&gt;</code> writes to a file (<strong>overwrites</strong>), <code>&gt;&gt;</code> <strong>appends</strong></li>
+<li class="fragment"><code>|</code> chains commands — no intermediate files needed</li>
+<li class="fragment">Three streams: <strong>stdin (0)</strong>, <strong>stdout (1)</strong>, <strong>stderr (2)</strong></li>
+</ul>
+</section>
+<section id="pipes-small-tools-combined" class="slide level2">
+<h2>Pipes: small tools, combined</h2>
+<div class="sourceCode" id="cb8"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="co"># Count how many lines match a pattern</span></span>
+<span id="cb8-2"><a></a><span class="fu">grep</span> <span class="st">&quot;pattern&quot;</span> file.txt <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span></span>
+<span id="cb8-3"><a></a></span>
+<span id="cb8-4"><a></a><span class="co"># Sort, find unique values, count them, rank by frequency</span></span>
+<span id="cb8-5"><a></a><span class="fu">cat</span> data.csv <span class="kw">|</span> <span class="fu">cut</span> <span class="at">-d</span><span class="st">&#39;,&#39;</span> <span class="at">-f2</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="kw">|</span> <span class="fu">uniq</span> <span class="at">-c</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-rn</span></span>
+<span id="cb8-6"><a></a></span>
+<span id="cb8-7"><a></a><span class="co"># Count sequences in a FASTA file</span></span>
+<span id="cb8-8"><a></a><span class="fu">grep</span> <span class="st">&quot;^&gt;&quot;</span> genome.fa <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><strong>Unix philosophy</strong>: small tools that each do one thing well</li>
+<li class="fragment">Build complex pipelines one stage at a time, checking output as you go</li>
+<li class="fragment">Filter early to keep the data flowing through small</li>
+</ul>
+</section>
+<section id="downloading-data" class="slide level2">
+<h2>Downloading data</h2>
+<div class="panel-tabset">
+<ul id="tabset-1" class="panel-tabset-tabby"><li><a data-tabby-default href="#tabset-1-1">wget</a></li><li><a href="#tabset-1-2">curl</a></li><li><a href="#tabset-1-3">Notes</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1">
+<div class="sourceCode" id="cb9"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a></a><span class="fu">wget</span> https://example.org/genome.fna.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-1-2">
+<div class="sourceCode" id="cb10"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a></a><span class="ex">curl</span> <span class="at">-o</span> genome.fa.gz https://example.org/genome.fna.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-1-3">
+<ul>
+<li>Both download files from a URL</li>
+<li><code>curl -o</code> lets you name the saved file</li>
+<li><code>.gz</code> = compressed — work with it directly via <code>zcat</code>, <code>zless</code>, <code>zgrep</code></li>
 </ul>
 </div>
 </div>
 </div>
 </section>
-<section id="when-not-to-use-pseudobulk" class="slide level2">
-<h2>When <em>not</em> to use pseudobulk</h2>
+<section id="getting-help" class="slide level2">
+<h2>Getting help</h2>
+<div class="sourceCode" id="cb11"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a></a><span class="fu">man</span> ls          <span class="co"># full manual page (q to quit)</span></span>
+<span id="cb11-2"><a></a><span class="fu">ls</span> <span class="at">--help</span>       <span class="co"># quick usage summary</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li>Questions about <strong>within-cell-type heterogeneity</strong> (subpopulations defined by a marker)</li>
-<li>Samples with only one or two biological replicates per condition — no test will save you</li>
-<li>Rare cell types with too few cells per sample to aggregate meaningfully</li>
+<li class="fragment"><code>man command</code> opens the manual; press <code>q</code> to exit</li>
+<li class="fragment"><code>command --help</code> gives a fast summary</li>
+<li class="fragment">And of course: the internet and generative AI (Claude, ChatGPT)</li>
 </ul>
 </section></section>
 <section>
-<section id="part-4-where-de-lands-in-the-bigger-picture" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 4 — Where DE lands in the bigger picture</h1>
+<section id="part-2-r-rstudio" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 2 — R &amp; RStudio</h1>
 
 </section>
-<section id="the-annotated-object-as-a-launchpad" class="slide level2">
-<h2>The annotated object as a launchpad</h2>
-
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NjAgNTAwIiBmb250LWZhbWlseT0iSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZiI+CiAgPHN0eWxlPgogICAgLnRpdGxlIHsgZm9udC1zaXplOiAxOHB4OyBmb250LXdlaWdodDogNzAwOyBmaWxsOiAjMjIyOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubm9kZVRpdGxlIHsgZm9udC1zaXplOiAxM3B4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjZmZmOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubm9kZVN1YiB7IGZvbnQtc2l6ZTogMTFweDsgZmlsbDogI2ZmZjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLmNlbnRlciB7IGZvbnQtc2l6ZTogMTRweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogI2ZmZjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLmNlbnRlclN1YiB7IGZvbnQtc2l6ZTogMTFweDsgZmlsbDogI2ZmZjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjODg4OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjQ4MCIgeT0iMzAiPkRvd25zdHJlYW0gYW5hbHlzZXMgYWZ0ZXIgY2x1c3RlcmluZyAmYW1wOyBhbm5vdGF0aW9uPC90ZXh0PgoKICA8IS0tIGNlbnRyYWwgaHViOiBhbm5vdGF0ZWQgVU1BUCAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzODAsMjEwKSI+CiAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI2MCIgcj0iOTAiIGZpbGw9IiM0NDQiLz4KICAgIDx0ZXh0IGNsYXNzPSJjZW50ZXIiIHg9IjEwMCIgeT0iNTIiPkFubm90YXRlZDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJjZW50ZXIiIHg9IjEwMCIgeT0iNzAiPmNlbGxzICsgVU1BUDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJjZW50ZXJTdWIiIHg9IjEwMCIgeT0iOTAiPihTZXVyYXQgb2JqZWN0IC88L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0iY2VudGVyU3ViIiB4PSIxMDAiIHk9IjEwNCI+QW5uRGF0YSk8L3RleHQ+CiAgPC9nPgoKICA8IS0tIDYgc2F0ZWxsaXRlIG5vZGVzIGFyb3VuZCB0aGUgaHViIC0tPgogIDwhLS0gREUgY29uZGl0aW9ucyAodG9wLWxlZnQpIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDEwMCw5MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMDAiIHk9IjIyIj5ERSBiZXR3ZWVuIGNvbmRpdGlvbnM8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVN1YiIgeD0iMTAwIiB5PSI0MCI+cHNldWRvYnVsayArIERFU2VxMiDCtyBNQVNUPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjEwMCIgeT0iNTUiPkZpbmRNYXJrZXJzIMK3IHJhbmtfZ2VuZXNfZ3JvdXBzPC90ZXh0PgogIDwvZz4KICA8cGF0aCBjbGFzcz0iYXJyb3ciIGQ9Ik0gMzAwIDEzMCBMIDQ2MCAyMzAiLz4KCiAgPCEtLSBFbnJpY2htZW50ICh0b3AtcmlnaHQpIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDY2MCw5MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjZTY2MTAxIi8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMTAiIHk9IjIyIj5QYXRod2F5IC8gZW5yaWNobWVudDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMTAiIHk9IjQwIj5mZ3NlYSDCtyBjbHVzdGVyUHJvZmlsZXIgwrcgZW5yaWNoUjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMTAiIHk9IjU1Ij5kZWNvdXBsZVIgwrcgR1NWQSDCtyBBVUNlbGw8L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA2NjAgMTMwIEwgNTIwIDIzMCIvPgoKICA8IS0tIFdHQ05BIChyaWdodCkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzMwLDIzMCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIwMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMDAiIHk9IjIyIj5Dby1leHByZXNzaW9uIG1vZHVsZXM8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVN1YiIgeD0iMTAwIiB5PSI0MCI+aGRXR0NOQSAoc2luZ2xlLWNlbGwpPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjEwMCIgeT0iNTUiPldHQ05BIG9uIHBzZXVkb2J1bGs8L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA3MzAgMjYwIEwgNTgwIDI4MCIvPgoKICA8IS0tIFRyYWplY3RvcnkgKGJvdHRvbS1yaWdodCkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNjYwLDM4MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjNzU2YmIxIi8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMTAiIHk9IjIyIj5UcmFqZWN0b3J5IC8gcHNldWRvdGltZTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMTAiIHk9IjQwIj5Nb25vY2xlMyDCtyBTbGluZ3Nob3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVN1YiIgeD0iMTEwIiB5PSI1NSI+UEFHQSDCtyBzY1ZlbG8gKFJOQSB2ZWxvY2l0eSk8L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA2NjAgNDAwIEwgNTQwIDM0MCIvPgoKICA8IS0tIENlbGwtY2VsbCBjb21tdW5pY2F0aW9uIChib3R0b20tbGVmdCkgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTAwLDM4MCkiPgogICAgPHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyMCIgaGVpZ2h0PSI3MCIgcng9IjEwIiBmaWxsPSIjZDk1ZjAyIi8+CiAgICA8dGV4dCBjbGFzcz0ibm9kZVRpdGxlIiB4PSIxMTAiIHk9IjIyIj5DZWxs4oCTY2VsbCBjb21tdW5pY2F0aW9uPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjExMCIgeT0iNDAiPkNlbGxDaGF0IMK3IExJQU5BPC90ZXh0PgogICAgPHRleHQgY2xhc3M9Im5vZGVTdWIiIHg9IjExMCIgeT0iNTUiPk5pY2hlTmV0IMK3IENlbGxQaG9uZURCPC90ZXh0PgogIDwvZz4KICA8cGF0aCBjbGFzcz0iYXJyb3ciIGQ9Ik0gMzIwIDQwMCBMIDQ1MCAzNDAiLz4KCiAgPCEtLSBQc2V1ZG9idWxrIChsZWZ0KSAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMCwyMzApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyMDAiIGhlaWdodD0iNzAiIHJ4PSIxMCIgZmlsbD0iI2NhMDAyMCIvPgogICAgPHRleHQgY2xhc3M9Im5vZGVUaXRsZSIgeD0iMTAwIiB5PSIyMiI+UHNldWRvYnVsayBhbmFseXNpczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMDAiIHk9IjQwIj5hZ2dyZWdhdGUg4oaSIERFU2VxMi9lZGdlUjwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJub2RlU3ViIiB4PSIxMDAiIHk9IjU1Ij5zYW1wbGUtbGV2ZWwgcmVwbGljYXRpb248L3RleHQ+CiAgPC9nPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSAyMzAgMjYwIEwgMzgwIDI4MCIvPgo8L3N2Zz4K" style="width:95.0%" class="r-stretch quarto-figure-center"><p class="caption">Downstream analysis hub: from annotated object to claims</p><ul>
-<li><strong>Within-cluster:</strong> marker genes, signatures, module scores</li>
-<li><strong>Between conditions:</strong> pseudobulk DE per cell type <em>(this lecture)</em></li>
-<li><strong>Across cells:</strong> gene modules → WGCNA (bonus), trajectory inference, ligand-receptor</li>
-<li><strong>Across samples:</strong> composition shifts (scCODA, propeller, milo)</li>
+<section id="why-r" class="slide level2">
+<h2>Why R?</h2>
+<ul>
+<li class="fragment">Powerful, flexible, <strong>free</strong>, runs everywhere</li>
+<li class="fragment">Superb data management, statistics, and graphics</li>
+<li class="fragment"><strong>Reproducibility</strong> — your scripts record exactly what you did</li>
+<li class="fragment">Write your own functions; huge online help and community</li>
+<li class="fragment">Nice front end (<strong>RStudio</strong>) and dynamic documents (<strong>Quarto</strong>)</li>
 </ul>
 </section>
-<section id="pathway-enrichment-follow-up" class="slide level2">
-<h2>Pathway / enrichment follow-up</h2>
-<p>After DE, summarize gene lists into pathways:</p>
+<section id="the-r-interpreter-rstudio-panes" class="slide level2">
+<h2>The R interpreter &amp; RStudio panes</h2>
 <ul>
-<li><strong>Over-representation</strong> (hypergeometric): <code>enrichR</code>, <code>clusterProfiler</code></li>
-<li><strong>Rank-based GSEA</strong>: <code>fgsea</code>, <code>clusterProfiler::gseGO</code></li>
-<li><strong>Per-cell scoring</strong> (alternative to gene lists): <code>decoupleR</code>, <code>AUCell</code>, <code>AddModuleScore</code></li>
+<li class="fragment"><strong>R</strong> is the engine that runs your commands; <strong>RStudio</strong> is the comfortable cockpit around it</li>
+<li class="fragment"><strong>Source</strong> (top-left) — your scripts and Quarto docs you edit and save</li>
+<li class="fragment"><strong>Console</strong> (bottom-left) — where commands actually run</li>
+<li class="fragment"><strong>Environment / History</strong> (top-right) — the objects you’ve created</li>
+<li class="fragment"><strong>Files / Plots / Packages / Help</strong> (bottom-right) — everything else</li>
+</ul>
+</section>
+<section id="assignment-basic-math" class="slide level2">
+<h2>Assignment &amp; basic math</h2>
+<div class="sourceCode" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a></a>x <span class="ot">&lt;-</span> <span class="dv">2</span>          <span class="co"># assign with &lt;-</span></span>
+<span id="cb12-2"><a></a>x <span class="sc">*</span> <span class="dv">3</span>           <span class="co"># 6</span></span>
+<span id="cb12-3"><a></a>y <span class="ot">&lt;-</span> x <span class="sc">*</span> <span class="dv">3</span>      <span class="co"># store a result</span></span>
+<span id="cb12-4"><a></a><span class="fu">log</span>(x)          <span class="co"># built-in functions: object goes in parentheses</span></span>
+<span id="cb12-5"><a></a><span class="fu">sqrt</span>(<span class="dv">16</span>)        <span class="co"># 4</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">Assign with <code>&lt;-</code>; names start with a letter; R is <strong>case sensitive</strong> (<code>x</code> ≠ <code>X</code>)</li>
+<li class="fragment">Normal math precedence (PEMDAS); parentheses control order</li>
+<li class="fragment">Comment with <code>#</code></li>
+</ul>
+</section>
+<section id="vectors-r-thinks-in-vectors" class="slide level2">
+<h2>Vectors — R thinks in vectors</h2>
+<div class="sourceCode" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a></a>x <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">2</span>, <span class="dv">1</span>, <span class="dv">5</span>)   <span class="co"># c() = concatenate into a vector</span></span>
+<span id="cb13-2"><a></a>y <span class="ot">&lt;-</span> x<span class="sc">^</span><span class="dv">2</span>                   <span class="co"># operations are element-wise</span></span>
+<span id="cb13-3"><a></a><span class="fu">mean</span>(x); <span class="fu">median</span>(x); <span class="fu">sd</span>(x)  <span class="co"># built-in summaries</span></span>
+<span id="cb13-4"><a></a><span class="fu">length</span>(x)                  <span class="co"># how many elements</span></span>
+<span id="cb13-5"><a></a><span class="fu">seq</span>(<span class="dv">0</span>, <span class="dv">10</span>, <span class="at">by =</span> <span class="fl">0.5</span>)       <span class="co"># a regular sequence</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">A <strong>vector</strong> is a list of values of one type</li>
+<li class="fragment">Math applies to <strong>every element at once</strong></li>
+<li class="fragment">Types: <code>int</code>, <code>dbl</code> (numeric), <code>chr</code>, <code>lgl</code>, plus <strong>factors</strong> for categories</li>
+</ul>
+</section>
+<section id="data-frames-tabular-data" class="slide level2">
+<h2>Data frames — tabular data</h2>
+<div class="sourceCode" id="cb14"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a></a>conc    <span class="ot">&lt;-</span> <span class="fu">factor</span>(<span class="fu">c</span>(<span class="st">&quot;low&quot;</span>, <span class="st">&quot;high&quot;</span>, <span class="st">&quot;high&quot;</span>, <span class="st">&quot;med&quot;</span>))</span>
+<span id="cb14-2"><a></a>stiff   <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">3.4</span>, <span class="fl">8.4</span>, <span class="fl">3.0</span>, <span class="fl">5.6</span>)</span>
+<span id="cb14-3"><a></a>mydata  <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(conc, stiff)</span>
+<span id="cb14-4"><a></a></span>
+<span id="cb14-5"><a></a>mydata<span class="sc">$</span>stiff        <span class="co"># a column by name (preferred)</span></span>
+<span id="cb14-6"><a></a>mydata[, <span class="dv">2</span>]         <span class="co"># column 2</span></span>
+<span id="cb14-7"><a></a>mydata[<span class="dv">1</span>, ]         <span class="co"># row 1</span></span>
+<span id="cb14-8"><a></a>mydata[mydata<span class="sc">$</span>stiff <span class="sc">&gt;</span> <span class="dv">4</span>, ]   <span class="co"># rows meeting a condition</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">The primary structure for tabular data; vectors become <strong>columns</strong></li>
+<li class="fragment"><code>[row, column]</code> indexing; <code>$</code> grabs a column by name</li>
+<li class="fragment"><code>factor()</code> marks a column as categorical</li>
+</ul>
+</section>
+<section id="lists-the-pocket-that-holds-anything" class="slide level2">
+<h2>Lists — the pocket that holds anything</h2>
+<div class="sourceCode" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a></a>experiment <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb15-2"><a></a>  <span class="at">sample_id  =</span> <span class="st">&quot;donor_01_CTRL&quot;</span>,</span>
+<span id="cb15-3"><a></a>  <span class="at">age        =</span> <span class="dv">42</span>,</span>
+<span id="cb15-4"><a></a>  <span class="at">cell_types =</span> <span class="fu">c</span>(<span class="st">&quot;B cell&quot;</span>, <span class="st">&quot;CD4 T&quot;</span>, <span class="st">&quot;NK&quot;</span>)</span>
+<span id="cb15-5"><a></a>)</span>
+<span id="cb15-6"><a></a></span>
+<span id="cb15-7"><a></a>experiment<span class="sc">$</span>sample_id     <span class="co"># access a slot by name</span></span>
+<span id="cb15-8"><a></a>experiment[[<span class="dv">3</span>]]          <span class="co"># the contents of the 3rd slot</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">Each slot can hold a <strong>different kind of thing</strong> — even another list</li>
+<li class="fragment"><code>[[ ]]</code> returns the <em>contents</em>; <code>[ ]</code> returns a sub-list</li>
+<li class="fragment"><strong>Seurat</strong> and <strong>SingleCellExperiment</strong> objects are lists under the hood</li>
+</ul>
+</section>
+<section id="functions" class="slide level2">
+<h2>Functions</h2>
+<div class="sourceCode" id="cb16"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a></a><span class="fu">round</span>(<span class="fl">3.14159</span>, <span class="dv">2</span>)              <span class="co"># positional args — order matters</span></span>
+<span id="cb16-2"><a></a><span class="fu">round</span>(<span class="at">x =</span> <span class="fl">3.14159</span>, <span class="at">digits =</span> <span class="dv">2</span>) <span class="co"># named args — order-independent, clearer</span></span>
+<span id="cb16-3"><a></a></span>
+<span id="cb16-4"><a></a><span class="co"># Define your own</span></span>
+<span id="cb16-5"><a></a>cv <span class="ot">&lt;-</span> <span class="cf">function</span>(x, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb16-6"><a></a>  <span class="cf">if</span> (na.rm) x <span class="ot">&lt;-</span> x[<span class="sc">!</span><span class="fu">is.na</span>(x)]</span>
+<span id="cb16-7"><a></a>  <span class="fu">sd</span>(x) <span class="sc">/</span> <span class="fu">mean</span>(x)</span>
+<span id="cb16-8"><a></a>}</span>
+<span id="cb16-9"><a></a><span class="fu">cv</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">Use <strong>named arguments</strong> whenever there’s ambiguity — self-documenting</li>
+<li class="fragment">scRNA-seq functions have long signatures, so almost everything is named</li>
+<li class="fragment">You’ll write small helper functions all the time</li>
+</ul>
+</section>
+<section id="packages-install.packages-vs-library" class="slide level2">
+<h2>Packages: <code>install.packages()</code> vs <code>library()</code></h2>
+<div class="sourceCode" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a></a><span class="fu">install.packages</span>(<span class="st">&quot;tidyverse&quot;</span>)   <span class="co"># download &amp; install — ONCE per machine</span></span>
+<span id="cb17-2"><a></a><span class="fu">library</span>(tidyverse)              <span class="co"># load — EVERY new R session</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><strong><code>install.packages()</code></strong> = get it onto your computer (do once)</li>
+<li class="fragment"><strong><code>library()</code></strong> = make it available in this session (do every time)</li>
+<li class="fragment">Bioconductor packages (Seurat ecosystem, DESeq2) use <code>BiocManager::install()</code></li>
+</ul>
+</section>
+<section id="the-tidyverse-the-pipe" class="slide level2">
+<h2>The tidyverse &amp; the pipe</h2>
+<div class="sourceCode" id="cb18"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb18-2"><a></a></span>
+<span id="cb18-3"><a></a>result <span class="ot">&lt;-</span> meta <span class="sc">|&gt;</span></span>
+<span id="cb18-4"><a></a>  <span class="fu">filter</span>(nFeature_RNA <span class="sc">&gt;</span> <span class="dv">200</span>, nFeature_RNA <span class="sc">&lt;</span> <span class="dv">2500</span>) <span class="sc">|&gt;</span></span>
+<span id="cb18-5"><a></a>  <span class="fu">group_by</span>(sample, cluster) <span class="sc">|&gt;</span></span>
+<span id="cb18-6"><a></a>  <span class="fu">summarise</span>(<span class="at">n_cells =</span> <span class="fu">n</span>(),</span>
+<span id="cb18-7"><a></a>            <span class="at">median_umi =</span> <span class="fu">median</span>(nCount_RNA),</span>
+<span id="cb18-8"><a></a>            <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb18-9"><a></a>  <span class="fu">arrange</span>(sample, <span class="fu">desc</span>(n_cells))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">Six verbs cover most work: <code>filter</code>, <code>select</code>, <code>mutate</code>, <code>arrange</code>, <code>group_by</code>, <code>summarise</code></li>
+<li class="fragment">The pipe <strong><code>|&gt;</code></strong> chains steps — read top-to-bottom, left-to-right</li>
+<li class="fragment">This style appears throughout the workshop tutorials</li>
+</ul>
+</section>
+<section id="reading-writing-data" class="slide level2">
+<h2>Reading &amp; writing data</h2>
+<div class="sourceCode" id="cb19"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a></a><span class="co"># Read</span></span>
+<span id="cb19-2"><a></a>df <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;data.csv&quot;</span>)     <span class="co"># tidyverse — returns a tibble</span></span>
+<span id="cb19-3"><a></a>df <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="st">&quot;data.txt&quot;</span>)     <span class="co"># tab-separated</span></span>
+<span id="cb19-4"><a></a>df <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;data.csv&quot;</span>)     <span class="co"># base R equivalent</span></span>
+<span id="cb19-5"><a></a></span>
+<span id="cb19-6"><a></a><span class="co"># Write</span></span>
+<span id="cb19-7"><a></a><span class="fu">write_csv</span>(df, <span class="st">&quot;results.csv&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><code>read_csv()</code> / <code>read_tsv()</code> (tidyverse) return tibbles; <code>read.csv()</code> is base R</li>
+<li class="fragment">Store data in plain text; keep an <strong>untouched original</strong>; include a header row</li>
+<li class="fragment">One column = one data type</li>
 </ul>
 </section></section>
 <section>
-<section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Recap &amp; what’s next</h1>
+<section id="youre-ready-for-day-1" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>You’re ready for Day 1</h1>
 
 </section>
-<section id="what-to-remember-from-lecture-06" class="slide level2">
-<h2>What to remember from Lecture 06</h2>
+<section id="youre-ready-for-day-1-1" class="slide level2">
+<h2>You’re ready for Day 1</h2>
 <ul>
-<li class="fragment">DESeq2 models <strong>integer counts</strong> with a <strong>negative binomial</strong> distribution and <strong>shrinks</strong> dispersion estimates toward a fitted trend</li>
-<li class="fragment"><code>relevel()</code> your factor before running <code>DESeq</code> — the reference level determines the <strong>sign</strong> of the log-fold-change</li>
-<li class="fragment">For ranking and visualization, <strong>shrink</strong> LFCs with <code>lfcShrink(dds, type = &quot;apeglm&quot;)</code> — but the <code>pvalue</code> / <code>padj</code> come from the <strong>unshrunken</strong> estimates (shrinkage is not part of the test since 2016)</li>
-<li class="fragment"><code>padj</code> is the <strong>FDR</strong> — filter on <code>padj &lt; 0.05</code>, not on raw <code>pvalue</code></li>
-<li class="fragment">For <strong>condition-level DE</strong>, default to <strong>pseudobulk</strong> + DESeq2/edgeR/limma-voom; never run per-cell DE for condition contrasts</li>
-<li class="fragment">Aggregate counts per <em>(sample × cell type)</em> with <code>AggregateExpression</code>, then test each cell type separately</li>
-<li class="fragment">Drop cell-type × sample combinations with <strong>fewer than ~10 cells</strong></li>
-<li class="fragment">You need real biological replicates (≥ 3 per group) — there is no shortcut</li>
+<li class="fragment"><strong>Shell:</strong> navigate (<code>pwd</code>/<code>ls</code>/<code>cd</code>), manage files, view with <code>head</code>/<code>less</code>, combine with <code>|</code>, <code>&gt;</code>, <code>&gt;&gt;</code>, get help with <code>man</code></li>
+<li class="fragment"><strong>R:</strong> assign with <code>&lt;-</code>, work with vectors / data frames / lists, write functions, <code>install.packages()</code> once + <code>library()</code> each session, pipe with <code>|&gt;</code>, read/write data</li>
+<li class="fragment">These are the everyday tools under every analysis step ahead</li>
 </ul>
 </section>
-<section id="coming-up-next" class="slide level2">
-<h2>Coming up next</h2>
+<section id="whats-next" class="slide level2">
+<h2>What’s next</h2>
 <ul>
-<li><strong>Lec 07</strong> — <a href="Lecture_07_FunctionalAnalysis.html">Functional Analysis</a> — turning a pseudobulk DE list into biological themes</li>
-<li><strong>Lec 08</strong> — <a href="Lecture_08_DifferentialAbundance.html">Differential Abundance</a> — the <em>complement</em>: do cell-type proportions change?</li>
-<li><strong>Hands-on:</strong> <a href="../Exercise_Folder/Tutorial_06_DESeq2_DE.html">Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE</a></li>
-<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_06_DESeq2_DE.html">Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE</a></li>
+<li class="fragment"><strong>Day 1 core modules</strong> build directly on this:
+<ul>
+<li class="fragment">Tutorial 00 — Setup: R, RStudio, Quarto</li>
+<li class="fragment">Lec/Tut 01 — QC &amp; Preprocessing</li>
+<li class="fragment">Lec/Tut 02 — Dimension Reduction &amp; Clustering</li>
+<li class="fragment">Lec/Tut 03+ — Annotation, Integration, DE, and beyond</li>
+</ul></li>
+<li class="fragment">Revisit the reading: <a href="../Resources_Folder/Chapter_Day0_2_R_and_CommandLine.html">Day 0 · Module 2 — R &amp; the Command Line</a></li>
+<li class="fragment">Keep a cheat sheet open — fluency comes from doing. See you Day 1!</li>
 </ul>
 
 
@@ -1548,7 +1519,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Lecture 06</p>
+<p>Single Cell RNA-seq Workshop · Day 0 · Module 2 — R &amp; the Command Line</p>
 </div>
 </div></div>
 
@@ -2721,44 +2692,6 @@ window.QuartoSupport = function () {
         ]
       });
     </script>
-    
-    <script>
-      // htmlwidgets need to know to resize themselves when slides are shown/hidden.
-      // Fire the "slideenter" event (handled by htmlwidgets.js) when the current
-      // slide changes (different for each slide format).
-      (function () {
-        // dispatch for htmlwidgets
-        function fireSlideEnter() {
-          const event = window.document.createEvent("Event");
-          event.initEvent("slideenter", true, true);
-          window.document.dispatchEvent(event);
-        }
-
-        function fireSlideChanged(previousSlide, currentSlide) {
-          fireSlideEnter();
-
-          // dispatch for shiny
-          if (window.jQuery) {
-            if (previousSlide) {
-              window.jQuery(previousSlide).trigger("hidden");
-            }
-            if (currentSlide) {
-              window.jQuery(currentSlide).trigger("shown");
-            }
-          }
-        }
-
-        // hookup for slidy
-        if (window.w3c_slidy) {
-          window.w3c_slidy.add_observer(function (slide_num) {
-            // slide_num starts at position 1
-            fireSlideChanged(null, w3c_slidy.slides[slide_num - 1]);
-          });
-        }
-
-      })();
-    </script>
-
     <script id="quarto-html-after-body" type="application/javascript">
       window.document.addEventListener("DOMContentLoaded", function (event) {
         const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
