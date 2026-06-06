@@ -1,0 +1,334 @@
+---
+title: "Module 11 — Raw Data Download + Cell Ranger `count` (bonus, upstream)"
+subtitle: "BCL → FASTQ → counts on a SLURM cluster — the raw-data step that feeds the core pipeline"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-important
+**This is a bonus *upstream* Talapas exercise, not a laptop tutorial.** It runs *before* the core pipeline — it produces the counts matrix the core Module 01 consumes. Cell Ranger requires a \~30 GB human reference genome, multi-GB FASTQs, and a multi-core machine with 64+ GB RAM. Do not try to run it on your laptop. Work through the laptop sequence (core tutorials 01–08) first; come here when you have your **own** raw 10x data and need to turn it into a counts matrix on Talapas.
+:::
+
+## About this tutorial
+
+The companion to **[scNotebooks Module 03](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module03/module03.html)** (their Cell Ranger walkthrough), adapted for **SLURM on Talapas**. You'll learn:
+
+-   How a 10x sequencing run goes from BCL → FASTQ (`cellranger mkfastq`) and FASTQ → counts (`cellranger count`)
+-   How to install Cell Ranger and the human reference on Talapas
+-   How to write a **batch SLURM script** to run `cellranger count` on a single sample
+-   How to scale to many samples with a **SLURM array job**
+-   How to inspect the Cell Ranger outputs (the same `filtered_feature_bc_matrix/` directory that `Read10X()` consumes)
+-   How to feed the outputs into the workshop's R-based downstream tutorials
+
+## Why this matters
+
+Most workshop participants will **start from `filtered_feature_bc_matrix/`**, because that's what your sequencing core or your collaborator hands you. But the moment you need to:
+
+-   Re-run on a newer reference genome,
+-   Add a missing sample to the same study,
+-   Process a non-standard chemistry (e.g. 5'-seq, multiome, fixed-cell),
+-   Demultiplex CMO-multiplexed samples,
+
+you'll be running Cell Ranger yourself. This exercise gives you the playbook so the first time isn't on a deadline.
+
+## Prerequisites
+
+-   A Talapas account ([request one](https://racs.uoregon.edu/request-access)) and basic familiarity with SLURM (see the [SLURM Basics tutorial](Tutorial_09_SLURM_Basics.html))
+-   \~50 GB of free space in your `/projects/<PIRG>/` quota for the human reference + intermediate files
+-   Either your own 10x FASTQs **or** the small public test dataset linked below
+
+## Cell Ranger overview
+
+```
+BCL (Illumina raw)
+   │
+   │  cellranger mkfastq   (uses bcl2fastq under the hood)
+   ▼
+FASTQ (per lane, per sample)
+   │
+   │  cellranger count     (this is the heavy lifting)
+   ▼
+Cell Ranger outs/
+   ├── web_summary.html              ← QC at a glance
+   ├── metrics_summary.csv           ← QC numbers
+   ├── filtered_feature_bc_matrix/   ← what the core pipeline's `01_qc_preprocessing.R` (Read10X) loads
+   ├── raw_feature_bc_matrix/        ← what SoupX needs
+   ├── possorted_genome_bam.bam      ← aligned reads
+   └── molecule_info.h5              ← per-UMI info, used by aggr
+```
+
+For most users, the sequencing core runs `cellranger mkfastq` and hands you the FASTQs. **This tutorial focuses on `cellranger count`**, which is where you start.
+
+## Step 1 — Install Cell Ranger on Talapas
+
+```bash
+# In your projects directory (NOT in $HOME — Cell Ranger is ~3 GB)
+cd /projects/<PIRG>/<your-username>
+
+mkdir -p software && cd software
+
+# Get the latest Cell Ranger from 10x (the URL has a temporary signed token,
+# so generate it fresh from https://www.10xgenomics.com/support/software/cell-ranger/downloads).
+# Replace the URL below with the freshly-generated one.
+wget -O cellranger-9.0.0.tar.gz "https://cf.10xgenomics.com/releases/cell-exp/cellranger-9.0.0.tar.gz?<token>"
+tar -xzf cellranger-9.0.0.tar.gz
+
+# Add to PATH (put this in your ~/.bashrc so future shells find it)
+export PATH=/projects/<PIRG>/<your-username>/software/cellranger-9.0.0:$PATH
+which cellranger
+cellranger --version
+```
+
+::: callout-tip
+On Talapas, `cellranger` may already be available as a module — check with `module avail cellranger`. If so, skip the manual install: `module load cellranger/9.0.0`.
+:::
+
+## Step 2 — Download the reference genome
+
+```bash
+cd /projects/<PIRG>/<your-username>/refs
+
+# Human GRCh38 (current release)
+wget https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz
+tar -xzf refdata-gex-GRCh38-2024-A.tar.gz
+
+# For mouse: refdata-gex-GRCm39-2024-A.tar.gz
+# For Drosophila / other species: build a custom reference with `cellranger mkref`
+ls refdata-gex-GRCh38-2024-A/
+# fasta/  genes/  reference.json  star/
+```
+
+::: {.callout-important title="Think about it"}
+The reference is \~12 GB compressed and \~30 GB extracted. Why would you NOT put it in your `$HOME`?
+
+<details>
+
+<summary>Show answers</summary>
+
+`$HOME` on Talapas has a small per-user quota. Reference data goes in `/projects/<PIRG>/...` where your group's PI has shared quota. Keep one canonical copy of each reference per group; multiple users sharing one reference is the norm.
+
+</details>
+:::
+
+## Step 3 — A test dataset to practice on
+
+10x Genomics ships small public datasets for exactly this — test-running the pipeline. The smallest is **PBMC 1k v3** (\~5 GB FASTQ, runs in \~30 minutes):
+
+```bash
+cd /projects/<PIRG>/<your-username>/test_data
+
+wget https://s3-us-west-2.amazonaws.com/10x.files/samples/cell-exp/3.0.0/pbmc_1k_v3/pbmc_1k_v3_fastqs.tar
+tar -xf pbmc_1k_v3_fastqs.tar
+ls pbmc_1k_v3_fastqs/
+# pbmc_1k_v3_S1_L001_I1_001.fastq.gz
+# pbmc_1k_v3_S1_L001_R1_001.fastq.gz
+# pbmc_1k_v3_S1_L001_R2_001.fastq.gz
+# pbmc_1k_v3_S1_L002_I1_001.fastq.gz   ...
+```
+
+The naming is **strict**. Cell Ranger uses the pattern `<SAMPLE>_S<num>_L<lane>_<RNA-or-index>_001.fastq.gz`. Don't rename the files.
+
+## Step 4 — A SLURM batch script for one sample
+
+Create `run_cellranger_count.sbatch`:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=cellranger_count_pbmc1k
+#SBATCH --partition=compute
+#SBATCH --account=<your_PIRG>
+#SBATCH --time=04:00:00
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+#SBATCH --output=logs/cellranger_%j.out
+#SBATCH --error=logs/cellranger_%j.err
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=<your_email>@uoregon.edu
+
+# Load the module if Talapas provides one, OR add Cell Ranger to PATH manually:
+# module load cellranger/9.0.0
+export PATH=/projects/<PIRG>/<your-username>/software/cellranger-9.0.0:$PATH
+
+# Change into the parent directory where the run-output should be written
+cd /projects/<PIRG>/<your-username>/cellranger_runs
+
+cellranger count \
+  --id=pbmc_1k_v3 \
+  --transcriptome=/projects/<PIRG>/<your-username>/refs/refdata-gex-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<your-username>/test_data/pbmc_1k_v3_fastqs \
+  --sample=pbmc_1k_v3 \
+  --create-bam=true \
+  --localcores=16 \
+  --localmem=120
+```
+
+Submit it:
+
+```bash
+mkdir -p logs
+sbatch run_cellranger_count.sbatch
+
+# Watch the job
+squeue -u $USER
+tail -f logs/cellranger_*.out
+```
+
+::: {.callout-important title="Think about it"}
+1.  Why do we tell SLURM `--mem=128G` but tell Cell Ranger `--localmem=120`?
+2.  Why `--cpus-per-task=16` not `--ntasks=16`?
+
+<details>
+
+<summary>Show answers</summary>
+
+1.  Cell Ranger's `--localmem` is the budget it allocates *internally*. Always set it slightly **lower** than the SLURM allocation so that I/O buffers, pre-loaded indexes, and brief spikes don't push the job above its hard SLURM limit and trigger an OOM-kill.
+2.  Cell Ranger is a **single-process multi-threaded** program (Rust + Python). It scales by threads inside one task, not by separate MPI tasks. Use `--cpus-per-task` to give it cores; `--ntasks` would request multiple MPI processes that Cell Ranger doesn't use.
+
+</details>
+:::
+
+## Step 5 — Inspect the output
+
+When the job finishes (\~30–60 min for PBMC 1k):
+
+```bash
+cd /projects/<PIRG>/<your-username>/cellranger_runs/pbmc_1k_v3/outs
+ls -la
+# web_summary.html          ← open in a browser via SSH-tunneled X11 or scp it down
+# metrics_summary.csv       ← cat or column -t
+# filtered_feature_bc_matrix/
+# raw_feature_bc_matrix/
+# possorted_genome_bam.bam (+ .bai)
+# molecule_info.h5
+# analysis/                 ← Cell Ranger's automatic clustering (rough, ignore)
+
+cat metrics_summary.csv | column -t -s,
+```
+
+The `web_summary.html` is the **first thing to look at**. Key red flags:
+
+| Metric | Worry threshold |
+|---|---|
+| Estimated number of cells | Outside expected target (over-loading or mis-calling) |
+| Mean reads per cell | Below \~20,000 → undersequenced |
+| Median genes per cell | Below \~1,000 → poor capture or dying cells |
+| Q30 bases in barcode | Below 90% → poor sequencing |
+| Q30 bases in RNA read | Below 70% → poor sequencing |
+| Reads mapped confidently to transcriptome | Below 60% → wrong reference or contamination |
+
+::: callout-tip
+The `web_summary.html` from a run is the **single most informative QC document** in the entire pipeline. Save it alongside your raw data; reviewers will ask for it.
+:::
+
+## Step 6 — Hand off to the workshop tutorials
+
+Copy the `filtered_feature_bc_matrix/` directory into a place the laptop tutorials can find it:
+
+```bash
+# From your local machine:
+scp -r <username>@login.talapas.uoregon.edu:/projects/<PIRG>/<your-username>/cellranger_runs/pbmc_1k_v3/outs/filtered_feature_bc_matrix \
+        ~/Documents/scrnaseq_workshop/data/
+```
+
+Now from R:
+
+```r
+library(Seurat)
+counts <- Read10X("~/Documents/scrnaseq_workshop/data/filtered_feature_bc_matrix/")
+seu    <- CreateSeuratObject(counts, project = "pbmc_1k_v3",
+                              min.cells = 3, min.features = 200)
+# … pick up at the core pipeline (Module 10), script 01 (QC metrics)
+```
+
+## Step 7 — Scale to many samples with a SLURM array
+
+When you have N samples (one FASTQ folder per sample), don't write N scripts. Use a **SLURM array job**:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=cellranger_count_array
+#SBATCH --partition=compute
+#SBATCH --account=<your_PIRG>
+#SBATCH --time=06:00:00
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=128G
+#SBATCH --output=logs/cr_%A_%a.out
+#SBATCH --array=1-8         # one sub-job per sample (edit to your N)
+
+export PATH=/projects/<PIRG>/<your-username>/software/cellranger-9.0.0:$PATH
+
+# samples.txt has one sample ID per line, in the same order you'd want them processed
+SAMPLE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" samples.txt)
+
+cd /projects/<PIRG>/<your-username>/cellranger_runs
+
+cellranger count \
+  --id="$SAMPLE" \
+  --transcriptome=/projects/<PIRG>/<your-username>/refs/refdata-gex-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<your-username>/raw_fastqs/"$SAMPLE" \
+  --sample="$SAMPLE" \
+  --create-bam=true \
+  --localcores=16 \
+  --localmem=120
+```
+
+`samples.txt`:
+```
+sample_01
+sample_02
+sample_03
+...
+sample_08
+```
+
+Submit with `sbatch run_cellranger_count_array.sbatch`. SLURM runs all 8 sub-jobs (subject to your group's resource limits, often 4–8 in parallel).
+
+## Step 8 — Aggregate multiple runs (optional, when needed)
+
+If you have multiple Cell Ranger runs from the same library prep that need to be **count-matrix-merged** (not the same as Seurat's downstream merge), use `cellranger aggr`:
+
+```bash
+# aggr_csv.csv:
+# library_id,molecule_h5
+# sample_01,/projects/.../sample_01/outs/molecule_info.h5
+# sample_02,/projects/.../sample_02/outs/molecule_info.h5
+
+cellranger aggr \
+  --id=combined \
+  --csv=aggr_csv.csv \
+  --normalize=mapped
+```
+
+For most workshop-style analyses you do **not** want `aggr` — Seurat's `merge()` + integration (Tutorial 05) gives you finer control. Use `aggr` only when you have technical duplicates of one library and need a depth-normalized merge before any analysis.
+
+## Common gotchas
+
+::: incremental
+1.  **FASTQ filename mismatch.** Cell Ranger requires the exact `<SAMPLE>_S<n>_L<lane>_R<1or2>_001.fastq.gz` pattern. Don't rename. If your core hands you renamed files, symlink them back.
+2.  **Mixed chemistries in one folder.** Cell Ranger refuses to run if `--fastqs` contains files from different chemistries (3' v2 + v3). Separate them.
+3.  **The "killed" exit with no error message.** Almost always SLURM-killed for OOM. Bump `--mem` and `--localmem`.
+4.  **Reference / chemistry mismatch.** Running 5' chemistry through a 3' reference works but gives garbage stats. Match `--chemistry` to your library if you're not auto-detected.
+:::
+
+## See also
+
+-   [scNotebooks Module 03](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module03/module03.html) — the parallel notebook walkthrough
+-   [Module 12 — Raw scATAC-seq with cellranger-atac](Tutorial_12_scATAC_CellRanger_RawData.html) — the ATAC-seq companion
+-   [Tutorial SLURM Basics](Tutorial_09_SLURM_Basics.html) — SLURM fundamentals on Talapas
+-   [10x Genomics Cell Ranger documentation](https://www.10xgenomics.com/support/software/cell-ranger/latest)
+-   [Module 10 — The Analysis Pipeline](Tutorial_10_Talapas_Pipeline.html) — the R-script pipeline that picks up downstream from the Cell Ranger output

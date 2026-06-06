@@ -1,0 +1,130 @@
+---
+title: "Module 10 — The Analysis Pipeline on Talapas (R scripts)"
+subtitle: "Streamlined, SLURM-callable R scripts that parallel the laptop learning notebooks — same ifnb dataset"
+---
+
+The laptop **[tutorials 01–08](../Materials.html)** are *learning notebooks*: rich prose,
+"Think about it" prompts, and inline output. This page is the fourth leg of the
+workshop's **1:1:1:1** mapping — **lecture → reading → laptop tutorial → Talapas
+script** — the *same* workflow as **streamlined R scripts** you run on Talapas as
+SLURM jobs. The scripts carry only minimal comments that mark each step's alignment
+with the matching notebook; the explanation lives in the notebook.
+
+The scripts run the **same `ifnb` dataset** (Kang *et al.* 2017) as the laptop
+tutorials, so this is the "run the identical analysis on the cluster" companion to
+the laptop series — no new dataset to learn. `ifnb` carries a real condition
+(`stim`: CTRL vs IFN-β) and real donors (`ind`: 8 lupus patients), so the
+differential-expression and differential-abundance steps produce **real biology**.
+
+::: callout-note
+**Prerequisite.** Work through [Module 09 — SLURM Basics](Tutorial_09_SLURM_Basics.html)
+first — it covers login, modules, and `sbatch`. You do **not** need raw FASTQs or
+Cell Ranger for this track: script 01 loads `ifnb` directly from Bioconductor.
+**Want the full pipeline from raw reads instead?** See the bonus upstream
+[Module 11 — Cell Ranger from raw FASTQs](Tutorial_11_CellRanger_RawData.html) and the
+[Full Talapas RNA-seq run from raw FASTQs](../Resources_Folder/Talapas_FullRun_FromFASTQs.html) roadmap.
+:::
+
+::: callout-tip
+**Pre-cache `ifnb` on a login node.** Script 01 downloads `ifnb` (~25 MB) through
+`ExperimentHub` on first use. Talapas compute nodes may not have outbound internet,
+so run `Rscript -e 'invisible(muscData::Kang18_8vs8())'` once on a **login node** (or
+in an interactive session with internet) to populate the cache before submitting the
+batch job.
+:::
+
+## The scripts ↔ notebook mapping
+
+Every analysis script lives in [`scripts/`](scripts/) and is numbered to match its
+laptop notebook.
+
+### Core pipeline (ifnb — run in order)
+
+These eight chain together on the shared `ifnb` object — each one's output is the
+next one's input.
+
+| Script | Parallels laptop notebook | Reads | Writes |
+|--------|---------------------------|-------|--------|
+| [`01_qc_preprocessing.R`](scripts/01_qc_preprocessing.R) | [Tutorial 01 — QC & Preprocessing](Tutorial_01_QC_Preprocessing.html) | `muscData::Kang18_8vs8()` | `objects/ifnb_preprocessed.rds` |
+| [`02_dimreduction_clustering.R`](scripts/02_dimreduction_clustering.R) | [Tutorial 02 — DimReduction & Clustering](Tutorial_02_DimReduction_Clustering.html) | `ifnb_preprocessed.rds` | `ifnb_clustered.rds` |
+| [`03_markers_annotation.R`](scripts/03_markers_annotation.R) | [Tutorial 03 — Markers & Annotation](Tutorial_03_Markers_Annotation.html) | `ifnb_clustered.rds` | `ifnb_annotated.rds` |
+| [`04_reference_annotation.R`](scripts/04_reference_annotation.R) | [Tutorial 04 — Reference Annotation](Tutorial_04_Reference_Annotation.html) | `ifnb_annotated.rds` | `ifnb_annotated_final.rds` |
+| [`05_integration.R`](scripts/05_integration.R) | [Tutorial 05 — Integration](Tutorial_05_Integration.html) | `ifnb_annotated_final.rds` | `ifnb_integrated.rds` |
+| [`06_pseudobulk_de.R`](scripts/06_pseudobulk_de.R) | [Tutorial 06 — Pseudobulk DE](Tutorial_06_DESeq2_DE.html) | `ifnb_integrated.rds` | `ifnb_pseudobulk_de.csv` |
+| [`07_functional_analysis.R`](scripts/07_functional_analysis.R) | [Tutorial 07 — Functional Analysis](Tutorial_07_FunctionalAnalysis.html) | `ifnb_pseudobulk_de.csv` | `functional/*.csv` |
+| [`08_differential_abundance.R`](scripts/08_differential_abundance.R) | [Tutorial 08 — Differential Abundance](Tutorial_08_DifferentialAbundance.html) | `ifnb_integrated.rds` | `ifnb_milo_da.csv` |
+
+Each step reads and writes `.rds`/`.csv` objects in `../objects/`; the only external
+input is `ifnb`, fetched by script 01. The scripts run **in order** — each one's
+output is the next one's input.
+
+### Bonus tracks (standalone — Modules 13–17)
+
+These parallel the **downstream bonus laptop tutorials** (run *after* the core). Scripts
+13 (WGCNA) and 15 (scATAC) use their **own datasets** (downloaded into `../data/`);
+14 and 17 run on the annotated `ifnb` object the core pipeline produces, and 16 (Spatial)
+uses `stxBrain`. They do not need to be run in sequence. (The raw-data *upstream* bonus
+modules 11–12 are Cell Ranger pipelines, not R scripts — see Materials.)
+
+| Script | Parallels laptop notebook | Reads | Writes |
+|--------|---------------------------|-------|--------|
+| [`13_wgcna.R`](scripts/13_wgcna.R) | [Module 13 — WGCNA](Tutorial_13_WGCNA.html) | `GSE152418_*_RawCounts.txt` | `wgcna_*.csv` |
+| [`14_trajectory_cellcomm.R`](scripts/14_trajectory_cellcomm.R) | [Module 14 — Trajectory & Cell–Cell Comm](Tutorial_14_Trajectory_CellCommunication.html) | `ifnb_annotated.rds` | `ifnb_slingshot_pseudotime.csv` |
+| [`15_scatac_signac.R`](scripts/15_scatac_signac.R) | [Module 15 — scATAC-seq (Signac)](Tutorial_15_scATACseq_Signac.html) | PBMC 10k scATAC files in `data/` | `pbmc_atac_clustered.rds` |
+| [`16_spatial.R`](scripts/16_spatial.R) | [Module 16 — Spatial Transcriptomics](Tutorial_16_Spatial_Transcriptomics.html) | `stxBrain` (SeuratData) | `brain_spatial_integrated.rds` |
+| [`17_fair_metadata.R`](scripts/17_fair_metadata.R) | [Module 17 — FAIR & Metadata](Tutorial_17_FAIR_Metadata.html) | `ifnb_annotated_final.rds` | `ifnb_for_submission.h5ad` |
+
+::: callout-note
+The bonus scripts mirror the runnable core of each notebook. Steps that are
+inherently interactive or Python-based — Monocle3 root selection, scVelo, CellChat
+plotting, the `cellxgene-schema` validator — are kept as commented sketches in the
+script, exactly as in the notebook.
+:::
+
+## Running the pipeline on Talapas
+
+The scripts are submitted with the generic wrapper
+[`run_rscript.sbatch`](scripts/run_rscript.sbatch), which loads R and runs the
+script you pass it. From the `scripts/` directory:
+
+``` bash
+# One-time setup: SLURM writes job logs here (it will NOT create the dir for you)
+mkdir -p logs
+
+# Run the pipeline in order (wait for each to finish before the next)
+sbatch --job-name=qc        run_rscript.sbatch 01_qc_preprocessing.R
+sbatch --job-name=cluster   run_rscript.sbatch 02_dimreduction_clustering.R
+sbatch --job-name=markers   run_rscript.sbatch 03_markers_annotation.R
+sbatch --job-name=refannot  run_rscript.sbatch 04_reference_annotation.R
+sbatch --job-name=integrate run_rscript.sbatch 05_integration.R
+sbatch --job-name=pb_de  --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
+sbatch --job-name=fa     --mem=32G run_rscript.sbatch 07_functional_analysis.R
+sbatch --job-name=da     --mem=96G run_rscript.sbatch 08_differential_abundance.R
+```
+
+::: callout-tip
+**Confirm each step before launching the next.** Check the `.out` log for the
+`Wrote ...` line and run `seff <jobid>` to confirm `State: COMPLETED` (not
+`OUT_OF_MEMORY`/`TIMEOUT`) — a job killed mid-write leaves a corrupt `.rds`.
+:::
+
+::: callout-note
+**Relocating outputs.** Set the `OBJ_DIR` environment variable to write the objects
+to `/scratch/<PIRG>/...` instead of `../objects/`, e.g.
+`export OBJ_DIR=/scratch/<PIRG>/<duckid>/ifnb/objects`.
+:::
+
+## Why ifnb gives real results
+
+Unlike a single dissociated-tumor run, `ifnb` has a **real biological condition**
+(`stim`: control vs IFN-β–stimulated) and **real biological replicates** (`ind`: 8
+lupus donors, each measured in both conditions). So scripts 05/06/08 use the genuine
+sample and donor structure — integration corrects the CTRL/STIM batch axis, and the
+pseudobulk DE and differential-abundance tests recover a real **interferon-stimulated
+gene (ISG)** response rather than a null result. This is the same dataset, and the
+same biology, as the laptop notebooks.
+
+## Credits
+
+Adapted from the laptop tutorial series for the Talapas HPC environment, building
+on **Shannon N. Snyder's** *Talapas Basics* materials.
