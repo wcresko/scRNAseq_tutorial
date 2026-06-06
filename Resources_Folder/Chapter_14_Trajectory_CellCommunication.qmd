@@ -1,0 +1,91 @@
+---
+title: "Chapter 14 — Trajectory Inference & Cell–Cell Communication"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 14](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)** and **[Tutorial 14](../Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.html)**. **Prerequisites:** an annotated, integrated object ([Chapter 4](Chapter_04_Reference_Annotation.html), [Chapter 5](Chapter_05_Integration.html)). A bonus chapter — these analyses are optional extensions of the core workflow.
+:::
+
+## 14.1 Two questions clustering cannot answer
+
+The core workflow ends with discrete clusters carrying cell-type labels. Two common follow-up questions do not fit that discrete frame:
+
+1.  **How do cells move between states?** Differentiation, activation, and the cell cycle are *continuous* processes. Cutting them into clusters throws away the ordering. **Trajectory inference** models cells as points along one or more paths and assigns each a **pseudotime** — a position along the path, not a wall-clock time.
+2.  **Which cell types signal to which?** Tissues are coordinated by ligand–receptor signaling between cell types. **Cell–cell communication** inference predicts that wiring from expression.
+
+Both build directly on the annotated, integrated object; neither replaces the clustering that produced it.
+
+## 14.2 Pseudotime and trajectory inference
+
+A trajectory method (i) embeds cells in a reduced space, (ii) fits a graph, tree, or smooth curve through them, (iii) picks a **root**, and (iv) measures distance along that structure as pseudotime. Genes whose expression varies smoothly along pseudotime are the candidate **drivers** of the process.
+
+Widely used tools:
+
+-   **Slingshot** — fits smooth principal curves through the cluster structure; robust, needs a start cluster.
+-   **Monocle3** — learns a principal *graph* and supports branch points; `learn_graph()` then `order_cells()`.
+-   **PAGA** (scanpy) — builds an abstracted graph of cluster connectivity; the best first question is often *"is there even a continuum?"*, which PAGA answers well.
+-   **Diffusion pseudotime** — random-walk distance from a root cell.
+
+The single most important user choice is the **root**: pseudotime has no inherent direction, so the biologist must declare which end is the start (usually from a known progenitor marker). A wrong root reverses the entire narrative.
+
+The deepest pitfall is more basic: **the algorithm will return a trajectory even when none exists.** Benchmarks (Saelens *et al.* 2019) show method choice matters enormously and that discrete data forced through trajectory tools produce confident nonsense. Decide *a priori* whether a continuum is biologically plausible.
+
+## 14.3 RNA velocity — adding direction
+
+Pseudotime supplies an axis but not a direction. **RNA velocity** recovers the arrow by splitting reads into **unspliced** (intron-containing, newly transcribed) and **spliced** (mature) counts per gene. A high unspliced/spliced ratio means a gene is being induced, so the cell is heading toward a state with more of that transcript; the per-gene signals combine into a per-cell velocity vector that can be projected onto the embedding.
+
+The original steady-state model is La Manno *et al.* 2018 (velocyto); the dynamical model in **scVelo** (Bergen *et al.* 2020) is the current default. Velocity needs a spliced/unspliced count matrix produced by `velocyto` or `kallisto | bustools` — *not* the standard filtered matrix — and assumes near-steady-state kinetics, so it is unreliable for shallow capture or fast processes.
+
+**CytoTRACE** (Gulati *et al.* 2020) offers an assumption-light cross-check: less-differentiated cells tend to express *more* genes, so the breadth of detected genes is a proxy for differentiation potential. When Slingshot, RNA velocity, and CytoTRACE agree on the ordering and root, the trajectory is credible; when they disagree, that disagreement is the result to report.
+
+## 14.4 Cell–cell communication
+
+scRNA-seq cannot observe receptor binding, but it can ask whether a **ligand** is expressed in one cell type and its **receptor** in another. Combined with curated ligand–receptor databases, per-cluster expression yields a predicted signaling network. Tools differ in emphasis:
+
+-   **CellPhoneDB** (Python) — permutation test for significance; models multi-subunit complexes.
+-   **CellChat** (R) — aggregates pairs into signaling *pathways*; strong circle/chord visualizations.
+-   **NicheNet** (R) — links a ligand to the *downstream target genes* it should induce in the receiver.
+-   **LIANA** (R/Python) — runs many methods/databases and reports a *consensus*.
+
+The universal caveat: **co-expression is not interaction.** These tools report that a ligand and receptor are expressed in the right places, not that signaling happens. They ignore spatial adjacency (pair with spatial data, Chapter 16), secretion and diffusion, and the gap between mRNA and active protein; the databases are curated for human and mouse and are sparse elsewhere. Treat the network as a **hypothesis generator** and validate top hits (spatial co-localization, perturbation) before claiming a circuit.
+
+## 14.5 A note on long reads and isoforms
+
+Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell which splice variant a cell uses. Pairing single-cell barcoding with **long-read** sequencing (PacBio Iso-Seq, ONT; e.g. scISO-seq) recovers full-length, isoform-resolved transcripts per cell. This connects back to the 3′ UTR annotation problem (Chapter 0 / Lecture 0): long reads both improve the annotations that short-read quantification depends on and enable per-cell isoform analysis — particularly valuable in non-model systems.
+
+## Cross-references
+
+-   **Lecture:** [Lecture 14 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)
+-   **Tutorial:** [Tutorial 14 — Trajectory & Cell–Cell Communication](../Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.html)
+-   **Prerequisites:** [Chapter 4 — Reference Annotation](Chapter_04_Reference_Annotation.html), [Chapter 5 — Integration](Chapter_05_Integration.html)
+-   **Benchmark:** Saelens *et al.* 2019, *Nat Biotechnol* (trajectory methods); Armingol *et al.* 2021, *Nat Rev Genet* (cell–cell communication)
+
+## 14.6 Going further
+
+::: incremental
+- **Saelens et al. 2019, *Nat Biotechnol*** — benchmark of 45 trajectory-inference methods, [doi:10.1038/s41587-019-0071-9](https://doi.org/10.1038/s41587-019-0071-9)
+- **Trapnell et al. 2014, *Nat Biotechnol*** — Monocle, pseudotemporal ordering of single cells, [doi:10.1038/nbt.2859](https://doi.org/10.1038/nbt.2859)
+- **Street et al. 2018, *BMC Genomics*** — Slingshot lineage / pseudotime inference, [doi:10.1186/s12864-018-4772-0](https://doi.org/10.1186/s12864-018-4772-0)
+- **La Manno et al. 2018, *Nature*** — RNA velocity (foundational), [doi:10.1038/s41586-018-0414-6](https://doi.org/10.1038/s41586-018-0414-6)
+- **Bergen et al. 2020, *Nat Biotechnol*** — scVelo, dynamical-model RNA velocity, [doi:10.1038/s41587-020-0591-3](https://doi.org/10.1038/s41587-020-0591-3)
+- **Armingol et al. 2021, *Nat Rev Genet*** — deciphering cell–cell communication from expression, [doi:10.1038/s41576-020-00292-x](https://doi.org/10.1038/s41576-020-00292-x)
+- **Armingol et al. 2024, *Nat Rev Genet*** — the diversification of cell–cell interaction methods, [doi:10.1038/s41576-023-00685-8](https://doi.org/10.1038/s41576-023-00685-8)
+- **Dimitrov et al. 2022, *Nat Commun*** — LIANA, a CCC-method meta-resource, [doi:10.1038/s41467-022-30755-0](https://doi.org/10.1038/s41467-022-30755-0)
+- **Jin et al. 2021, *Nat Commun*** — CellChat, [doi:10.1038/s41467-021-21246-9](https://doi.org/10.1038/s41467-021-21246-9)
+- **Full curated reading list:** [Additional Resources](../Additional_Resources.html)
+:::

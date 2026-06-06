@@ -11,8 +11,9 @@
 #      so students can download them and run them locally. The student-
 #      facing HTML for each tutorial is built by Exercise_Folder/_quarto.yml
 #      with `execute.eval: false`, so the page shows the code but does NOT
-#      run it. The Talapas Advanced sub-folder is rendered separately by
-#      Exercise_Folder/Talapas/_quarto.yml.
+#      run it. All tutorials — core 00-10 (incl. the Talapas HPC modules)
+#      and bonus 11-17 — now live flat in Exercise_Folder/, with the
+#      executable Talapas scripts in Exercise_Folder/scripts/.
 #
 # Optionally produce instructor "solutions" by setting SOLUTIONS=1 in the
 # environment. That re-renders the tutorials with `eval: true` (so chunks
@@ -33,46 +34,32 @@ cd ..
 echo "=== Rendering course website (pages + Resources_Folder) ==="
 quarto render
 
-echo "=== Rendering laptop tutorials (student version, eval=false) ==="
+echo "=== Rendering tutorials — core 00-10 + bonus 11-17 (student version, eval=false) ==="
 cd Exercise_Folder
 quarto render
 cd ..
 
-echo "=== Rendering Talapas Advanced tutorials (eval=false) ==="
-cd Exercise_Folder/Talapas
-quarto render
-cd ../..
-
-# Copy each laptop-tutorial .qmd source to docs/Exercise_Folder/ as a *.qmd.txt
+# Copy each tutorial .qmd source to docs/Exercise_Folder/ as a *.qmd.txt
 # file so students can download it cleanly. The .txt extension stops
 # Quarto from auto-rewriting the link href to the rendered .html and
 # stops the browser from trying to render the file inline; students are
-# instructed (in Tutorials.qmd and each tutorial's intro) to drop the
-# trailing `.txt` after downloading.
+# instructed (in Materials.qmd and each tutorial's intro) to drop the
+# trailing `.txt` after downloading. This covers every tutorial — the
+# core analysis modules (00-08), the Talapas HPC modules (09-10), and the
+# bonus modules (11-17) — since they all now live flat in Exercise_Folder/.
 echo "=== Copying tutorial .qmd sources to docs/ as .qmd.txt for download ==="
 mkdir -p docs/Exercise_Folder
 for f in Exercise_Folder/*.qmd; do
   cp -f "$f" "docs/Exercise_Folder/$(basename "$f").txt"
 done
 
-# Talapas Advanced tutorial sources + executable scripts.
-mkdir -p docs/Exercise_Folder/Talapas/scripts
-for f in Exercise_Folder/Talapas/*.qmd; do
+# Executable SLURM (.sbatch) and R (.R) scripts — the Talapas track's fourth
+# leg. Copied as-is (not .txt-suffixed) so students get the right extensions.
+echo "=== Copying Talapas scripts to docs/ ==="
+mkdir -p docs/Exercise_Folder/scripts
+for f in Exercise_Folder/scripts/*; do
   [ -e "$f" ] || continue
-  cp -f "$f" "docs/Exercise_Folder/Talapas/$(basename "$f").txt"
-done
-# Executable SLURM scripts and R scripts — copy as-is (not .txt-suffixed) so
-# students get the right extensions when they download.
-for f in Exercise_Folder/Talapas/scripts/*; do
-  [ -e "$f" ] || continue
-  cp -f "$f" "docs/Exercise_Folder/Talapas/scripts/$(basename "$f")"
-done
-
-# Companion: scATAC raw-data Cell Ranger tutorial (kept as-is in Talapas_RawData/).
-mkdir -p docs/Exercise_Folder/Talapas_RawData
-for f in Exercise_Folder/Talapas_RawData/*.qmd; do
-  [ -e "$f" ] || continue
-  cp -f "$f" "docs/Exercise_Folder/Talapas_RawData/$(basename "$f").txt"
+  cp -f "$f" "docs/Exercise_Folder/scripts/$(basename "$f")"
 done
 
 # Copy metadata templates into the rendered docs so students can download them
