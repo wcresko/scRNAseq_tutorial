@@ -87,8 +87,18 @@ If you're running a graded course, link the rendered solutions page from your LM
 
 library(Seurat)
 library(tidyverse)
+library(patchwork)   # combine + annotate multi-panel Seurat plots
 
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod3_C<chunk>_<name>
+# into ../output/Mod3/ so it can be cross-referenced from the rest of the site.
+#   Mod3 = Module 3 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod3"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ```{r}
@@ -116,6 +126,11 @@ ifnb
 
 cluster1.markers <- FindMarkers(ifnb, ident.1 = 1, min.pct = 0.25)
 head(cluster1.markers, 10)
+
+# --- Table out: top markers for cluster 1 (gene moved from rownames) -------
+cluster1.markers |>
+  tibble::rownames_to_column("gene") |>
+  readr::write_csv(file.path(out_dir, "Mod3_C3_cluster1_markers.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -148,6 +163,10 @@ top_markers <- ifnb.markers |>
   group_by(cluster) |>
   slice_max(avg_log2FC, n = 5)
 top_markers
+
+# --- Tables out: all positive markers + the per-cluster top 5 --------------
+readr::write_csv(ifnb.markers, file.path(out_dir, "Mod3_C4_all_markers.csv"))
+readr::write_csv(top_markers,  file.path(out_dir, "Mod3_C4_top5_markers_per_cluster.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -187,26 +206,57 @@ PBMC canonical markers — useful to keep handy:
 
 ```{r}
 #| label: viz-vln
+#| fig-cap: "Violin plots of six canonical PBMC marker genes across clusters (resolution 0.5)."
 
-VlnPlot(ifnb,
+p_vln <- VlnPlot(ifnb,
         features = c("CD14", "LYZ", "MS4A1", "CD79A", "CD8A", "GNLY"),
-        pt.size = 0, ncol = 3)
+        pt.size = 0, ncol = 3) &
+  xlab("Cluster (RNA_snn_res.0.5)") &
+  ylab("Log-normalized expression") &
+  theme(plot.title = element_text(size = 11))
+p_vln <- p_vln +
+  patchwork::plot_annotation(
+    title    = "Canonical PBMC marker expression by cluster",
+    subtitle = "Monocyte (CD14/LYZ), B (MS4A1/CD79A), CD8 T (CD8A) and NK (GNLY) markers",
+    caption  = "Module 3 · Markers & Annotation"
+  )
+p_vln
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod3_C5_marker_violins.png"), p_vln,
+       width = 10, height = 6, dpi = 300)
 ```
 
 ### 3b. Feature plots — expression on UMAP
 
 ```{r}
 #| label: viz-feature
+#| fig-cap: "UMAP feature plots showing where four canonical markers (CD14, MS4A1, CD8A, GNLY) are expressed."
 
-FeaturePlot(ifnb,
+p_feature <- FeaturePlot(ifnb,
             features = c("CD14", "MS4A1", "CD8A", "GNLY"),
-            ncol = 2)
+            ncol = 2) &
+  xlab("UMAP 1") &
+  ylab("UMAP 2") &
+  theme(plot.title = element_text(size = 11))
+p_feature <- p_feature +
+  patchwork::plot_annotation(
+    title    = "Marker expression overlaid on the UMAP",
+    subtitle = "CD14 (monocytes), MS4A1 (B), CD8A (CD8 T), GNLY (NK)",
+    caption  = "Module 3 · Markers & Annotation"
+  )
+p_feature
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod3_C6_marker_featureplots.png"), p_feature,
+       width = 9, height = 8, dpi = 300)
 ```
 
 ### 3c. Heatmap — top markers across clusters
 
 ```{r}
 #| label: viz-heatmap
+#| fig-cap: "Heatmap of the top-10 markers per cluster (z-scored expression), cells grouped by cluster."
 
 top10 <- ifnb.markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
 
@@ -214,18 +264,44 @@ top10 <- ifnb.markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
 # non-HVG markers also appear in the heatmap rather than being dropped.
 ifnb <- ScaleData(ifnb, features = unique(top10$gene))
 
-DoHeatmap(ifnb, features = top10$gene) + NoLegend()
+p_heatmap <- DoHeatmap(ifnb, features = top10$gene) +
+  NoLegend() +
+  labs(
+    title    = "Top-10 markers per cluster — scaled expression heatmap",
+    subtitle = "Each column is a cell, grouped by cluster; rows are marker genes",
+    caption  = "Module 3 · Markers & Annotation"
+  )
+p_heatmap
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod3_C7_marker_heatmap.png"), p_heatmap,
+       width = 12, height = 10, dpi = 300)
 ```
 
 ### 3d. Dot plot — % expressing × mean expression
 
 ```{r}
 #| label: viz-dot
+#| fig-cap: "Dot plot of a 16-gene canonical marker panel across clusters — dot size is percent expressing, colour is scaled mean expression."
 
 canonical_markers <- c("CD14", "LYZ", "FCGR3A", "MS4A7", "FCER1A", "CST3",
                        "IL7R", "CCR7", "S100A4", "CD8A", "GZMK", "GNLY",
                        "NKG7", "MS4A1", "CD79A", "PPBP")
-DotPlot(ifnb, features = canonical_markers) + RotatedAxis()
+p_dot <- DotPlot(ifnb, features = canonical_markers) +
+  RotatedAxis() +
+  labs(
+    title    = "Canonical PBMC marker panel across clusters",
+    subtitle = "Dot size = % of cells expressing; colour = scaled average expression",
+    x        = "Marker gene",
+    y        = "Cluster (RNA_snn_res.0.5)",
+    colour   = "Avg. expression",
+    size     = "Percent expressed"
+  )
+p_dot
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
+       width = 10, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -297,19 +373,51 @@ The `ifnb` dataset ships with author-curated labels in `seurat_annotations`. Thi
 
 ```{r}
 #| label: validate
+#| fig-cap: "Side-by-side UMAPs comparing your manual cluster annotation against the author-curated ground-truth labels that ship with ifnb."
 
 # Side-by-side UMAPs
 p_manual <- DimPlot(ifnb, reduction = "umap", label = TRUE, repel = TRUE) +
-  NoLegend() + ggtitle("Manual annotation (yours)")
+  NoLegend() +
+  labs(
+    title  = "Manual annotation (yours)",
+    x      = "UMAP 1",
+    y      = "UMAP 2"
+  )
 p_truth  <- DimPlot(ifnb, reduction = "umap", group.by = "seurat_annotations",
                     label = TRUE, repel = TRUE) +
-  NoLegend() + ggtitle("Author labels (ground truth)")
+  NoLegend() +
+  labs(
+    title  = "Author labels (ground truth)",
+    x      = "UMAP 1",
+    y      = "UMAP 2"
+  )
 
 p_manual
 p_truth
 
+# Combined two-panel manual-vs-truth comparison, shared annotation
+p_validate <- (p_manual | p_truth) +
+  patchwork::plot_annotation(
+    title    = "Manual annotation vs author ground truth on the same embedding",
+    subtitle = "Cells should land in matching positions if your manual labels agree with the authors'",
+    caption  = "Module 3 · Markers & Annotation"
+  )
+
 # Cross-tabulate. Each row should ideally concentrate on a single column.
-# table(manual = Idents(ifnb), truth = ifnb$seurat_annotations)
+manual_vs_truth <- table(manual = Idents(ifnb), truth = ifnb$seurat_annotations)
+manual_vs_truth
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod3_C10_umap_manual.png"),         p_manual,
+       width = 7,  height = 6, dpi = 300)
+ggsave(file.path(out_dir, "Mod3_C10_umap_ground_truth.png"),   p_truth,
+       width = 7,  height = 6, dpi = 300)
+ggsave(file.path(out_dir, "Mod3_C10_umap_manual_vs_truth.png"), p_validate,
+       width = 13, height = 6, dpi = 300)
+
+# --- Table out: cross-tab of manual labels vs ground-truth labels ----------
+as.data.frame(manual_vs_truth) |>
+  readr::write_csv(file.path(out_dir, "Mod3_C10_manual_vs_truth.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}

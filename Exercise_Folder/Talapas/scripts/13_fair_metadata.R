@@ -4,14 +4,24 @@
 # Runs on the annotated ifnb object (the same dataset as the laptop notebook).
 # Run:  sbatch --job-name=fair run_rscript.sbatch 13_fair_metadata.R
 # In:   ../objects/ifnb_annotated_final.rds   Out: ../objects/ifnb_for_submission.h5ad
+# Tables (match the Mod13 notebook filenames): ../output/Mod13/Mod13_C*_*
 
-suppressPackageStartupMessages({ library(Seurat); library(tidyverse) })
+suppressPackageStartupMessages({ library(Seurat); library(tidyverse); library(patchwork) })
 set.seed(2026)
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod13") # tables, named to match Tutorial_13.qmd
+dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 seu <- readRDS(file.path(OBJ_DIR, "ifnb_annotated_final.rds"))
 
 # Step 1 — Audit the metadata that already exists
 cat("Per-cell metadata columns:\n"); print(colnames(seu@meta.data))
+
+# Tables out: metadata column inventory and per-sample cell counts (Mod13_C2)
+tibble(metadata_column = colnames(seu@meta.data)) |>
+  write_csv(file.path(OUT_DIR, "Mod13_C2_metadata_columns.csv"))
+enframe(table(seu$stim), name = "stim", value = "n_cells") |>
+  mutate(n_cells = as.integer(n_cells)) |>
+  write_csv(file.path(OUT_DIR, "Mod13_C2_cells_per_sample.csv"))
 
 # Step 3 — Attach CELLxGENE-style study-level metadata (controlled-vocabulary IDs;
 # edit these to match your study — look terms up at the OLS / BioPortal).

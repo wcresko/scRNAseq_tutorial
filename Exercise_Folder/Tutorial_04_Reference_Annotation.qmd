@@ -68,6 +68,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 
 ```{r}
 #| label: setup
+#| fig-cap: "Manual cell-type annotations (from Tutorial 03) on the unintegrated UMAP — the starting point for reference-based annotation."
 library(Seurat)
 library(SingleR)
 library(celldex)
@@ -77,11 +78,31 @@ library(patchwork)
 
 set.seed(2026)
 
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod4_C<chunk>_<name>
+# into ../output/Mod4/ so it can be cross-referenced from the rest of the site.
+#   Mod4 = Module 4 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod4"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
 ifnb <- readRDS("../data/ifnb_annotated.rds")
 DefaultAssay(ifnb) <- "RNA"
 
-DimPlot(ifnb, group.by = "seurat_annotations", reduction = "umap",
-        label = TRUE, repel = TRUE) + NoLegend()
+p_setup_umap <- DimPlot(ifnb, group.by = "seurat_annotations", reduction = "umap",
+        label = TRUE, repel = TRUE) +
+  NoLegend() +
+  labs(
+    title = "Manual cell-type annotations on the unintegrated UMAP",
+    subtitle = "Author-curated seurat_annotations carried from Tutorial 03",
+    x = "UMAP 1",
+    y = "UMAP 2"
+  )
+p_setup_umap
+
+ggsave(file.path(out_dir, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ## Path 1 — `SingleR` against a `celldex` reference
@@ -102,27 +123,61 @@ pred <- SingleR(test = sce, ref = ref,
                 assay.type.test = "logcounts",
                 BPPARAM = BiocParallel::SerialParam())
 table(pred$labels)
+
+# --- Table out: number of cells assigned to each SingleR label -------------
+tibble::enframe(table(pred$labels),
+                name = "singler_label", value = "n_cells") |>
+  dplyr::mutate(n_cells = as.integer(n_cells)) |>
+  dplyr::arrange(dplyr::desc(n_cells)) |>
+  readr::write_csv(file.path(out_dir, "Mod4_C2_singler_label_counts.csv"))
 ```
 
 Attach the calls back to the Seurat object:
 
 ```{r}
 #| label: singler-attach
+#| fig-cap: "SingleR reference-based labels (celldex HumanPrimaryCellAtlas) projected onto the unintegrated UMAP."
 
 ifnb$singler_label <- pred$labels
 ifnb$singler_score <- apply(pred$scores, 1, max)
 
-DimPlot(ifnb, group.by = "singler_label", reduction = "umap",
-        label = TRUE, repel = TRUE) + NoLegend()
+p_singler_umap <- DimPlot(ifnb, group.by = "singler_label", reduction = "umap",
+        label = TRUE, repel = TRUE) +
+  NoLegend() +
+  labs(
+    title = "SingleR labels on the unintegrated UMAP",
+    subtitle = "celldex HumanPrimaryCellAtlas reference (label.main)",
+    x = "UMAP 1",
+    y = "UMAP 2"
+  )
+p_singler_umap
+
+ggsave(file.path(out_dir, "Mod4_C3_singler_labels_umap.png"), p_singler_umap,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ### Score-distribution plot — a built-in confidence check
 
 ```{r}
 #| label: singler-confidence
+#| fig-cap: "SingleR confidence diagnostics: per-label score heatmap and the per-cell delta (top-label score minus median) distribution."
 
-plotScoreHeatmap(pred)
-plotDeltaDistribution(pred)
+p_score_heatmap <- plotScoreHeatmap(pred)
+p_score_heatmap
+
+p_delta <- plotDeltaDistribution(pred) +
+  labs(
+    title = "SingleR delta distribution by assigned label",
+    subtitle = "delta = top-label score minus median score; small delta = low-confidence call",
+    x = "Assigned label",
+    y = "Delta (score gap)"
+  )
+p_delta
+
+ggsave(file.path(out_dir, "Mod4_C4_singler_score_heatmap.png"), p_score_heatmap,
+       width = 9, height = 7, dpi = 300)
+ggsave(file.path(out_dir, "Mod4_C4_singler_delta_distribution.png"), p_delta,
+       width = 9, height = 5, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -153,6 +208,7 @@ Azimuth wraps Seurat's anchor-based reference mapping with curated atlases. The 
 
 ```{r}
 #| label: azimuth
+#| fig-cap: "Azimuth (pbmcref) level-2 predicted cell types projected onto the unintegrated UMAP."
 # install if needed
 # remotes::install_github("satijalab/azimuth")
 library(Azimuth)
@@ -163,8 +219,24 @@ ifnb <- RunAzimuth(ifnb, reference = "pbmcref")
 # New columns: predicted.celltype.l1 / l2 / l3 + scores
 head(ifnb@meta.data[, grep("predicted", colnames(ifnb@meta.data))])
 
-DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = "umap",
-        label = TRUE, repel = TRUE) + NoLegend()
+# --- Table out: per-cell Azimuth predictions (l1/l2/l3 + scores) -----------
+ifnb@meta.data[, grep("predicted", colnames(ifnb@meta.data)), drop = FALSE] |>
+  tibble::rownames_to_column("cell") |>
+  readr::write_csv(file.path(out_dir, "Mod4_C6_azimuth_predictions.csv"))
+
+p_azimuth_umap <- DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = "umap",
+        label = TRUE, repel = TRUE) +
+  NoLegend() +
+  labs(
+    title = "Azimuth predicted cell types (level 2) on the unintegrated UMAP",
+    subtitle = "Anchor-based mapping against the Azimuth pbmcref reference",
+    x = "UMAP 1",
+    y = "UMAP 2"
+  )
+p_azimuth_umap
+
+ggsave(file.path(out_dir, "Mod4_C6_azimuth_labels_umap.png"), p_azimuth_umap,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -193,21 +265,44 @@ ann <- ifnb@meta.data |>
 
 table(ann$seurat_annotations, ann$singler_label_pruned, useNA = "ifany")
 table(ann$seurat_annotations, ann$predicted.celltype.l2, useNA = "ifany")
+
+# --- Tables out: ground-truth vs each automatic method cross-tabulations ----
+as.data.frame(
+  table(seurat_annotations = ann$seurat_annotations,
+        singler_label_pruned = ann$singler_label_pruned, useNA = "ifany"),
+  responseName = "n_cells"
+) |>
+  readr::write_csv(file.path(out_dir, "Mod4_C7_truth_vs_singler.csv"))
+
+as.data.frame(
+  table(seurat_annotations = ann$seurat_annotations,
+        predicted_celltype_l2 = ann$predicted.celltype.l2, useNA = "ifany"),
+  responseName = "n_cells"
+) |>
+  readr::write_csv(file.path(out_dir, "Mod4_C7_truth_vs_azimuth.csv"))
 ```
 
 A cleaner cross-tabulation as a heatmap:
 
 ```{r}
 #| label: compare-heatmap
+#| fig-cap: "Confusion heatmap of author ground-truth labels (rows) against Azimuth level-2 predictions (columns)."
 
-ann |>
+p_compare_heatmap <- ann |>
   count(seurat_annotations, predicted.celltype.l2) |>
   ggplot(aes(predicted.celltype.l2, seurat_annotations, fill = n)) +
   geom_tile() +
   scale_fill_viridis_c() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(title = "Ground truth (rows) vs. Azimuth (cols)",
-       x = NULL, y = NULL)
+       subtitle = "Tile colour = number of cells with that (truth, Azimuth) label pair",
+       x = "Azimuth predicted.celltype.l2",
+       y = "Author seurat_annotations",
+       fill = "Cells")
+p_compare_heatmap
+
+ggsave(file.path(out_dir, "Mod4_C8_truth_vs_azimuth_heatmap.png"), p_compare_heatmap,
+       width = 8, height = 6, dpi = 300)
 ```
 
 ## Reconcile disagreements
@@ -224,6 +319,13 @@ ifnb$celltype_final <- with(ifnb@meta.data, dplyr::case_when(
 ))
 
 table(ifnb$celltype_final)
+
+# --- Table out: final reconciled cell-type call counts ---------------------
+tibble::enframe(table(ifnb$celltype_final),
+                name = "celltype_final", value = "n_cells") |>
+  dplyr::mutate(n_cells = as.integer(n_cells)) |>
+  dplyr::arrange(dplyr::desc(n_cells)) |>
+  readr::write_csv(file.path(out_dir, "Mod4_C9_celltype_final_counts.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}

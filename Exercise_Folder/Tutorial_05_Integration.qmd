@@ -96,8 +96,18 @@ library(Seurat)
 library(tidyverse)
 # install.packages("harmony")  # if not yet installed
 library(harmony)
+library(patchwork)
 
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod5_C<chunk>_<name>
+# into ../output/Mod5/ so it can be cross-referenced from the rest of the site.
+#   Mod5 = Module 5 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod5"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ```{r}
@@ -237,31 +247,51 @@ After `IntegrateData()` the **default assay** becomes `"integrated"`. That assay
 
 ```{r}
 #| label: compare
+#| fig-cap: "Unintegrated vs Harmony vs Seurat-anchor UMAPs, coloured by sample (mixing check) and by cell type (structure check)."
 
 # Unintegrated UMAP from Tut 02 (still inside the `ifnb` object)
 p_un_sample   <- DimPlot(ifnb, reduction = "umap", group.by = "stim") +
-  ggtitle("Unintegrated — by sample")
+  ggtitle("Unintegrated — by sample") + labs(x = "UMAP 1", y = "UMAP 2", colour = "Sample")
 p_un_cell     <- DimPlot(ifnb, reduction = "umap", group.by = "seurat_annotations",
                          label = TRUE, repel = TRUE) +
-  NoLegend() + ggtitle("Unintegrated — by cell type")
+  NoLegend() + ggtitle("Unintegrated — by cell type") + labs(x = "UMAP 1", y = "UMAP 2")
 
 # Harmony
 p_h_sample    <- DimPlot(ifnb_h, reduction = "umap_harmony", group.by = "stim") +
-  ggtitle("Harmony — by sample")
+  ggtitle("Harmony — by sample") + labs(x = "UMAP 1", y = "UMAP 2", colour = "Sample")
 p_h_cell      <- DimPlot(ifnb_h, reduction = "umap_harmony", group.by = "seurat_annotations",
                          label = TRUE, repel = TRUE) +
-  NoLegend() + ggtitle("Harmony — by cell type")
+  NoLegend() + ggtitle("Harmony — by cell type") + labs(x = "UMAP 1", y = "UMAP 2")
 
 # Seurat anchors
 p_s_sample    <- DimPlot(ifnb_s, reduction = "umap_seurat", group.by = "stim") +
-  ggtitle("Seurat anchors — by sample")
+  ggtitle("Seurat anchors — by sample") + labs(x = "UMAP 1", y = "UMAP 2", colour = "Sample")
 p_s_cell      <- DimPlot(ifnb_s, reduction = "umap_seurat", group.by = "seurat_annotations",
                          label = TRUE, repel = TRUE) +
-  NoLegend() + ggtitle("Seurat anchors — by cell type")
+  NoLegend() + ggtitle("Seurat anchors — by cell type") + labs(x = "UMAP 1", y = "UMAP 2")
 
 # Render whichever pair is most useful — or use patchwork to show all six
-p_un_sample + p_h_sample + p_s_sample
-p_un_cell   + p_h_cell   + p_s_cell
+p_compare_sample <- (p_un_sample + p_h_sample + p_s_sample) +
+  patchwork::plot_annotation(
+    title    = "Sample mixing across integration methods",
+    subtitle = "CTRL vs STIM should interleave within clusters after integration",
+    caption  = "Module 5 · Two-Sample Integration"
+  )
+p_compare_sample
+
+p_compare_cell <- (p_un_cell + p_h_cell + p_s_cell) +
+  patchwork::plot_annotation(
+    title    = "Cell-type structure across integration methods",
+    subtitle = "Each cell type should collapse from two per-sample islands into one region",
+    caption  = "Module 5 · Two-Sample Integration"
+  )
+p_compare_cell
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
+       width = 15, height = 5, dpi = 300)
+ggsave(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
+       width = 15, height = 5, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -288,6 +318,7 @@ The risk of integration is **erasing real biology**. The ISG response is real �
 
 ```{r}
 #| label: isg-score
+#| fig-cap: "Per-cell interferon-stimulated-gene (ISG) module score on the Harmony and Seurat-anchor UMAPs — integration should mix cells in space without flattening the ISG response."
 
 isg_set <- c("ISG15","IFI6","IFIT1","IFIT3","ISG20","MX1","OAS1","RSAD2","IFIT2")
 
@@ -302,18 +333,36 @@ ifnb_s <- AddModuleScore(ifnb_s, features = list(isg_set), name = "ISG_score")
 DefaultAssay(ifnb)   <- "RNA"
 ifnb   <- AddModuleScore(ifnb,   features = list(isg_set), name = "ISG_score")
 
-FeaturePlot(ifnb_h, features = "ISG_score1", reduction = "umap_harmony") +
-  ggtitle("Harmony UMAP, ISG score (per-cell)")
-FeaturePlot(ifnb_s, features = "ISG_score1", reduction = "umap_seurat") +
-  ggtitle("Seurat-anchors UMAP, ISG score (per-cell)")
+p_isg_h <- FeaturePlot(ifnb_h, features = "ISG_score1", reduction = "umap_harmony") +
+  ggtitle("Harmony UMAP, ISG score (per-cell)") +
+  labs(x = "UMAP 1", y = "UMAP 2", colour = "ISG score")
+p_isg_s <- FeaturePlot(ifnb_s, features = "ISG_score1", reduction = "umap_seurat") +
+  ggtitle("Seurat-anchors UMAP, ISG score (per-cell)") +
+  labs(x = "UMAP 1", y = "UMAP 2", colour = "ISG score")
+
+p_isg <- (p_isg_h + p_isg_s) +
+  patchwork::plot_annotation(
+    title    = "Per-cell IFN-β response (ISG module score) after integration",
+    subtitle = "Scored on the RNA assay; high-ISG STIM cells should co-cluster with low-ISG CTRL cells",
+    caption  = "Module 5 · Two-Sample Integration"
+  )
+p_isg
 
 # Check that mean ISG score per cell type is still ~0 in CTRL and ~positive in STIM
 # (i.e. the biology survived integration)
-ifnb_h@meta.data |>
+isg_by_celltype <- ifnb_h@meta.data |>
   group_by(seurat_annotations, stim) |>
   summarise(ISG_mean = mean(ISG_score1), .groups = "drop") |>
   pivot_wider(names_from = stim, values_from = ISG_mean) |>
   arrange(desc(STIM - CTRL))
+isg_by_celltype
+
+# --- Outputs: ISG FeaturePlots + per-cell-type STIM-vs-CTRL ISG means -------
+ggsave(file.path(out_dir, "Mod5_C7_isg_featureplots.png"), p_isg,
+       width = 12, height = 5, dpi = 300)
+
+readr::write_csv(isg_by_celltype,
+                 file.path(out_dir, "Mod5_C7_isg_mean_by_celltype.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -348,9 +397,17 @@ ifnb_h_markers <- FindAllMarkers(
   logfc.threshold = 0.25
 )
 
-ifnb_h_markers |>
+ifnb_h_top_markers <- ifnb_h_markers |>
   group_by(cluster) |>
-  slice_max(avg_log2FC, n = 5)
+  slice_max(avg_log2FC, n = 5) |>
+  ungroup()
+ifnb_h_top_markers
+
+# --- Tables out: all integrated-cluster markers + top-5 per cluster ---------
+readr::write_csv(ifnb_h_markers,
+                 file.path(out_dir, "Mod5_C8_integrated_markers.csv"))
+readr::write_csv(ifnb_h_top_markers,
+                 file.path(out_dir, "Mod5_C8_integrated_top5_markers.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}

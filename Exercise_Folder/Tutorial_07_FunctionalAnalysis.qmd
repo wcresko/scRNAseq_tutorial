@@ -79,8 +79,18 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 library(enrichplot)
 library(ReactomePA)
+library(patchwork)   # combine + annotate multi-panel plots
 
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod7_C<chunk>_<name>
+# into ../output/Mod7/ so it can be cross-referenced from the rest of the site.
+#   Mod7 = Module 7 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod7"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 de <- read_csv("../data/ifnb_pseudobulk_de.csv")
 glimpse(de)
@@ -155,10 +165,14 @@ ego_list <- map(unique(de_mapped$celltype),
   compact()
 
 # Top 5 BP terms per cell type
-map_dfr(names(ego_list),
+ego_top5 <- map_dfr(names(ego_list),
         \(ct) head(ego_list[[ct]]@result, 5) |>
               mutate(celltype = ct) |>
               select(celltype, ID, Description, Count, p.adjust))
+ego_top5
+
+# --- Table out: top-5 GO BP terms per cell type ----------------------------
+readr::write_csv(ego_top5, file.path(out_dir, "Mod7_C3_enrichgo_top5.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -181,6 +195,7 @@ A single dot plot showing which BP terms are enriched in which cell type:
 
 ```{r}
 #| label: compareCluster
+#| fig-cap: "GO BP over-representation per cell type (STIM vs CTRL) as a compareCluster dot plot."
 
 # Build the input list: named list of significant ENTREZIDs per cell type
 sig_by_ct <- de_mapped |>
@@ -201,9 +216,21 @@ cc <- compareCluster(
   pvalueCutoff  = 0.05
 )
 
-dotplot(cc, showCategory = 8) +
+p_cc <- dotplot(cc, showCategory = 8) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  ggtitle("GO BP enrichment per cell type — STIM vs CTRL")
+  labs(
+    title    = "GO BP enrichment per cell type — STIM vs CTRL",
+    subtitle = "Top 8 over-represented Biological Process terms per cell type",
+    x        = "Cell type",
+    y        = "GO Biological Process term",
+    colour   = "Adjusted p-value",
+    size     = "Gene ratio"
+  )
+p_cc
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod7_C4_comparecluster_dotplot.png"), p_cc,
+       width = 10, height = 8, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -253,25 +280,35 @@ gse_list <- map(unique(de_mapped$celltype), run_gseGO, df = de_mapped) |>
   compact()
 
 # Top GSEA hits per cell type, ranked by NES (Normalized Enrichment Score)
-map_dfr(names(gse_list),
+gse_top5 <- map_dfr(names(gse_list),
         \(ct) gse_list[[ct]]@result |>
               arrange(desc(NES)) |>
               head(5) |>
               mutate(celltype = ct) |>
               select(celltype, Description, NES, p.adjust))
+gse_top5
+
+# --- Table out: top-5 GSEA BP terms per cell type (by NES) -----------------
+readr::write_csv(gse_top5, file.path(out_dir, "Mod7_C5_gsego_top5.csv"))
 ```
 
 A classic GSEA "running enrichment" plot for a single term in a single cell type:
 
 ```{r}
 #| label: gsea-plot
+#| fig-cap: "GSEA running-enrichment plot for the top 3 GO BP terms in CD14 monocytes."
 
 # Pick a cell type and a known interesting term
 ct_pick <- "CD14 Mono"
 if (!is.null(gse_list[[ct_pick]])) {
-  gseaplot2(gse_list[[ct_pick]],
+  p_gsea <- gseaplot2(gse_list[[ct_pick]],
             geneSetID = head(gse_list[[ct_pick]]@result$ID, 3),
             title     = paste0(ct_pick, " — top 3 BP enrichments"))
+  print(p_gsea)
+
+  # --- Figure out ----------------------------------------------------------
+  ggsave(file.path(out_dir, "Mod7_C6_gsea_running_enrichment.png"), p_gsea,
+         width = 8, height = 6, dpi = 300)
 }
 ```
 
@@ -294,10 +331,14 @@ reactome_list <- map(unique(de_mapped$celltype), function(ct) {
 }) |> set_names(unique(de_mapped$celltype)) |> compact()
 
 # Top hits per cell type
-map_dfr(names(reactome_list),
+reactome_top5 <- map_dfr(names(reactome_list),
         \(ct) head(reactome_list[[ct]]@result, 5) |>
               mutate(celltype = ct) |>
               select(celltype, Description, p.adjust))
+reactome_top5
+
+# --- Table out: top-5 Reactome pathways per cell type ----------------------
+readr::write_csv(reactome_top5, file.path(out_dir, "Mod7_C7_reactome_top5.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -319,25 +360,23 @@ map_dfr(names(reactome_list),
 ```{r}
 #| label: save
 
-dir.create("../data", showWarnings = FALSE)
-
 # GO BP per cell type
 ego_long <- map_dfr(names(ego_list),
                     \(ct) ego_list[[ct]]@result |>
                           mutate(celltype = ct))
-write_csv(ego_long, "../data/ifnb_enrichGO_BP.csv")
+readr::write_csv(ego_long, file.path(out_dir, "Mod7_C8_enrichgo_bp.csv"))
 
 # Reactome per cell type
 reactome_long <- map_dfr(names(reactome_list),
                          \(ct) reactome_list[[ct]]@result |>
                                mutate(celltype = ct))
-write_csv(reactome_long, "../data/ifnb_reactome.csv")
+readr::write_csv(reactome_long, file.path(out_dir, "Mod7_C8_reactome.csv"))
 
 # GSEA per cell type
 gse_long <- map_dfr(names(gse_list),
                     \(ct) gse_list[[ct]]@result |>
                           mutate(celltype = ct))
-write_csv(gse_long, "../data/ifnb_gseGO_BP.csv")
+readr::write_csv(gse_long, file.path(out_dir, "Mod7_C8_gsego_bp.csv"))
 ```
 
 ## Wrap-up

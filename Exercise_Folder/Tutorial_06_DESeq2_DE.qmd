@@ -86,7 +86,17 @@ There's no separate download — the counts and metadata ride along with the pac
 library(DESeq2)
 library(airway)
 library(tidyverse)
+library(patchwork)   # combine + annotate multi-panel plots
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod6_C<chunk>_<name>
+# into ../output/Mod6/ so it can be cross-referenced from the rest of the site.
+#   Mod6 = Module 6 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod6"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ## A.2 — Load the data and pull out counts + metadata
@@ -107,6 +117,15 @@ colData$dex <- factor(gsub("untrt", "untreated", colData$dex))
 
 head(counts_data[, 1:4])
 colData
+
+# --- Tables out: sample metadata + a peek at the counts matrix --------------
+colData |>
+  tibble::rownames_to_column("sample") |>
+  readr::write_csv(file.path(out_dir, "Mod6_C3_airway_coldata.csv"))
+
+as.data.frame(counts_data) |>
+  tibble::rownames_to_column("gene") |>
+  readr::write_csv(file.path(out_dir, "Mod6_C3_airway_counts.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -188,6 +207,11 @@ dds$dex <- relevel(dds$dex, ref = "untreated")
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("dex", "treated", "untreated"))
 summary(res)
+
+# --- Table out: full DESeq2 results (treated vs untreated) ------------------
+as.data.frame(res) |>
+  tibble::rownames_to_column("gene") |>
+  readr::write_csv(file.path(out_dir, "Mod6_C8_airway_deseq_results.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -205,10 +229,23 @@ summary(res)
 
 ```{r}
 #| label: lfcshrink-airway
+#| fig-cap: "MA plot of apeglm-shrunken log2 fold changes (treated vs untreated) for the airway dataset."
 res_shrunk <- lfcShrink(dds,
                         coef = "dex_treated_vs_untreated",
                         type = "apeglm")
-plotMA(res_shrunk, ylim = c(-3, 3))
+plotMA(res_shrunk, ylim = c(-3, 3),
+       main = "airway: shrunken LFC (treated vs untreated)",
+       xlab = "Mean of normalized counts",
+       ylab = "log2 fold change (apeglm-shrunken)")
+
+# --- Figure out: base-graphics MA plot via png device ----------------------
+png(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"),
+    width = 7, height = 5, units = "in", res = 300)
+plotMA(res_shrunk, ylim = c(-3, 3),
+       main = "airway: shrunken LFC (treated vs untreated)",
+       xlab = "Mean of normalized counts",
+       ylab = "log2 fold change (apeglm-shrunken)")
+dev.off()
 ```
 
 ::: callout-tip
@@ -219,13 +256,25 @@ plotMA(res_shrunk, ylim = c(-3, 3))
 
 ```{r}
 #| label: top-hit-airway
+#| fig-cap: "Per-sample normalized counts for the top-ranked airway hit, split by treatment."
 top_genes <- as.data.frame(res_shrunk) |>
   rownames_to_column("gene") |>
   arrange(padj) |>
   head(5)
 top_genes
 
-plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex")
+plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
+           main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
+
+# --- Table out: top 5 hits by padj -----------------------------------------
+readr::write_csv(top_genes, file.path(out_dir, "Mod6_C10_airway_top_hits.csv"))
+
+# --- Figure out: base-graphics per-sample counts for the top hit -----------
+png(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"),
+    width = 6, height = 5, units = "in", res = 300)
+plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
+           main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
+dev.off()
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -244,8 +293,19 @@ Quality-control your samples *post-hoc* with a variance-stabilizing transform (`
 
 ```{r}
 #| label: vst-pca-airway
+#| fig-cap: "PCA of variance-stabilized airway samples, coloured by treatment and cell line."
 vsd <- vst(dds, blind = FALSE)
-plotPCA(vsd, intgroup = c("dex", "cell"))
+p_pca <- plotPCA(vsd, intgroup = c("dex", "cell")) +
+  labs(
+    title    = "airway: sample PCA on variance-stabilized counts",
+    subtitle = "Look for treated vs untreated separation within each cell line",
+    colour   = "Treatment · cell line"
+  )
+p_pca
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod6_C11_airway_vst_pca.png"), p_pca,
+       width = 7, height = 5, dpi = 300)
 ```
 
 ::: callout-tip
@@ -348,6 +408,10 @@ ifnb$condition <- ifnb$stim   # CTRL or STIM
 ifnb$celltype  <- ifnb$seurat_annotations
 
 table(ifnb$donor, ifnb$condition)
+
+# --- Table out: cells per donor x condition --------------------------------
+as.data.frame(table(donor = ifnb$donor, condition = ifnb$condition)) |>
+  readr::write_csv(file.path(out_dir, "Mod6_C14_donor_by_condition.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -402,6 +466,9 @@ meta_pb <- tibble(group_id_clean = colnames(pb)) |>
   left_join(group_meta, by = "group_id_clean")
 
 head(meta_pb)
+
+# --- Table out: pseudobulk column metadata (donor x condition x celltype) ---
+readr::write_csv(meta_pb, file.path(out_dir, "Mod6_C16_pseudobulk_coldata.csv"))
 ```
 
 ## B.4 — Filter low-count groups
@@ -425,6 +492,10 @@ pb      <- pb[, keep]
 meta_pb <- meta_pb[keep, ]
 
 table(meta_pb$celltype, meta_pb$condition)
+
+# --- Table out: surviving pseudobulk groups per celltype x condition --------
+as.data.frame(table(celltype = meta_pb$celltype, condition = meta_pb$condition)) |>
+  readr::write_csv(file.path(out_dir, "Mod6_C17_groups_per_celltype.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -467,6 +538,9 @@ run_de <- function(ct) {
 de_all <- map_dfr(unique(meta_pb$celltype), run_de) |>
   filter(!is.na(padj))
 glimpse(de_all)
+
+# --- Table out: full per-cell-type pseudobulk DE results --------------------
+readr::write_csv(de_all, file.path(out_dir, "Mod6_C18_pseudobulk_de_all.csv"))
 ```
 
 ## B.6 — Inspect the top hits
@@ -479,6 +553,9 @@ de_top <- de_all |>
   slice_min(padj, n = 10) |>
   ungroup()
 de_top
+
+# --- Table out: top 10 hits per cell type by padj --------------------------
+readr::write_csv(de_top, file.path(out_dir, "Mod6_C19_pseudobulk_de_top.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -501,20 +578,29 @@ A simple per-cell-type volcano plot:
 
 ```{r}
 #| label: volcano
+#| fig-cap: "Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."
 
 # Pick three cell types to plot; adjust to whichever yours has
 plot_types <- c("CD14 Mono", "CD4 Naive T", "B")
 plot_types <- intersect(plot_types, unique(de_all$celltype))
 
-de_all |>
+p_volcano <- de_all |>
   filter(celltype %in% plot_types) |>
   ggplot(aes(log2FoldChange, -log10(padj))) +
   geom_point(alpha = 0.4, size = 1) +
   geom_hline(yintercept = -log10(0.05), linetype = 2) +
   geom_vline(xintercept = c(-1, 1), linetype = 3, color = "grey50") +
   facet_wrap(~ celltype) +
-  labs(title = "Pseudobulk DE: STIM vs CTRL (log2FC > 0 = up in STIM)",
-       x = "log2 FC (shrunken)", y = "-log10(padj)")
+  labs(title    = "Pseudobulk DE: STIM vs CTRL (log2FC > 0 = up in STIM)",
+       subtitle = "Dashed line: padj = 0.05; dotted lines: |log2FC| = 1",
+       x        = "log2 fold change (apeglm-shrunken)",
+       y        = "-log10(padj)",
+       caption  = "Module 6 · DESeq2 pseudobulk DE")
+p_volcano
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod6_C20_pseudobulk_volcano.png"), p_volcano,
+       width = 10, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -540,8 +626,13 @@ Always inspect `n_cells` per group and the dispersion plot before reporting "X g
 ```{r}
 #| label: save-de
 
+# Pipeline hand-off: Tutorial 07 reads these from ../data/ — keep them there.
 write_csv(de_all,  "../data/ifnb_pseudobulk_de.csv")
 write_csv(de_top,  "../data/ifnb_pseudobulk_de_top.csv")
+
+# --- Tables out: student-facing copies in the module output dir -------------
+readr::write_csv(de_all, file.path(out_dir, "Mod6_C21_pseudobulk_de.csv"))
+readr::write_csv(de_top, file.path(out_dir, "Mod6_C21_pseudobulk_de_top.csv"))
 ```
 
 ## Wrap-up

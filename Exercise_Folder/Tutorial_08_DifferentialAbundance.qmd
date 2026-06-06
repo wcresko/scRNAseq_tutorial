@@ -88,6 +88,15 @@ library(miloR)
 
 set.seed(2026)
 
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod8_C<chunk>_<name>
+# into ../output/Mod8/ so it can be cross-referenced from the rest of the site.
+#   Mod8 = Module 8 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod8"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
 ifnb <- readRDS("../data/ifnb_integrated.rds")
 DefaultAssay(ifnb) <- "RNA"
 ifnb
@@ -115,6 +124,11 @@ if (!"donor" %in% colnames(ifnb@meta.data)) {
 # miloR needs a single per-cell sample ID. Combine donor + stim:
 ifnb$sample <- paste(ifnb$donor, ifnb$stim, sep = "_")
 table(ifnb$sample, ifnb$stim)
+
+# --- Table out: cells per sample x condition -------------------------------
+as.data.frame(table(sample = ifnb$sample, stim = ifnb$stim)) |>
+  dplyr::rename(n_cells = Freq) |>
+  readr::write_csv(file.path(out_dir, "Mod8_C2_cells_per_sample.csv"))
 ```
 
 ::: callout-warning
@@ -143,6 +157,7 @@ The kNN graph is built on the **integrated** reduction (`harmony`), so neighbour
 
 ```{r}
 #| label: build-graph
+#| fig-cap: "Distribution of neighbourhood sizes after refined sampling (target peak 50-200 cells)."
 
 # Build the kNN graph on the harmony reduction.
 # k = 30, d = 20 are reasonable defaults for ~14k cells.
@@ -157,7 +172,19 @@ milo <- makeNhoods(milo,
                    reduced_dims = "HARMONY")
 
 # Diagnostic: distribution of neighbourhood sizes (want most >50, peak ~100)
-plotNhoodSizeHist(milo)
+p_nhood_size <- plotNhoodSizeHist(milo) +
+  labs(
+    title    = "Neighbourhood size distribution",
+    subtitle = "Most neighbourhoods should hold 50-200 cells for a powered NB test",
+    x        = "Neighbourhood size (cells)",
+    y        = "Number of neighbourhoods",
+    caption  = "Module 8 · Differential Abundance"
+  )
+p_nhood_size
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod8_C4_nhood_size_hist.png"), p_nhood_size,
+       width = 6, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -207,9 +234,13 @@ da_results <- testNhoods(milo,
                          reduced.dim = "HARMONY")
 
 # Top hits
-da_results |>
+da_top10 <- da_results |>
   arrange(SpatialFDR) |>
   head(10)
+da_top10
+
+# --- Table out: top-10 neighbourhoods by SpatialFDR ------------------------
+readr::write_csv(da_top10, file.path(out_dir, "Mod8_C6_da_top10.csv"))
 ```
 
 The **SpatialFDR** column is miloR's analogue of `padj` — it controls the false discovery rate while accounting for the fact that overlapping neighbourhoods have correlated tests.
@@ -225,12 +256,17 @@ da_results <- annotateNhoods(milo,
                               coldata_col = "seurat_annotations")
 
 # Per-cell-type fraction of significantly DA neighbourhoods
-da_results |>
+da_by_celltype <- da_results |>
   filter(SpatialFDR < 0.1) |>
   count(seurat_annotations, sign = sign(logFC)) |>
   pivot_wider(names_from = sign, values_from = n,
               names_prefix = "logFC_") |>
   rename(up_in_STIM = logFC_1, up_in_CTRL = `logFC_-1`)
+da_by_celltype
+
+# --- Table out: DA neighbourhood counts per cell type, by direction --------
+readr::write_csv(da_by_celltype,
+                 file.path(out_dir, "Mod8_C7_da_by_celltype.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -251,6 +287,7 @@ The signature miloR plot. Each node is a neighbourhood, sized by the number of c
 
 ```{r}
 #| label: plot-graph
+#| fig-cap: "Cell-type UMAP (left) alongside the DA neighbourhood graph (right); red = enriched in STIM, blue = enriched in CTRL."
 
 milo <- buildNhoodGraph(milo)
 
@@ -266,7 +303,17 @@ da  <- plotNhoodGraphDA(milo, da_results, alpha = 0.1,
                          layout = "UMAP_HARMONY") +
         ggtitle("DA neighbourhoods (red = ↑ STIM, blue = ↑ CTRL)")
 
-um + da
+p_graph <- (um + da) +
+  patchwork::plot_annotation(
+    title    = "Differential abundance across the harmony UMAP — STIM vs CTRL",
+    subtitle = "Each node is a neighbourhood, sized by cell count, coloured by log-fold change",
+    caption  = "Module 8 · Differential Abundance"
+  )
+p_graph
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod8_C8_da_nhood_graph.png"), p_graph,
+       width = 12, height = 5, dpi = 300)
 ```
 
 ::: callout-tip
@@ -279,8 +326,21 @@ A clean summary that strips out the spatial graph and asks "which annotated cell
 
 ```{r}
 #| label: beeswarm
+#| fig-cap: "Beeswarm of per-neighbourhood log-fold change grouped by annotated cell type (STIM vs CTRL)."
 
-plotDAbeeswarm(da_results, group.by = "seurat_annotations")
+p_beeswarm <- plotDAbeeswarm(da_results, group.by = "seurat_annotations") +
+  labs(
+    title    = "Differential abundance per cell type — STIM vs CTRL",
+    subtitle = "Each dot is a neighbourhood; above zero = enriched in STIM, below = enriched in CTRL",
+    x        = "Cell type",
+    y        = "Log-fold change (STIM vs CTRL)",
+    colour   = "SpatialFDR"
+  )
+p_beeswarm
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod8_C9_da_beeswarm.png"), p_beeswarm,
+       width = 8, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -300,8 +360,13 @@ Within-cell-type heterogeneity: a *subset* of that cell type is expanding while 
 ```{r}
 #| label: save
 
+# Pipeline hand-off: keep the ../data/ copies so downstream tutorials and the
+# Talapas pipeline can pick the DA result and Milo object up unchanged.
 write_csv(da_results, "../data/ifnb_milo_da.csv")
 saveRDS(milo,         "../data/ifnb_milo.rds")
+
+# --- Table out: full DA result table for this module's outputs --------------
+readr::write_csv(da_results, file.path(out_dir, "Mod8_C10_milo_da_results.csv"))
 ```
 
 ## Wrap-up
