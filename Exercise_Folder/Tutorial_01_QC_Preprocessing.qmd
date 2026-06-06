@@ -122,8 +122,18 @@ library(Seurat)
 library(muscData)
 library(SingleCellExperiment)
 library(tidyverse)
+library(patchwork)   # combine + annotate multi-panel Seurat plots
 
 set.seed(2026)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod1_C<chunk>_<name>
+# into ../output/Mod1/ so it can be cross-referenced from the rest of the site.
+#   Mod1 = Module 1 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod1"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ::: callout-note
@@ -167,6 +177,18 @@ table(ifnb$stim)
 
 # Author-curated cell-type labels (we'll use these as ground truth in Tut 03)
 table(ifnb$seurat_annotations)
+
+# --- Tables out: per-sample and per-cell-type cell counts ------------------
+tibble::enframe(table(ifnb$stim),
+                name = "sample", value = "n_cells") |>
+  dplyr::mutate(n_cells = as.integer(n_cells)) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C2_cells_per_sample.csv"))
+
+tibble::enframe(table(ifnb$seurat_annotations),
+                name = "cell_type", value = "n_cells") |>
+  dplyr::mutate(n_cells = as.integer(n_cells)) |>
+  dplyr::arrange(dplyr::desc(n_cells)) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C2_cells_per_celltype.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -193,6 +215,14 @@ The `ifnb` object already arrives as a single Seurat object containing both cond
 # Record the starting matrix dimensions
 dim_raw <- dim(ifnb)
 dim_raw
+
+# --- Table out: starting matrix dimensions (features x barcodes) -----------
+tibble::tibble(
+  stage    = "Step 1 — loaded (singlets, annotated)",
+  features = dim_raw[1],
+  barcodes = dim_raw[2]
+) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C3_starting_dimensions.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -218,6 +248,19 @@ ifnb[["percent.mt"]] <- PercentageFeatureSet(ifnb, pattern = "^MT-")
 ifnb[["percent.rb"]] <- PercentageFeatureSet(ifnb, pattern = "^RP[SL]")
 
 head(ifnb@meta.data)
+
+# --- Table out: per-sample summary of the QC metrics just computed ---------
+ifnb@meta.data |>
+  dplyr::group_by(stim) |>
+  dplyr::summarise(
+    n_cells           = dplyr::n(),
+    median_nFeature   = median(nFeature_RNA),
+    median_nCount     = median(nCount_RNA),
+    median_percent_mt = round(median(percent.mt), 2),
+    median_percent_rb = round(median(percent.rb), 2),
+    .groups = "drop"
+  ) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C4_qc_metric_summary.csv"))
 ```
 
 ::: callout-note
@@ -242,18 +285,44 @@ The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-c
 
 ```{r}
 #| label: qc-plots
+#| fig-cap: "Per-sample QC distributions (violins) and the UMI–gene relationship (scatter) for the ifnb dataset."
 
-VlnPlot(ifnb,
+# Violin panel: four QC metrics, split by sample, fully labelled
+p_qc_vln <- VlnPlot(ifnb,
         features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
         group.by = "stim",
         ncol = 4,
-        pt.size = 0)
+        pt.size = 0) &
+  xlab("Sample (stim condition)") &
+  theme(plot.title = element_text(size = 11))
+p_qc_vln <- p_qc_vln +
+  patchwork::plot_annotation(
+    title    = "Per-cell QC metrics by sample — ifnb (CTRL vs IFN-β STIM)",
+    subtitle = "Genes/cell, UMIs/cell, mitochondrial % and ribosomal % distributions",
+    caption  = "Module 1 · QC & Preprocessing"
+  )
+p_qc_vln
 
-FeatureScatter(ifnb,
+# Scatter: UMIs vs unique genes, coloured by sample, with a linear trend
+p_qc_scatter <- FeatureScatter(ifnb,
                feature1 = "nCount_RNA",
                feature2 = "nFeature_RNA",
                group.by = "stim") +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  labs(
+    title    = "Sequencing depth vs library complexity",
+    subtitle = "Each point is a cell; the line is a per-group linear fit",
+    x        = "nCount_RNA (total UMIs per cell)",
+    y        = "nFeature_RNA (unique genes per cell)",
+    colour   = "Sample"
+  )
+p_qc_scatter
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod1_C5_qc_violins.png"),  p_qc_vln,
+       width = 12, height = 4, dpi = 300)
+ggsave(file.path(out_dir, "Mod1_C5_qc_scatter.png"),  p_qc_scatter,
+       width = 6,  height = 5, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -357,10 +426,27 @@ ifnb <- JoinLayers(ifnb)
 # How many doublets were called per sample?
 table(sample = ifnb$stim, class = ifnb$scDblFinder.class)
 
+# --- Table out: doublet calls per sample -----------------------------------
+as.data.frame(table(sample = ifnb$stim, class = ifnb$scDblFinder.class)) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C7_doublet_counts.csv"))
+
 # Inspect: doublets should sit at the high end of nCount/nFeature
-VlnPlot(ifnb,
+p_dbl <- VlnPlot(ifnb,
         features = c("nFeature_RNA", "nCount_RNA"),
-        group.by = "scDblFinder.class", pt.size = 0)
+        group.by = "scDblFinder.class", pt.size = 0) &
+  xlab("scDblFinder class") &
+  theme(plot.title = element_text(size = 11))
+p_dbl <- p_dbl +
+  patchwork::plot_annotation(
+    title    = "Library size and complexity for called singlets vs doublets",
+    subtitle = "Doublets are expected to sit at the high end of both metrics",
+    caption  = "Module 1 · QC & Preprocessing"
+  )
+p_dbl
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod1_C7_doublet_violins.png"), p_dbl,
+       width = 7, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -395,6 +481,12 @@ ifnb
 table(ifnb$stim)
 
 dim_after_filter <- dim(ifnb)
+
+# --- Table out: cells surviving the QC filter, per sample ------------------
+tibble::enframe(table(ifnb$stim),
+                name = "sample", value = "n_cells_after_filter") |>
+  dplyr::mutate(n_cells_after_filter = as.integer(n_cells_after_filter)) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C8_cells_after_filter.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -443,6 +535,7 @@ dim_after_normalize <- dim(ifnb)
 
 ```{r}
 #| label: hvgs
+#| fig-cap: "Mean–variance relationship across genes with the top-10 highly variable features labelled."
 
 ifnb <- FindVariableFeatures(
   ifnb,
@@ -452,7 +545,22 @@ ifnb <- FindVariableFeatures(
 
 top10 <- head(VariableFeatures(ifnb), 10)
 plot1 <- VariableFeaturePlot(ifnb)
-LabelPoints(plot = plot1, points = top10, repel = TRUE)
+p_hvg <- LabelPoints(plot = plot1, points = top10, repel = TRUE) +
+  labs(
+    title    = "Highly variable genes (vst) — top 2,000 selected",
+    subtitle = "Top 10 most variable genes labelled; many are interferon-stimulated genes",
+    x        = "Average expression (log scale)",
+    y        = "Standardized variance",
+    colour   = "Selected as HVG"
+  )
+p_hvg
+
+# --- Outputs: HVG plot + the labelled top-10 genes as a table --------------
+ggsave(file.path(out_dir, "Mod1_C10_variable_features.png"), p_hvg,
+       width = 7, height = 5, dpi = 300)
+
+tibble::tibble(rank = seq_along(top10), gene = top10) |>
+  readr::write_csv(file.path(out_dir, "Mod1_C10_top10_hvgs.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -507,6 +615,9 @@ dim_summary <- tibble::tribble(
   "Step 8 — NormalizeData (no dimension change)",            dim_after_normalize[1], dim_after_normalize[2]
 )
 dim_summary
+
+# --- Table out: counts-matrix progression summary --------------------------
+readr::write_csv(dim_summary, file.path(out_dir, "Mod1_C12_dimension_progression.csv"))
 ```
 
 You should see roughly:

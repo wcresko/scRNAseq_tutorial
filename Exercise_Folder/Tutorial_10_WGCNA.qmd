@@ -79,6 +79,16 @@ From R via `GEOquery`:
 #| label: tutorial-10-wgcna-1
 #| eval: false
 library(GEOquery)
+
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod10_C<chunk>_<name>
+# into ../output/Mod10/ so it can be cross-referenced from the rest of the site.
+#   Mod10 = Module 10 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod10"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
 # This pulls the series matrix (metadata) and supplementary files into ../data/
 getGEOSuppFiles("GSE152418", baseDir = "../data")
 ```
@@ -123,6 +133,7 @@ library(GEOquery)
 library(tidyverse)
 library(CorLevelPlot)
 library(gridExtra)
+library(patchwork)   # combine + annotate multi-panel plots
 
 allowWGCNAThreads()    # multi-threading
 
@@ -140,6 +151,11 @@ gse       <- getGEO("GSE152418", GSEMatrix = TRUE)
 phenoData <- pData(phenoData(gse[[1]]))
 phenoData <- phenoData[, c(1, 2, 46:50)]
 head(phenoData)
+
+# --- Table out: the trimmed sample metadata (phenoData) ---------------------
+phenoData |>
+  tibble::rownames_to_column("geo_accession_rowname") |>
+  readr::write_csv(file.path(out_dir, "Mod10_C3_pheno_data.csv"))
 ```
 
 ```{r}
@@ -156,6 +172,14 @@ data <- data |>
 
 dim(data)
 data[1:5, 1:5]
+
+# --- Table out: counts-matrix dimensions (genes x samples) ------------------
+tibble::tibble(
+  stage   = "Step 1 — tidy counts matrix (Ensembl x GEO accession)",
+  genes   = nrow(data),
+  samples = ncol(data)
+) |>
+  readr::write_csv(file.path(out_dir, "Mod10_C4_counts_dimensions.csv"))
 ```
 
 ## Step 2 — Outlier detection
@@ -170,29 +194,61 @@ gsg <- goodSamplesGenes(t(data))
 summary(gsg)
 gsg$allOK
 
+# --- Table out: goodSamplesGenes outcome (genes/samples flagged) ------------
+tibble::tibble(
+  all_ok        = gsg$allOK,
+  n_good_genes   = sum(gsg$goodGenes),
+  n_bad_genes    = sum(!gsg$goodGenes),
+  n_good_samples = sum(gsg$goodSamples),
+  n_bad_samples  = sum(!gsg$goodSamples)
+) |>
+  readr::write_csv(file.path(out_dir, "Mod10_C5_good_samples_genes.csv"))
+
 # Drop outlier genes
 data <- data[gsg$goodGenes == TRUE, ]
 ```
 
 ```{r}
 #| label: hclust
+#| fig-cap: "Average-linkage hierarchical clustering of samples (Euclidean distance) for outlier detection."
 htree <- hclust(dist(t(data)), method = "average")
-plot(htree)
+plot(htree,
+     main = "Sample clustering for outlier detection — GSE152418 PBMCs",
+     sub  = "Average linkage, Euclidean distance on samples",
+     xlab = "Sample")
+
+# --- Figure out (base graphics) --------------------------------------------
+png(file.path(out_dir, "Mod10_C6_sample_dendrogram.png"),
+    width = 10, height = 6, units = "in", res = 300)
+plot(htree,
+     main = "Sample clustering for outlier detection — GSE152418 PBMCs",
+     sub  = "Average linkage, Euclidean distance on samples",
+     xlab = "Sample")
+dev.off()
 ```
 
 ```{r}
 #| label: pca-outlier
+#| fig-cap: "Sample-level PCA (PC1 vs PC2) with each sample labelled, used to spot outlying samples."
 pca       <- prcomp(t(data))
 pca.dat   <- pca$x
 pca.var   <- pca$sdev^2
 pca.var.p <- round(pca.var / sum(pca.var) * 100, digits = 2)
 
-ggplot(as.data.frame(pca.dat), aes(PC1, PC2)) +
+p_pca <- ggplot(as.data.frame(pca.dat), aes(PC1, PC2)) +
   geom_point() +
   geom_text(label = rownames(pca.dat), nudge_y = 5) +
-  labs(x = paste0("PC1: ", pca.var.p[1], "%"),
-       y = paste0("PC2: ", pca.var.p[2], "%")) +
+  labs(title    = "Sample PCA for outlier detection — GSE152418 PBMCs",
+       subtitle = "Each point is a sample; outliers sit far from the main cloud",
+       x = paste0("PC1: ", pca.var.p[1], "%"),
+       y = paste0("PC2: ", pca.var.p[2], "%"),
+       caption  = "Module 10 · WGCNA") +
   theme_minimal()
+p_pca
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod10_C7_sample_pca.png"), p_pca,
+       width = 7, height = 6, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -247,6 +303,7 @@ norm.counts <- assay(dds_norm) |> t()      # WGCNA wants samples × genes
 
 ```{r}
 #| label: pick-power
+#| fig-cap: "Soft-threshold scan: scale-free topology fit (signed R²) and mean connectivity versus candidate powers."
 power <- c(1:10, seq(12, 30, by = 2))
 sft <- pickSoftThreshold(norm.counts,
                          powerVector = power,
@@ -257,13 +314,25 @@ sft.data <- sft$fitIndices
 a1 <- ggplot(sft.data, aes(Power, SFT.R.sq, label = Power)) +
         geom_point() + geom_text(nudge_y = 0.05) +
         geom_hline(yintercept = 0.8, color = "red") +
-        labs(x = "Power", y = "Scale-free topology fit, signed R²") +
+        labs(title = "Scale-free topology fit",
+             x = "Power", y = "Scale-free topology fit, signed R²") +
         theme_classic()
 a2 <- ggplot(sft.data, aes(Power, mean.k., label = Power)) +
         geom_point() + geom_text(nudge_y = 0.1) +
-        labs(x = "Power", y = "Mean connectivity") +
+        labs(title = "Mean connectivity",
+             x = "Power", y = "Mean connectivity") +
         theme_classic()
 grid.arrange(a1, a2, nrow = 2)
+
+# --- Figure out (multi-panel via patchwork) --------------------------------
+p_sft <- (a1 / a2) +
+  patchwork::plot_annotation(
+    title    = "Soft-thresholding power selection — GSE152418 PBMCs",
+    subtitle = "Smallest power crossing signed R² ≈ 0.8 with reasonable connectivity",
+    caption  = "Module 10 · WGCNA"
+  )
+ggsave(file.path(out_dir, "Mod10_C10_soft_threshold.png"), p_sft,
+       width = 7, height = 8, dpi = 300)
 ```
 
 ::: callout-warning
@@ -296,13 +365,28 @@ cor <- temp_cor                          # restore base::cor
 
 ```{r}
 #| label: dendro
+#| fig-cap: "Gene dendrogram with unmerged and merged module-colour assignments from blockwiseModules."
 plotDendroAndColors(bwnet$dendrograms[[1]],
                     cbind(bwnet$unmergedColors, bwnet$colors),
                     c("unmerged", "merged"),
                     dendroLabels = FALSE,
                     addGuide     = TRUE,
                     hang         = 0.03,
-                    guideHang    = 0.05)
+                    guideHang    = 0.05,
+                    main         = "Gene clustering dendrogram & module colours")
+
+# --- Figure out (base graphics) --------------------------------------------
+png(file.path(out_dir, "Mod10_C12_module_dendrogram.png"),
+    width = 10, height = 6, units = "in", res = 300)
+plotDendroAndColors(bwnet$dendrograms[[1]],
+                    cbind(bwnet$unmergedColors, bwnet$colors),
+                    c("unmerged", "merged"),
+                    dendroLabels = FALSE,
+                    addGuide     = TRUE,
+                    hang         = 0.03,
+                    guideHang    = 0.05,
+                    main         = "Gene clustering dendrogram & module colours")
+dev.off()
 ```
 
 ## Step 6 — Module eigengenes & module–trait correlations
@@ -312,6 +396,17 @@ plotDendroAndColors(bwnet$dendrograms[[1]],
 module_eigengenes <- bwnet$MEs
 head(module_eigengenes)
 table(bwnet$colors)        # genes per module
+
+# --- Tables out: module eigengenes and genes-per-module --------------------
+module_eigengenes |>
+  tibble::rownames_to_column("sample") |>
+  readr::write_csv(file.path(out_dir, "Mod10_C13_module_eigengenes.csv"))
+
+tibble::enframe(table(bwnet$colors),
+                name = "module", value = "n_genes") |>
+  dplyr::mutate(n_genes = as.integer(n_genes)) |>
+  dplyr::arrange(dplyr::desc(n_genes)) |>
+  readr::write_csv(file.path(out_dir, "Mod10_C13_genes_per_module.csv"))
 ```
 
 ```{r}
@@ -331,6 +426,7 @@ traits <- cbind(traits, severity.out)
 
 ```{r}
 #| label: cor-trait
+#| fig-cap: "Module–trait relationships: correlation of each module eigengene with the severity traits."
 nSamples <- nrow(norm.counts)
 nGenes   <- ncol(norm.counts)
 
@@ -343,7 +439,27 @@ heatmap.data <- column_to_rownames(heatmap.data, var = "Row.names")
 CorLevelPlot(heatmap.data,
              x      = names(traits),
              y      = names(module_eigengenes),
-             col    = c("blue1", "skyblue", "white", "pink", "red"))
+             col    = c("blue1", "skyblue", "white", "pink", "red"),
+             main   = "Module–trait correlations — GSE152418 severity")
+
+# --- Figure out (base graphics) --------------------------------------------
+png(file.path(out_dir, "Mod10_C15_module_trait_heatmap.png"),
+    width = 8, height = 8, units = "in", res = 300)
+CorLevelPlot(heatmap.data,
+             x      = names(traits),
+             y      = names(module_eigengenes),
+             col    = c("blue1", "skyblue", "white", "pink", "red"),
+             main   = "Module–trait correlations — GSE152418 severity")
+dev.off()
+
+# --- Table out: module-trait correlations and p-values ---------------------
+as.data.frame(module.trait.corr) |>
+  tibble::rownames_to_column("module") |>
+  readr::write_csv(file.path(out_dir, "Mod10_C15_module_trait_corr.csv"))
+
+as.data.frame(module.trait.corr.p) |>
+  tibble::rownames_to_column("module") |>
+  readr::write_csv(file.path(out_dir, "Mod10_C15_module_trait_pvalues.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -375,6 +491,17 @@ mm |>
   rownames_to_column("gene") |>
   arrange(desc(MEturquoise)) |>
   head(15)
+
+# --- Tables out: gene-module assignments and top kME hub genes -------------
+module.gene.mapping |>
+  rownames_to_column("gene") |>
+  readr::write_csv(file.path(out_dir, "Mod10_C16_gene_module_assignments.csv"))
+
+mm |>
+  rownames_to_column("gene") |>
+  arrange(desc(MEturquoise)) |>
+  head(15) |>
+  readr::write_csv(file.path(out_dir, "Mod10_C16_turquoise_hub_genes.csv"))
 ```
 
 ## Stretch goals

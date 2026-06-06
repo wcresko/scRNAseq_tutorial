@@ -103,6 +103,15 @@ library(SeuratData)
 library(tidyverse)
 library(patchwork)
 
+# ---------------------------------------------------------------------------
+# Output directory for this module's figures and tables.
+# Every figure/table chunk below writes a file named  Mod11_C<chunk>_<name>
+# into ../output/Mod11/ so it can be cross-referenced from the rest of the site.
+#   Mod11 = Module 11 (this tutorial);  C<n> = the nth code chunk.
+# ---------------------------------------------------------------------------
+out_dir <- "../output/Mod11"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
 set.seed(2026)
 ```
 
@@ -119,6 +128,14 @@ post
 
 # Check the assays — Visium objects have a "Spatial" assay (not "RNA")
 DefaultAssay(ant)
+
+# --- Table out: per-section dimensions (features x spots) -------------------
+tibble::tibble(
+  section  = c("anterior1", "posterior1"),
+  features = c(nrow(ant), nrow(post)),
+  spots    = c(ncol(ant), ncol(post))
+) |>
+  readr::write_csv(file.path(out_dir, "Mod11_C2_section_dimensions.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -141,6 +158,7 @@ The same per-spot QC metrics as scRNA-seq apply: `nCount_Spatial`, `nFeature_Spa
 
 ```{r}
 #| label: qc
+#| fig-cap: "Per-spot QC for the anterior section: violin distributions and the same metrics overlaid on the tissue."
 
 ant[["percent.mt"]] <- PercentageFeatureSet(ant, pattern = "^mt-")
 post[["percent.mt"]] <- PercentageFeatureSet(post, pattern = "^mt-")
@@ -148,16 +166,36 @@ post[["percent.mt"]] <- PercentageFeatureSet(post, pattern = "^mt-")
 # Standard violin
 p1 <- VlnPlot(ant,
               features = c("nCount_Spatial", "nFeature_Spatial", "percent.mt"),
-              pt.size = 0, ncol = 3)
+              pt.size = 0, ncol = 3) &
+  xlab("Anterior section") &
+  theme(plot.title = element_text(size = 11))
+p1 <- p1 +
+  patchwork::plot_annotation(
+    title    = "Per-spot QC metrics — stxBrain anterior section",
+    subtitle = "UMIs/spot, genes/spot and mitochondrial % distributions",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
 
 # Spatial overlay — same metrics, on the tissue
 p2 <- SpatialFeaturePlot(ant,
                          features = c("nCount_Spatial", "percent.mt"),
                          pt.size.factor = 1.6) +
         plot_layout(ncol = 2)
+p2 <- p2 +
+  patchwork::plot_annotation(
+    title    = "Spatial QC overlay — stxBrain anterior section",
+    subtitle = "UMIs/spot and mitochondrial % on the histology image",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
 
 p1
 p2
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod11_C3_qc_violins.png"), p1,
+       width = 10, height = 4, dpi = 300)
+ggsave(file.path(out_dir, "Mod11_C3_qc_spatial.png"), p2,
+       width = 10, height = 5, dpi = 300)
 ```
 
 ::: callout-tip
@@ -202,11 +240,32 @@ Sanity-check that the data captures known anatomy. For the mouse brain:
 
 ```{r}
 #| label: markers
+#| fig-cap: "Known anatomical marker genes overlaid on the anterior and posterior tissue sections."
 
-SpatialFeaturePlot(ant, features = c("Hpca", "Plp1", "Sst"),
-                   ncol = 3, alpha = c(0.1, 1))
-SpatialFeaturePlot(post, features = c("Hpca", "Plp1", "Pcp4"),
-                   ncol = 3, alpha = c(0.1, 1))
+p_markers_ant <- SpatialFeaturePlot(ant, features = c("Hpca", "Plp1", "Sst"),
+                   ncol = 3, alpha = c(0.1, 1)) +
+  patchwork::plot_annotation(
+    title    = "Anatomical markers on tissue — anterior section",
+    subtitle = "Hpca (hippocampus), Plp1 (white matter), Sst (interneurons)",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
+
+p_markers_post <- SpatialFeaturePlot(post, features = c("Hpca", "Plp1", "Pcp4"),
+                   ncol = 3, alpha = c(0.1, 1)) +
+  patchwork::plot_annotation(
+    title    = "Anatomical markers on tissue — posterior section",
+    subtitle = "Hpca (hippocampus), Plp1 (white matter), Pcp4 (cerebellum)",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
+
+p_markers_ant
+p_markers_post
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod11_C5_markers_anterior.png"),  p_markers_ant,
+       width = 12, height = 4, dpi = 300)
+ggsave(file.path(out_dir, "Mod11_C5_markers_posterior.png"), p_markers_post,
+       width = 12, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -227,6 +286,7 @@ Same workflow as scRNA-seq, but on the SCT assay:
 
 ```{r}
 #| label: cluster
+#| fig-cap: "Anterior-section spot clusters shown as a UMAP and overlaid on the tissue."
 
 ant <- ant |>
   RunPCA(assay = "SCT", verbose = FALSE) |>
@@ -236,11 +296,22 @@ ant <- ant |>
 
 # UMAP and tissue side-by-side
 p_umap <- DimPlot(ant, reduction = "umap", label = TRUE) +
-            ggtitle("Anterior — UMAP")
+            labs(title = "Anterior — UMAP", x = "UMAP 1", y = "UMAP 2",
+                 colour = "Cluster")
 p_tis  <- SpatialDimPlot(ant, label = TRUE, label.size = 3) +
-            ggtitle("Anterior — clusters on tissue")
+            labs(title = "Anterior — clusters on tissue", fill = "Cluster")
 
-p_umap + p_tis
+p_cluster <- (p_umap + p_tis) +
+  patchwork::plot_annotation(
+    title    = "Spot clustering — stxBrain anterior section",
+    subtitle = "SNN clusters on the SCT assay, in UMAP space and on the histology image",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
+p_cluster
+
+# --- Figure out ------------------------------------------------------------
+ggsave(file.path(out_dir, "Mod11_C6_anterior_clusters.png"), p_cluster,
+       width = 12, height = 5, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -261,6 +332,7 @@ Some genes are variable *and* their variation has spatial structure (a clear pat
 
 ```{r}
 #| label: svf
+#| fig-cap: "Top spatially variable genes (Moran's I) in the anterior section, overlaid on the tissue."
 
 ant <- FindSpatiallyVariableFeatures(
   ant,
@@ -273,7 +345,20 @@ ant <- FindSpatiallyVariableFeatures(
 top_sv <- SpatiallyVariableFeatures(ant, selection.method = "moransi")[1:6]
 top_sv
 
-SpatialFeaturePlot(ant, features = top_sv, ncol = 3, alpha = c(0.1, 1))
+p_svf <- SpatialFeaturePlot(ant, features = top_sv, ncol = 3, alpha = c(0.1, 1)) +
+  patchwork::plot_annotation(
+    title    = "Top spatially variable features (Moran's I) — anterior section",
+    subtitle = "Genes whose expression has the strongest spatial structure",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
+p_svf
+
+# --- Outputs: top spatially variable genes (table) + tissue overlay --------
+tibble::tibble(rank = seq_along(top_sv), gene = top_sv) |>
+  readr::write_csv(file.path(out_dir, "Mod11_C7_spatially_variable_features.csv"))
+
+ggsave(file.path(out_dir, "Mod11_C7_spatially_variable_features.png"), p_svf,
+       width = 12, height = 7, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -294,6 +379,7 @@ The same two-sample integration logic as `ifnb`, but on Visium. We use `SCTransf
 
 ```{r}
 #| label: merge-integrate
+#| fig-cap: "Joint embedding of both sections after SCT integration: UMAP coloured by section and cluster, plus per-section cluster maps on tissue."
 
 # Each section is its own "batch"
 ant$slice  <- "anterior"
@@ -323,10 +409,28 @@ brain <- brain |>
   RunUMAP(dims = 1:30)
 
 # Joint UMAP
-DimPlot(brain, group.by = c("slice", "seurat_clusters"))
+p_int_umap <- DimPlot(brain, group.by = c("slice", "seurat_clusters")) +
+  patchwork::plot_annotation(
+    title    = "Integrated UMAP — anterior + posterior sections",
+    subtitle = "Coloured by section of origin and by joint cluster",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
+p_int_umap
 
 # And per-slice spatial cluster maps
-SpatialDimPlot(brain, label = TRUE)
+p_int_spatial <- SpatialDimPlot(brain, label = TRUE) +
+  patchwork::plot_annotation(
+    title    = "Integrated clusters on tissue — both sections",
+    subtitle = "Joint cluster assignments mapped back onto each section",
+    caption  = "Module 11 · Spatial Transcriptomics"
+  )
+p_int_spatial
+
+# --- Figures out -----------------------------------------------------------
+ggsave(file.path(out_dir, "Mod11_C8_integrated_umap.png"), p_int_umap,
+       width = 12, height = 5, dpi = 300)
+ggsave(file.path(out_dir, "Mod11_C8_integrated_spatial_clusters.png"), p_int_spatial,
+       width = 10, height = 5, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
