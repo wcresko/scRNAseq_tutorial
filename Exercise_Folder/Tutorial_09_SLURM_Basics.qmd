@@ -1,6 +1,6 @@
 ---
-title: "Talapas 01 — SLURM Basics on Talapas"
-subtitle: "Interactive sessions and batch scripts on UO's HPC cluster"
+title: "Module 09 — SLURM Basics on Talapas"
+subtitle: "The first Friday-morning Talapas module: interactive sessions and batch scripts on UO's HPC cluster"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -20,9 +20,9 @@ editor: visual
 
 ## About this tutorial
 
-This tutorial covers the **basics of using SLURM** (the job scheduler on the University of Oregon's Talapas HPC cluster) --- both in **interactive mode** and through **batch scripts**. It is aimed at workshop participants who have a Duck ID and Talapas account and are ready to run their first jobs.
+This is the **first of the two Friday-morning Talapas modules** (the second is [Module 10 — the analysis pipeline](Tutorial_10_Talapas_Pipeline.html)). It covers the **basics of using SLURM** (the job scheduler on the University of Oregon's Talapas HPC cluster) --- both in **interactive mode** and through **batch scripts** --- and ends with an example batch script that runs the whole `01`–`08` analysis series. It is aimed at workshop participants who have a Duck ID and Talapas account and are ready to run their first jobs.
 
-All examples are specific to UO and Talapas. If you have not yet logged in to Talapas for the first time, see the [**VS Code & Talapas**](../Resources_Folder/VSCode_Talapas.html) reference first.
+All examples are specific to UO and Talapas. You should already have connected VS Code to Talapas in an **interactive** session back in [Module 00](../Materials.html); if you have not yet logged in to Talapas for the first time, see the [**VS Code & Talapas**](../Resources_Folder/VSCode_Talapas.html) reference first.
 
 Material is adapted from the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and the [How-To articles](https://uoracs.github.io/talapas2-knowledge-base/) in the Talapas Knowledge Base, and from **Shannon Snyder's *Talapas Basics*** workshop guide (the `hello_world.R` / `salloc` / job-monitoring walkthroughs below). For first-time login and editing files on Talapas, pair this with the [**VS Code & Talapas**](../Resources_Folder/VSCode_Talapas.html) reference.
 
@@ -372,7 +372,33 @@ cat logs/hello_*.out      # stdout
 cat logs/hello_*.err      # stderr / R errors
 ```
 
-This is exactly how the rest of the Talapas track is run — every analysis step (the numbered pipeline scripts in [Talapas 03](Tutorial_10_Talapas_Pipeline.html)) is an R script submitted through this wrapper.
+This is exactly how the rest of the Talapas track is run — every analysis step (the numbered pipeline scripts in [Module 10 — the analysis pipeline](Tutorial_10_Talapas_Pipeline.html)) is an R script submitted through this wrapper.
+
+### 6.6 Example: run the whole `01`–`08` series in one job
+
+When you want to reproduce the **entire core analysis** (Modules 01–08) end-to-end rather than one step at a time, the folder also ships [`run_pipeline.sbatch`](scripts/run_pipeline.sbatch). It runs the eight numbered scripts **in order** inside a single allocation — each step's `.rds`/`.csv` output is the next step's input:
+
+``` bash
+#SBATCH ... (one allocation, ~12 h, 96 GB)
+STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
+for step in "${STEPS[@]}"; do
+  echo "==== RUNNING ${step} ===="
+  Rscript "${step}"
+done
+```
+
+Submit it once (after `mkdir -p logs` and pre-caching `ifnb` on a login node):
+
+``` bash
+sbatch run_pipeline.sbatch
+squeue -u $USER
+seff <jobid>                 # confirm State: COMPLETED
+tail -f logs/ifnb_pipeline_*.out
+```
+
+This is the simplest way to "run the series of R scripts" on the cluster. For finer
+control — running one step at a time, or right-sizing memory per step — use
+`run_rscript.sbatch` (above) as documented in [Module 10](Tutorial_10_Talapas_Pipeline.html).
 
 ------------------------------------------------------------------------
 
