@@ -11,9 +11,9 @@ This page describes the datasets the workshop uses, where to download them, and 
 The workshop runs on the **`ifnb`** dataset throughout — the same data on both your laptop and (as SLURM scripts) on the Talapas HPC cluster:
 
 -   **Laptop path (default).** The two-sample `ifnb` dataset (\~25 MB, \~14k cells) lets you complete the entire scRNA-seq workflow — including **integration** — on a typical laptop. This is what the numbered tutorials (01–08) use.
--   **Talapas HPC track.** The **same `ifnb` dataset**, run as R + SLURM scripts on the [Talapas cluster](Resources_Folder/VSCode_Talapas.html) — see [Talapas 03 — Analysis Pipeline](Exercise_Folder/Talapas/Tutorial_Talapas_03_Analysis_Pipeline.html). Nothing extra to download; script 01 loads `ifnb` from Bioconductor.
+-   **Talapas HPC track.** The **same `ifnb` dataset**, run as R + SLURM scripts on the [Talapas cluster](Resources_Folder/VSCode_Talapas.html) — see [Talapas 03 — Analysis Pipeline](Exercise_Folder/Tutorial_10_Talapas_Pipeline.html). Nothing extra to download; script 01 loads `ifnb` from Bioconductor.
 
-A larger **10x NSCLC DTC** dataset (20k cells, 7 donors, \~250 MB) is used only by the optional **[Full Talapas run from raw FASTQs](Additional_Resources.qmd)** in Additional Resources, which goes from raw reads through Cell Ranger and the full pipeline. Described in detail below.
+A larger **10x NSCLC DTC** dataset (20k cells, 7 donors, \~250 MB) is used only by the optional **[Full Talapas run from raw FASTQs](Resources_Folder/Talapas_FullRun_FromFASTQs.html)** in Additional Resources, which goes from raw reads through Cell Ranger and the full pipeline. Described in detail below.
 
 Where applicable, we follow Khushbu Patel's [YouTube Tutorials](https://github.com/kpatel427/YouTubeTutorials) so her video walkthroughs serve as supplementary material.
 
@@ -24,6 +24,7 @@ By convention every tutorial reads from `../data/` — i.e. a `data/` folder at 
 ```
 scrnaseq_workshop/
 ├── Exercise_Folder/
+│   ├── Tutorial_00_Setup_RStudio_Packages.qmd    (R, RStudio, Quarto, VS Code + Talapas)
 │   ├── Tutorial_01_QC_Preprocessing.qmd          (laptop, ifnb)
 │   ├── Tutorial_02_DimReduction_Clustering.qmd
 │   ├── Tutorial_03_Markers_Annotation.qmd
@@ -32,24 +33,26 @@ scrnaseq_workshop/
 │   ├── Tutorial_06_DESeq2_DE.qmd
 │   ├── Tutorial_07_FunctionalAnalysis.qmd        (clusterProfiler)
 │   ├── Tutorial_08_DifferentialAbundance.qmd     (miloR)
-│   ├── Tutorial_09_scATACseq_Signac.qmd
-│   ├── Tutorial_10_WGCNA.qmd
-│   ├── Tutorial_11_Spatial_Transcriptomics.qmd   (Visium, stxBrain)
-│   └── Talapas/                        (Talapas HPC track — same ifnb, as R scripts)
-│       ├── Tutorial_Talapas_01_SLURM_Basics.qmd
-│       ├── Tutorial_Talapas_02_RawData_Cellranger.qmd
-│       ├── Tutorial_Talapas_03_Analysis_Pipeline.qmd
-│       └── scripts/   (01_qc_preprocessing.R … 13_fair_metadata.R)
+│   ├── Tutorial_09_SLURM_Basics.qmd              (Talapas HPC — Friday morning)
+│   ├── Tutorial_10_Talapas_Pipeline.qmd          (same ifnb, as R scripts on Talapas)
+│   ├── Tutorial_11_CellRanger_RawData.qmd        (bonus: raw FASTQ → counts, RNA)
+│   ├── Tutorial_12_scATAC_CellRanger_RawData.qmd (bonus: raw FASTQ → peaks, scATAC)
+│   ├── Tutorial_13_WGCNA.qmd                      (bonus)
+│   ├── Tutorial_14_Trajectory_CellCommunication.qmd (bonus)
+│   ├── Tutorial_15_scATACseq_Signac.qmd          (bonus)
+│   ├── Tutorial_16_Spatial_Transcriptomics.qmd   (bonus: Visium, stxBrain)
+│   ├── Tutorial_17_FAIR_Metadata.qmd             (bonus)
+│   └── scripts/   (01_qc_preprocessing.R … 17_fair_metadata.R + .sbatch wrappers)
 └── data/
     ├── (ifnb is loaded via muscData, stxBrain via SeuratData — no download to data/)
     ├── filtered_feature_bc_matrix/                # NSCLC (optional: Talapas run from raw FASTQs)
     │   ├── barcodes.tsv.gz
     │   ├── features.tsv.gz
     │   └── matrix.mtx.gz
-    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5  # scATAC (Tut 09)
-    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 09)
-    ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 09)
-    └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 10)
+    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5  # scATAC (Tut 15)
+    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)   # scATAC (Tut 15)
+    ├── atac_v1_pbmc_10k_singlecell.csv              # scATAC (Tut 15)
+    └── GSE152418_p20047_Study1_RawCounts.txt        # WGCNA (Tut 13)
 ```
 
 Tutorials 01–08 do **not** need anything in `data/` to start — `ifnb` is downloaded once into a local cache by Bioconductor's `muscData` package (via ExperimentHub). They only write to `data/` (the chained `.rds` files between tutorials).
@@ -110,7 +113,7 @@ BiocManager::install("airway")
 library(airway); data(airway)
 ```
 
-## Tutorial 09 — PBMC 10k scATAC-seq v1 (10x, hg19)
+## Tutorial 15 — PBMC 10k scATAC-seq v1 (10x, hg19)
 
 Used for the scATAC-seq tutorial. **Same dataset as Patel's** [`scATACSeq_standard_workflow.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R) and the [Signac PBMC vignette](https://stuartlab.org/signac/articles/pbmc_vignette).
 
@@ -131,7 +134,7 @@ wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1
 The earlier "Next GEM v1.1" re-release of this sample is mapped to **hg38** (filenames prefixed `atac_v1_pbmc_10k_nextgem_*`). The tutorial assumes the **v1 / hg19** release because it pairs with `EnsDb.Hsapiens.v75`.
 :::
 
-## Tutorial 10 — GSE152418 (COVID-19 PBMC bulk RNA-seq)
+## Tutorial 13 — GSE152418 (COVID-19 PBMC bulk RNA-seq)
 
 **What it is.** PBMC bulk RNA-seq from a published cross-sectional study of COVID-19 patients (Arunachalam *et al.* 2020, *Science*). Severity gradient from healthy to ICU. Same dataset as Patel's [`WGCNA.R`](https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R).
 
@@ -154,7 +157,7 @@ getGEOSuppFiles("GSE152418", baseDir = "data")
 
 ## From raw FASTQs — Cell Ranger / cellranger-atac (optional, self-paced)
 
-The datasets below are for the optional **[Full Talapas run from raw FASTQs](Additional_Resources.qmd)** in Additional Resources — **not** the in-class Talapas track, which runs the same `ifnb` data as the laptop tutorials. The [raw-data Talapas tutorials](Exercise_Folder/Talapas/Tutorial_Talapas_02_RawData_Cellranger.html) start from raw 10x FASTQs and run **`cellranger count`** (RNA) or **`cellranger-atac count`** (ATAC) as SLURM batch jobs to produce the same `filtered_feature_bc_matrix/` directories the laptop tutorials consume.
+The datasets below are for the optional **[Full Talapas run from raw FASTQs](Resources_Folder/Talapas_FullRun_FromFASTQs.html)** in Additional Resources — **not** the in-class Talapas track, which runs the same `ifnb` data as the laptop tutorials. The [raw-data Talapas tutorials](Exercise_Folder/Tutorial_11_CellRanger_RawData.html) start from raw 10x FASTQs and run **`cellranger count`** (RNA) or **`cellranger-atac count`** (ATAC) as SLURM batch jobs to produce the same `filtered_feature_bc_matrix/` directories the laptop tutorials consume.
 
 For practice runs, 10x ships small public test datasets:
 
@@ -170,7 +173,7 @@ Both should live under `/projects/<PIRG>/refs/` on Talapas, not in `$HOME`.
 
 ## 20k NSCLC DTC — for the optional "Talapas run from raw FASTQs" (10x 3' v3.1 Multiplex)
 
-The optional **[Full Talapas run from raw FASTQs](Additional_Resources.qmd)** uses this larger dataset to take the pipeline from raw reads through Cell Ranger and the full analysis. It is **not** part of the in-class Talapas track (which runs the same `ifnb` data as the laptop tutorials). **Run it on your own time, after the workshop.**
+The optional **[Full Talapas run from raw FASTQs](Resources_Folder/Talapas_FullRun_FromFASTQs.html)** uses this larger dataset to take the pipeline from raw reads through Cell Ranger and the full analysis. It is **not** part of the in-class Talapas track (which runs the same `ifnb` data as the laptop tutorials). **Run it on your own time, after the workshop.**
 
 **What it is.** Twenty-thousand dissociated tumor cells (DTCs) pooled from **seven non-small-cell lung cancer (NSCLC) donors**, run on the 10x Chromium **3' v3.1** assay with **CellPlex multiplexing** (CMO hashing). Every cell carries a gene-expression profile *and* a sample-of-origin barcode — so downstream you get both heterogeneity and donor-level structure to integrate.
 
@@ -179,7 +182,7 @@ This is the **same dataset Patel uses** in [`singleCell_standard_workflow.R`](ht
 -   Landing page: [10x Genomics — 20k NSCLC DTC, 3' v3.1 Multiplex](https://www.10xgenomics.com/datasets/20-k-mixture-of-nsclc-dt-cs-from-7-donors-3-v-3-1-multiplex-3-1-standard-6-0-0)
 -   Reference genome: GRCh38 (human)
 -   Cell count: \~20,000 post-filter cells across 7 donors
--   Used in: the optional [Full Talapas run from raw FASTQs](Additional_Resources.qmd) (Additional Resources)
+-   Used in: the optional [Full Talapas run from raw FASTQs](Resources_Folder/Talapas_FullRun_FromFASTQs.html) (Additional Resources)
 
 ### Getting through 10x Genomics' click-through TOS
 
@@ -218,12 +221,12 @@ wget https://cf.10xgenomics.com/samples/cell-exp/6.0.0/20k_NSCLC_DTC_3p_nextgem_
 ```
 :::
 
-## Tutorial 11 — `stxBrain` (10x Visium adult mouse brain)
+## Tutorial 16 — `stxBrain` (10x Visium adult mouse brain)
 
 **What it is.** Two 10x Visium sections from the same adult mouse brain — one **anterior** (\~2,700 spots) and one **posterior** (\~3,300 spots). Each spot is \~55 µm and captures the transcripts from \~1–10 cells underneath. Total ≈ 6,000 spots across two sections, \~50 MB on disk.
 
 -   Distribution: `SeuratData::InstallData("stxBrain")` (no manual download, no 10x click-through)
--   Used in: Tutorial 11 (Spatial Transcriptomics)
+-   Used in: Tutorial 16 (Spatial Transcriptomics)
 -   Reference: 10x Genomics public Visium dataset; workflow follows the [Seurat spatial vignette](https://satijalab.org/seurat/articles/spatial_vignette).
 
 ```r
@@ -242,7 +245,7 @@ These are loaded automatically by the relevant R packages on first use — you d
 |---|---|---|
 | `HumanPrimaryCellAtlasData()` | `celldex` | Tutorial 04 (SingleR — Seurat default reference path) |
 | Azimuth `pbmcref` | `Azimuth` / `SeuratData` | Tutorial 04 (Azimuth) |
-| `EnsDb.Hsapiens.v75` | Bioconductor | Tutorial 09 (scATAC) |
+| `EnsDb.Hsapiens.v75` | Bioconductor | Tutorial 15 (scATAC) |
 
 ## Disk-space budget — full workshop
 
@@ -252,8 +255,8 @@ These are loaded automatically by the relevant R packages on first use — you d
 | Per-tutorial `.rds` snapshots (laptop path) | — | up to \~2 GB if you keep them all |
 | **Talapas run from raw FASTQs (NSCLC filtered, optional)** | \~250 MB | \~700 MB |
 | **Talapas run from raw FASTQs (NSCLC raw `.h5`, optional)** | \~1.5 GB | \~1.5 GB (single file) |
-| Tutorial 09 — PBMC 10k scATAC-seq | \~2.5 GB | \~5 GB |
-| Tutorial 10 — GSE152418 raw counts | \~7 MB | \~80 MB |
+| Tutorial 15 — PBMC 10k scATAC-seq | \~2.5 GB | \~5 GB |
+| Tutorial 13 — GSE152418 raw counts | \~7 MB | \~80 MB |
 | Reference data (cached) | — | \~500 MB |
 
 For a **laptop-only workshop** doing Tutorials 01–08, plan for **\~3 GB total** including reference caches and intermediate `.rds` files. Add the optional from-FASTQs Talapas run (NSCLC) on top and you're at **\~5 GB**; the full ATAC + WGCNA suite pushes the total to \~12 GB.

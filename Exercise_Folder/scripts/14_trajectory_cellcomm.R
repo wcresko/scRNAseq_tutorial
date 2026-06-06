@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 # Talapas analysis pipeline 12 — parallels laptop Tutorial 12 (Trajectory & Cell-Cell Comm).
-# Learning notebook: Exercise_Folder/Tutorial_12_Trajectory_CellCommunication.qmd
+# Learning notebook: Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.qmd
 # Runs on the annotated ifnb object (the same dataset as the laptop notebook).
-# Run:  sbatch --job-name=traj --mem=64G run_rscript.sbatch 12_trajectory_cellcomm.R
+# Run:  sbatch --job-name=traj --mem=64G run_rscript.sbatch 14_trajectory_cellcomm.R
 # In:   ../objects/ifnb_annotated.rds   Out: ../objects/ifnb_slingshot_pseudotime.csv
 # Figures/tables: ../output/Mod12/Mod12_*  (Tutorial_12 has no executable chunks, so
 # there are no canonical ModN_C{k}_ filenames to mirror — Mod12_<name> is used here.)

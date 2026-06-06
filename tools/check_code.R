@@ -27,7 +27,7 @@ root <- normalizePath(file.path(dirname(sub("--file=", "",
 if (is.na(root) || !dir.exists(file.path(root, "Exercise_Folder"))) root <- getwd()
 setwd(root)
 
-SCRIPTS_DIR <- "Exercise_Folder/Talapas/scripts"
+SCRIPTS_DIR <- "Exercise_Folder/scripts"
 fails <- 0L
 
 ## ----------------------------------------------------------------- helpers

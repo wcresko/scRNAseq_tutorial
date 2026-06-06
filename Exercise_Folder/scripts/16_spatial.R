@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 # Talapas analysis pipeline 11 — parallels laptop Tutorial 11 (Spatial / Visium).
 # Standalone bonus track. Dataset: stxBrain (10x Visium adult mouse brain) via SeuratData.
-# Learning notebook: Exercise_Folder/Tutorial_11_Spatial_Transcriptomics.qmd
-# Run:  sbatch --job-name=spatial --mem=64G run_rscript.sbatch 11_spatial.R
+# Learning notebook: Exercise_Folder/Tutorial_16_Spatial_Transcriptomics.qmd
+# Run:  sbatch --job-name=spatial --mem=64G run_rscript.sbatch 16_spatial.R
 # Out:  ../objects/brain_spatial_integrated.rds
 # Figures/tables (match the Mod11 notebook filenames): ../output/Mod11/Mod11_C*_*
 
