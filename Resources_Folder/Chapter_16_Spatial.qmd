@@ -1,5 +1,5 @@
 ---
-title: "Chapter 11 — Spatial Transcriptomics"
+title: "Chapter 16 — Spatial Transcriptomics"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -18,10 +18,10 @@ editor: visual
 ---
 
 ::: callout-note
-**Where this chapter sits.** Companion to **[Lecture 11](../Lecture_Folder/Lecture_11_Spatial.html)** and **[Tutorial 11](../Exercise_Folder/Tutorial_11_Spatial_Transcriptomics.html)**. **Prerequisites:** [Chapter 1 — Preprocessing](Chapter_01_Preprocessing.html) (general QC), [Chapter 2 — DimReduction & Clustering](Chapter_02_DimReduction.html) (the geometry workflow generalizes).
+**Where this chapter sits.** Companion to **[Lecture 16](../Lecture_Folder/Lecture_16_Spatial.html)** and **[Tutorial 16](../Exercise_Folder/Tutorial_16_Spatial_Transcriptomics.html)**. **Prerequisites:** [Chapter 1 — Preprocessing](Chapter_01_Preprocessing.html) (general QC), [Chapter 2 — DimReduction & Clustering](Chapter_02_DimReduction.html) (the geometry workflow generalizes).
 :::
 
-## 11.1 What spatial buys us
+## 16.1 What spatial buys us
 
 scRNA-seq starts with **dissociation**: tissue → cell suspension. That gives each cell's transcriptome but loses everywhere it ever was in the tissue. For developmental biology, immunology, and disease microenvironments, position is the answer to half the questions:
 
@@ -32,7 +32,7 @@ scRNA-seq starts with **dissociation**: tissue → cell suspension. That gives e
 
 **Spatial transcriptomics** measures gene expression *while preserving the position*. The major platforms differ in resolution (spot vs cell vs sub-cellular) and coverage (whole-transcriptome vs targeted panel).
 
-## 11.2 The technology landscape
+## 16.2 The technology landscape
 
 | Technology | Resolution | Throughput | Genome coverage | Best for |
 |---|---|---|---|---|
@@ -45,7 +45,7 @@ scRNA-seq starts with **dissociation**: tissue → cell suspension. That gives e
 
 Two axes matter: **resolution** (spot vs cell vs sub-cellular) and **coverage** (whole-transcriptome vs targeted). Visium is high-coverage / low-resolution; Xenium is targeted / high-resolution. Match to your hypothesis.
 
-## 11.3 What a Visium spot is — and isn't
+## 16.3 What a Visium spot is — and isn't
 
 A Visium spot is a **55 µm circle on the tissue surface** that captures the polyA-tailed mRNA from whatever happened to be under it. Depending on the tissue:
 
@@ -61,7 +61,7 @@ So **a spot is not a single cell.** Most analysis tooling reuses the language of
 
 For true single-cell resolution, use Xenium / MERFISH / Visium HD. For tissue-overview-level analysis, Visium is fine and cheaper.
 
-## 11.4 The Visium workflow
+## 16.4 The Visium workflow
 
 The lab pipeline:
 
@@ -77,11 +77,11 @@ The bioinformatic pipeline:
 2. **QC** per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus **always plot them on the tissue**, because spatial outliers are tissue artifacts (folds, bubbles), not random noise
 3. **Normalize** with `SCTransform` — preferred over `LogNormalize` for spatial because spot-level counts have wider dynamic range (each spot pools 1–15 cells)
 4. **Run PCA + clustering** as in scRNA — but expect clusters to recover **anatomical regions**, not single-cell-type populations
-5. **Spatially variable features** with **Moran's I** — see §11.6
+5. **Spatially variable features** with **Moran's I** — see §16.6
 6. **Integrate** sections if you have multiple — same Harmony / anchor methods as scRNA
-7. **Deconvolute** to get cell-type fractions per spot (§11.7)
+7. **Deconvolute** to get cell-type fractions per spot (§16.7)
 
-## 11.5 Spatial QC — *always* plot metrics on the tissue
+## 16.5 Spatial QC — *always* plot metrics on the tissue
 
 For scRNA the QC distribution alone is informative. For spatial, you need both:
 
@@ -96,7 +96,7 @@ The latter catches:
 
 Filter spots by their distribution *with* this spatial context in mind. The right threshold for a brain section may exclude the white matter (which is biologically lower-signal) — check that the filtered region matches a real anatomical structure, not just a number.
 
-## 11.6 Spatially variable features and Moran's I
+## 16.6 Spatially variable features and Moran's I
 
 Some genes vary spot-to-spot **with spatial structure** — clear pattern on the tissue. Some vary spot-to-spot but spatially randomly. The first kind is what you want to study in a spatial dataset.
 
@@ -110,7 +110,7 @@ Seurat's `FindSpatiallyVariableFeatures` runs the test. The output is the gene l
 
 Compare to `FindVariableFeatures` (which finds variable-but-not-necessarily-spatially-structured genes): the spatially variable list is a strict subset of the variable list. The difference is informative — variable but spatially random genes are usually technical (depth, ambient bleed) rather than biological.
 
-## 11.7 Cell-type deconvolution
+## 16.7 Cell-type deconvolution
 
 Each Visium spot is a mixture. Deconvolution decomposes each spot's transcriptome into estimated cell-type fractions, using a single-cell **reference** of the same tissue.
 
@@ -128,7 +128,7 @@ The reference choice is critical. Deconvolving a brain Visium with a PBMC refere
 
 The output: per-spot, a probability vector over cell types. Plot each cell-type fraction as a `SpatialFeaturePlot`; you see the spatial distribution of each cell type as it's distributed across the tissue.
 
-## 11.8 Spatial-aware clustering — beyond standard SNN+Leiden
+## 16.8 Spatial-aware clustering — beyond standard SNN+Leiden
 
 Standard Seurat clustering treats spots as iid points in expression space. But adjacent spots are spatially correlated by construction — a clustering that ignores spatial layout misses that signal.
 
@@ -141,7 +141,7 @@ Modern spatial-aware clusterers:
 
 These produce smoother, more biologically interpretable spatial domains. Worth using for any "what are the regions of this tissue?" question.
 
-## 11.9 Common errors
+## 16.9 Common errors
 
 | You see | What's wrong | What to do |
 |---|---|---|
@@ -151,13 +151,13 @@ These produce smoother, more biologically interpretable spatial domains. Worth u
 | Section integration OOMs | SCT-anchor integration is RAM-hungry on Visium | Downsample spots first, or use Harmony on SCT residuals |
 | Deconvolution returns flat per-cell-type fractions | Your reference doesn't match the tissue | Use a tissue-matched single-cell reference |
 
-## 11.10 Where this material is also discussed
+## 16.10 Where this material is also discussed
 
-- **Lecture:** [Lecture 11](../Lecture_Folder/Lecture_11_Spatial.html)
-- **Tutorial:** [Tutorial 11](../Exercise_Folder/Tutorial_11_Spatial_Transcriptomics.html)
+- **Lecture:** [Lecture 16](../Lecture_Folder/Lecture_16_Spatial.html)
+- **Tutorial:** [Tutorial 16](../Exercise_Folder/Tutorial_16_Spatial_Transcriptomics.html)
 - **scNotebooks Module 10** — parallel walkthrough on 10x Visium breast cancer
 
-## 11.11 Going further
+## 16.11 Going further
 
 ::: incremental
 - **Moses & Pachter 2022** — comprehensive spatial-methods landscape, [doi:10.1038/s41592-022-01409-2](https://doi.org/10.1038/s41592-022-01409-2)

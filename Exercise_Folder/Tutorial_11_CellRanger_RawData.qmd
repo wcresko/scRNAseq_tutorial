@@ -1,6 +1,6 @@
 ---
-title: "Talapas 02 — Raw Data Download + Cell Ranger `count`"
-subtitle: "BCL → FASTQ → counts on a SLURM cluster"
+title: "Module 11 — Raw Data Download + Cell Ranger `count` (bonus, upstream)"
+subtitle: "BCL → FASTQ → counts on a SLURM cluster — the raw-data step that feeds the core pipeline"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -19,7 +19,7 @@ editor: visual
 ---
 
 ::: callout-important
-**This is a Talapas Advanced exercise, not a laptop tutorial.** Cell Ranger requires a \~30 GB human reference genome, multi-GB FASTQs, and a multi-core machine with 64+ GB RAM. Do not try to run it on your laptop. Work through the laptop sequence (Tutorials 01–12) first; come here when you have your **own** raw 10x data and need to turn it into a counts matrix on Talapas.
+**This is a bonus *upstream* Talapas exercise, not a laptop tutorial.** It runs *before* the core pipeline — it produces the counts matrix the core Module 01 consumes. Cell Ranger requires a \~30 GB human reference genome, multi-GB FASTQs, and a multi-core machine with 64+ GB RAM. Do not try to run it on your laptop. Work through the laptop sequence (core tutorials 01–08) first; come here when you have your **own** raw 10x data and need to turn it into a counts matrix on Talapas.
 :::
 
 ## About this tutorial
@@ -46,7 +46,7 @@ you'll be running Cell Ranger yourself. This exercise gives you the playbook so 
 
 ## Prerequisites
 
--   A Talapas account ([request one](https://racs.uoregon.edu/request-access)) and basic familiarity with SLURM (see the [SLURM Basics tutorial](Tutorial_Talapas_01_SLURM_Basics.html))
+-   A Talapas account ([request one](https://racs.uoregon.edu/request-access)) and basic familiarity with SLURM (see the [SLURM Basics tutorial](Tutorial_09_SLURM_Basics.html))
 -   \~50 GB of free space in your `/projects/<PIRG>/` quota for the human reference + intermediate files
 -   Either your own 10x FASTQs **or** the small public test dataset linked below
 
@@ -64,7 +64,7 @@ FASTQ (per lane, per sample)
 Cell Ranger outs/
    ├── web_summary.html              ← QC at a glance
    ├── metrics_summary.csv           ← QC numbers
-   ├── filtered_feature_bc_matrix/   ← what Talapas 03's Read10X loads
+   ├── filtered_feature_bc_matrix/   ← what the core pipeline's `01_qc_preprocessing.R` (Read10X) loads
    ├── raw_feature_bc_matrix/        ← what SoupX needs
    ├── possorted_genome_bam.bam      ← aligned reads
    └── molecule_info.h5              ← per-UMI info, used by aggr
@@ -251,7 +251,7 @@ library(Seurat)
 counts <- Read10X("~/Documents/scrnaseq_workshop/data/filtered_feature_bc_matrix/")
 seu    <- CreateSeuratObject(counts, project = "pbmc_1k_v3",
                               min.cells = 3, min.features = 200)
-# … pick up at Talapas 03 (QC metrics)
+# … pick up at the core pipeline (Module 10), script 01 (QC metrics)
 ```
 
 ## Step 7 — Scale to many samples with a SLURM array
@@ -328,7 +328,7 @@ For most workshop-style analyses you do **not** want `aggr` — Seurat's `merge(
 ## See also
 
 -   [scNotebooks Module 03](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module03/module03.html) — the parallel notebook walkthrough
--   [Talapas Advanced — Raw scATAC-seq with cellranger-atac](../Talapas_RawData/Tutorial_Talapas_RawData_ATAC.html) — the ATAC-seq companion
--   [Tutorial SLURM Basics](Tutorial_Talapas_01_SLURM_Basics.html) — SLURM fundamentals on Talapas
+-   [Module 12 — Raw scATAC-seq with cellranger-atac](Tutorial_12_scATAC_CellRanger_RawData.html) — the ATAC-seq companion
+-   [Tutorial SLURM Basics](Tutorial_09_SLURM_Basics.html) — SLURM fundamentals on Talapas
 -   [10x Genomics Cell Ranger documentation](https://www.10xgenomics.com/support/software/cell-ranger/latest)
--   [Talapas 03 — The Analysis Pipeline](Tutorial_Talapas_03_Analysis_Pipeline.html) — the R-script pipeline that picks up downstream from the Cell Ranger output
+-   [Module 10 — The Analysis Pipeline](Tutorial_10_Talapas_Pipeline.html) — the R-script pipeline that picks up downstream from the Cell Ranger output

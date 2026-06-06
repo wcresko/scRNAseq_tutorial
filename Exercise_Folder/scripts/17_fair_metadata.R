@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
 # Talapas analysis pipeline 13 — parallels laptop Tutorial 13 (FAIR & Metadata).
-# Learning notebook: Exercise_Folder/Tutorial_13_FAIR_Metadata.qmd
+# Learning notebook: Exercise_Folder/Tutorial_17_FAIR_Metadata.qmd
 # Runs on the annotated ifnb object (the same dataset as the laptop notebook).
-# Run:  sbatch --job-name=fair run_rscript.sbatch 13_fair_metadata.R
+# Run:  sbatch --job-name=fair run_rscript.sbatch 17_fair_metadata.R
 # In:   ../objects/ifnb_annotated_final.rds   Out: ../objects/ifnb_for_submission.h5ad
 # Tables (match the Mod13 notebook filenames): ../output/Mod13/Mod13_C*_*
 
