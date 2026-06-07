@@ -33,7 +33,7 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ## Where this lecture fits
 
 -   Previous: [Lec 01 — Pre-processing](Lecture_01_Preprocessing.html)
--   **You are here:** Lec 02 — *PCA, neighbour graph, Leiden, t-SNE/UMAP on a single sample*
+-   **You are here:** Lec 02 — *PCA, neighbour graph, graph-based clustering, t-SNE/UMAP on a single sample*
 -   Next: [Lec 03 — Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
 -   **Companion tutorial:** [Tutorial 02 — Dim Reduction & Clustering](../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html)
 -   **Multi-sample integration** has its own lecture and tutorial — see [Lec 05 — Integration](Lecture_05_Integration.html).
@@ -85,7 +85,7 @@ ElbowPlot(seu, ndims = 50)
     -   **Compresses** the data: 2,000 genes → \~50 PCs that explain most of the structured variance
     -   **Denoises** by discarding low-variance directions dominated by technical noise
     -   **Decorrelates** the axes — PCs are orthogonal, so distances in PC space behave well for the neighbour-graph and clustering steps that follow
--   Everything downstream — Harmony, FindNeighbors, Leiden, UMAP — operates on the PC matrix, *not* the gene matrix
+-   Everything downstream — Harmony, FindNeighbors, clustering, UMAP — operates on the PC matrix, *not* the gene matrix
 
 ::: callout-warning
 **Don't skip PCA and run UMAP on raw gene expression.** UMAP/t-SNE on tens of thousands of genes is slow, noisy, and produces visibly worse embeddings. PCA is doing real statistical work, not just bookkeeping.
@@ -212,26 +212,26 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 -   Workflow tools: `VizDimLoadings(seu, dims = 1:4)` for bar plots, `DimHeatmap(seu, dims = 1:9, balanced = TRUE)` for a per-cell heatmap of the top loaders.
 -   This is the step where PCA earns its reputation as **interpretable**: t-SNE and UMAP cannot tell you *which genes* drive a separation — PCA can.
 
-# Step 7 — Neighbour graph + Leiden clustering {background-color="#2c3e50"}
+# Step 7 — Neighbour graph + graph-based clustering {background-color="#2c3e50"}
 
-## SNN graph → Leiden
+## SNN graph → clusters (Louvain / Leiden)
 
 -   Build a **shared nearest-neighbor (SNN)** graph from the integrated PCs — each cell connects to its $k$ nearest neighbours, weighted by how many of those neighbours are *shared*
--   **[Cluster](../Resources_Folder/Glossary.html#c)** with **Louvain** or (preferred today) **Leiden** at a chosen resolution
--   The graph (not the gene matrix, not the UMAP) is the object Leiden actually clusters
+-   **[Cluster](../Resources_Folder/Glossary.html#c)** the graph at a chosen resolution — with Seurat's default **Louvain**, or the modern **Leiden** (preferred, but needs a Python dependency)
+-   The graph (not the gene matrix, not the UMAP) is the object the clustering actually runs on
 
 ``` r
 seu <- FindNeighbors(seu, dims = 1:30) |>
-  FindClusters(resolution = 0.5, algorithm = 4)  # 4 = Leiden
+  FindClusters(resolution = 0.5)   # Louvain (Seurat default); add algorithm = 4 for Leiden
 ```
 
 ``` python
 sc.pp.neighbors(adata, n_pcs=30)
-sc.tl.leiden(adata, resolution=0.5)
+sc.tl.leiden(adata, resolution=0.5)   # scanpy uses Leiden out of the box
 ```
 
 ::: callout-note
-**Default vs. Leiden in practice.** Seurat's `FindClusters()` defaults to **Louvain** (`algorithm = 1`); Leiden (`algorithm = 4`, shown above) is the modern preferred method but needs the `leidenalg` Python package via `reticulate`. For portability, the **workshop tutorials run the Louvain default** — switching to Leiden is the one-line `algorithm = 4` change once that dependency is installed. (`scanpy`'s `sc.tl.leiden` uses Leiden out of the box.)
+**Louvain (default) vs. Leiden.** Seurat's `FindClusters()` defaults to **Louvain** (`algorithm = 1`), and that is what the **workshop tutorials run** — for portability. **Leiden** (`algorithm = 4`) is the modern preferred refinement (it guarantees well-connected communities) but needs the `leidenalg` Python package via `reticulate`. Switching is the one-line `algorithm = 4` change once that dependency is installed.
 :::
 
 ## KNN — the building block
@@ -251,7 +251,7 @@ sc.tl.leiden(adata, resolution=0.5)
 This is the same reason single-cell pipelines have largely abandoned hierarchical clustering on raw expression: graph methods scale to millions of cells, run in minutes, and respect the local geometry that PCA preserved.
 :::
 
-## Leiden clustering — step by step
+## Graph-based clustering — step by step
 
 ![Leiden clustering: KNN graph -> communities -> aggregation -> refinement](images/lec01_use_leiden_clustering.svg){fig-align="center" width="98%"}
 
@@ -259,11 +259,11 @@ This is the same reason single-cell pipelines have largely abandoned hierarchica
 -   **Find communities** → initial partition; **refine** merges/splits based on modularity
 -   **Aggregate** the network, refine again → **final partition** (better-connected communities than Louvain)
 
-## Leiden clustering — step by step (dup1)
+## Graph-based clustering — step by step (dup1)
 
 ![Clustering methods overview — alternative svg rendering](images/week_10_S67_clustering_methods_overview.svg){fig-align="center" width="92%"}
 
-## Leiden clustering — step by step (dup2)
+## Graph-based clustering — step by step (dup2)
 
 ![Clustering — raster reference](images/clustering.jpeg){fig-align="center" width="92%"}
 
@@ -271,7 +271,7 @@ This is the same reason single-cell pipelines have largely abandoned hierarchica
 
 ::: incremental
 -   No single "right" resolution exists — the question is *what cell types you want to resolve*
--   Typical starting range: **0.4 – 1.2** for Leiden on a 10–30k cell dataset
+-   Typical starting range: **0.4 – 1.2** for Louvain/Leiden on a 10–30k cell dataset
 -   Use **`clustree`** to visualize cluster stability across a sweep of resolutions
 -   Cross-check by inspecting markers of merged vs. split clusters
 :::
@@ -424,7 +424,7 @@ $$CE = -\sum_{i,j} \left[ w_{ij} \log v_{ij} + (1 - w_{ij}) \log(1 - v_{ij}) \ri
 
 ::: incremental
 -   **PCA** on HVGs is the substrate every downstream step builds on — read the scree, read the loadings before you trust the embedding
--   Build the **SNN graph** on the PCs, then cluster with **Leiden** — graph-based methods beat K-means for scRNA-seq
+-   Build the **SNN graph** on the PCs, then cluster with **Louvain/Leiden** — graph-based methods beat K-means for scRNA-seq
 -   **t-SNE** preserves local neighbourhoods via KL divergence + the t-distribution; cluster *distances* in t-SNE are not meaningful
 -   **UMAP** preserves more global topology via cross-entropy on a fuzzy graph; today it's the default
 -   Both are **visualizations, not analyses** — they sit on top of PCA + clustering, never replace them

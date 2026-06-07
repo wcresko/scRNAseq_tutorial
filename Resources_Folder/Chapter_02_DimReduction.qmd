@@ -28,7 +28,7 @@ After preprocessing, every cell is a point in a \~2,000-dimensional gene-express
 Three steps fix this:
 
 1. **Project** to a lower-dimensional space that keeps the structured variance (PCA → 20–50 PCs)
-2. **Partition** the cells into communities of mutually-similar neighbors (k-NN graph + Leiden)
+2. **Partition** the cells into communities of mutually-similar neighbors (k-NN graph + Louvain/Leiden)
 3. **Paint** the result onto a 2-D picture for inspection (UMAP or t-SNE)
 
 Each step is a separate idea with its own theory and failure modes. This chapter walks them in order.
@@ -89,17 +89,17 @@ For every edge $(i, j)$ in the kNN graph, weight it by how many of $i$'s neighbo
 
 Seurat's `FindNeighbors(seu, dims = 1:30)` builds both. The SNN graph stored in `seu@graphs$RNA_snn` is then handed to `FindClusters`.
 
-## 2.5 Leiden community detection
+## 2.5 Graph-based community detection (Louvain & Leiden)
 
-The clustering algorithm of choice is **Leiden** (Traag, Waltman, van Eck 2019), which improves on Louvain by guaranteeing well-connected communities. The objective is **modularity** — a measure of how much denser within-community edges are than the random expectation.
+Both algorithms optimize **modularity** — a measure of how much denser within-community edges are than the random expectation. **Louvain** is Seurat's default and is what the **workshop tutorials run** (`FindClusters(seu, resolution = 0.5)`, i.e. `algorithm = 1`), because it has no extra dependencies. **Leiden** (Traag, Waltman, van Eck 2019) is the modern preferred refinement — it improves on Louvain by guaranteeing well-connected communities — but it needs the `leidenalg` Python package via `reticulate`, so we present it as the one-line upgrade rather than the default.
 
-Leiden iterates:
+Leiden iterates (Louvain follows the same first and third steps, without the refinement guarantee):
 
 1. Local moves: each cell joins the neighbor's community if doing so increases modularity
-2. Refinement: split sub-communities that have low internal connectivity
+2. Refinement (Leiden only): split sub-communities that have low internal connectivity
 3. Aggregation: collapse each community into a node and run again
 
-The final partition is a labeling of every cell into a numbered cluster. `FindClusters(seu, resolution = 0.5, algorithm = 4)` runs Leiden in Seurat (`algorithm = 4` selects Leiden; `1` is Louvain).
+The final partition is a labeling of every cell into a numbered cluster. To switch from the Louvain default to Leiden, add `algorithm = 4`: `FindClusters(seu, resolution = 0.5, algorithm = 4)` (`algorithm = 4` selects Leiden; `1` is Louvain) — once `leidenalg` is installed.
 
 The **resolution parameter** controls granularity:
 
