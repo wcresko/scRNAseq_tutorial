@@ -22,7 +22,7 @@ This appendix is the **biology** behind every term Lecture 00 starts using. If y
 
 A **cell** is a membrane-bound compartment that holds a copy of an organism's **genome** (its DNA), plus all the machinery to read that DNA into proteins. The genome is identical across every cell in your body — what differs between cells is **which genes are turned on**, and the readout of "which genes are on" is the **transcriptome**: the set of RNA molecules currently present in that cell.
 
-scRNA-seq measures the transcriptome **one cell at a time**, which is what makes it powerful (you see cell-to-cell heterogeneity) and what makes it hard (each cell yields only a tiny amount of RNA, so the data are noisy and sparse).
+scRNA-seq measures the transcriptome **one cell at a time**, which is what makes it powerful (you see cell-to-cell heterogeneity) and what makes it hard (each cell yields only a tiny amount of RNA, so the data are noisy and sparse). The first single-cell transcriptome was sequenced in 2009 [@tang2009mrna]; droplet chemistries later scaled the approach to thousands of cells per run [@macosko2015dropseq; @zheng2017chromium].
 
 # 2. From DNA to mRNA to counts
 
@@ -96,7 +96,7 @@ When a cell's mRNA captures onto a primer, reverse transcriptase produces a cDNA
 
 ## 4a. Why UMIs
 
-PCR amplifies some molecules more than others — by orders of magnitude. Without UMIs, the read count for a gene reflects mostly PCR luck, not how many original molecules the cell had. With UMIs, you can collapse all reads with the same `(cell barcode, gene, UMI)` tuple to a single count — that's the **molecule count** for that gene in that cell.
+PCR amplifies some molecules more than others — by orders of magnitude. Without UMIs, the read count for a gene reflects mostly PCR luck, not how many original molecules the cell had. With UMIs, you can collapse all reads with the same `(cell barcode, gene, UMI)` tuple to a single count — that's the **molecule count** for that gene in that cell. Doing this collapse correctly (accounting for sequencing errors in the UMI itself) is a small algorithm in its own right [@smith2017umitools].
 
 ::: callout-tip
 This is why scRNA-seq pipelines call them **UMI counts**, not "read counts". Reads are sequencing-machine output. UMIs are biological molecules.
@@ -126,7 +126,7 @@ The three standard QC metrics — `nCount_RNA`, `nFeature_RNA`, `percent.mt` —
 | `nFeature_RNA` | how many genes are detected (UMI ≥ 1) per cell | How "rich" this cell's transcriptome is. Strongly correlated with nCount_RNA but reaches a saturation. |
 | `percent.mt` | fraction of UMIs that map to mitochondrial-encoded genes | Cell health proxy. Healthy cells: \~5–15% (tissue-dependent). Stressed/dying cells leak cytoplasmic RNA but keep mitochondrial RNA → percent.mt rises. |
 
-**Why mitochondrial?** Your nuclear genome is in the nucleus; your **mitochondria** (the cell's energy factories) have their own small genome with \~37 genes. When a cell is dying, its plasma membrane breaks down first; cytoplasmic mRNAs leak out into the suspension; but mitochondrial mRNAs stay locked inside the mitochondrion, which has its own membrane. So a cell that lost its membrane integrity has a relative excess of mitochondrial RNA → high `percent.mt`. This is why we filter on `percent.mt < 5%` (or whatever's tissue-appropriate).
+**Why mitochondrial?** Your nuclear genome is in the nucleus; your **mitochondria** (the cell's energy factories) have their own small genome with \~37 genes. When a cell is dying, its plasma membrane breaks down first; cytoplasmic mRNAs leak out into the suspension; but mitochondrial mRNAs stay locked inside the mitochondrion, which has its own membrane. So a cell that lost its membrane integrity has a relative excess of mitochondrial RNA → high `percent.mt`. This is why we filter on `percent.mt < 5%` (or whatever's tissue-appropriate); systematic work on what distinguishes low-quality cells confirms that mitochondrial fraction plus library complexity carry most of the QC signal [@ilicic2016classification].
 
 # 7. Cell types vs cell states vs lineages
 
@@ -162,7 +162,7 @@ What's new:
 
 ::: incremental
 - **Sparsity** — \~90–95% zeros in droplet data. Most analyses use specialized methods designed for this
-- **Cells are not biological replicates** — cells from the same tissue from the same donor share genetics, library prep, and dissociation. Statistically, the unit is the *donor*, not the cell. (This is why pseudobulk DE in Lecture 06 is the right answer for condition contrasts)
+- **Cells are not biological replicates** — cells from the same tissue from the same donor share genetics, library prep, and dissociation. Statistically, the unit is the *donor*, not the cell, and ignoring this produces large numbers of false discoveries [@squair2021confronting]. (This is why pseudobulk DE in Lecture 06 is the right answer for condition contrasts)
 - **Cell type is a latent variable** — you have to recover it from the data
 - **Integration across samples** is a first-class problem, not an afterthought
 :::
@@ -234,11 +234,16 @@ These come up in every lecture; the [main Glossary](Glossary.html) has the analy
 If this appendix moved too fast, the canonical free references are:
 
 - **[Molecular Biology of the Cell, 7e](https://www.ncbi.nlm.nih.gov/books/NBK21054/)** (Alberts et al.) — chapters 6–7 on transcription, RNA processing, and gene regulation
-- **[Single-cell best practices, Chapter 1](https://www.sc-best-practices.org/preamble.html)** — the same biology in scRNA-seq context
-- **[10x Genomics support / Chromium](https://www.10xgenomics.com/support/single-cell-gene-expression)** — manufacturer's documentation, very thorough on chemistry
+- **[Single-cell best practices](https://www.sc-best-practices.org/preamble.html)** — the same biology in scRNA-seq context; the companion paper [@heumos2023bestpractices] and the original best-practices tutorial [@luecken2019bestpractices] are the field's standard end-to-end references
+- **[10x Genomics support / Chromium](https://www.10xgenomics.com/support/single-cell-gene-expression)** — manufacturer's documentation, very thorough on chemistry [@zheng2017chromium]
 - **[Scanpy tutorials, Preprocessing](https://scanpy.readthedocs.io/en/stable/tutorials/index.html)** — Python-side walkthrough of the same concepts
 
 Once you can read this appendix without looking anything up, you're ready for **Lecture 00**.
+
+## References
+
+::: {#refs}
+:::
 
 ## See also
 
