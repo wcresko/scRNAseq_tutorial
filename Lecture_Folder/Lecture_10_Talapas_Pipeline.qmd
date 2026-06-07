@@ -1,0 +1,226 @@
+---
+title: "Lecture 10 — Running the Analysis Pipeline on Talapas"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: "Single Cell RNA-seq Workshop · Lecture 10 — Running the Analysis Pipeline on Talapas"
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+# Lecture 10: Running the Analysis Pipeline on Talapas {background-color="#2c3e50"}
+
+## Where this fits
+
+::: incremental
+-   This is the **second Friday-morning Talapas module** — putting Module 09's SLURM skills to work on the real analysis.
+-   **Companion reading:** [Chapter 10 — The Talapas Analysis Pipeline](../Resources_Folder/Chapter_10_Talapas_Pipeline.html)
+-   **Companion tutorial:** [Tutorial 10 — Talapas Pipeline](../Exercise_Folder/Tutorial_10_Talapas_Pipeline.html)
+-   **Prerequisite:** [Lecture 09 — SLURM Basics](Lecture_09_SLURM_Basics.html)
+-   Goal: run the **same `ifnb` analysis** as the laptop notebooks, but as **SLURM jobs**.
+:::
+
+## Goals of this lecture
+
+::: incremental
+-   See how the workshop's **1:1:1:1** structure maps onto the cluster
+-   Understand the `01`–`08` scripts as a **chained pipeline**
+-   Use the `run_rscript.sbatch` wrapper and `run_pipeline.sbatch`
+-   Know why you **pre-cache `ifnb`** and what `OBJ_DIR` is for
+-   Understand why `ifnb` yields **real biology**, not a null result
+-   Know where the **bonus scripts 13–17** fit
+:::
+
+# The 1:1:1:1 mapping {background-color="#2c3e50"}
+
+## Four legs, one workflow
+
+::: incremental
+-   Every module of the workshop has four parallel legs:
+-   **Lecture** → concept slides (this deck)
+-   **Reading** → long-form prose chapter
+-   **Laptop tutorial** → rich learning notebook with output
+-   **Talapas script** → the *same* workflow, streamlined for SLURM
+:::
+
+## Notebooks vs scripts
+
+::: incremental
+-   The **laptop notebooks** are teaching documents: prose, "Think about it" prompts, inline plots.
+-   The **Talapas scripts** are the *same* analysis, stripped to runnable R.
+-   Scripts carry only minimal comments that mark each step's alignment with its notebook — **the explanation lives in the notebook**.
+-   Same dataset, same biology — no new analysis to learn, just a new place to run it.
+:::
+
+# The chained pipeline {background-color="#2c3e50"}
+
+## `01`–`08`: each output feeds the next
+
+::: incremental
+-   The eight core scripts **chain** on a shared `ifnb` object.
+-   Each step **reads** the previous step's `.rds`/`.csv` and **writes** the next one's input.
+-   Only external input is `ifnb` itself, fetched by script `01`.
+-   They must run **in order** — a missing or corrupt hand-off breaks the chain.
+:::
+
+## The hand-off chain
+
+| Script | Reads | Writes |
+|---|---|---|
+| `01_qc_preprocessing` | `Kang18_8vs8()` | `ifnb_preprocessed.rds` |
+| `02_dimreduction_clustering` | `ifnb_preprocessed.rds` | `ifnb_clustered.rds` |
+| `03_markers_annotation` | `ifnb_clustered.rds` | `ifnb_annotated.rds` |
+| `04_reference_annotation` | `ifnb_annotated.rds` | `ifnb_annotated_final.rds` |
+| `05_integration` | `ifnb_annotated_final.rds` | `ifnb_integrated.rds` |
+| `06_pseudobulk_de` | `ifnb_integrated.rds` | `ifnb_pseudobulk_de.csv` |
+| `07_functional_analysis` | `ifnb_pseudobulk_de.csv` | `functional/*.csv` |
+| `08_differential_abundance` | `ifnb_integrated.rds` | `ifnb_milo_da.csv` |
+
+## Why `.rds` hand-offs?
+
+::: incremental
+-   Each `.rds` is a **checkpoint** — a fully-formed Seurat object on disk.
+-   Re-run step 6 without re-running 1–5; just point it at the saved object.
+-   Steps can be **right-sized independently** (06 and 08 want more memory).
+-   A clean, inspectable contract between steps — exactly how reproducible pipelines are built.
+:::
+
+# The wrappers {background-color="#2c3e50"}
+
+## `run_rscript.sbatch` — the generic wrapper
+
+::: incremental
+-   You don't write a separate `.sbatch` for every R script.
+-   One wrapper loads R and runs whatever script you pass it; its last line is just `Rscript "${SCRIPT}"`.
+-   Override the job name (and memory) per run.
+:::
+
+``` bash
+mkdir -p logs
+sbatch --job-name=qc            run_rscript.sbatch 01_qc_preprocessing.R
+sbatch --job-name=cluster       run_rscript.sbatch 02_dimreduction_clustering.R
+sbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
+```
+
+## Confirm before launching the next
+
+::: incremental
+-   The steps are **chained** — don't fire step 2 until step 1 truly finished.
+-   Check the `.out` log for the `Wrote ...` line.
+-   Run `seff <jobid>` and confirm `State: COMPLETED` (not `OUT_OF_MEMORY` / `TIMEOUT`).
+-   A job killed mid-write leaves a **corrupt `.rds`** that poisons the next step.
+:::
+
+## `run_pipeline.sbatch` — the whole series at once
+
+``` bash
+STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
+for step in "${STEPS[@]}"; do
+  echo "==== RUNNING ${step} ===="
+  Rscript "${step}"
+done
+```
+
+::: incremental
+-   Runs all eight **in order**, in a single allocation (~12 h, ~96 GB).
+-   Submit once: `sbatch run_pipeline.sbatch`, then `seff <jobid>` to confirm `COMPLETED`.
+-   Simplest way to reproduce the entire core analysis end-to-end.
+:::
+
+# Setup details {background-color="#2c3e50"}
+
+## Pre-caching `ifnb`
+
+::: incremental
+-   Script `01` downloads `ifnb` (~25 MB) via `ExperimentHub` on first use.
+-   **Compute nodes may have no outbound internet** — the download would fail inside the job.
+-   So populate the cache **once** on a login node (which has internet) before submitting:
+:::
+
+``` bash
+Rscript -e 'invisible(muscData::Kang18_8vs8())'
+```
+
+## `OBJ_DIR` — where objects land
+
+::: incremental
+-   By default the scripts write objects to `../objects/`.
+-   Set `OBJ_DIR` to redirect them — e.g. to fast, roomy `/scratch`:
+:::
+
+``` bash
+export OBJ_DIR=/scratch/<PIRG>/<duckid>/ifnb/objects
+```
+
+-   Keeps large intermediates off `/home/` and makes the run **reproducible and relocatable**.
+
+# The biology {background-color="#2c3e50"}
+
+## Why `ifnb` gives real results
+
+::: incremental
+-   `ifnb` (Kang *et al.* 2017) has a **real condition** — `stim`: CTRL vs IFN-β.
+-   And **real biological replicates** — `ind`: 8 lupus donors, each in both conditions.
+-   So scripts 05/06/08 use genuine sample and donor structure.
+-   Integration corrects the CTRL/STIM axis; DE and DA recover a real **interferon-stimulated gene (ISG)** response — not a null.
+:::
+
+## Same dataset, same biology
+
+::: incremental
+-   This is the **identical** dataset and biology as the laptop notebooks.
+-   The cluster run isn't a toy demo — it reproduces the workshop's real findings at scale.
+-   A single dissociated-tumor run would lack condition + replicate structure; `ifnb` has both by design.
+:::
+
+# Bonus scripts {background-color="#2c3e50"}
+
+## Scripts 13–17 — standalone tracks
+
+::: incremental
+-   Parallel the **downstream bonus notebooks**; run *after* the core, not in sequence.
+-   `13_wgcna` — co-expression modules, its **own** GSE152418 dataset.
+-   `14_trajectory_cellcomm` — runs on the annotated `ifnb` object.
+-   `15_scatac_signac` — scATAC on PBMC 10k, its own data.
+-   `16_spatial` — `stxBrain` spatial data.
+-   `17_fair_metadata` — exports `ifnb` for submission (`.h5ad`).
+:::
+
+## What stays interactive
+
+::: incremental
+-   Inherently interactive / Python steps are kept as **commented sketches**, exactly as in the notebooks.
+-   E.g. Monocle3 root selection, scVelo, CellChat plotting, the `cellxgene-schema` validator.
+-   The scripts mirror the **runnable core** of each notebook.
+:::
+
+## What's next
+
+::: incremental
+-   You can now run the **full ifnb analysis on Talapas** as chained SLURM jobs.
+-   Adapt the scripts to **your own counts matrix** — swap script 01's loader, keep the chain (see the [companion chapter](../Resources_Folder/Chapter_10_Talapas_Pipeline.html)).
+-   For the raw-FASTQ upstream path, see the Cell Ranger bonus modules and the full Talapas run roadmap.
+:::
+
+## Key takeaways
+
+::: incremental
+-   The pipeline is a **chain**: `.rds` checkpoints hand off step to step, in order.
+-   `run_rscript.sbatch` runs any one step; `run_pipeline.sbatch` runs all eight.
+-   **Pre-cache `ifnb`** on a login node; use `OBJ_DIR` to relocate outputs.
+-   `ifnb`'s condition + donor design yields **real ISG biology**.
+-   Confirm `COMPLETED` with `seff` before chaining onward.
+:::

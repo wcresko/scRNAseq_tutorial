@@ -1,0 +1,158 @@
+---
+title: "Chapter 10 — The Talapas Analysis Pipeline"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** This is the conceptual reading for the **second of the two Friday-morning Talapas modules**. Companion to **[Lecture 10 — Running the Analysis Pipeline on Talapas](../Lecture_Folder/Lecture_10_Talapas_Pipeline.html)** and **[Tutorial 10 — Talapas Pipeline](../Exercise_Folder/Tutorial_10_Talapas_Pipeline.html)**. **Prerequisite:** [Chapter 9 — SLURM & HPC Scheduling on Talapas](Chapter_09_SLURM_Basics.html), which covers login, modules, partitions, and `sbatch`. Where Chapter 9 taught the *mechanics* of the cluster, this chapter explains the *architecture* of the analysis you run on it.
+:::
+
+## 10.1 From notebooks to scripts: the fourth leg of 1:1:1:1
+
+Every module in this workshop is taught through four parallel artifacts — a **lecture**, a **reading**, a **laptop tutorial**, and a **Talapas script** — all covering the same workflow at different altitudes. The laptop tutorials (notebooks 01–08) are *learning* documents: rich prose, "Think about it" prompts, inline plots, and explanation woven through every step. They are written to be read and understood at a desk, one cell at a time.
+
+The Talapas scripts are the fourth leg. They run the *same* analysis, on the *same* dataset, but stripped down to runnable R with only minimal comments that mark which notebook each step parallels. This division of labor is deliberate. A teaching notebook and a production script have opposite goals: the notebook maximizes explanation, the script maximizes reproducibility and unattended execution. Rather than compromise either, the workshop keeps them separate — **the explanation lives in the notebook, the execution lives in the script** — and the comment markers in the script point you back to the notebook whenever you need the "why."
+
+The payoff is that moving to the cluster introduces *no new analysis to learn*. You already understand QC, clustering, annotation, integration, pseudobulk DE, functional enrichment, and differential abundance from the laptop series. Chapter 10 is purely about how that same understanding is packaged so it can run as a chain of SLURM jobs on Talapas.
+
+## 10.2 The dataset: why `ifnb` is not a toy
+
+The scripts run the **`ifnb` dataset** (Kang *et al.* 2017), the same one used throughout the laptop tutorials. It is worth dwelling on *why* this dataset was chosen, because the choice is what makes the cluster run a real analysis rather than a demonstration.
+
+`ifnb` carries two kinds of structure that most single-cell demo datasets lack:
+
+::: incremental
+- A **real biological condition** — `stim`, with two levels: `CTRL` (control) and `STIM` (cells stimulated with interferon-β). This is a genuine perturbation with a known biological consequence.
+- **Real biological replicates** — `ind`, identifying 8 lupus patient donors, each measured in *both* conditions. These are true replicates at the level that matters for statistics: the donor.
+:::
+
+Contrast this with a single dissociated-tumor run, which gives you one sample, no condition, and no replicates. With such data you can cluster and annotate cells, but you cannot ask whether anything *changes* between conditions, because there is no condition and nothing to compare. `ifnb` has both axes by design, so the downstream steps — integration (05), pseudobulk differential expression (06), and differential abundance (08) — operate on genuine sample and donor structure. Integration corrects the CTRL/STIM batch axis; the DE and DA tests recover a real **interferon-stimulated gene (ISG)** response rather than returning a null result. The cluster run reproduces the workshop's actual biological findings, at scale, on the real machine.
+
+## 10.3 Pipeline architecture: a chain of object hand-offs
+
+The eight core scripts are not eight independent programs. They form a **pipeline** — a chain in which each step's output is the next step's input. The connective tissue is the filesystem: each script reads an object from disk, does its work, and writes a new object that the following script will read.
+
+| Script | Parallels notebook | Reads | Writes |
+|--------|--------------------|-------|--------|
+| `01_qc_preprocessing.R` | Tutorial 01 — QC & Preprocessing | `muscData::Kang18_8vs8()` | `ifnb_preprocessed.rds` |
+| `02_dimreduction_clustering.R` | Tutorial 02 — DimReduction & Clustering | `ifnb_preprocessed.rds` | `ifnb_clustered.rds` |
+| `03_markers_annotation.R` | Tutorial 03 — Markers & Annotation | `ifnb_clustered.rds` | `ifnb_annotated.rds` |
+| `04_reference_annotation.R` | Tutorial 04 — Reference Annotation | `ifnb_annotated.rds` | `ifnb_annotated_final.rds` |
+| `05_integration.R` | Tutorial 05 — Integration | `ifnb_annotated_final.rds` | `ifnb_integrated.rds` |
+| `06_pseudobulk_de.R` | Tutorial 06 — Pseudobulk DE | `ifnb_integrated.rds` | `ifnb_pseudobulk_de.csv` |
+| `07_functional_analysis.R` | Tutorial 07 — Functional Analysis | `ifnb_pseudobulk_de.csv` | `functional/*.csv` |
+| `08_differential_abundance.R` | Tutorial 08 — Differential Abundance | `ifnb_integrated.rds` | `ifnb_milo_da.csv` |
+
+Reading the table top to bottom traces the entire workflow: raw `ifnb` enters at step 01, becomes a QC'd object, then a clustered object, then an annotated object, then an integrated object — and from the integrated object the pipeline branches to pseudobulk DE (06, which 07 then interprets functionally) and to differential abundance (08). The only external input to the whole chain is `ifnb` itself, fetched once by script 01. Everything else is an internal hand-off.
+
+Because the steps are linked by their inputs and outputs, they must run **in order**. Step 02 cannot run until step 01 has written `ifnb_preprocessed.rds`; step 06 cannot run until step 05 has written `ifnb_integrated.rds`. A missing or corrupt hand-off breaks the chain at that point.
+
+## 10.4 Why `.rds` checkpoints?
+
+The hand-off format is R's native serialization, `.rds` (with `.csv` for the tabular results of steps 06–08). Saving a fully-formed Seurat object to a `.rds` file after each step is more than a convenience; it is a deliberate design pattern with several payoffs.
+
+::: incremental
+- **Each `.rds` is a checkpoint.** A step's output is a complete, self-contained object on disk. If step 06 fails, you do not re-run steps 01 through 05 — you fix step 06 and point it at the already-saved `ifnb_integrated.rds`.
+- **Steps can be right-sized independently.** Because each is its own SLURM job reading from disk, you can give step 06 (pseudobulk DE) and step 08 (differential abundance) the extra memory they need without inflating the cheaper steps. Right-sizing per step (the skill from Chapter 9) only works because the pipeline is decomposed this way.
+- **The contract between steps is inspectable.** The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.
+:::
+
+The cost of this pattern is the discipline it demands: **you must confirm each step truly succeeded before launching the next.** A job that runs out of memory or time mid-write leaves behind a *truncated, corrupt* `.rds` — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.6) before chaining onward.
+
+## 10.5 Reproducibility: pre-caching and `OBJ_DIR`
+
+Two practical knobs make the pipeline reproducible and portable on a cluster.
+
+**Pre-caching `ifnb`.** Script 01 downloads `ifnb` (about 25 MB) through Bioconductor's `ExperimentHub` the first time it runs. On Talapas this collides with a quirk from Chapter 9: compute nodes may have **no outbound internet**. A download that works fine on your laptop fails inside the batch job, because the compute node cannot reach the internet to fetch the data. The fix is to populate the cache *once*, on a login node (which does have internet), before you submit any jobs:
+
+``` bash
+Rscript -e 'invisible(muscData::Kang18_8vs8())'
+```
+
+After this, the data sit in your local `ExperimentHub` cache, and script 01 finds them there with no network access required.
+
+**`OBJ_DIR` — controlling where objects land.** By default the scripts write their `.rds`/`.csv` hand-offs into `../objects/`. The `OBJ_DIR` environment variable overrides that destination, which matters for two reasons. First, the intermediate Seurat objects can be large, and Chapter 9's etiquette says large working data belongs in `/scratch/<PIRG>/`, not in `/home/`. Second, making the output location a variable rather than a hard-coded path is itself a reproducibility practice — the same scripts run unchanged whether the objects go to your project directory, scratch, or somewhere else entirely:
+
+``` bash
+export OBJ_DIR=/scratch/<PIRG>/<duckid>/ifnb/objects
+```
+
+## 10.6 Running the pipeline: the two wrappers
+
+You do not write a separate `.sbatch` file for each of the eight scripts. The workshop ships two wrappers that handle the SLURM boilerplate.
+
+**`run_rscript.sbatch` — one step at a time.** This is a generic wrapper whose essential line is just `Rscript "${SCRIPT}"`. You pass it the R script to run and override the job name (and, where needed, the memory) per submission. This is the right tool when you want fine control — running steps individually, watching each finish, and giving the memory-hungry steps more RAM:
+
+``` bash
+mkdir -p logs   # one-time: SLURM will not create the log dir for you (Chapter 9)
+
+sbatch --job-name=qc            run_rscript.sbatch 01_qc_preprocessing.R
+sbatch --job-name=cluster       run_rscript.sbatch 02_dimreduction_clustering.R
+sbatch --job-name=markers       run_rscript.sbatch 03_markers_annotation.R
+sbatch --job-name=refannot      run_rscript.sbatch 04_reference_annotation.R
+sbatch --job-name=integrate     run_rscript.sbatch 05_integration.R
+sbatch --job-name=pb_de  --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
+sbatch --job-name=fa     --mem=32G run_rscript.sbatch 07_functional_analysis.R
+sbatch --job-name=da     --mem=96G run_rscript.sbatch 08_differential_abundance.R
+```
+
+Because the steps are chained, you launch them one at a time and **confirm each before starting the next**. Concretely: look in the `.out` log for the `Wrote ...` line that the script prints when it has finished writing its object, and run `seff <jobid>` to confirm `State: COMPLETED` — not `OUT_OF_MEMORY` or `TIMEOUT`, either of which would have left a corrupt hand-off (§10.4).
+
+**`run_pipeline.sbatch` — the whole series in one allocation.** When you simply want to reproduce the entire core analysis end-to-end, this wrapper runs all eight scripts in order inside a single SLURM allocation (roughly 12 hours, 96 GB):
+
+``` bash
+STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
+for step in "${STEPS[@]}"; do
+  echo "==== RUNNING ${step} ===="
+  Rscript "${step}"
+done
+```
+
+You submit it once with `sbatch run_pipeline.sbatch` (after `mkdir -p logs` and pre-caching `ifnb`), then confirm `State: COMPLETED` with `seff`. This is the simplest path to "run the whole thing." The trade-off versus the one-at-a-time approach is granularity: a single fat allocation cannot right-size memory per step, so use the per-step wrapper when you need that control and the pipeline wrapper when you just want the full run.
+
+## 10.7 The bonus scripts (13–17)
+
+Beyond the core chain, five **bonus scripts** parallel the downstream bonus laptop tutorials. Unlike the core, these are largely **standalone** — they run *after* the core pipeline rather than in a fixed sequence with each other, and several bring their own datasets.
+
+| Script | Parallels notebook | Reads | Writes |
+|--------|--------------------|-------|--------|
+| `13_wgcna.R` | Module 13 — WGCNA | `GSE152418_*_RawCounts.txt` | `wgcna_*.csv` |
+| `14_trajectory_cellcomm.R` | Module 14 — Trajectory & Cell–Cell Comm | `ifnb_annotated.rds` | `ifnb_slingshot_pseudotime.csv` |
+| `15_scatac_signac.R` | Module 15 — scATAC-seq (Signac) | PBMC 10k scATAC files | `pbmc_atac_clustered.rds` |
+| `16_spatial.R` | Module 16 — Spatial Transcriptomics | `stxBrain` (SeuratData) | `brain_spatial_integrated.rds` |
+| `17_fair_metadata.R` | Module 17 — FAIR & Metadata | `ifnb_annotated_final.rds` | `ifnb_for_submission.h5ad` |
+
+Scripts 13 (WGCNA) and 15 (scATAC) use their own datasets, downloaded into `../data/`; 14 and 17 run on the annotated `ifnb` object the core pipeline produces; 16 uses the `stxBrain` spatial dataset. Because they do not chain on each other, you can run whichever bonus analyses interest you in any order, once the relevant input exists.
+
+One caveat, consistent with the notebooks: steps that are inherently *interactive* or *Python-based* — Monocle3 root selection, scVelo, CellChat plotting, the `cellxgene-schema` validator — cannot be fully automated in a batch script and are kept as **commented sketches** inside the scripts, exactly as they appear in the notebooks. The bonus scripts mirror the *runnable core* of each notebook, not its interactive parts.
+
+## 10.8 Adapting the pipeline to your own data
+
+The whole point of learning this pipeline on `ifnb` is to run it on *your* data afterward, and the chained architecture makes that swap clean. The only place the pipeline touches the external world is **script 01**, which loads `ifnb` from Bioconductor. To run the analysis on your own counts:
+
+::: incremental
+- **Replace the loader in script 01.** Swap the `muscData::Kang18_8vs8()` call for code that builds a Seurat object from your own counts matrix — for example, reading a Cell Ranger output directory or a 10x `.h5` file — and carry your condition and donor information into the object's metadata.
+- **Keep the rest of the chain.** Steps 02–08 read from the previous step's `.rds`, so once script 01 writes a Seurat object in the expected shape, the downstream steps run unchanged.
+- **Mind the design.** The DE and DA steps (05/06/08) depend on having a real condition and real replicates in the metadata. If your data lacks a condition or has no biological replication, those steps will not return meaningful results — the limitation is your experimental design, not the scripts. This is the same lesson §10.2 drew from why `ifnb` was chosen.
+- **Right-size for your scale.** A dataset much larger than `ifnb` will need more memory and time; use `seff` from Chapter 9 to tune each step.
+:::
+
+## 10.9 Where this leads
+
+You now have the full picture: the cluster mechanics from Chapter 9, and in this chapter the architecture of the analysis that runs on it — a chain of `.rds` checkpoints, two wrappers to submit it, the pre-caching and `OBJ_DIR` knobs that make it reproducible, and the `ifnb` design that gives the whole run real interferon biology to recover.
+
+If you want to go *upstream* of script 01 — to start from raw FASTQs and generate the counts matrix yourself with Cell Ranger — see the bonus Cell Ranger modules and the [Full Talapas RNA-seq run from raw FASTQs](Talapas_FullRun_FromFASTQs.html) roadmap. Otherwise, you are ready to reproduce the entire single-cell workflow on Talapas and then point it at your own experiment.

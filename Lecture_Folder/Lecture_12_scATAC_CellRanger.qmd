@@ -1,0 +1,234 @@
+---
+title: "Lecture 12 — Raw scATAC-seq with cellranger-atac"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: "Single Cell RNA-seq Workshop · Lecture 12 — Raw scATAC-seq with cellranger-atac"
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+# Lecture 12: Raw scATAC-seq with cellranger-atac {background-color="#2c3e50"}
+
+## Where this lecture fits
+
+::: incremental
+-   Another **bonus upstream module** — it runs **before** the core scATAC analysis
+-   The RNA companion ([Lecture 11](Lecture_11_CellRanger.html)) covered `cellranger count`; this is its chromatin twin
+-   Same SLURM patterns, same FASTQ rules, same reference model — **different outputs**
+-   The hand-off target is **Module 15** (Signac), not Module 01
+:::
+
+## Companion materials
+
+-   **Reading:** [Chapter 12 — Raw scATAC-seq Processing](../Resources_Folder/Chapter_12_scATAC_CellRanger.html)
+-   **Tutorial:** [Tutorial 12 — Raw scATAC-seq with cellranger-atac](../Exercise_Folder/Tutorial_12_scATAC_CellRanger_RawData.html)
+-   **RNA companion:** [Lecture 11 — Cell Ranger: Raw Reads to Counts](Lecture_11_CellRanger.html)
+-   **Downstream:** [Module 15 — scATAC-seq with Signac](Lecture_15_ATACseq.html)
+
+## Goals of this lecture
+
+::: incremental
+-   See **how scATAC differs from scRNA** at the data level (peaks vs genes, fragments vs UMIs)
+-   Run `cellranger-atac count` and read its parameters
+-   Pick the **right reference** (arc vs gex vs atac)
+-   Read ATAC-specific QC: **TSS enrichment, FRiP, nucleosome signal**
+-   Know which file feeds Module 15: **`fragments.tsv.gz`**
+-   Note when to switch to **multiome** (`cellranger-arc`)
+:::
+
+# Part 1 — How scATAC differs from RNA {background-color="#2c3e50"}
+
+## Different measurement, parallel pipeline
+
+::: incremental
+-   scRNA measures **transcription** — polyA mRNA captured, counted as UMIs per gene
+-   scATAC measures **accessibility** — Tn5-cut DNA fragments, counted per genomic peak
+-   The *plumbing* (SLURM, FASTQ naming, reference model) is nearly identical
+-   The *outputs* diverge because the underlying biology is different
+:::
+
+## RNA vs ATAC, side by side
+
+| Step | scRNA-seq | scATAC-seq |
+|---|---|---|
+| Library | polyA mRNA | Tn5-cut DNA fragments |
+| Per-cell unit | UMI per gene | Fragment per peak |
+| Reference | Transcriptome | Whole genome + motifs |
+| Per-cell QC | nUMI, nFeature, % mito | nFrag, TSS enr., nucleosome signal |
+| Cell calling | Knee on barcode rank | Signal-vs-background |
+| `count` output | matrix + BAM | **fragments.tsv.gz** + peaks.bed |
+
+## The new file: `fragments.tsv.gz`
+
+::: incremental
+-   A sorted, gzipped TSV — one row per Tn5-cut fragment
+-   Columns: `chrom  start  end  barcode  duplicate-count`
+-   This is the file Signac and ArchR consume **directly**
+-   It travels with its index: `fragments.tsv.gz.tbi` — never lose it in transit
+:::
+
+# Part 2 — Running cellranger-atac count {background-color="#2c3e50"}
+
+## The core invocation
+
+``` bash
+cellranger-atac count \
+  --id=atac_pbmc_1k_v1 \
+  --reference=/projects/<PIRG>/<user>/refs/refdata-cellranger-arc-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<user>/test_data/atac_pbmc_1k_v1_fastqs \
+  --sample=atac_pbmc_1k_v1 \
+  --localcores=16 \
+  --localmem=120
+```
+
+::: incremental
+-   Note `--reference`, not `--transcriptome` — the flag name differs from RNA
+-   No `--create-bam` flag here; a position-sorted BAM is written by default
+-   Same `--localcores` / `--localmem` discipline as RNA (budget below SLURM `--mem`)
+:::
+
+## Why it runs 2–3× longer than RNA
+
+::: incremental
+-   Aligns fragments to the **whole genome**, not a small transcriptome
+-   Deduplicates at single-**fragment** resolution
+-   **Calls peaks de novo** with a MACS-style algorithm — RAM-hungry
+-   Counts fragments per peak per barcode
+-   Plan your SLURM `--time` accordingly (6–10 h is typical)
+:::
+
+# Part 3 — The ATAC reference {background-color="#2c3e50"}
+
+## arc vs gex vs atac — choose carefully
+
+::: incremental
+-   `refdata-gex-GRCh38-...` — **RNA only**. Do **not** pass this to cellranger-atac
+-   `refdata-cellranger-arc-GRCh38-2024-A` — the current ATAC / multiome reference
+-   `refdata-cellranger-atac-GRCh37-1.2.0` — older hg19, for matching `EnsDb.Hsapiens.v75` in Module 15
+-   They share `fasta/` and `genes/` folders but have **different indexes and annotations**
+:::
+
+## Download the ATAC reference
+
+``` bash
+cd /projects/<PIRG>/<user>/refs
+
+# Current human ATAC / arc reference
+wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+tar -xzf refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+```
+
+::: incremental
+-   The ATAC reference is **separate** because it indexes the whole genome, not just transcribed regions
+-   A wrong-reference run usually fails to start — but the error can be cryptic
+:::
+
+# Part 4 — ATAC-specific QC {background-color="#2c3e50"}
+
+## The outputs are different
+
+``` bash
+outs/
+  ├── web_summary.html
+  ├── summary.csv
+  ├── singlecell.csv             per-barcode QC
+  ├── filtered_peak_bc_matrix.h5  peaks × barcodes
+  ├── fragments.tsv.gz (+ .tbi)   the key file for Signac
+  ├── peaks.bed                   peak coordinates
+  └── possorted_bam.bam (+ .bai)
+```
+
+## Metrics to scrutinize
+
+| Metric | Worry threshold |
+|---|---|
+| Estimated number of cells | Off your target |
+| Median fragments per cell | < 5,000 → undersequenced |
+| **TSS enrichment** | < 4 → poor signal-to-noise |
+| **Fraction fragments in peaks (FRiP)** | < 0.4 → poor capture / wrong ref |
+| Fraction in blacklist | > 0.05 → repetitive-region artefacts |
+| Fraction nucleosome-free | < 0.3 → Tn5 over-tagmentation |
+
+## What these metrics mean
+
+::: incremental
+-   **TSS enrichment** — fragments concentrate at transcription start sites in healthy cells; low = high background
+-   **FRiP** (fraction of reads in peaks) — how much signal lands in real open regions vs noise
+-   **Nucleosome signal** — the fragment-size profile shows nucleosome-free (<100 bp), mono- (~200), di- (~400) peaks
+-   A flat fragment-size distribution signals poor digestion or contamination
+:::
+
+# Part 5 — The hand-off to Signac {background-color="#2c3e50"}
+
+## Four files Module 15 expects
+
+``` bash
+SRC=<user>@login.talapas.uoregon.edu:/projects/.../outs
+
+scp $SRC/filtered_peak_bc_matrix.h5  data/
+scp $SRC/singlecell.csv              data/
+scp $SRC/fragments.tsv.gz            data/
+scp $SRC/fragments.tsv.gz.tbi        data/
+```
+
+::: incremental
+-   `cellranger-atac` produces exactly what Module 15 loads — no reformatting needed
+-   Module 15 uses `Read10X_h5()` + `CreateChromatinAssay()`
+-   The `.tbi` index must travel with `fragments.tsv.gz` or Signac can't read it
+:::
+
+## Scaling and gotchas
+
+::: incremental
+-   Same **SLURM array** pattern as RNA — one sample per row of `samples.txt`
+-   **Wrong reference** (gex instead of arc) is the #1 failure — cryptic error
+-   **Lost `.tbi`** breaks Signac silently downstream
+-   **Mixed chemistries** (v1 vs v1.1 Next GEM) in one folder — different barcode conventions
+-   **OOM in peak calling** — the de-novo step needs ~80 GB for 10k cells
+:::
+
+# Part 6 — Multiome note {background-color="#2c3e50"}
+
+## When RNA and ATAC come from the same cells
+
+::: incremental
+-   A 10x **Multiome** library captures RNA **and** ATAC from each cell
+-   Use `cellranger-arc count` (not `-atac`) — it produces both a counts matrix and a fragments file
+-   Outputs are **pre-paired by barcode** — RNA and ATAC for the same cell are linked
+-   Same SLURM pattern; bigger reference; longer runtime
+-   This is what enables joint RNA+ATAC analysis downstream
+:::
+
+# Summary {background-color="#2c3e50"}
+
+## What to take away
+
+::: incremental
+-   scATAC measures accessibility (fragments/peaks), not transcription (UMIs/genes)
+-   Use `cellranger-atac count` with `--reference`, the **arc** (not gex) reference
+-   It runs longer because of whole-genome alignment + de-novo peak calling
+-   Read TSS enrichment, FRiP, and nucleosome signal — ATAC's own QC vocabulary
+-   `fragments.tsv.gz` (+ `.tbi`) is the hand-off to **Module 15** (Signac)
+-   Joint RNA+ATAC → switch to `cellranger-arc`
+:::
+
+## Next steps
+
+-   **Read:** [Chapter 12 — Raw scATAC-seq Processing](../Resources_Folder/Chapter_12_scATAC_CellRanger.html)
+-   **Do:** [Tutorial 12 — cellranger-atac on Talapas](../Exercise_Folder/Tutorial_12_scATAC_CellRanger_RawData.html)
+-   **Then:** [Module 15 — scATAC-seq with Signac](Lecture_15_ATACseq.html)
+-   **RNA companion:** [Lecture 11 — Cell Ranger: Raw Reads to Counts](Lecture_11_CellRanger.html)

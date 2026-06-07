@@ -1,0 +1,267 @@
+---
+title: "Lecture 09 — SLURM Basics on Talapas"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: "Single Cell RNA-seq Workshop · Lecture 09 — SLURM Basics on Talapas"
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+# Lecture 09: SLURM Basics on Talapas {background-color="#2c3e50"}
+
+## Where this fits
+
+::: incremental
+-   This is the **first of two Friday-morning Talapas modules** — moving the analysis off your laptop onto UO's HPC cluster.
+-   **Companion reading:** [Chapter 9 — SLURM & HPC Scheduling on Talapas](../Resources_Folder/Chapter_09_SLURM_Basics.html)
+-   **Companion tutorial:** [Tutorial 09 — SLURM Basics](../Exercise_Folder/Tutorial_09_SLURM_Basics.html)
+-   **Next:** [Lecture 10 — Running the Analysis Pipeline on Talapas](Lecture_10_Talapas_Pipeline.html)
+-   This deck is the **concept map**; the tutorial is the hands-on command-by-command walkthrough.
+:::
+
+## Goals of this lecture
+
+::: incremental
+-   Understand **why** a shared cluster needs a scheduler at all
+-   Tell apart **login nodes** and **compute nodes** — and why it matters
+-   Choose between **interactive** and **batch** work
+-   Read the **key SLURM flags** and **partitions** you'll use constantly
+-   Submit, monitor, and right-size jobs with `sbatch` / `squeue` / `seff`
+-   Be a **good cluster citizen** at UO
+:::
+
+# Why a scheduler? {background-color="#2c3e50"}
+
+## A cluster is a shared resource
+
+::: incremental
+-   Talapas has **thousands of CPU cores**, hundreds of GPUs, terabytes of RAM.
+-   **Dozens of users** compete for those resources at any moment.
+-   If everyone just ran whatever they wanted, the machine would thrash and nobody's work would finish.
+-   A **scheduler** turns chaos into an orderly queue.
+:::
+
+## What SLURM does
+
+::: incremental
+-   **SLURM** = Simple Linux Utility for Resource Management.
+-   It decides *when*, *where*, and *with what resources* every job runs.
+-   You **declare** what you need — CPUs, memory, time, maybe GPUs.
+-   SLURM finds a **compute node** that fits and runs your job there.
+-   Every UO job names an **account** (your PIRG) for fair-share accounting.
+:::
+
+## Fair-share, briefly
+
+::: incremental
+-   SLURM doesn't run jobs first-come-first-served — it balances by **fair-share**.
+-   Groups that have used a lot recently are nudged down the queue; lighter users move up.
+-   Net effect: **smaller, well-sized jobs tend to start sooner**.
+-   You don't game the queue — you size jobs honestly and let fair-share work.
+:::
+
+# Login vs compute nodes {background-color="#2c3e50"}
+
+## Two very different machines
+
+::: incremental
+-   You **land on a login node** when you `ssh` in (`login.talapas.uoregon.edu`).
+-   Login nodes are for **editing files, short commands, and submitting jobs** — nothing heavy.
+-   The real work happens on **compute nodes**, which SLURM hands you on request.
+-   **Never** run a Seurat pipeline directly on a login node — it hurts everyone sharing it.
+:::
+
+## The golden rule
+
+> Login nodes are the **front desk**. Compute nodes are the **workshop**.
+
+::: incremental
+-   Ask SLURM (via `srun`/`salloc`/`sbatch`) to send your work to a compute node.
+-   Modules you load on a login node **do not** follow you into a job — load them *inside* the job.
+:::
+
+# Interactive vs batch {background-color="#2c3e50"}
+
+## Which mode when?
+
+::: incremental
+-   **Interactive** (`srun --pty bash` / `salloc`): you **sit and watch** — testing, debugging, exploring data, short runs.
+-   **Batch** (`sbatch`): you **start it and walk away** — long runs that keep going after you log out.
+-   Most real workshop analysis is **batch**; you'll prototype interactively, then submit.
+:::
+
+## A minimal interactive session
+
+``` bash
+srun --account=<myPIRG> \
+     --partition=compute \
+     --time=1:00:00 \
+     --mem=4G \
+     --cpus-per-task=2 \
+     --pty bash
+```
+
+::: incremental
+-   When granted, your prompt changes to a compute node (e.g. `n0123`).
+-   `salloc` is the close cousin — request an allocation, prompt jumps to the node.
+-   Type `exit` the moment you're done — idle sessions **hoard** the node.
+:::
+
+# Partitions & key flags {background-color="#2c3e50"}
+
+## Partitions = queues
+
+::: incremental
+-   Every job targets a **partition**, which maps to a class of hardware and a time cap.
+-   `compute` / `computelong` — standard CPU, 1 day / 14 days.
+-   `gpu` / `gpulong` — GPU jobs.
+-   `memory` / `memorylong` — high-RAM nodes (up to 4 TB).
+-   `interactive` / `interactivegpu` — short sessions, fast to start.
+-   `preempt` — any node, but the owner can bump you off.
+:::
+
+## Run `sinfo` to see the cluster
+
+``` bash
+sinfo
+```
+
+-   Shows each partition and the **state of its nodes** (idle, allocated, down).
+-   QOS (quality-of-service) limits ride on partitions too — they cap how much one user can hold at once.
+
+## Key SLURM flags
+
+::: incremental
+-   `--account=<myPIRG>` — PIRG to charge (required).
+-   `--partition=<name>` — which queue.
+-   `--time=<HH:MM:SS>` — wall-clock limit; over it, SLURM kills the job.
+-   `--mem=<size>` / `--mem-per-cpu=<size>` — memory.
+-   `--cpus-per-task=<N>` — cores for a threaded task.
+-   `--gpus=<N>` + `--constraint=gpu-40gb` — GPUs and memory tier.
+:::
+
+# Batch jobs {background-color="#2c3e50"}
+
+## Anatomy of an `sbatch` script
+
+``` bash
+#!/bin/bash
+#SBATCH --account=<myPIRG>
+#SBATCH --partition=compute
+#SBATCH --job-name=seurat_qc
+#SBATCH --output=logs/seurat_qc_%j.out
+#SBATCH --error=logs/seurat_qc_%j.err
+#SBATCH --time=04:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+
+module purge
+module load R/4.3.2
+Rscript scripts/01_qc_preprocessing.R
+```
+
+-   All `#SBATCH` lines sit at the **top**, before any command.
+-   `%j` is the job ID; `module load` happens **inside** the job.
+
+## Create `logs/` first — one time
+
+::: incremental
+-   The shipped scripts write `.out`/`.err` to a `logs/` subdirectory.
+-   **SLURM will not create it for you** — a missing dir means the job is rejected with no log to explain why.
+:::
+
+``` bash
+mkdir -p logs
+```
+
+# Submitting & monitoring {background-color="#2c3e50"}
+
+## Submit and watch
+
+``` bash
+sbatch hostname.sbatch        # -> Submitted batch job 123456
+squeue -u $USER               # your jobs
+squeue -j 123456              # one job
+scancel 123456                # cancel it
+```
+
+::: incremental
+-   State codes: `PD` pending, `R` running, `CG` completing.
+-   Two files appear when done: `*_123456.out` (stdout) and `*_123456.err` (stderr).
+:::
+
+## Check what a job actually used
+
+``` bash
+seff 123456
+sacct -j 123456 --format=JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode
+```
+
+::: incremental
+-   `seff` gives a friendly summary: CPU efficiency, peak memory, wall time.
+-   `MaxRSS` = peak memory used; `Elapsed` = wall time.
+-   Use both to **right-size** your next submission.
+:::
+
+# Right-sizing resources {background-color="#2c3e50"}
+
+## The size trade-off
+
+::: incremental
+-   **Smaller requests run sooner** — SLURM slots them into gaps in the schedule.
+-   **But ask for enough** — exceed `--mem` and you get `OUT_OF_MEMORY`; exceed `--time` and you get `TIMEOUT`. Either way, the job dies.
+-   First run of a new pipeline: err **slightly high**, then trim using `seff`.
+-   Default per-core memory is ~3.7 GB; request more explicitly if you need it.
+:::
+
+## Why jobs sit in `PD`
+
+::: incremental
+-   `Priority` / `Resources` — normal queueing; you're waiting your turn.
+-   `QOSMaxJobsPerUserLimit` — you hit a per-user cap; let earlier jobs finish.
+-   `ReqNodeNotAvail, Reserved for maintenance` — your `--time` runs into a maintenance window; shorten it or add `--time-min`.
+:::
+
+# Cluster etiquette {background-color="#2c3e50"}
+
+## Being a good cluster citizen
+
+::: incremental
+-   **Never** run heavy work on login nodes — always `srun`/`sbatch`.
+-   `exit` idle interactive sessions; don't hoard nodes.
+-   Don't request more CPUs/RAM/GPUs than you'll use.
+-   Put big intermediates in `/scratch/<PIRG>/`, not `/home/` (scratch purges at 90 days).
+-   **Back up anything you care about** — RACS does not back up Talapas.
+:::
+
+## What's next — Module 10
+
+::: incremental
+-   You can now request resources and submit jobs — the *mechanics*.
+-   **Module 10** uses these to run the **real scRNA-seq pipeline** on Talapas: the numbered `01`–`08` scripts, chained through `.rds` hand-offs.
+-   Read the [companion chapter](../Resources_Folder/Chapter_09_SLURM_Basics.html) for the conceptual deep-dive on schedulers and fair-share.
+:::
+
+## Key takeaways
+
+::: incremental
+-   A scheduler exists because the cluster is **shared** — declare what you need.
+-   **Login nodes edit and submit; compute nodes compute.**
+-   **Interactive** to watch, **batch** to walk away.
+-   `sbatch` → `squeue` → `seff`, then **right-size** the next run.
+-   Size honestly, clean up after yourself, back up your data.
+:::

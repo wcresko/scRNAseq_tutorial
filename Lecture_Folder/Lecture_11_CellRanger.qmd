@@ -1,0 +1,300 @@
+---
+title: "Lecture 11 — Cell Ranger: Raw Reads to Counts"
+author: "Bill Cresko"
+format:
+  revealjs:
+    footer: "Single Cell RNA-seq Workshop · Lecture 11 — Cell Ranger: Raw Reads to Counts"
+    transition: fade
+    transition-speed: slow
+    theme: default
+    slide-number: true
+    code-fold: false
+    code-overflow: wrap
+    code-line-numbers: true
+    highlight-style: github
+    embed-resources: true
+    css: cresko_style.css
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+# Lecture 11: Cell Ranger — Raw Reads to Counts {background-color="#2c3e50"}
+
+## Where this lecture fits
+
+::: incremental
+-   This is a **bonus upstream module**: it runs **before** the core pipeline, not after it
+-   Most participants *start* from a counts matrix; this lecture explains where that matrix comes from
+-   You arrive here when **you** have raw 10x data and must turn it into counts yourself
+-   The hand-off target is **Module 01** — the QC/preprocessing step that loads `filtered_feature_bc_matrix/`
+:::
+
+## Companion materials
+
+-   **Reading:** [Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix](../Resources_Folder/Chapter_11_CellRanger.html)
+-   **Tutorial:** [Tutorial 11 — Raw Data + Cell Ranger `count`](../Exercise_Folder/Tutorial_11_CellRanger_RawData.html)
+-   **scATAC companion:** [Lecture 12 — Raw scATAC-seq with cellranger-atac](Lecture_12_scATAC_CellRanger.html)
+-   **Downstream:** [Module 01 — QC & Preprocessing](Lecture_01_Preprocessing.html)
+
+## Goals of this lecture
+
+::: incremental
+-   Trace the path from **sequencer to counts**: BCL → FASTQ → matrix
+-   Distinguish `cellranger mkfastq` from `cellranger count`
+-   Understand the **reference genome** and why it lives in shared storage
+-   Read the **`web_summary.html`** QC report critically
+-   Know exactly which output file feeds Module 01
+-   Scale one sample to many with **SLURM arrays**
+:::
+
+# Part 1 — Where raw data comes from {background-color="#2c3e50"}
+
+## The sequencer doesn't make FASTQs
+
+::: incremental
+-   An Illumina run writes **BCL** files — raw per-cycle base-call intensities, not reads
+-   BCLs are organized by lane and cycle, not by sample or by molecule
+-   Two things still have to happen before any biology:
+    -   **Demultiplex** — split reads back to the sample they came from (by index)
+    -   **Assemble** — stitch per-cycle calls into per-read FASTQ records
+:::
+
+## The full chain in one picture
+
+``` bash
+BCL (Illumina raw intensities)
+   │  cellranger mkfastq      (wraps bcl2fastq / BCL Convert)
+   ▼
+FASTQ (per lane, per sample)
+   │  cellranger count        (the heavy lifting)
+   ▼
+outs/
+   ├── web_summary.html              QC at a glance
+   ├── metrics_summary.csv           QC numbers
+   ├── filtered_feature_bc_matrix/   feeds Module 01 (Read10X)
+   ├── raw_feature_bc_matrix/        feeds SoupX
+   ├── possorted_genome_bam.bam      aligned reads
+   └── molecule_info.h5              per-UMI info, used by aggr
+```
+
+## Who runs what
+
+::: incremental
+-   In practice your **sequencing core** usually runs `mkfastq` and hands you FASTQs
+-   So the step **you** own is almost always `cellranger count`
+-   This lecture focuses there, but you should recognize the whole chain when something upstream breaks
+:::
+
+# Part 2 — mkfastq vs count {background-color="#2c3e50"}
+
+## `cellranger mkfastq`
+
+::: incremental
+-   **Input:** the BCL run folder + a sample sheet mapping index → sample
+-   **Job:** demultiplex and convert to FASTQ
+-   **Output:** FASTQs in the strict 10x naming pattern
+-   `<SAMPLE>_S<num>_L<lane>_<R1/R2/I1>_001.fastq.gz`
+-   The naming is **not cosmetic** — `count` parses sample and lane from it. Never rename.
+:::
+
+## `cellranger count`
+
+::: incremental
+-   **Input:** FASTQs + a reference transcriptome
+-   **Job:** barcode correction → alignment → UMI dedup → **cell calling** → count matrix
+-   **Output:** the `outs/` directory, including the matrix Module 01 consumes
+-   Single-process, **multi-threaded** (Rust + Python) — scale with cores, not MPI tasks
+:::
+
+## What `count` actually does inside
+
+::: incremental
+-   **Barcode correction** — fix 1-base errors against the known 10x whitelist
+-   **Alignment** — STAR maps cDNA reads to the transcriptome
+-   **UMI deduplication** — collapse PCR duplicates so each molecule counts once
+-   **Cell calling** — separate real cells from empty droplets (knee + EmptyDrops-style)
+-   **Counting** — build the genes × barcodes sparse matrix
+:::
+
+# Part 3 — The reference genome {background-color="#2c3e50"}
+
+## What the reference is
+
+::: incremental
+-   A pre-built bundle: genome **FASTA**, gene **annotation (GTF)**, and a **STAR index**
+-   10x ships `refdata-gex-GRCh38-...` (human), `refdata-gex-GRCm39-...` (mouse)
+-   Non-model species → build your own with `cellranger mkref`
+-   Note the **`gex`** tag: this is the gene-expression reference (distinct from the ATAC one)
+:::
+
+## Where it lives — and why it matters
+
+``` bash
+# Human GRCh38 reference (~12 GB compressed, ~30 GB extracted)
+cd /projects/<PIRG>/<user>/refs
+wget https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz
+tar -xzf refdata-gex-GRCh38-2024-A.tar.gz
+```
+
+::: incremental
+-   **Never** in `$HOME` — small per-user quota on Talapas
+-   Keep **one canonical copy per group** in `/projects/<PIRG>/...`; everyone shares it
+-   Check `module avail cellranger` first — the cluster may already provide it
+:::
+
+# Part 4 — Key `count` parameters {background-color="#2c3e50"}
+
+## The core invocation
+
+``` bash
+cellranger count \
+  --id=pbmc_1k_v3 \
+  --transcriptome=/projects/<PIRG>/<user>/refs/refdata-gex-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<user>/test_data/pbmc_1k_v3_fastqs \
+  --sample=pbmc_1k_v3 \
+  --create-bam=true \
+  --localcores=16 \
+  --localmem=120
+```
+
+## Parameter by parameter
+
+::: incremental
+-   `--id` — names the output folder; pick something stable and traceable
+-   `--transcriptome` — the reference directory (not the tarball)
+-   `--fastqs` / `--sample` — where the reads are and which sample prefix to use
+-   `--create-bam` — keep the aligned BAM (needed for some QC / re-analysis)
+-   `--localcores` / `--localmem` — the **internal** compute budget
+:::
+
+## SLURM-vs-Cell-Ranger memory
+
+::: incremental
+-   SLURM `--mem=128G` is the **hard ceiling**; exceed it and the job is OOM-killed
+-   `--localmem=120` is Cell Ranger's **self-imposed** budget
+-   Set `--localmem` slightly *below* the SLURM allocation
+-   The gap absorbs I/O buffers, index loading, and brief spikes
+-   A silent "Killed" with no error message is almost always this
+:::
+
+## Threads, not tasks
+
+::: incremental
+-   Cell Ranger is one multi-threaded process — use `--cpus-per-task=16`
+-   **Not** `--ntasks=16` — that requests MPI processes Cell Ranger never uses
+-   Match `--localcores` to `--cpus-per-task`
+:::
+
+# Part 5 — Reading the QC {background-color="#2c3e50"}
+
+## `web_summary.html` is the single best QC doc
+
+::: incremental
+-   Open it **first**, before any R
+-   It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot
+-   Save it next to your raw data — reviewers will ask for it
+-   `metrics_summary.csv` has the same numbers in machine-readable form
+:::
+
+## Red flags to scan for
+
+| Metric | Worry threshold |
+|---|---|
+| Estimated number of cells | Far off your target (over-loading / mis-call) |
+| Mean reads per cell | < ~20,000 → undersequenced |
+| Median genes per cell | < ~1,000 → poor capture or dying cells |
+| Q30 in barcode | < 90% → poor sequencing |
+| Q30 in RNA read | < 70% → poor sequencing |
+| Reads mapped to transcriptome | < 60% → wrong reference / contamination |
+
+## The barcode-rank ("knee") plot
+
+::: incremental
+-   X = barcodes ranked by UMI count; Y = UMIs (log–log)
+-   A clean run shows a **sharp knee**: real cells (high) drop steeply to empties (low)
+-   A soft, gradual slope means ambiguous cell calling — inspect carefully
+-   This plot is the visual story behind "Estimated number of cells"
+:::
+
+# Part 6 — The hand-off {background-color="#2c3e50"}
+
+## The one directory that matters downstream
+
+``` bash
+outs/filtered_feature_bc_matrix/
+  ├── barcodes.tsv.gz
+  ├── features.tsv.gz
+  └── matrix.mtx.gz
+```
+
+::: incremental
+-   This is exactly what `Read10X()` loads in Module 01
+-   `raw_feature_bc_matrix/` (all barcodes, pre-calling) is what **SoupX** needs
+-   Everything downstream in the workshop begins from these three files
+:::
+
+## Into the core pipeline
+
+``` r
+library(Seurat)
+counts <- Read10X("data/filtered_feature_bc_matrix/")
+seu <- CreateSeuratObject(counts, project = "pbmc_1k_v3",
+                          min.cells = 3, min.features = 200)
+# … continue at Module 01 (QC metrics)
+```
+
+# Part 7 — Scaling up {background-color="#2c3e50"}
+
+## Don't write N scripts — use a SLURM array
+
+``` bash
+#SBATCH --array=1-8        # one sub-job per sample
+
+# samples.txt: one sample ID per line
+SAMPLE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" samples.txt)
+
+cellranger count \
+  --id="$SAMPLE" \
+  --transcriptome=/projects/<PIRG>/<user>/refs/refdata-gex-GRCh38-2024-A \
+  --fastqs=/projects/<PIRG>/<user>/raw_fastqs/"$SAMPLE" \
+  --sample="$SAMPLE" \
+  --create-bam=true --localcores=16 --localmem=120
+```
+
+::: incremental
+-   One row in `samples.txt` per sample; SLURM fans them out in parallel
+-   Same script, scales from 1 to dozens of samples
+-   `cellranger aggr` is a separate, rarely-needed depth-normalized merge — prefer Seurat `merge()` + integration
+:::
+
+## Common gotchas
+
+::: incremental
+-   **FASTQ filename mismatch** — keep the exact `_S_L_R_001` pattern; symlink if renamed
+-   **Mixed chemistries** in one `--fastqs` folder — Cell Ranger refuses; separate them
+-   **Silent "Killed"** — almost always OOM; raise `--mem` and `--localmem`
+-   **Reference / chemistry mismatch** — 5' reads through a 3' reference "run" but give garbage stats
+:::
+
+# Summary {background-color="#2c3e50"}
+
+## What to take away
+
+::: incremental
+-   BCL → FASTQ (`mkfastq`) → counts (`count`) — you usually own the last step
+-   The reference is big, shared, and **gex**-tagged; keep it in `/projects`
+-   `--localmem` < SLURM `--mem`; cores not tasks
+-   Read `web_summary.html` first; trust the knee plot
+-   `filtered_feature_bc_matrix/` is the hand-off to **Module 01**
+-   Scale with a SLURM array, not N scripts
+:::
+
+## Next steps
+
+-   **Read:** [Chapter 11 — From Raw Reads to a Counts Matrix](../Resources_Folder/Chapter_11_CellRanger.html)
+-   **Do:** [Tutorial 11 — Cell Ranger `count` on Talapas](../Exercise_Folder/Tutorial_11_CellRanger_RawData.html)
+-   **Then:** pick up the core pipeline at [Module 01](Lecture_01_Preprocessing.html)
+-   **ATAC next:** [Lecture 12 — Raw scATAC-seq](Lecture_12_scATAC_CellRanger.html)
