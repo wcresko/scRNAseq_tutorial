@@ -1,0 +1,148 @@
+---
+title: "Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 11](../Lecture_Folder/Lecture_11_CellRanger.html)** and **[Tutorial 11](../Exercise_Folder/Tutorial_11_CellRanger_RawData.html)**. This is a **bonus *upstream* module**: it runs *before* the core pipeline, not after it. Most workshop participants start from a finished counts matrix (`filtered_feature_bc_matrix/`) because that is what a sequencing core hands them. This chapter explains where that matrix comes from and what every step did to your data along the way — so that when you eventually run Cell Ranger yourself, you understand the choices rather than copying a command. The hand-off target is **[Chapter 1](Chapter_01_Preprocessing.html)**, the QC/preprocessing step that loads the matrix.
+:::
+
+## 11.1 Why understand the raw-data step at all
+
+For a long time the boundary of single-cell analysis, for most biologists, was the counts matrix. Someone else ran the sequencer, someone else ran Cell Ranger, and a folder of three small files arrived. You can do excellent science starting there, and the rest of this workshop does exactly that.
+
+But the boundary is movable, and it moves the moment your project becomes non-standard. You will need to run Cell Ranger yourself when you want to re-process old data against a newer reference genome, add a late-arriving sample to a study that was already analyzed, handle a chemistry the core does not routinely run (5'-seq, fixed-cell, multiplexed), or simply because you are the core. When that day comes, it is far better to already understand the pipeline than to learn it under a deadline. This chapter builds that understanding.
+
+There is also a subtler reason. Every decision Cell Ranger makes — which reference, which chemistry, where it drew the line between cells and empty droplets — is baked into the matrix you analyze downstream. If you treat the matrix as a black-box input, those decisions become invisible assumptions. Reading this chapter turns them back into choices you can interrogate.
+
+## 11.2 The sequencer does not produce reads
+
+A common mental model is that a sequencer "produces FASTQ files." It does not. An Illumina instrument writes **BCL** files — base-call files — which record, for every cluster on the flow cell, the fluorescence intensity measured at each sequencing cycle. The data are organized by lane and by cycle, not by sample and not by molecule. There is no notion yet of "read 1 of sample A"; there are only per-cycle intensity images, reduced to per-cluster base calls with quality scores.
+
+Two transformations stand between this raw instrument output and anything analyzable:
+
+- **Demultiplexing** — sorting clusters back to the sample they came from, using the sample-index reads, so that pooled libraries are separated again.
+- **Assembly into reads** — collecting the per-cycle base calls for each cluster into a contiguous sequence with per-base quality, written as a FASTQ record.
+
+Both are handled by `cellranger mkfastq`, which wraps Illumina's `bcl2fastq` / BCL Convert under the hood. The output is a set of FASTQ files in a strict 10x naming pattern.
+
+## 11.3 mkfastq versus count
+
+Cell Ranger's two main subcommands map directly onto the two transformations above plus the biology.
+
+**`cellranger mkfastq`** takes a BCL run folder and a sample sheet (which index belongs to which sample) and emits FASTQs named `<SAMPLE>_S<num>_L<lane>_<R1|R2|I1>_001.fastq.gz`. This naming is not cosmetic: `count` parses the sample name and lane directly from the filenames. Renaming a FASTQ is one of the most common ways to break the pipeline. If a core hands you renamed files, symlink them back to the canonical pattern rather than editing the names in place.
+
+**`cellranger count`** is where the biology happens. It takes FASTQs plus a reference and produces the counts matrix. In practice, your sequencing core usually runs `mkfastq` for you, so the step you actually own is almost always `count`. The rest of this chapter focuses there — but you should be able to recognize the whole chain so you can diagnose a problem when it lives upstream of where you started.
+
+## 11.4 What `count` actually does to your reads
+
+It is worth walking through the internal stages of `count`, because each one corresponds to a way the data can go right or wrong.
+
+**Barcode correction.** Each read carries a cell barcode (which droplet) and a UMI (which original molecule). Sequencing introduces errors. Cell Ranger compares each observed barcode against the known 10x whitelist for that chemistry and corrects single-base errors to the nearest valid barcode. Barcodes too far from any whitelist entry are discarded.
+
+**Alignment.** The cDNA read (R2 in 3' chemistry) is aligned to the reference transcriptome with STAR. Reads are classified by where they land: confidently mapped to an exon, to an intron, to an intergenic region, or unmapped. The fraction "confidently mapped to transcriptome" is a key QC number; a low value usually means the wrong reference or contamination.
+
+**UMI deduplication.** Because libraries are PCR-amplified before sequencing, the same original molecule appears many times. Cell Ranger collapses reads that share a cell barcode, a gene, and a UMI (allowing for one-base UMI errors) into a single counted molecule. This is what makes the final numbers *molecule counts*, not *read counts* — the whole point of the UMI design.
+
+**Cell calling.** This is the most consequential step and the one most worth understanding (Section 11.6).
+
+**Counting.** Finally, the deduplicated molecules are tallied into a sparse genes-by-barcodes matrix, separately for the "raw" set of all barcodes and the "filtered" set of called cells.
+
+## 11.5 The reference genome
+
+The reference Cell Ranger uses is not a bare FASTA. It is a pre-built bundle containing the genome sequence (FASTA), a gene annotation (GTF), and a precomputed STAR index. 10x distributes ready-made references — `refdata-gex-GRCh38-...` for human, `refdata-gex-GRCm39-...` for mouse — and for non-model organisms you build your own with `cellranger mkref` from a genome FASTA and a GTF.
+
+Note the `gex` tag in the name: this is the **gene-expression** reference, which is distinct from the ATAC reference of Chapter 12. They are not interchangeable.
+
+```bash
+# Human GRCh38 gene-expression reference (~12 GB compressed, ~30 GB extracted)
+cd /projects/<PIRG>/<user>/refs
+wget https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz
+tar -xzf refdata-gex-GRCh38-2024-A.tar.gz
+# fasta/  genes/  reference.json  star/
+```
+
+Two practical points follow from the size. First, a reference does not belong in your home directory: most clusters give each user a small home quota, and a 30 GB reference will fill it. It belongs in shared project storage (`/projects/<PIRG>/...`), where one canonical copy serves the whole group. Second, check whether your cluster already provides Cell Ranger and references as a module before downloading anything; maintained modules save disk and avoid version drift.
+
+## 11.6 Cell calling: separating cells from empty droplets
+
+A droplet-based experiment generates far more barcodes than cells. Most droplets are empty — they captured no cell but still contain a little ambient RNA floating in the suspension, which gets barcoded and sequenced. The defining problem of the `count` step is drawing the line between barcodes that represent real cells and barcodes that represent empty droplets.
+
+The classic tool for seeing this is the **barcode-rank plot** (the "knee" plot). Barcodes are ranked from most to fewest UMIs and plotted on log-log axes. A clean experiment shows a sharp **knee**: a plateau of high-UMI barcodes (real cells) that drops steeply to a long tail of low-UMI barcodes (empties). The location of the knee is, roughly, the cell count.
+
+Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a knee-based threshold identifies obvious high-count cells, and then an **EmptyDrops**-style test recovers real cells that happen to have lower counts by asking whether each remaining barcode's *expression profile* differs significantly from the ambient profile. A small dying cell with few UMIs but a distinctive transcriptome can thus be rescued, where a naive knee cut would have thrown it away. The consequence for you: the "filtered" matrix is the product of a statistical decision, not a simple threshold, and a soft or ambiguous knee in the plot is a sign to scrutinize that decision.
+
+## 11.7 Reading `web_summary.html`
+
+Every `count` run writes a `web_summary.html`. It is the single most informative QC document in the entire pipeline, and it should be the *first* thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in `metrics_summary.csv` for programmatic use. Save the `web_summary.html` alongside your raw data, because reviewers and collaborators will ask for it.
+
+A short list of the numbers that most often reveal a problem:
+
+| Metric | What it tells you | Worry threshold |
+|---|---|---|
+| Estimated number of cells | Whether cell calling matched your loading | Far off your target |
+| Mean reads per cell | Sequencing depth per cell | < ~20,000 → undersequenced |
+| Median genes per cell | Capture quality / cell health | < ~1,000 → poor capture or dying cells |
+| Q30 bases in barcode | Barcode sequencing quality | < 90% |
+| Q30 bases in RNA read | cDNA sequencing quality | < 70% |
+| Reads mapped confidently to transcriptome | Reference correctness | < 60% → wrong reference / contamination |
+
+None of these is a hard pass/fail; they are prompts. A low "median genes per cell" in a sample of small resting lymphocytes may be biology, not failure. The skill is reading the numbers together and against your expectations for the tissue.
+
+## 11.8 The hand-off to the core pipeline
+
+When `count` finishes, the directory that matters for everything downstream is one subfolder of `outs/`:
+
+```bash
+outs/filtered_feature_bc_matrix/
+  ├── barcodes.tsv.gz    # the called cell barcodes
+  ├── features.tsv.gz    # the genes
+  └── matrix.mtx.gz      # the sparse counts
+```
+
+These three files are exactly what `Read10X()` loads at the start of the core pipeline:
+
+```r
+library(Seurat)
+counts <- Read10X("data/filtered_feature_bc_matrix/")
+seu <- CreateSeuratObject(counts, project = "pbmc_1k_v3",
+                          min.cells = 3, min.features = 200)
+# … continue at Chapter 1 (QC metrics)
+```
+
+There is a companion folder, `raw_feature_bc_matrix/`, that contains *all* barcodes including the empties. You normally ignore it — except for ambient-RNA correction tools such as SoupX, which need the empty droplets to estimate the contamination profile. Keeping both folders is cheap and occasionally essential.
+
+## 11.9 Scaling beyond one sample, and pitfalls
+
+A single `count` run is a long, single-process, multi-threaded job. On a cluster it scales by **cores within one task** (`--cpus-per-task`), not by MPI tasks (`--ntasks`), because Cell Ranger is one Rust+Python process, not an MPI program. Give its `--localcores` the cores you allocated, and set its `--localmem` slightly *below* the scheduler's memory ceiling so that I/O buffers and brief spikes do not push the job over the hard limit and trigger a silent kill. A "Killed" with no error message is, nine times out of ten, exactly this.
+
+For many samples, do not write many scripts. A scheduler **array job** runs one sub-job per sample from a single script, reading the sample name from a list file — the same script scaling from one sample to dozens. The tutorial walks through the SLURM specifics.
+
+A few recurring pitfalls are worth internalizing:
+
+- **FASTQ filename mismatch.** Keep the exact `_S_L_R_001` pattern; symlink rather than rename.
+- **Mixed chemistries in one input folder.** Cell Ranger refuses to mix 3' v2 and v3 reads; separate them.
+- **Reference / chemistry mismatch.** Running 5' reads against a 3' reference will "succeed" but produce statistics that are quietly wrong — always the hardest kind of error to catch.
+- **Aggregation confusion.** `cellranger aggr` performs a depth-normalized count-level merge of technical replicates of one library; it is *not* the same as the Seurat `merge()` + integration you do downstream, and for most analyses you want the latter for its finer control.
+
+## 11.10 See also
+
+- [Lecture 11 — Cell Ranger: Raw Reads to Counts](../Lecture_Folder/Lecture_11_CellRanger.html)
+- [Tutorial 11 — Raw Data + Cell Ranger `count` on Talapas](../Exercise_Folder/Tutorial_11_CellRanger_RawData.html)
+- [Chapter 12 — Raw scATAC-seq Processing](Chapter_12_scATAC_CellRanger.html) — the chromatin companion
+- [Chapter 1 — QC & Preprocessing](Chapter_01_Preprocessing.html) — where the matrix is picked up
+- [10x Genomics Cell Ranger documentation](https://www.10xgenomics.com/support/software/cell-ranger/latest)

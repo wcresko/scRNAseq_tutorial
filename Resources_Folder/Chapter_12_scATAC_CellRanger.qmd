@@ -1,0 +1,134 @@
+---
+title: "Chapter 12 — Raw scATAC-seq Processing"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+::: callout-note
+**Where this chapter sits.** Companion to **[Lecture 12](../Lecture_Folder/Lecture_12_scATAC_CellRanger.html)** and **[Tutorial 12](../Exercise_Folder/Tutorial_12_scATAC_CellRanger_RawData.html)**. Like its RNA sibling ([Chapter 11](Chapter_11_CellRanger.html)), this is a **bonus *upstream* module**: it runs *before* the core scATAC analysis, producing the inputs that step consumes. The chromatin pipeline is structurally parallel to the RNA one — same cluster patterns, same FASTQ-naming rules, same reference-genome model — but the *outputs are different*, because chromatin accessibility is a different measurement than transcription. The hand-off target here is **[Chapter 15](Chapter_15_ATAC.html)** (the Signac analysis), not the RNA QC chapter. Read [Chapter 11](Chapter_11_CellRanger.html) first; this chapter assumes you already understand the BCL → FASTQ → matrix chain and only highlights what changes for ATAC.
+:::
+
+## 12.1 What scATAC measures, and why processing differs
+
+Single-cell RNA-seq measures **transcription**: it captures polyadenylated mRNA and counts molecules (UMIs) per gene. Single-cell ATAC-seq measures **chromatin accessibility**: a hyperactive Tn5 transposase cuts DNA preferentially where the chromatin is open, and the assay captures and sequences those cut fragments. The per-cell readout is not "how many copies of gene X" but "how many fragments fell in open region Y."
+
+Because the underlying measurement differs, the raw-processing pipeline diverges from RNA at almost every output even though the surrounding machinery is the same. The table below lines them up:
+
+| Step | scRNA-seq | scATAC-seq |
+|---|---|---|
+| What's captured | polyA mRNA | Tn5-cut DNA fragments |
+| Per-cell unit | UMI count per gene | Fragment count per peak / interval |
+| Reference | Transcriptome (genes + 3' bias) | Whole genome + motif annotations |
+| Per-cell QC | nUMI, nFeature, % mito | nFragments, TSS enrichment, nucleosome signal, blacklist ratio |
+| Cell calling | Knee + EmptyDrops on UMIs | Signal-vs-background on fragments |
+| `count` output | counts matrix + BAM | **fragments.tsv.gz** + **peaks.bed** + per-barcode QC |
+
+The tool that does the work is `cellranger-atac` (distinct from `cellranger`), and its main subcommand is again `count`. The SLURM patterns, the strict FASTQ naming, and the "reference lives in shared storage, not home" discipline are all identical to Chapter 11 — so this chapter spends its time on what is genuinely new.
+
+## 12.2 From open chromatin to fragments
+
+It helps to follow a single molecule through the assay. In an open region of chromatin, the Tn5 enzyme inserts and cuts the DNA at two nearby positions, excising a fragment and tagging both ends with known adapter sequences. Inside a droplet, that fragment is barcoded with the cell's barcode and amplified. After sequencing, paired-end reads tell you the two genomic coordinates the enzyme cut at — the fragment's start and end.
+
+The central output of `cellranger-atac count` is therefore the **fragments file**, `fragments.tsv.gz`: a sorted, gzipped, tab-separated table with one row per fragment, columns `chrom  start  end  barcode  duplicate-count`. This single file is the canonical representation of an scATAC experiment, and it is what the downstream tools — Signac and ArchR — consume directly. It always travels with a companion index, `fragments.tsv.gz.tbi`, which lets those tools query genomic regions without reading the whole file; lose the `.tbi` and the analysis breaks (often silently).
+
+Because the readout is positional, there is no fixed feature set analogous to a gene list. That is where peak calling comes in.
+
+## 12.3 Peak calling: defining the features
+
+In RNA, the features are given to you: genes come from the annotation. In ATAC, the features must be *discovered* from the data, because the interesting units are the open regions, and where those fall depends on the cells you sequenced. `cellranger-atac count` therefore performs **de novo peak calling**: it pools fragments across all barcodes, finds genomic intervals where fragments pile up far above background (a MACS-style algorithm), and declares those intervals **peaks**. Each peak becomes a feature, and the experiment is summarized as a peaks-by-barcodes count matrix.
+
+This step is the main reason an ATAC run takes roughly two to three times as long as an RNA run at the same cell count. The pipeline must align fragments to the **whole genome** rather than a small transcriptome, deduplicate at single-fragment resolution, run the peak caller (which is memory-hungry — on the order of 80 GB for ~10,000 cells), and then count fragments per peak per barcode. Budget your wall-clock time and memory accordingly; the tutorial gives concrete SLURM numbers.
+
+A consequence worth noting: because peaks are dataset-specific, two experiments processed separately will have different peak sets, which is why downstream integration of ATAC datasets requires re-counting against a common peak set — a complication that has no clean RNA analogue.
+
+## 12.4 The ATAC reference: arc vs gex vs atac
+
+The reference for `cellranger-atac` is **not** the RNA reference, and confusing them is the most common failure mode. The RNA reference (`refdata-gex-...`) is built around the transcriptome; the ATAC reference indexes the whole genome and ships with motif annotations the RNA build lacks. They even share `fasta/` and `genes/` subdirectories, which makes the wrong one look superficially plausible — but the indexes and annotations differ, and a wrong-reference run usually fails to start with a cryptic error rather than a clear one.
+
+Three names you will encounter:
+
+- `refdata-gex-GRCh38-...` — **RNA only**. Never pass this to `cellranger-atac`.
+- `refdata-cellranger-arc-GRCh38-2024-A` — the current human reference for ATAC and multiome. This is the one to use for new work.
+- `refdata-cellranger-atac-GRCh37-1.2.0` — an older hg19 build, useful only when you must match a downstream annotation pinned to hg19 (for example, Chapter 15's `EnsDb.Hsapiens.v75`).
+
+```bash
+cd /projects/<PIRG>/<user>/refs
+wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+tar -xzf refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+```
+
+The same storage discipline as Chapter 11 applies: the reference is large, belongs in shared project space, and may already exist as a cluster module — check `module avail cellranger-atac` before downloading.
+
+## 12.5 Cell calling without UMIs
+
+ATAC has no UMIs, so the RNA cell-calling logic does not transfer directly. Instead, `cellranger-atac` distinguishes cells from empty droplets using a **signal-versus-background** model built on ATAC-specific evidence: a real cell shows many fragments *and* those fragments are enriched at biologically expected places (transcription start sites) rather than scattered as noise. A barcode with a modest fragment count but strong TSS enrichment is a cell; a barcode with a similar fragment count but flat, background-like signal is an empty droplet contaminated with ambient DNA. This is conceptually parallel to the EmptyDrops idea — judge the *profile*, not just the *count* — adapted to chromatin data.
+
+## 12.6 ATAC-specific QC
+
+The `web_summary.html` for an ATAC run looks similar to the RNA one but its key numbers are different, and they are worth understanding rather than just thresholding.
+
+| Metric | What it measures | Worry threshold |
+|---|---|---|
+| Estimated number of cells | Cell-calling outcome vs loading | Off your target |
+| Median fragments per cell | Depth / capture per cell | < 5,000 → undersequenced or poor capture |
+| TSS enrichment score | Signal-to-noise of accessibility | < 4 → high background |
+| Fraction of fragments in peaks (FRiP) | Share of signal in real open regions | < 0.4 → poor capture / wrong reference |
+| Fraction in blacklist | Artefactual repetitive-region signal | > 0.05 |
+| Fraction nucleosome-free | Tn5 tagmentation quality | < 0.3 → over-tagmentation |
+
+Three of these deserve a sentence of intuition:
+
+- **TSS enrichment.** Open chromatin is concentrated at active transcription start sites. In a healthy cell, fragments pile up sharply around TSSs; a high enrichment score means most of your signal is biological, a low one means it is drowned in background. It is the closest thing ATAC has to a single overall quality number.
+- **FRiP** (fraction of reads/fragments in peaks). If most fragments fall *inside* called peaks, your library captured real accessibility; if they are spread across the genome, you mostly captured noise. Low FRiP and low TSS enrichment tend to move together.
+- **Nucleosome signal.** Fragment lengths carry a physical fingerprint: a clean library shows a nucleosome-free population below ~100 bp, then mono-nucleosomal (~200 bp) and di-nucleosomal (~400 bp) humps reflecting fragments that spanned one or two nucleosomes. A flat, featureless fragment-size distribution signals poor tagmentation or contamination.
+
+## 12.7 The hand-off to Signac
+
+What `cellranger-atac count` writes is exactly what the downstream Signac analysis (Chapter 15) expects — no reformatting required. The files that matter are:
+
+```bash
+outs/
+  ├── filtered_peak_bc_matrix.h5   # peaks × barcodes counts
+  ├── singlecell.csv               # per-barcode QC (TSS, fragments, …)
+  ├── fragments.tsv.gz (+ .tbi)    # the key file for Signac / ArchR
+  ├── peaks.bed                    # peak coordinates
+  └── web_summary.html             # QC at a glance
+```
+
+Signac loads the matrix with `Read10X_h5()` and builds a `ChromatinAssay` that points at the fragments file:
+
+```r
+library(Signac)
+counts <- Read10X_h5("data/filtered_peak_bc_matrix.h5")
+chrom  <- CreateChromatinAssay(counts, fragments = "data/fragments.tsv.gz")
+# … continue at Chapter 15 (Signac QC and analysis)
+```
+
+The single most common transit error is losing the `.tbi` index. `fragments.tsv.gz` and `fragments.tsv.gz.tbi` must always travel together; with the index missing, Signac cannot perform the region queries it depends on.
+
+## 12.8 Pitfalls and the multiome note
+
+Most of the RNA-side pitfalls recur — keep the FASTQ naming intact, do not mix chemistries (here, v1 versus v1.1 Next GEM, which use different barcode conventions), and watch for OOM kills in the memory-hungry peak-calling step. The two ATAC-specific traps to remember are the **wrong reference** (gex instead of arc, the number-one cause of a failed start) and the **lost `.tbi`**, which fails downstream rather than at processing time and is therefore easy to misdiagnose.
+
+Finally, a note on **multiome**. If your library is a 10x Multiome — joint RNA *and* ATAC from the *same* cells — you do not run `cellranger-atac` at all. You run `cellranger-arc count`, which produces both a gene-expression counts matrix and a fragments file, **pre-paired by barcode** so that the RNA and ATAC measurements of each cell are linked. The SLURM pattern is the same; the reference is bigger (the arc build) and the runtime longer. This barcode-level pairing is what makes joint RNA+ATAC analysis possible downstream — the two modalities describe the same individual cells rather than two parallel populations.
+
+## 12.9 See also
+
+- [Lecture 12 — Raw scATAC-seq with cellranger-atac](../Lecture_Folder/Lecture_12_scATAC_CellRanger.html)
+- [Tutorial 12 — Raw scATAC-seq with cellranger-atac on Talapas](../Exercise_Folder/Tutorial_12_scATAC_CellRanger_RawData.html)
+- [Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix](Chapter_11_CellRanger.html) — the RNA companion
+- [Chapter 15 — Bulk and Single-Cell ATAC-seq](Chapter_15_ATAC.html) — the downstream Signac analysis
+- [10x Genomics Cell Ranger ATAC documentation](https://www.10xgenomics.com/support/software/cell-ranger-atac/latest)

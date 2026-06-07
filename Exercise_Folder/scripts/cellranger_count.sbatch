@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=128G
 
-# Talapas 02 — Raw data download + cellranger count
+# Module 11 — Raw data download + cellranger count (Talapas)
 # Edit <PIRG>, <user>, <SAMPLE>, and paths below to match your environment.
 
 set -euo pipefail
