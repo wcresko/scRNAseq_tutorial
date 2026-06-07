@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Day 0 · Module 1 — Computer System Fundamentals</title>
+  <title>Single Cell RNA-seq Workshop – Lecture 09 — SLURM Basics on Talapas</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Day 0 · Module 1 — Computer System Fundamentals</h1>
+  <h1 class="title">Lecture 09 — SLURM Basics on Talapas</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,439 +1150,262 @@ Bill Cresko
 
 </section>
 <section>
-<section id="day-0-module-1-computer-system-fundamentals" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Day 0 · Module 1 — Computer System Fundamentals</h1>
+<section id="lecture-09-slurm-basics-on-talapas" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Lecture 09: SLURM Basics on Talapas</h1>
 
 </section>
 <section id="where-this-fits" class="slide level2">
 <h2>Where this fits</h2>
 <ul>
-<li class="fragment"><strong>Day 0 (optional Tuesday refresher)</strong> — a relaxed primer before the workshop proper begins on Day 1.</li>
-<li class="fragment">This is <strong>Module 1 of 2</strong>:
-<ul>
-<li class="fragment"><strong>Module 1 (now):</strong> Computer System Fundamentals — hardware, OS, HPC, Talapas.</li>
-<li class="fragment"><strong>Module 2 (next):</strong> <a href="Lecture_Day0_2_R_and_CommandLine.html">R &amp; the Command Line</a>.</li>
-</ul></li>
-<li class="fragment">Pairs with the reading: <a href="../Resources_Folder/Chapter_Day0_1_Computer_Systems.html">Day 0 · Module 1 — Computer System Fundamentals</a>.</li>
-<li class="fragment">Goal: build a shared mental model so the analysis days (Day 1+) make sense.</li>
+<li class="fragment">This is the <strong>first of two Friday-morning Talapas modules</strong> — moving the analysis off your laptop onto UO’s HPC cluster.</li>
+<li class="fragment"><strong>Companion reading:</strong> <a href="../Resources_Folder/Chapter_09_SLURM_Basics.html">Chapter 9 — SLURM &amp; HPC Scheduling on Talapas</a></li>
+<li class="fragment"><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_09_SLURM_Basics.html">Tutorial 09 — SLURM Basics</a></li>
+<li class="fragment"><strong>Next:</strong> <a href="Lecture_10_Talapas_Pipeline.html">Lecture 10 — Running the Analysis Pipeline on Talapas</a></li>
+<li class="fragment">This deck is the <strong>concept map</strong>; the tutorial is the hands-on command-by-command walkthrough.</li>
 </ul>
 </section>
-<section id="goals-for-this-hour" class="slide level2">
-<h2>Goals for this hour</h2>
+<section id="goals-of-this-lecture" class="slide level2">
+<h2>Goals of this lecture</h2>
 <ul>
-<li class="fragment">Know the parts of a computer that matter for data analysis: <strong>CPU, RAM, disk</strong>.</li>
-<li class="fragment">Understand what an <strong>operating system</strong> does for you.</li>
-<li class="fragment">Know what an <strong>HPC cluster</strong> is and <em>when you actually need one</em>.</li>
-<li class="fragment">Be able to <strong>log in to Talapas</strong> and find your way around.</li>
-<li class="fragment">Understand <strong>modules</strong> and the <strong>SLURM</strong> scheduler at a high level.</li>
-<li class="fragment">See how <strong>VS Code</strong> and <strong>reproducible environments</strong> make this comfortable.</li>
+<li class="fragment">Understand <strong>why</strong> a shared cluster needs a scheduler at all</li>
+<li class="fragment">Tell apart <strong>login nodes</strong> and <strong>compute nodes</strong> — and why it matters</li>
+<li class="fragment">Choose between <strong>interactive</strong> and <strong>batch</strong> work</li>
+<li class="fragment">Read the <strong>key SLURM flags</strong> and <strong>partitions</strong> you’ll use constantly</li>
+<li class="fragment">Submit, monitor, and right-size jobs with <code>sbatch</code> / <code>squeue</code> / <code>seff</code></li>
+<li class="fragment">Be a <strong>good cluster citizen</strong> at UO</li>
 </ul>
 </section></section>
 <section>
-<section id="how-computers-operating-systems-work" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>How computers &amp; operating systems work</h1>
+<section id="why-a-scheduler" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Why a scheduler?</h1>
 
 </section>
-<section id="the-three-things-that-matter-most" class="slide level2">
-<h2>The three things that matter most</h2>
+<section id="a-cluster-is-a-shared-resource" class="slide level2">
+<h2>A cluster is a shared resource</h2>
 <ul>
-<li class="fragment"><strong>CPU</strong> — does the work. Made of <strong>cores</strong> (independent workers) and runs at some <strong>clock speed</strong> (GHz). More cores = more tasks at once.</li>
-<li class="fragment"><strong>RAM</strong> — fast, <em>volatile</em> working memory. Your data must fit here while you analyze it. <strong>Lost when power is off.</strong></li>
-<li class="fragment"><strong>Disk</strong> — slow, <em>persistent</em> storage. SSDs are fast (~0.1 ms); spinning HDDs are slow (~10 ms) but cheap and large.</li>
-</ul>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p>The #1 single-cell bottleneck is <strong>RAM</strong>: a big count matrix must fit in memory. “Out of memory” usually means <em>get more RAM</em>, not a faster CPU.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="cpu-vs-gpu-one-slide" class="slide level2">
-<h2>CPU vs GPU (one slide)</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<p><strong>CPU</strong></p>
-<ul>
-<li>A few powerful cores (4–64)</li>
-<li>Great at sequential, branching logic</li>
-<li>Runs your OS and most R/Bioconductor code</li>
-</ul>
-</div><div class="column" style="width:50%;">
-<p><strong>GPU</strong></p>
-<ul>
-<li>Thousands of small cores</li>
-<li>Massive parallelism</li>
-<li>Machine learning, some scRNA-seq tools</li>
-</ul>
-</div></div>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p>Most of this workshop runs on the <strong>CPU</strong>. GPUs matter for deep-learning steps and a few accelerated tools.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="what-an-operating-system-does" class="slide level2">
-<h2>What an operating system does</h2>
-<ul>
-<li class="fragment">The OS is the <strong>manager</strong> sitting between you and the hardware.</li>
-<li class="fragment"><strong>Process management</strong> — schedules many running programs across cores.</li>
-<li class="fragment"><strong>Memory management</strong> — hands out RAM, protects programs from each other.</li>
-<li class="fragment"><strong>File system</strong> — organizes files into directories with permissions.</li>
-<li class="fragment"><strong>Security</strong> — users, groups, and the <em>least-privilege</em> principle.</li>
+<li class="fragment">Talapas has <strong>thousands of CPU cores</strong>, hundreds of GPUs, terabytes of RAM.</li>
+<li class="fragment"><strong>Dozens of users</strong> compete for those resources at any moment.</li>
+<li class="fragment">If everyone just ran whatever they wanted, the machine would thrash and nobody’s work would finish.</li>
+<li class="fragment">A <strong>scheduler</strong> turns chaos into an orderly queue.</li>
 </ul>
 </section>
-<section id="the-filesystem-processes" class="slide level2">
-<h2>The filesystem &amp; processes</h2>
+<section id="what-slurm-does" class="slide level2">
+<h2>What SLURM does</h2>
 <ul>
-<li class="fragment">Files live in a <strong>tree</strong> of directories; you navigate with paths (<code>/home/you/data</code>).</li>
-<li class="fragment">A <strong>process</strong> is a running program; the OS gives each a slice of CPU time and a chunk of RAM.</li>
-<li class="fragment">On a shared machine, <em>many users’ processes coexist</em> — so being a good citizen matters (especially on a cluster).</li>
-<li class="fragment">Unix/Linux is the lingua franca of scientific computing — the same commands work on your laptop and on Talapas.</li>
+<li class="fragment"><strong>SLURM</strong> = Simple Linux Utility for Resource Management.</li>
+<li class="fragment">It decides <em>when</em>, <em>where</em>, and <em>with what resources</em> every job runs.</li>
+<li class="fragment">You <strong>declare</strong> what you need — CPUs, memory, time, maybe GPUs.</li>
+<li class="fragment">SLURM finds a <strong>compute node</strong> that fits and runs your job there.</li>
+<li class="fragment">Every UO job names an <strong>account</strong> (your PIRG) for fair-share accounting.</li>
+</ul>
+</section>
+<section id="fair-share-briefly" class="slide level2">
+<h2>Fair-share, briefly</h2>
+<ul>
+<li class="fragment">SLURM doesn’t run jobs first-come-first-served — it balances by <strong>fair-share</strong>.</li>
+<li class="fragment">Groups that have used a lot recently are nudged down the queue; lighter users move up.</li>
+<li class="fragment">Net effect: <strong>smaller, well-sized jobs tend to start sooner</strong>.</li>
+<li class="fragment">You don’t game the queue — you size jobs honestly and let fair-share work.</li>
 </ul>
 </section></section>
 <section>
-<section id="what-is-an-hpc-cluster" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>What is an HPC cluster?</h1>
+<section id="login-vs-compute-nodes" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Login vs compute nodes</h1>
 
 </section>
-<section id="a-cluster-in-one-picture" class="slide level2">
-<h2>A cluster, in one picture</h2>
+<section id="two-very-different-machines" class="slide level2">
+<h2>Two very different machines</h2>
 <ul>
-<li class="fragment">A <strong>cluster</strong> is many computers (“nodes”) wired together to act as one big system.</li>
-<li class="fragment"><strong>Login (head) node</strong> — where you land; for light work only (editing, submitting jobs).</li>
-<li class="fragment"><strong>Compute nodes</strong> — the workhorses where your jobs actually run.</li>
-<li class="fragment"><strong>Shared storage</strong> — a parallel filesystem every node can see.</li>
-<li class="fragment"><strong>Scheduler</strong> (SLURM) — decides whose job runs where and when.</li>
+<li class="fragment">You <strong>land on a login node</strong> when you <code>ssh</code> in (<code>login.talapas.uoregon.edu</code>).</li>
+<li class="fragment">Login nodes are for <strong>editing files, short commands, and submitting jobs</strong> — nothing heavy.</li>
+<li class="fragment">The real work happens on <strong>compute nodes</strong>, which SLURM hands you on request.</li>
+<li class="fragment"><strong>Never</strong> run a Seurat pipeline directly on a login node — it hurts everyone sharing it.</li>
 </ul>
 </section>
-<section id="when-do-you-actually-need-one" class="slide level2">
-<h2>When do you actually need one?</h2>
-<div class="columns">
-<div class="column" style="width:50%;">
-<p><strong>Laptop is fine when…</strong></p>
+<section id="the-golden-rule" class="slide level2">
+<h2>The golden rule</h2>
+<blockquote>
+<p>Login nodes are the <strong>front desk</strong>. Compute nodes are the <strong>workshop</strong>.</p>
+</blockquote>
 <ul>
-<li>Data fits in your RAM</li>
-<li>One sample / small dataset</li>
-<li>Quick exploration &amp; plotting</li>
-</ul>
-</div><div class="column" style="width:50%;">
-<p><strong>Reach for HPC when…</strong></p>
-<ul>
-<li>Data exceeds laptop RAM (many samples)</li>
-<li>Long-running jobs (hours/days)</li>
-<li>Many jobs in parallel</li>
-<li>You need GPUs or huge memory nodes</li>
-</ul>
-</div></div>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p>Rule of thumb: prototype small on your laptop, then scale the <em>same</em> workflow up on Talapas.</p>
-</div>
-</div>
-</div>
-</section></section>
-<section>
-<section id="uo-talapas" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>UO Talapas</h1>
-
-</section>
-<section id="meet-talapas" class="slide level2">
-<h2>Meet Talapas</h2>
-<ul>
-<li class="fragment">UO’s flagship HPC cluster, run by <strong>Research Advanced Computing Services (RACS)</strong>.</li>
-<li class="fragment">Named from the Chinook word for <em>coyote</em> — educator and keeper of knowledge.</li>
-<li class="fragment">Scale: <strong>~14,500 CPU cores, 129 TB RAM, ~89 GPUs (A40–H100), ~3 PB storage.</strong></li>
-<li class="fragment">Docs: <a href="https://uoracs.github.io/talapas2-knowledge-base/">Talapas Knowledge Base</a>.</li>
-</ul>
-</section>
-<section id="getting-access-a-pirg-an-account" class="slide level2">
-<h2>Getting access: a PIRG + an account</h2>
-<ul>
-<li class="fragment">Access is tied to a <strong>PIRG</strong> (Principal Investigator Research Group).</li>
-<li class="fragment">Ask your <strong>PI</strong> to add you, or have RACS create a new PIRG.</li>
-<li class="fragment">Request access at <a href="https://racs.uoregon.edu/request-access">racs.uoregon.edu/request-access</a>.</li>
-<li class="fragment">Your <strong>username = your Duck ID</strong>; your <strong>password = your UO password</strong>.</li>
-</ul>
-</section>
-<section id="logging-in-ssh-duo" class="slide level2">
-<h2>Logging in: SSH + Duo</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="co"># Connect with SSH (off campus: connect to UO VPN first)</span></span>
-<span id="cb1-2"><a></a><span class="fu">ssh</span> yourduckid@login.talapas.uoregon.edu</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">No characters appear while you type your password — that’s normal.</li>
-<li class="fragment">Logins require <strong>Duo</strong> two-factor: type <code>1</code> and Enter for a push.</li>
-<li class="fragment">You land on a <strong>login node</strong> — light tasks only. Heavy jobs there get killed.</li>
-</ul>
-</section>
-<section id="file-systems-where-things-go" class="slide level2">
-<h2>File systems: where things go</h2>
-<table class="caption-top">
-<colgroup>
-<col style="width: 35%">
-<col style="width: 15%">
-<col style="width: 49%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Location</th>
-<th>Quota</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>/home/&lt;duckid&gt;</code></td>
-<td>250 GB</td>
-<td>Config files, scripts, small installs</td>
-</tr>
-<tr class="even">
-<td><code>/projects/&lt;PIRG&gt;</code></td>
-<td>2 TB</td>
-<td>Shared project data &amp; analysis</td>
-</tr>
-<tr class="odd">
-<td><code>/scratch/&lt;PIRG&gt;</code></td>
-<td>20 TB</td>
-<td>High-throughput working space — <strong>purged after 90 days idle</strong></td>
-</tr>
-</tbody>
-</table>
-<div class="callout callout-warning callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Warning</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Talapas is NOT backed up.</strong> You are responsible for your own backups. Keep large data in <code>/projects</code>; clean up <code>/scratch</code>.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="software-modules-lmod" class="slide level2">
-<h2>Software: modules (Lmod)</h2>
-<p>Talapas software is loaded on demand with <strong>Lmod</strong> — per shell, so reload it in every session/job.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="ex">module</span> spider R          <span class="co"># search for software</span></span>
-<span id="cb2-2"><a></a><span class="ex">module</span> avail             <span class="co"># list loadable modules</span></span>
-<span id="cb2-3"><a></a><span class="ex">module</span> load R/4.4.1      <span class="co"># load a specific version (reproducible!)</span></span>
-<span id="cb2-4"><a></a><span class="ex">module</span> list              <span class="co"># what&#39;s loaded now</span></span>
-<span id="cb2-5"><a></a><span class="ex">module</span> purge             <span class="co"># unload everything</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p>Always pin a version (<code>R/4.4.1</code>, not just <code>R</code>) so your analysis is reproducible later.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="partitions-slurm" class="slide level2">
-<h2>Partitions &amp; SLURM</h2>
-<p>Jobs go to <strong>partitions</strong> (queues) via the <strong>SLURM</strong> scheduler. Every job must name its <strong><code>--account</code></strong> (your PIRG).</p>
-<table class="caption-top">
-<colgroup>
-<col style="width: 38%">
-<col style="width: 42%">
-<col style="width: 19%">
-</colgroup>
-<thead>
-<tr class="header">
-<th>Partition</th>
-<th>Typical use</th>
-<th>Max wall time</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>compute</code></td>
-<td>Standard CPU jobs</td>
-<td>1 day</td>
-</tr>
-<tr class="even">
-<td><code>computelong</code></td>
-<td>Long CPU jobs</td>
-<td>14 days</td>
-</tr>
-<tr class="odd">
-<td><code>gpu</code> / <code>gpulong</code></td>
-<td>GPU jobs (short / long)</td>
-<td>1 day / 14 d</td>
-</tr>
-<tr class="even">
-<td><code>memory</code> / <code>memorylong</code></td>
-<td>High-memory CPU (up to 4 TB)</td>
-<td>1 day / 14 d</td>
-</tr>
-<tr class="odd">
-<td><code>interactive</code> / <code>interactivegpu</code></td>
-<td>Short interactive sessions</td>
-<td>12 h / 8 h</td>
-</tr>
-<tr class="even">
-<td><code>preempt</code></td>
-<td>All nodes; may be preempted</td>
-<td>Variable</td>
-</tr>
-</tbody>
-</table>
-</section>
-<section id="submitting-work-to-slurm" class="slide level2">
-<h2>Submitting work to SLURM</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="co"># Batch job (the normal way to run real work)</span></span>
-<span id="cb3-2"><a></a><span class="ex">sbatch</span> my_script.sh</span>
-<span id="cb3-3"><a></a></span>
-<span id="cb3-4"><a></a><span class="co"># Interactive session (testing / debugging)</span></span>
-<span id="cb3-5"><a></a><span class="ex">srun</span> <span class="at">--pty</span> <span class="at">--partition</span><span class="op">=</span>interactive <span class="at">--account</span><span class="op">=</span>myPIRG <span class="dt">\</span></span>
-<span id="cb3-6"><a></a>     <span class="at">--time</span><span class="op">=</span>2:00:00 <span class="at">--cpus-per-task</span><span class="op">=</span>4 <span class="at">--mem</span><span class="op">=</span>8G /bin/bash</span>
-<span id="cb3-7"><a></a></span>
-<span id="cb3-8"><a></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span>     <span class="co"># your jobs in the queue</span></span>
-<span id="cb3-9"><a></a><span class="ex">scancel</span> JOBID       <span class="co"># cancel a job</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-tip callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Tip</strong></p>
-</div>
-<div class="callout-content">
-<p>Golden rule: <strong>never run heavy computation on a login node.</strong> Anything longer than a few seconds belongs in <code>srun</code> or <code>sbatch</code>.</p>
-</div>
-</div>
-</div>
-</section>
-<section id="anatomy-of-a-batch-script" class="slide level2">
-<h2>Anatomy of a batch script</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="co">#!/bin/bash</span></span>
-<span id="cb4-2"><a></a><span class="co">#SBATCH --job-name=my_analysis   # name</span></span>
-<span id="cb4-3"><a></a><span class="co">#SBATCH --partition=compute      # queue</span></span>
-<span id="cb4-4"><a></a><span class="co">#SBATCH --account=myPIRG         # your PIRG (required)</span></span>
-<span id="cb4-5"><a></a><span class="co">#SBATCH --time=04:00:00          # HH:MM:SS</span></span>
-<span id="cb4-6"><a></a><span class="co">#SBATCH --cpus-per-task=4        # cores</span></span>
-<span id="cb4-7"><a></a><span class="co">#SBATCH --mem=16G                # memory</span></span>
-<span id="cb4-8"><a></a><span class="co">#SBATCH --output=out_%j.log      # %j = job ID</span></span>
-<span id="cb4-9"><a></a></span>
-<span id="cb4-10"><a></a><span class="ex">module</span> load R/4.4.1              <span class="co"># load modules AFTER #SBATCH lines</span></span>
-<span id="cb4-11"><a></a><span class="ex">Rscript</span> my_analysis.R            <span class="co"># do the work</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><code>#SBATCH</code> lines are scheduler directives, not run by bash.</li>
-<li class="fragment">Request only what you need — smaller jobs start sooner.</li>
+<li class="fragment">Ask SLURM (via <code>srun</code>/<code>salloc</code>/<code>sbatch</code>) to send your work to a compute node.</li>
+<li class="fragment">Modules you load on a login node <strong>do not</strong> follow you into a job — load them <em>inside</em> the job.</li>
 </ul>
 </section></section>
 <section>
-<section id="working-interactively" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Working interactively</h1>
+<section id="interactive-vs-batch" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Interactive vs batch</h1>
 
 </section>
-<section id="vs-code-remote-ssh" class="slide level2">
-<h2>VS Code + Remote-SSH</h2>
+<section id="which-mode-when" class="slide level2">
+<h2>Which mode when?</h2>
 <ul>
-<li class="fragment"><strong>VS Code</strong> is a free editor that can connect <em>into</em> Talapas over SSH.</li>
-<li class="fragment">Install the <strong>Remote – SSH</strong> and <strong>Remote Explorer</strong> extensions.</li>
-<li class="fragment">Add the host <code>login.talapas.uoregon.edu</code>, connect (password + Duo), and a green banner confirms you’re on Talapas.</li>
-<li class="fragment">Browse remote files, edit scripts, and use the <strong>integrated terminal</strong> — all in one window.</li>
-<li class="fragment">The <strong>Quarto extension</strong> lets you edit and render <code>.qmd</code> documents right there.</li>
+<li class="fragment"><strong>Interactive</strong> (<code>srun --pty bash</code> / <code>salloc</code>): you <strong>sit and watch</strong> — testing, debugging, exploring data, short runs.</li>
+<li class="fragment"><strong>Batch</strong> (<code>sbatch</code>): you <strong>start it and walk away</strong> — long runs that keep going after you log out.</li>
+<li class="fragment">Most real workshop analysis is <strong>batch</strong>; you’ll prototype interactively, then submit.</li>
 </ul>
 </section>
-<section id="open-ondemand-browser-no-ssh" class="slide level2">
-<h2>Open OnDemand (browser, no SSH)</h2>
+<section id="a-minimal-interactive-session" class="slide level2">
+<h2>A minimal interactive session</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> <span class="dt">\</span></span>
+<span id="cb1-2"><a></a>     <span class="at">--partition</span><span class="op">=</span>compute <span class="dt">\</span></span>
+<span id="cb1-3"><a></a>     <span class="at">--time</span><span class="op">=</span>1:00:00 <span class="dt">\</span></span>
+<span id="cb1-4"><a></a>     <span class="at">--mem</span><span class="op">=</span>4G <span class="dt">\</span></span>
+<span id="cb1-5"><a></a>     <span class="at">--cpus-per-task</span><span class="op">=</span>2 <span class="dt">\</span></span>
+<span id="cb1-6"><a></a>     <span class="at">--pty</span> bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li class="fragment">Web portal: <a href="https://ondemand.talapas.uoregon.edu">ondemand.talapas.uoregon.edu</a> — Chrome or Firefox.</li>
-<li class="fragment">No SSH client needed; great for beginners.</li>
-<li class="fragment">File browser for uploads/downloads.</li>
-<li class="fragment">Launch <strong>interactive apps</strong>: JupyterLab, RStudio, MATLAB, remote desktop.</li>
-<li class="fragment">Easiest way to get an RStudio or Jupyter session on Talapas.</li>
+<li class="fragment">When granted, your prompt changes to a compute node (e.g. <code>n0123</code>).</li>
+<li class="fragment"><code>salloc</code> is the close cousin — request an allocation, prompt jumps to the node.</li>
+<li class="fragment">Type <code>exit</code> the moment you’re done — idle sessions <strong>hoard</strong> the node.</li>
 </ul>
 </section></section>
 <section>
-<section id="reproducible-environments" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Reproducible environments</h1>
+<section id="partitions-key-flags" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Partitions &amp; key flags</h1>
 
 </section>
-<section id="why-pin-your-environment" class="slide level2">
-<h2>Why pin your environment?</h2>
+<section id="partitions-queues" class="slide level2">
+<h2>Partitions = queues</h2>
 <ul>
-<li class="fragment">So you can <strong>reproduce a result six months later</strong>.</li>
-<li class="fragment">So a co-author runs the <strong>same package versions</strong>.</li>
-<li class="fragment">So you avoid days of dependency debugging on Talapas.</li>
-<li class="fragment">Two layers cover most cases: <strong><code>renv</code></strong> (R packages) and <strong>containers</strong> (everything).</li>
+<li class="fragment">Every job targets a <strong>partition</strong>, which maps to a class of hardware and a time cap.</li>
+<li class="fragment"><code>compute</code> / <code>computelong</code> — standard CPU, 1 day / 14 days.</li>
+<li class="fragment"><code>gpu</code> / <code>gpulong</code> — GPU jobs.</li>
+<li class="fragment"><code>memory</code> / <code>memorylong</code> — high-RAM nodes (up to 4 TB).</li>
+<li class="fragment"><code>interactive</code> / <code>interactivegpu</code> — short sessions, fast to start.</li>
+<li class="fragment"><code>preempt</code> — any node, but the owner can bump you off.</li>
 </ul>
 </section>
-<section id="renv-containers-brief" class="slide level2">
-<h2>renv + containers (brief)</h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a><span class="co"># renv: pin exact R-package versions (reads renv.lock)</span></span>
-<span id="cb5-2"><a></a><span class="fu">install.packages</span>(<span class="st">&quot;renv&quot;</span>)</span>
-<span id="cb5-3"><a></a>renv<span class="sc">::</span><span class="fu">restore</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="co"># Container: a self-contained image (R + Bioconductor + system deps)</span></span>
-<span id="cb6-2"><a></a><span class="co"># Laptop uses Docker; Talapas uses Apptainer (Docker isn&#39;t allowed there)</span></span>
-<span id="cb6-3"><a></a><span class="ex">module</span> load apptainer</span>
-<span id="cb6-4"><a></a><span class="ex">apptainer</span> pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest</span>
-<span id="cb6-5"><a></a><span class="ex">apptainer</span> exec scrnaseq_tutorial_latest.sif R</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="callout callout-note callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Note</strong></p>
-</div>
-<div class="callout-content">
-<p><strong>Docker</strong> on your laptop, <strong>Apptainer</strong> on Talapas — same image, reproducible either way.</p>
-</div>
-</div>
-</div>
+<section id="run-sinfo-to-see-the-cluster" class="slide level2">
+<h2>Run <code>sinfo</code> to see the cluster</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="ex">sinfo</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li>Shows each partition and the <strong>state of its nodes</strong> (idle, allocated, down).</li>
+<li>QOS (quality-of-service) limits ride on partitions too — they cap how much one user can hold at once.</li>
+</ul>
+</section>
+<section id="key-slurm-flags" class="slide level2">
+<h2>Key SLURM flags</h2>
+<ul>
+<li class="fragment"><code>--account=&lt;myPIRG&gt;</code> — PIRG to charge (required).</li>
+<li class="fragment"><code>--partition=&lt;name&gt;</code> — which queue.</li>
+<li class="fragment"><code>--time=&lt;HH:MM:SS&gt;</code> — wall-clock limit; over it, SLURM kills the job.</li>
+<li class="fragment"><code>--mem=&lt;size&gt;</code> / <code>--mem-per-cpu=&lt;size&gt;</code> — memory.</li>
+<li class="fragment"><code>--cpus-per-task=&lt;N&gt;</code> — cores for a threaded task.</li>
+<li class="fragment"><code>--gpus=&lt;N&gt;</code> + <code>--constraint=gpu-40gb</code> — GPUs and memory tier.</li>
+</ul>
 </section></section>
 <section>
-<section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Recap &amp; what’s next</h1>
+<section id="batch-jobs" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Batch jobs</h1>
 
 </section>
-<section id="recap" class="slide level2">
-<h2>Recap</h2>
+<section id="anatomy-of-an-sbatch-script" class="slide level2">
+<h2>Anatomy of an <code>sbatch</code> script</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="co">#!/bin/bash</span></span>
+<span id="cb3-2"><a></a><span class="co">#SBATCH --account=&lt;myPIRG&gt;</span></span>
+<span id="cb3-3"><a></a><span class="co">#SBATCH --partition=compute</span></span>
+<span id="cb3-4"><a></a><span class="co">#SBATCH --job-name=seurat_qc</span></span>
+<span id="cb3-5"><a></a><span class="co">#SBATCH --output=logs/seurat_qc_%j.out</span></span>
+<span id="cb3-6"><a></a><span class="co">#SBATCH --error=logs/seurat_qc_%j.err</span></span>
+<span id="cb3-7"><a></a><span class="co">#SBATCH --time=04:00:00</span></span>
+<span id="cb3-8"><a></a><span class="co">#SBATCH --cpus-per-task=8</span></span>
+<span id="cb3-9"><a></a><span class="co">#SBATCH --mem=64G</span></span>
+<span id="cb3-10"><a></a></span>
+<span id="cb3-11"><a></a><span class="ex">module</span> purge</span>
+<span id="cb3-12"><a></a><span class="ex">module</span> load R/4.3.2</span>
+<span id="cb3-13"><a></a><span class="ex">Rscript</span> scripts/01_qc_preprocessing.R</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li class="fragment"><strong>CPU / RAM / disk</strong> — RAM is usually the limiting resource for single-cell work.</li>
-<li class="fragment">The <strong>OS</strong> manages processes, memory, files, and security for you.</li>
-<li class="fragment">An <strong>HPC cluster</strong> = many nodes + shared storage + a scheduler; use it when your laptop runs out of room or time.</li>
-<li class="fragment">On <strong>Talapas</strong>: PIRG + account, SSH + Duo, mind your file systems, <code>module load</code>, and submit jobs with <strong>SLURM</strong> — never on the login node.</li>
-<li class="fragment"><strong>VS Code / Open OnDemand</strong> make remote work comfortable; <strong>renv + containers</strong> make it reproducible.</li>
+<li>All <code>#SBATCH</code> lines sit at the <strong>top</strong>, before any command.</li>
+<li><code>%j</code> is the job ID; <code>module load</code> happens <strong>inside</strong> the job.</li>
 </ul>
 </section>
-<section id="whats-next" class="slide level2">
-<h2>What’s next</h2>
+<section id="create-logs-first-one-time" class="slide level2">
+<h2>Create <code>logs/</code> first — one time</h2>
 <ul>
-<li class="fragment"><strong>Module 2 (next):</strong> <a href="Lecture_Day0_2_R_and_CommandLine.html">R &amp; the Command Line</a> — the tools you’ll type into every day.</li>
-<li class="fragment"><strong>Day 1 onward:</strong> the single-cell analysis workflow itself.</li>
-<li class="fragment">Optional refresher reading: <a href="../Resources_Folder/Chapter_Day0_1_Computer_Systems.html">Day 0 · Module 1 — Computer System Fundamentals</a>.</li>
-<li class="fragment">Need help on Talapas? <a href="https://uoracs.github.io/talapas2-knowledge-base/">Knowledge Base</a> · <a href="https://hpcrcf.atlassian.net/servicedesk/customer/portal/1">Service Desk</a> · racs@uoregon.edu.</li>
+<li class="fragment">The shipped scripts write <code>.out</code>/<code>.err</code> to a <code>logs/</code> subdirectory.</li>
+<li class="fragment"><strong>SLURM will not create it for you</strong> — a missing dir means the job is rejected with no log to explain why.</li>
+</ul>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="fu">mkdir</span> <span class="at">-p</span> logs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section></section>
+<section>
+<section id="submitting-monitoring" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Submitting &amp; monitoring</h1>
+
+</section>
+<section id="submit-and-watch" class="slide level2">
+<h2>Submit and watch</h2>
+<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a></a><span class="ex">sbatch</span> hostname.sbatch        <span class="co"># -&gt; Submitted batch job 123456</span></span>
+<span id="cb5-2"><a></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span>               <span class="co"># your jobs</span></span>
+<span id="cb5-3"><a></a><span class="ex">squeue</span> <span class="at">-j</span> 123456              <span class="co"># one job</span></span>
+<span id="cb5-4"><a></a><span class="ex">scancel</span> 123456                <span class="co"># cancel it</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment">State codes: <code>PD</code> pending, <code>R</code> running, <code>CG</code> completing.</li>
+<li class="fragment">Two files appear when done: <code>*_123456.out</code> (stdout) and <code>*_123456.err</code> (stderr).</li>
+</ul>
+</section>
+<section id="check-what-a-job-actually-used" class="slide level2">
+<h2>Check what a job actually used</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="ex">seff</span> 123456</span>
+<span id="cb6-2"><a></a><span class="ex">sacct</span> <span class="at">-j</span> 123456 <span class="at">--format</span><span class="op">=</span>JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><code>seff</code> gives a friendly summary: CPU efficiency, peak memory, wall time.</li>
+<li class="fragment"><code>MaxRSS</code> = peak memory used; <code>Elapsed</code> = wall time.</li>
+<li class="fragment">Use both to <strong>right-size</strong> your next submission.</li>
+</ul>
+</section></section>
+<section>
+<section id="right-sizing-resources" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Right-sizing resources</h1>
+
+</section>
+<section id="the-size-trade-off" class="slide level2">
+<h2>The size trade-off</h2>
+<ul>
+<li class="fragment"><strong>Smaller requests run sooner</strong> — SLURM slots them into gaps in the schedule.</li>
+<li class="fragment"><strong>But ask for enough</strong> — exceed <code>--mem</code> and you get <code>OUT_OF_MEMORY</code>; exceed <code>--time</code> and you get <code>TIMEOUT</code>. Either way, the job dies.</li>
+<li class="fragment">First run of a new pipeline: err <strong>slightly high</strong>, then trim using <code>seff</code>.</li>
+<li class="fragment">Default per-core memory is ~3.7 GB; request more explicitly if you need it.</li>
+</ul>
+</section>
+<section id="why-jobs-sit-in-pd" class="slide level2">
+<h2>Why jobs sit in <code>PD</code></h2>
+<ul>
+<li class="fragment"><code>Priority</code> / <code>Resources</code> — normal queueing; you’re waiting your turn.</li>
+<li class="fragment"><code>QOSMaxJobsPerUserLimit</code> — you hit a per-user cap; let earlier jobs finish.</li>
+<li class="fragment"><code>ReqNodeNotAvail, Reserved for maintenance</code> — your <code>--time</code> runs into a maintenance window; shorten it or add <code>--time-min</code>.</li>
+</ul>
+</section></section>
+<section>
+<section id="cluster-etiquette" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Cluster etiquette</h1>
+
+</section>
+<section id="being-a-good-cluster-citizen" class="slide level2">
+<h2>Being a good cluster citizen</h2>
+<ul>
+<li class="fragment"><strong>Never</strong> run heavy work on login nodes — always <code>srun</code>/<code>sbatch</code>.</li>
+<li class="fragment"><code>exit</code> idle interactive sessions; don’t hoard nodes.</li>
+<li class="fragment">Don’t request more CPUs/RAM/GPUs than you’ll use.</li>
+<li class="fragment">Put big intermediates in <code>/scratch/&lt;PIRG&gt;/</code>, not <code>/home/</code> (scratch purges at 90 days).</li>
+<li class="fragment"><strong>Back up anything you care about</strong> — RACS does not back up Talapas.</li>
+</ul>
+</section>
+<section id="whats-next-module-10" class="slide level2">
+<h2>What’s next — Module 10</h2>
+<ul>
+<li class="fragment">You can now request resources and submit jobs — the <em>mechanics</em>.</li>
+<li class="fragment"><strong>Module 10</strong> uses these to run the <strong>real scRNA-seq pipeline</strong> on Talapas: the numbered <code>01</code>–<code>08</code> scripts, chained through <code>.rds</code> hand-offs.</li>
+<li class="fragment">Read the <a href="../Resources_Folder/Chapter_09_SLURM_Basics.html">companion chapter</a> for the conceptual deep-dive on schedulers and fair-share.</li>
+</ul>
+</section>
+<section id="key-takeaways" class="slide level2">
+<h2>Key takeaways</h2>
+<ul>
+<li class="fragment">A scheduler exists because the cluster is <strong>shared</strong> — declare what you need.</li>
+<li class="fragment"><strong>Login nodes edit and submit; compute nodes compute.</strong></li>
+<li class="fragment"><strong>Interactive</strong> to watch, <strong>batch</strong> to walk away.</li>
+<li class="fragment"><code>sbatch</code> → <code>squeue</code> → <code>seff</code>, then <strong>right-size</strong> the next run.</li>
+<li class="fragment">Size honestly, clean up after yourself, back up your data.</li>
 </ul>
 
 
@@ -1590,7 +1413,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Day 0 · Module 1 — Computer System Fundamentals</p>
+<p>Single Cell RNA-seq Workshop · Lecture 09 — SLURM Basics on Talapas</p>
 </div>
 </div></div>
 

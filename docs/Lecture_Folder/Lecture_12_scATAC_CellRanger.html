@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.7.30">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Day 0 · Module 2 — R &amp; the Command Line</title>
+  <title>Single Cell RNA-seq Workshop – Lecture 12 — Raw scATAC-seq with cellranger-atac</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1138,7 +1138,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Day 0 · Module 2 — R &amp; the Command Line</h1>
+  <h1 class="title">Lecture 12 — Raw scATAC-seq with cellranger-atac</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1150,368 +1150,300 @@ Bill Cresko
 
 </section>
 <section>
-<section id="day-0-module-2-r-the-command-line" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Day 0 · Module 2 — R &amp; the Command Line</h1>
+<section id="lecture-12-raw-scatac-seq-with-cellranger-atac" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Lecture 12: Raw scATAC-seq with cellranger-atac</h1>
 
 </section>
-<section id="where-this-fits" class="slide level2">
-<h2>Where this fits</h2>
+<section id="where-this-lecture-fits" class="slide level2">
+<h2>Where this lecture fits</h2>
 <ul>
-<li class="fragment"><strong>Day 0 (optional Tuesday refresher)</strong> — for getting everyone up and running before the core workshop</li>
-<li class="fragment"><strong>Module 2 of 2</strong> — follows <strong>Module 1 (Computer Systems)</strong></li>
-<li class="fragment">Goal today: just enough <strong>shell</strong> and <strong>R</strong> to be productive on Day 1, not a full course</li>
-<li class="fragment">Pairs with the reading: <a href="../Resources_Folder/Chapter_Day0_2_R_and_CommandLine.html">Day 0 · Module 2 — R &amp; the Command Line</a></li>
+<li class="fragment">Another <strong>bonus upstream module</strong> — it runs <strong>before</strong> the core scATAC analysis</li>
+<li class="fragment">The RNA companion (<a href="Lecture_11_CellRanger.html">Lecture 11</a>) covered <code>cellranger count</code>; this is its chromatin twin</li>
+<li class="fragment">Same SLURM patterns, same FASTQ rules, same reference model — <strong>different outputs</strong></li>
+<li class="fragment">The hand-off target is <strong>Module 15</strong> (Signac), not Module 01</li>
 </ul>
 </section>
-<section id="what-youll-walk-away-with" class="slide level2">
-<h2>What you’ll walk away with</h2>
+<section id="companion-materials" class="slide level2">
+<h2>Companion materials</h2>
 <ul>
-<li class="fragment">Open a terminal and <strong>move around the filesystem</strong> with confidence</li>
-<li class="fragment">Create, view, move, and delete files; combine tools with <strong>pipes &amp; redirection</strong></li>
-<li class="fragment">Download data with <code>wget</code> / <code>curl</code>, and <strong>get help</strong> when stuck</li>
-<li class="fragment">Launch <strong>RStudio</strong>, assign variables, and work with vectors, data frames, and lists</li>
-<li class="fragment">Install and load packages; read &amp; write data; write <strong>tidyverse</strong> pipelines</li>
+<li><strong>Reading:</strong> <a href="../Resources_Folder/Chapter_12_scATAC_CellRanger.html">Chapter 12 — Raw scATAC-seq Processing</a></li>
+<li><strong>Tutorial:</strong> <a href="../Exercise_Folder/Tutorial_12_scATAC_CellRanger_RawData.html">Tutorial 12 — Raw scATAC-seq with cellranger-atac</a></li>
+<li><strong>RNA companion:</strong> <a href="Lecture_11_CellRanger.html">Lecture 11 — Cell Ranger: Raw Reads to Counts</a></li>
+<li><strong>Downstream:</strong> <a href="Lecture_15_ATACseq.html">Module 15 — scATAC-seq with Signac</a></li>
+</ul>
+</section>
+<section id="goals-of-this-lecture" class="slide level2">
+<h2>Goals of this lecture</h2>
+<ul>
+<li class="fragment">See <strong>how scATAC differs from scRNA</strong> at the data level (peaks vs genes, fragments vs UMIs)</li>
+<li class="fragment">Run <code>cellranger-atac count</code> and read its parameters</li>
+<li class="fragment">Pick the <strong>right reference</strong> (arc vs gex vs atac)</li>
+<li class="fragment">Read ATAC-specific QC: <strong>TSS enrichment, FRiP, nucleosome signal</strong></li>
+<li class="fragment">Know which file feeds Module 15: <strong><code>fragments.tsv.gz</code></strong></li>
+<li class="fragment">Note when to switch to <strong>multiome</strong> (<code>cellranger-arc</code>)</li>
 </ul>
 </section></section>
 <section>
-<section id="part-1-the-command-line" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 1 — The Command Line</h1>
+<section id="part-1-how-scatac-differs-from-rna" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 1 — How scATAC differs from RNA</h1>
 
 </section>
-<section id="why-the-shell-first" class="slide level2">
-<h2>Why the shell first?</h2>
+<section id="different-measurement-parallel-pipeline" class="slide level2">
+<h2>Different measurement, parallel pipeline</h2>
 <ul>
-<li class="fragment">The <strong>shell</strong> is the gateway: it runs everything else (R, aligners, HPC jobs)</li>
-<li class="fragment">A program that takes typed <strong>commands</strong> and hands them to the operating system</li>
-<li class="fragment"><strong>Bash</strong> is the shell on Mac, Linux, and Windows (via WSL)</li>
-<li class="fragment">You reach it through a <strong>terminal window</strong></li>
-<li class="fragment">Bioinformatics data is big — these tools scale to gigabytes effortlessly</li>
+<li class="fragment">scRNA measures <strong>transcription</strong> — polyA mRNA captured, counted as UMIs per gene</li>
+<li class="fragment">scATAC measures <strong>accessibility</strong> — Tn5-cut DNA fragments, counted per genomic peak</li>
+<li class="fragment">The <em>plumbing</em> (SLURM, FASTQ naming, reference model) is nearly identical</li>
+<li class="fragment">The <em>outputs</em> diverge because the underlying biology is different</li>
 </ul>
 </section>
-<section id="anatomy-of-a-command" class="slide level2">
-<h2>Anatomy of a command</h2>
-<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="fu">ls</span> <span class="at">-l</span> Documents</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><strong>Prompt</strong> — the shell signaling it’s ready for input</li>
-<li class="fragment"><strong>Command</strong> — the action (<code>ls</code>)</li>
-<li class="fragment"><strong>Options / flags</strong> — change behavior (<code>-l</code> = long format)</li>
-<li class="fragment"><strong>Argument</strong> — what it operates on (<code>Documents</code>)</li>
-</ul>
+<section id="rna-vs-atac-side-by-side" class="slide level2">
+<h2>RNA vs ATAC, side by side</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>scRNA-seq</th>
+<th>scATAC-seq</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Library</td>
+<td>polyA mRNA</td>
+<td>Tn5-cut DNA fragments</td>
+</tr>
+<tr class="even">
+<td>Per-cell unit</td>
+<td>UMI per gene</td>
+<td>Fragment per peak</td>
+</tr>
+<tr class="odd">
+<td>Reference</td>
+<td>Transcriptome</td>
+<td>Whole genome + motifs</td>
+</tr>
+<tr class="even">
+<td>Per-cell QC</td>
+<td>nUMI, nFeature, % mito</td>
+<td>nFrag, TSS enr., nucleosome signal</td>
+</tr>
+<tr class="odd">
+<td>Cell calling</td>
+<td>Knee on barcode rank</td>
+<td>Signal-vs-background</td>
+</tr>
+<tr class="even">
+<td><code>count</code> output</td>
+<td>matrix + BAM</td>
+<td><strong>fragments.tsv.gz</strong> + peaks.bed</td>
+</tr>
+</tbody>
+</table>
 </section>
-<section id="how-a-computer-is-organized" class="slide level2">
-<h2>How a computer is organized</h2>
+<section id="the-new-file-fragments.tsv.gz" class="slide level2">
+<h2>The new file: <code>fragments.tsv.gz</code></h2>
 <ul>
-<li class="fragment">A tree of <strong>directories</strong> (folders) and <strong>files</strong></li>
-<li class="fragment"><code>/</code> = the <strong>root</strong> — holds everything else</li>
-<li class="fragment"><code>~</code> = your <strong>home</strong> directory (e.g. <code>/Users/yourname</code>)</li>
-<li class="fragment">A <strong>path</strong> is a location in the tree (<code>/Users/wcresko/Documents</code>)</li>
-<li class="fragment">Navigating = jumping up and down between directories</li>
-</ul>
-</section>
-<section id="where-am-i-navigating" class="slide level2">
-<h2>Where am I? Navigating</h2>
-<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="bu">pwd</span>            <span class="co"># print working directory — where am I?</span></span>
-<span id="cb2-2"><a></a><span class="fu">ls</span>             <span class="co"># list contents of current directory</span></span>
-<span id="cb2-3"><a></a><span class="fu">ls</span> <span class="at">-l</span>          <span class="co"># long format: sizes, dates, permissions</span></span>
-<span id="cb2-4"><a></a><span class="fu">ls</span> <span class="at">-la</span>         <span class="co"># also show hidden files (start with .)</span></span>
-<span id="cb2-5"><a></a><span class="bu">cd</span> Documents   <span class="co"># change into Documents</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><code>pwd</code> tells you where you are</li>
-<li class="fragment"><code>ls</code> shows what’s there (<code>-l</code> long, <code>-a</code> all, <code>-t</code> by time, <code>-S</code> by size)</li>
-<li class="fragment"><code>cd</code> moves you around</li>
-</ul>
-</section>
-<section id="paths-absolute-vs.-relative" class="slide level2">
-<h2>Paths: absolute vs. relative</h2>
-<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="bu">cd</span> /Users/wcresko/Documents   <span class="co"># absolute — full path from /</span></span>
-<span id="cb3-2"><a></a><span class="bu">cd</span> data                       <span class="co"># relative — from where I am now</span></span>
-<span id="cb3-3"><a></a><span class="bu">cd</span> ..                         <span class="co"># up one directory (parent)</span></span>
-<span id="cb3-4"><a></a><span class="bu">cd</span> ../scripts                 <span class="co"># up one, then into scripts</span></span>
-<span id="cb3-5"><a></a><span class="bu">cd</span> ~                          <span class="co"># home directory</span></span>
-<span id="cb3-6"><a></a><span class="bu">cd</span> <span class="at">-</span>                          <span class="co"># back to previous directory</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><strong>Absolute</strong> = full path starting at <code>/</code></li>
-<li class="fragment"><strong>Relative</strong> = from your current location</li>
-<li class="fragment"><code>.</code> = here · <code>..</code> = parent · <code>~</code> = home</li>
-</ul>
-</section>
-<section id="making-moving-removing" class="slide level2">
-<h2>Making, moving, removing</h2>
-<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="fu">mkdir</span> project          <span class="co"># make a new directory</span></span>
-<span id="cb4-2"><a></a><span class="fu">touch</span> notes.txt        <span class="co"># make a new empty file</span></span>
-<span id="cb4-3"><a></a><span class="fu">mv</span> notes.txt README    <span class="co"># rename (or move) a file</span></span>
-<span id="cb4-4"><a></a><span class="fu">cp</span> README README.bak   <span class="co"># copy a file</span></span>
-<span id="cb4-5"><a></a><span class="fu">rm</span> README.bak          <span class="co"># delete a file</span></span>
-<span id="cb4-6"><a></a><span class="fu">rmdir</span> project          <span class="co"># delete an (empty) directory</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><strong>The shell trusts you</strong> — <code>rm</code> deletes immediately, no trash bin</li>
-<li class="fragment">Naming: avoid spaces, don’t start with <code>-</code>, stick to letters/numbers/<code>.</code>/<code>-</code>/<code>_</code></li>
-<li class="fragment">Use meaningful extensions (<code>.txt</code>, <code>.csv</code>, <code>.fasta</code>)</li>
-</ul>
-</section>
-<section id="viewing-files" class="slide level2">
-<h2>Viewing files</h2>
-<div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a></a><span class="fu">cat</span> small.txt          <span class="co"># dump a whole (small) file</span></span>
-<span id="cb5-2"><a></a><span class="fu">less</span> large.txt         <span class="co"># page through: space=fwd, b=back, /=search, q=quit</span></span>
-<span id="cb5-3"><a></a><span class="fu">head</span> data.txt          <span class="co"># first 10 lines</span></span>
-<span id="cb5-4"><a></a><span class="fu">head</span> <span class="at">-n</span> 20 data.txt    <span class="co"># first 20 lines</span></span>
-<span id="cb5-5"><a></a><span class="fu">tail</span> data.txt          <span class="co"># last 10 lines</span></span>
-<span id="cb5-6"><a></a><span class="fu">tail</span> <span class="at">-f</span> log.txt        <span class="co"># follow a growing file in real time</span></span>
-<span id="cb5-7"><a></a><span class="fu">wc</span> <span class="at">-l</span> data.txt         <span class="co"># count lines</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div title="Never cat a huge file">
-<div class="callout callout-important callout-titled callout-style-default">
-<div class="callout-body">
-<div class="callout-title">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<p><strong>Never cat a huge file</strong></p>
-</div>
-<div class="callout-content">
-<p>A 3 GB genome will freeze your session. Use <code>head</code>, <code>tail</code>, or <code>less</code> instead.</p>
-</div>
-</div>
-</div>
-</div>
-</section>
-<section id="wildcards" class="slide level2">
-<h2>Wildcards</h2>
-<div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="fu">ls</span> <span class="pp">*</span>.csv               <span class="co"># everything ending in .csv</span></span>
-<span id="cb6-2"><a></a><span class="fu">ls</span> sample_<span class="pp">*</span>.fastq      <span class="co"># sample_1.fastq, sample_2.fastq, ...</span></span>
-<span id="cb6-3"><a></a><span class="fu">ls</span> data_<span class="pp">?</span>.txt          <span class="co"># ? matches exactly one character</span></span>
-<span id="cb6-4"><a></a><span class="fu">rm</span> tmp_<span class="pp">*</span>               <span class="co"># careful! deletes everything matching</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><code>*</code> matches <strong>any number</strong> of characters</li>
-<li class="fragment"><code>?</code> matches <strong>exactly one</strong> character</li>
-<li class="fragment">Lets one command act on many files at once</li>
-</ul>
-</section>
-<section id="pipes-redirection" class="slide level2">
-<h2>Pipes &amp; redirection</h2>
-<div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="fu">ls</span> <span class="at">-l</span> <span class="op">&gt;</span> files.txt          <span class="co"># &gt; send output to a file (overwrites!)</span></span>
-<span id="cb7-2"><a></a><span class="bu">echo</span> <span class="st">&quot;more&quot;</span> <span class="op">&gt;&gt;</span> files.txt   <span class="co"># &gt;&gt; append to a file</span></span>
-<span id="cb7-3"><a></a><span class="fu">ls</span> /nope <span class="dv">2</span><span class="op">&gt;</span> errors.txt     <span class="co"># 2&gt; capture error messages</span></span>
-<span id="cb7-4"><a></a><span class="fu">sort</span> names.txt <span class="kw">|</span> <span class="fu">uniq</span>      <span class="co"># | feed one command&#39;s output into the next</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><code>&gt;</code> writes to a file (<strong>overwrites</strong>), <code>&gt;&gt;</code> <strong>appends</strong></li>
-<li class="fragment"><code>|</code> chains commands — no intermediate files needed</li>
-<li class="fragment">Three streams: <strong>stdin (0)</strong>, <strong>stdout (1)</strong>, <strong>stderr (2)</strong></li>
-</ul>
-</section>
-<section id="pipes-small-tools-combined" class="slide level2">
-<h2>Pipes: small tools, combined</h2>
-<div class="sourceCode" id="cb8"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="co"># Count how many lines match a pattern</span></span>
-<span id="cb8-2"><a></a><span class="fu">grep</span> <span class="st">&quot;pattern&quot;</span> file.txt <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span></span>
-<span id="cb8-3"><a></a></span>
-<span id="cb8-4"><a></a><span class="co"># Sort, find unique values, count them, rank by frequency</span></span>
-<span id="cb8-5"><a></a><span class="fu">cat</span> data.csv <span class="kw">|</span> <span class="fu">cut</span> <span class="at">-d</span><span class="st">&#39;,&#39;</span> <span class="at">-f2</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="kw">|</span> <span class="fu">uniq</span> <span class="at">-c</span> <span class="kw">|</span> <span class="fu">sort</span> <span class="at">-rn</span></span>
-<span id="cb8-6"><a></a></span>
-<span id="cb8-7"><a></a><span class="co"># Count sequences in a FASTA file</span></span>
-<span id="cb8-8"><a></a><span class="fu">grep</span> <span class="st">&quot;^&gt;&quot;</span> genome.fa <span class="kw">|</span> <span class="fu">wc</span> <span class="at">-l</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><strong>Unix philosophy</strong>: small tools that each do one thing well</li>
-<li class="fragment">Build complex pipelines one stage at a time, checking output as you go</li>
-<li class="fragment">Filter early to keep the data flowing through small</li>
-</ul>
-</section>
-<section id="downloading-data" class="slide level2">
-<h2>Downloading data</h2>
-<div class="panel-tabset">
-<ul id="tabset-1" class="panel-tabset-tabby"><li><a data-tabby-default href="#tabset-1-1">wget</a></li><li><a href="#tabset-1-2">curl</a></li><li><a href="#tabset-1-3">Notes</a></li></ul>
-<div class="tab-content">
-<div id="tabset-1-1">
-<div class="sourceCode" id="cb9"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a></a><span class="fu">wget</span> https://example.org/genome.fna.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div id="tabset-1-2">
-<div class="sourceCode" id="cb10"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a></a><span class="ex">curl</span> <span class="at">-o</span> genome.fa.gz https://example.org/genome.fna.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<div id="tabset-1-3">
-<ul>
-<li>Both download files from a URL</li>
-<li><code>curl -o</code> lets you name the saved file</li>
-<li><code>.gz</code> = compressed — work with it directly via <code>zcat</code>, <code>zless</code>, <code>zgrep</code></li>
-</ul>
-</div>
-</div>
-</div>
-</section>
-<section id="getting-help" class="slide level2">
-<h2>Getting help</h2>
-<div class="sourceCode" id="cb11"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a></a><span class="fu">man</span> ls          <span class="co"># full manual page (q to quit)</span></span>
-<span id="cb11-2"><a></a><span class="fu">ls</span> <span class="at">--help</span>       <span class="co"># quick usage summary</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><code>man command</code> opens the manual; press <code>q</code> to exit</li>
-<li class="fragment"><code>command --help</code> gives a fast summary</li>
-<li class="fragment">And of course: the internet and generative AI (Claude, ChatGPT)</li>
+<li class="fragment">A sorted, gzipped TSV — one row per Tn5-cut fragment</li>
+<li class="fragment">Columns: <code>chrom  start  end  barcode  duplicate-count</code></li>
+<li class="fragment">This is the file Signac and ArchR consume <strong>directly</strong></li>
+<li class="fragment">It travels with its index: <code>fragments.tsv.gz.tbi</code> — never lose it in transit</li>
 </ul>
 </section></section>
 <section>
-<section id="part-2-r-rstudio" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 2 — R &amp; RStudio</h1>
+<section id="part-2-running-cellranger-atac-count" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 2 — Running cellranger-atac count</h1>
 
 </section>
-<section id="why-r" class="slide level2">
-<h2>Why R?</h2>
+<section id="the-core-invocation" class="slide level2">
+<h2>The core invocation</h2>
+<div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="ex">cellranger-atac</span> count <span class="dt">\</span></span>
+<span id="cb1-2"><a></a>  <span class="at">--id</span><span class="op">=</span>atac_pbmc_1k_v1 <span class="dt">\</span></span>
+<span id="cb1-3"><a></a>  <span class="at">--reference</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs/refdata-cellranger-arc-GRCh38-2024-A <span class="dt">\</span></span>
+<span id="cb1-4"><a></a>  <span class="at">--fastqs</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/test_data/atac_pbmc_1k_v1_fastqs <span class="dt">\</span></span>
+<span id="cb1-5"><a></a>  <span class="at">--sample</span><span class="op">=</span>atac_pbmc_1k_v1 <span class="dt">\</span></span>
+<span id="cb1-6"><a></a>  <span class="at">--localcores</span><span class="op">=</span>16 <span class="dt">\</span></span>
+<span id="cb1-7"><a></a>  <span class="at">--localmem</span><span class="op">=</span>120</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li class="fragment">Powerful, flexible, <strong>free</strong>, runs everywhere</li>
-<li class="fragment">Superb data management, statistics, and graphics</li>
-<li class="fragment"><strong>Reproducibility</strong> — your scripts record exactly what you did</li>
-<li class="fragment">Write your own functions; huge online help and community</li>
-<li class="fragment">Nice front end (<strong>RStudio</strong>) and dynamic documents (<strong>Quarto</strong>)</li>
+<li class="fragment">Note <code>--reference</code>, not <code>--transcriptome</code> — the flag name differs from RNA</li>
+<li class="fragment">No <code>--create-bam</code> flag here; a position-sorted BAM is written by default</li>
+<li class="fragment">Same <code>--localcores</code> / <code>--localmem</code> discipline as RNA (budget below SLURM <code>--mem</code>)</li>
 </ul>
 </section>
-<section id="the-r-interpreter-rstudio-panes" class="slide level2">
-<h2>The R interpreter &amp; RStudio panes</h2>
+<section id="why-it-runs-23-longer-than-rna" class="slide level2">
+<h2>Why it runs 2–3× longer than RNA</h2>
 <ul>
-<li class="fragment"><strong>R</strong> is the engine that runs your commands; <strong>RStudio</strong> is the comfortable cockpit around it</li>
-<li class="fragment"><strong>Source</strong> (top-left) — your scripts and Quarto docs you edit and save</li>
-<li class="fragment"><strong>Console</strong> (bottom-left) — where commands actually run</li>
-<li class="fragment"><strong>Environment / History</strong> (top-right) — the objects you’ve created</li>
-<li class="fragment"><strong>Files / Plots / Packages / Help</strong> (bottom-right) — everything else</li>
-</ul>
-</section>
-<section id="assignment-basic-math" class="slide level2">
-<h2>Assignment &amp; basic math</h2>
-<div class="sourceCode" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a></a>x <span class="ot">&lt;-</span> <span class="dv">2</span>          <span class="co"># assign with &lt;-</span></span>
-<span id="cb12-2"><a></a>x <span class="sc">*</span> <span class="dv">3</span>           <span class="co"># 6</span></span>
-<span id="cb12-3"><a></a>y <span class="ot">&lt;-</span> x <span class="sc">*</span> <span class="dv">3</span>      <span class="co"># store a result</span></span>
-<span id="cb12-4"><a></a><span class="fu">log</span>(x)          <span class="co"># built-in functions: object goes in parentheses</span></span>
-<span id="cb12-5"><a></a><span class="fu">sqrt</span>(<span class="dv">16</span>)        <span class="co"># 4</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">Assign with <code>&lt;-</code>; names start with a letter; R is <strong>case sensitive</strong> (<code>x</code> ≠ <code>X</code>)</li>
-<li class="fragment">Normal math precedence (PEMDAS); parentheses control order</li>
-<li class="fragment">Comment with <code>#</code></li>
-</ul>
-</section>
-<section id="vectors-r-thinks-in-vectors" class="slide level2">
-<h2>Vectors — R thinks in vectors</h2>
-<div class="sourceCode" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a></a>x <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">2</span>, <span class="dv">1</span>, <span class="dv">5</span>)   <span class="co"># c() = concatenate into a vector</span></span>
-<span id="cb13-2"><a></a>y <span class="ot">&lt;-</span> x<span class="sc">^</span><span class="dv">2</span>                   <span class="co"># operations are element-wise</span></span>
-<span id="cb13-3"><a></a><span class="fu">mean</span>(x); <span class="fu">median</span>(x); <span class="fu">sd</span>(x)  <span class="co"># built-in summaries</span></span>
-<span id="cb13-4"><a></a><span class="fu">length</span>(x)                  <span class="co"># how many elements</span></span>
-<span id="cb13-5"><a></a><span class="fu">seq</span>(<span class="dv">0</span>, <span class="dv">10</span>, <span class="at">by =</span> <span class="fl">0.5</span>)       <span class="co"># a regular sequence</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">A <strong>vector</strong> is a list of values of one type</li>
-<li class="fragment">Math applies to <strong>every element at once</strong></li>
-<li class="fragment">Types: <code>int</code>, <code>dbl</code> (numeric), <code>chr</code>, <code>lgl</code>, plus <strong>factors</strong> for categories</li>
-</ul>
-</section>
-<section id="data-frames-tabular-data" class="slide level2">
-<h2>Data frames — tabular data</h2>
-<div class="sourceCode" id="cb14"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a></a>conc    <span class="ot">&lt;-</span> <span class="fu">factor</span>(<span class="fu">c</span>(<span class="st">&quot;low&quot;</span>, <span class="st">&quot;high&quot;</span>, <span class="st">&quot;high&quot;</span>, <span class="st">&quot;med&quot;</span>))</span>
-<span id="cb14-2"><a></a>stiff   <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="fl">3.4</span>, <span class="fl">8.4</span>, <span class="fl">3.0</span>, <span class="fl">5.6</span>)</span>
-<span id="cb14-3"><a></a>mydata  <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(conc, stiff)</span>
-<span id="cb14-4"><a></a></span>
-<span id="cb14-5"><a></a>mydata<span class="sc">$</span>stiff        <span class="co"># a column by name (preferred)</span></span>
-<span id="cb14-6"><a></a>mydata[, <span class="dv">2</span>]         <span class="co"># column 2</span></span>
-<span id="cb14-7"><a></a>mydata[<span class="dv">1</span>, ]         <span class="co"># row 1</span></span>
-<span id="cb14-8"><a></a>mydata[mydata<span class="sc">$</span>stiff <span class="sc">&gt;</span> <span class="dv">4</span>, ]   <span class="co"># rows meeting a condition</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">The primary structure for tabular data; vectors become <strong>columns</strong></li>
-<li class="fragment"><code>[row, column]</code> indexing; <code>$</code> grabs a column by name</li>
-<li class="fragment"><code>factor()</code> marks a column as categorical</li>
-</ul>
-</section>
-<section id="lists-the-pocket-that-holds-anything" class="slide level2">
-<h2>Lists — the pocket that holds anything</h2>
-<div class="sourceCode" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a></a>experiment <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb15-2"><a></a>  <span class="at">sample_id  =</span> <span class="st">&quot;donor_01_CTRL&quot;</span>,</span>
-<span id="cb15-3"><a></a>  <span class="at">age        =</span> <span class="dv">42</span>,</span>
-<span id="cb15-4"><a></a>  <span class="at">cell_types =</span> <span class="fu">c</span>(<span class="st">&quot;B cell&quot;</span>, <span class="st">&quot;CD4 T&quot;</span>, <span class="st">&quot;NK&quot;</span>)</span>
-<span id="cb15-5"><a></a>)</span>
-<span id="cb15-6"><a></a></span>
-<span id="cb15-7"><a></a>experiment<span class="sc">$</span>sample_id     <span class="co"># access a slot by name</span></span>
-<span id="cb15-8"><a></a>experiment[[<span class="dv">3</span>]]          <span class="co"># the contents of the 3rd slot</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">Each slot can hold a <strong>different kind of thing</strong> — even another list</li>
-<li class="fragment"><code>[[ ]]</code> returns the <em>contents</em>; <code>[ ]</code> returns a sub-list</li>
-<li class="fragment"><strong>Seurat</strong> and <strong>SingleCellExperiment</strong> objects are lists under the hood</li>
-</ul>
-</section>
-<section id="functions" class="slide level2">
-<h2>Functions</h2>
-<div class="sourceCode" id="cb16"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a></a><span class="fu">round</span>(<span class="fl">3.14159</span>, <span class="dv">2</span>)              <span class="co"># positional args — order matters</span></span>
-<span id="cb16-2"><a></a><span class="fu">round</span>(<span class="at">x =</span> <span class="fl">3.14159</span>, <span class="at">digits =</span> <span class="dv">2</span>) <span class="co"># named args — order-independent, clearer</span></span>
-<span id="cb16-3"><a></a></span>
-<span id="cb16-4"><a></a><span class="co"># Define your own</span></span>
-<span id="cb16-5"><a></a>cv <span class="ot">&lt;-</span> <span class="cf">function</span>(x, <span class="at">na.rm =</span> <span class="cn">TRUE</span>) {</span>
-<span id="cb16-6"><a></a>  <span class="cf">if</span> (na.rm) x <span class="ot">&lt;-</span> x[<span class="sc">!</span><span class="fu">is.na</span>(x)]</span>
-<span id="cb16-7"><a></a>  <span class="fu">sd</span>(x) <span class="sc">/</span> <span class="fu">mean</span>(x)</span>
-<span id="cb16-8"><a></a>}</span>
-<span id="cb16-9"><a></a><span class="fu">cv</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">Use <strong>named arguments</strong> whenever there’s ambiguity — self-documenting</li>
-<li class="fragment">scRNA-seq functions have long signatures, so almost everything is named</li>
-<li class="fragment">You’ll write small helper functions all the time</li>
-</ul>
-</section>
-<section id="packages-install.packages-vs-library" class="slide level2">
-<h2>Packages: <code>install.packages()</code> vs <code>library()</code></h2>
-<div class="sourceCode" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a></a><span class="fu">install.packages</span>(<span class="st">&quot;tidyverse&quot;</span>)   <span class="co"># download &amp; install — ONCE per machine</span></span>
-<span id="cb17-2"><a></a><span class="fu">library</span>(tidyverse)              <span class="co"># load — EVERY new R session</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><strong><code>install.packages()</code></strong> = get it onto your computer (do once)</li>
-<li class="fragment"><strong><code>library()</code></strong> = make it available in this session (do every time)</li>
-<li class="fragment">Bioconductor packages (Seurat ecosystem, DESeq2) use <code>BiocManager::install()</code></li>
-</ul>
-</section>
-<section id="the-tidyverse-the-pipe" class="slide level2">
-<h2>The tidyverse &amp; the pipe</h2>
-<div class="sourceCode" id="cb18"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb18-2"><a></a></span>
-<span id="cb18-3"><a></a>result <span class="ot">&lt;-</span> meta <span class="sc">|&gt;</span></span>
-<span id="cb18-4"><a></a>  <span class="fu">filter</span>(nFeature_RNA <span class="sc">&gt;</span> <span class="dv">200</span>, nFeature_RNA <span class="sc">&lt;</span> <span class="dv">2500</span>) <span class="sc">|&gt;</span></span>
-<span id="cb18-5"><a></a>  <span class="fu">group_by</span>(sample, cluster) <span class="sc">|&gt;</span></span>
-<span id="cb18-6"><a></a>  <span class="fu">summarise</span>(<span class="at">n_cells =</span> <span class="fu">n</span>(),</span>
-<span id="cb18-7"><a></a>            <span class="at">median_umi =</span> <span class="fu">median</span>(nCount_RNA),</span>
-<span id="cb18-8"><a></a>            <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb18-9"><a></a>  <span class="fu">arrange</span>(sample, <span class="fu">desc</span>(n_cells))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment">Six verbs cover most work: <code>filter</code>, <code>select</code>, <code>mutate</code>, <code>arrange</code>, <code>group_by</code>, <code>summarise</code></li>
-<li class="fragment">The pipe <strong><code>|&gt;</code></strong> chains steps — read top-to-bottom, left-to-right</li>
-<li class="fragment">This style appears throughout the workshop tutorials</li>
-</ul>
-</section>
-<section id="reading-writing-data" class="slide level2">
-<h2>Reading &amp; writing data</h2>
-<div class="sourceCode" id="cb19"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a></a><span class="co"># Read</span></span>
-<span id="cb19-2"><a></a>df <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;data.csv&quot;</span>)     <span class="co"># tidyverse — returns a tibble</span></span>
-<span id="cb19-3"><a></a>df <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="st">&quot;data.txt&quot;</span>)     <span class="co"># tab-separated</span></span>
-<span id="cb19-4"><a></a>df <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;data.csv&quot;</span>)     <span class="co"># base R equivalent</span></span>
-<span id="cb19-5"><a></a></span>
-<span id="cb19-6"><a></a><span class="co"># Write</span></span>
-<span id="cb19-7"><a></a><span class="fu">write_csv</span>(df, <span class="st">&quot;results.csv&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<ul>
-<li class="fragment"><code>read_csv()</code> / <code>read_tsv()</code> (tidyverse) return tibbles; <code>read.csv()</code> is base R</li>
-<li class="fragment">Store data in plain text; keep an <strong>untouched original</strong>; include a header row</li>
-<li class="fragment">One column = one data type</li>
+<li class="fragment">Aligns fragments to the <strong>whole genome</strong>, not a small transcriptome</li>
+<li class="fragment">Deduplicates at single-<strong>fragment</strong> resolution</li>
+<li class="fragment"><strong>Calls peaks de novo</strong> with a MACS-style algorithm — RAM-hungry</li>
+<li class="fragment">Counts fragments per peak per barcode</li>
+<li class="fragment">Plan your SLURM <code>--time</code> accordingly (6–10 h is typical)</li>
 </ul>
 </section></section>
 <section>
-<section id="youre-ready-for-day-1" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>You’re ready for Day 1</h1>
+<section id="part-3-the-atac-reference" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 3 — The ATAC reference</h1>
 
 </section>
-<section id="youre-ready-for-day-1-1" class="slide level2">
-<h2>You’re ready for Day 1</h2>
+<section id="arc-vs-gex-vs-atac-choose-carefully" class="slide level2">
+<h2>arc vs gex vs atac — choose carefully</h2>
 <ul>
-<li class="fragment"><strong>Shell:</strong> navigate (<code>pwd</code>/<code>ls</code>/<code>cd</code>), manage files, view with <code>head</code>/<code>less</code>, combine with <code>|</code>, <code>&gt;</code>, <code>&gt;&gt;</code>, get help with <code>man</code></li>
-<li class="fragment"><strong>R:</strong> assign with <code>&lt;-</code>, work with vectors / data frames / lists, write functions, <code>install.packages()</code> once + <code>library()</code> each session, pipe with <code>|&gt;</code>, read/write data</li>
-<li class="fragment">These are the everyday tools under every analysis step ahead</li>
+<li class="fragment"><code>refdata-gex-GRCh38-...</code> — <strong>RNA only</strong>. Do <strong>not</strong> pass this to cellranger-atac</li>
+<li class="fragment"><code>refdata-cellranger-arc-GRCh38-2024-A</code> — the current ATAC / multiome reference</li>
+<li class="fragment"><code>refdata-cellranger-atac-GRCh37-1.2.0</code> — older hg19, for matching <code>EnsDb.Hsapiens.v75</code> in Module 15</li>
+<li class="fragment">They share <code>fasta/</code> and <code>genes/</code> folders but have <strong>different indexes and annotations</strong></li>
 </ul>
 </section>
-<section id="whats-next" class="slide level2">
-<h2>What’s next</h2>
+<section id="download-the-atac-reference" class="slide level2">
+<h2>Download the ATAC reference</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="bu">cd</span> /projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs</span>
+<span id="cb2-2"><a></a></span>
+<span id="cb2-3"><a></a><span class="co"># Current human ATAC / arc reference</span></span>
+<span id="cb2-4"><a></a><span class="fu">wget</span> https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-arc-GRCh38-2024-A.tar.gz</span>
+<span id="cb2-5"><a></a><span class="fu">tar</span> <span class="at">-xzf</span> refdata-cellranger-arc-GRCh38-2024-A.tar.gz</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <ul>
-<li class="fragment"><strong>Day 1 core modules</strong> build directly on this:
+<li class="fragment">The ATAC reference is <strong>separate</strong> because it indexes the whole genome, not just transcribed regions</li>
+<li class="fragment">A wrong-reference run usually fails to start — but the error can be cryptic</li>
+</ul>
+</section></section>
+<section>
+<section id="part-4-atac-specific-qc" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 4 — ATAC-specific QC</h1>
+
+</section>
+<section id="the-outputs-are-different" class="slide level2">
+<h2>The outputs are different</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="ex">outs/</span></span>
+<span id="cb3-2"><a></a>  <span class="ex">├──</span> web_summary.html</span>
+<span id="cb3-3"><a></a>  <span class="ex">├──</span> summary.csv</span>
+<span id="cb3-4"><a></a>  <span class="ex">├──</span> singlecell.csv             per-barcode QC</span>
+<span id="cb3-5"><a></a>  <span class="ex">├──</span> filtered_peak_bc_matrix.h5  peaks × barcodes</span>
+<span id="cb3-6"><a></a>  <span class="ex">├──</span> fragments.tsv.gz <span class="er">(</span><span class="ex">+</span> .tbi<span class="kw">)</span>   <span class="ex">the</span> key file for Signac</span>
+<span id="cb3-7"><a></a>  <span class="ex">├──</span> peaks.bed                   peak coordinates</span>
+<span id="cb3-8"><a></a>  <span class="ex">└──</span> possorted_bam.bam <span class="er">(</span><span class="ex">+</span> .bai<span class="kw">)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="metrics-to-scrutinize" class="slide level2">
+<h2>Metrics to scrutinize</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>Worry threshold</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Estimated number of cells</td>
+<td>Off your target</td>
+</tr>
+<tr class="even">
+<td>Median fragments per cell</td>
+<td>&lt; 5,000 → undersequenced</td>
+</tr>
+<tr class="odd">
+<td><strong>TSS enrichment</strong></td>
+<td>&lt; 4 → poor signal-to-noise</td>
+</tr>
+<tr class="even">
+<td><strong>Fraction fragments in peaks (FRiP)</strong></td>
+<td>&lt; 0.4 → poor capture / wrong ref</td>
+</tr>
+<tr class="odd">
+<td>Fraction in blacklist</td>
+<td>&gt; 0.05 → repetitive-region artefacts</td>
+</tr>
+<tr class="even">
+<td>Fraction nucleosome-free</td>
+<td>&lt; 0.3 → Tn5 over-tagmentation</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="what-these-metrics-mean" class="slide level2">
+<h2>What these metrics mean</h2>
 <ul>
-<li class="fragment">Tutorial 00 — Setup: R, RStudio, Quarto</li>
-<li class="fragment">Lec/Tut 01 — QC &amp; Preprocessing</li>
-<li class="fragment">Lec/Tut 02 — Dimension Reduction &amp; Clustering</li>
-<li class="fragment">Lec/Tut 03+ — Annotation, Integration, DE, and beyond</li>
-</ul></li>
-<li class="fragment">Revisit the reading: <a href="../Resources_Folder/Chapter_Day0_2_R_and_CommandLine.html">Day 0 · Module 2 — R &amp; the Command Line</a></li>
-<li class="fragment">Keep a cheat sheet open — fluency comes from doing. See you Day 1!</li>
+<li class="fragment"><strong>TSS enrichment</strong> — fragments concentrate at transcription start sites in healthy cells; low = high background</li>
+<li class="fragment"><strong>FRiP</strong> (fraction of reads in peaks) — how much signal lands in real open regions vs noise</li>
+<li class="fragment"><strong>Nucleosome signal</strong> — the fragment-size profile shows nucleosome-free (&lt;100 bp), mono- (~200), di- (~400) peaks</li>
+<li class="fragment">A flat fragment-size distribution signals poor digestion or contamination</li>
+</ul>
+</section></section>
+<section>
+<section id="part-5-the-hand-off-to-signac" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 5 — The hand-off to Signac</h1>
+
+</section>
+<section id="four-files-module-15-expects" class="slide level2">
+<h2>Four files Module 15 expects</h2>
+<div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="va">SRC</span><span class="op">=&lt;</span>user<span class="op">&gt;</span>@login.talapas.uoregon.edu:/projects/.../outs</span>
+<span id="cb4-2"><a></a></span>
+<span id="cb4-3"><a></a><span class="fu">scp</span> <span class="va">$SRC</span>/filtered_peak_bc_matrix.h5  data/</span>
+<span id="cb4-4"><a></a><span class="fu">scp</span> <span class="va">$SRC</span>/singlecell.csv              data/</span>
+<span id="cb4-5"><a></a><span class="fu">scp</span> <span class="va">$SRC</span>/fragments.tsv.gz            data/</span>
+<span id="cb4-6"><a></a><span class="fu">scp</span> <span class="va">$SRC</span>/fragments.tsv.gz.tbi        data/</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<ul>
+<li class="fragment"><code>cellranger-atac</code> produces exactly what Module 15 loads — no reformatting needed</li>
+<li class="fragment">Module 15 uses <code>Read10X_h5()</code> + <code>CreateChromatinAssay()</code></li>
+<li class="fragment">The <code>.tbi</code> index must travel with <code>fragments.tsv.gz</code> or Signac can’t read it</li>
+</ul>
+</section>
+<section id="scaling-and-gotchas" class="slide level2">
+<h2>Scaling and gotchas</h2>
+<ul>
+<li class="fragment">Same <strong>SLURM array</strong> pattern as RNA — one sample per row of <code>samples.txt</code></li>
+<li class="fragment"><strong>Wrong reference</strong> (gex instead of arc) is the #1 failure — cryptic error</li>
+<li class="fragment"><strong>Lost <code>.tbi</code></strong> breaks Signac silently downstream</li>
+<li class="fragment"><strong>Mixed chemistries</strong> (v1 vs v1.1 Next GEM) in one folder — different barcode conventions</li>
+<li class="fragment"><strong>OOM in peak calling</strong> — the de-novo step needs ~80 GB for 10k cells</li>
+</ul>
+</section></section>
+<section>
+<section id="part-6-multiome-note" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Part 6 — Multiome note</h1>
+
+</section>
+<section id="when-rna-and-atac-come-from-the-same-cells" class="slide level2">
+<h2>When RNA and ATAC come from the same cells</h2>
+<ul>
+<li class="fragment">A 10x <strong>Multiome</strong> library captures RNA <strong>and</strong> ATAC from each cell</li>
+<li class="fragment">Use <code>cellranger-arc count</code> (not <code>-atac</code>) — it produces both a counts matrix and a fragments file</li>
+<li class="fragment">Outputs are <strong>pre-paired by barcode</strong> — RNA and ATAC for the same cell are linked</li>
+<li class="fragment">Same SLURM pattern; bigger reference; longer runtime</li>
+<li class="fragment">This is what enables joint RNA+ATAC analysis downstream</li>
+</ul>
+</section></section>
+<section>
+<section id="summary" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Summary</h1>
+
+</section>
+<section id="what-to-take-away" class="slide level2">
+<h2>What to take away</h2>
+<ul>
+<li class="fragment">scATAC measures accessibility (fragments/peaks), not transcription (UMIs/genes)</li>
+<li class="fragment">Use <code>cellranger-atac count</code> with <code>--reference</code>, the <strong>arc</strong> (not gex) reference</li>
+<li class="fragment">It runs longer because of whole-genome alignment + de-novo peak calling</li>
+<li class="fragment">Read TSS enrichment, FRiP, and nucleosome signal — ATAC’s own QC vocabulary</li>
+<li class="fragment"><code>fragments.tsv.gz</code> (+ <code>.tbi</code>) is the hand-off to <strong>Module 15</strong> (Signac)</li>
+<li class="fragment">Joint RNA+ATAC → switch to <code>cellranger-arc</code></li>
+</ul>
+</section>
+<section id="next-steps" class="slide level2">
+<h2>Next steps</h2>
+<ul>
+<li><strong>Read:</strong> <a href="../Resources_Folder/Chapter_12_scATAC_CellRanger.html">Chapter 12 — Raw scATAC-seq Processing</a></li>
+<li><strong>Do:</strong> <a href="../Exercise_Folder/Tutorial_12_scATAC_CellRanger_RawData.html">Tutorial 12 — cellranger-atac on Talapas</a></li>
+<li><strong>Then:</strong> <a href="Lecture_15_ATACseq.html">Module 15 — scATAC-seq with Signac</a></li>
+<li><strong>RNA companion:</strong> <a href="Lecture_11_CellRanger.html">Lecture 11 — Cell Ranger: Raw Reads to Counts</a></li>
 </ul>
 
 
@@ -1519,7 +1451,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Day 0 · Module 2 — R &amp; the Command Line</p>
+<p>Single Cell RNA-seq Workshop · Lecture 12 — Raw scATAC-seq with cellranger-atac</p>
 </div>
 </div></div>
 

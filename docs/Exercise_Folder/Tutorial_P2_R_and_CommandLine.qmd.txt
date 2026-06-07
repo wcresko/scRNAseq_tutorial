@@ -1,0 +1,552 @@
+---
+title: "Tutorial P2 — R & the Command Line (hands-on)"
+subtitle: "Shell navigation, R & RStudio basics, and installing the workshop packages"
+author: "Single Cell RNA-seq Workshop"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  eval: false
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+## About this tutorial
+
+This is the **runnable companion** to the P2 reading — the second hour of the optional **Tuesday (Day 0)** computational refresher. The reading lays out the concepts (what a shell is, why R, what the tidyverse is); here you actually **do it** at a keyboard. The tutorial has three parts: **Part A** is the Unix command line — navigating the filesystem, making and moving files, viewing data, wildcards, pipes, and redirection; **Part B** is R and RStudio — the interface, assignment, the core data structures, functions, and the tidyverse pipe; and **Part C** is where everyone **installs the workshop packages**, so that by Day 1 your machine has every R / Bioconductor package the tutorials need and the demo datasets are pre-cached. Work along in a terminal and an R session — don't just read.
+
+::: callout-note
+**Companion lecture:** [Lecture P2 — R & the Command Line](../Lecture_Folder/Lecture_P2_R_and_CommandLine.html) · **Companion reading:** [Chapter P2 — R & the Command Line](../Resources_Folder/Chapter_P2_R_and_CommandLine.html).
+:::
+
+::: {.callout-tip title="How to use this page"}
+The rendered HTML shows the code but does **not** execute it. To work along, download the source — <a href="Tutorial_P2_R_and_CommandLine.qmd.txt" download="Tutorial_P2_R_and_CommandLine.qmd">Tutorial_P2_R_and_CommandLine.qmd</a> — then **drop the trailing `.txt`** so the filename ends in `.qmd`, and open it in **RStudio** (for the R parts) or **VS Code** (for the shell parts). The `bash` blocks are meant to be typed into a terminal; the `r` blocks into the R Console.
+:::
+
+::: {.callout-note title="What you need"}
+- A terminal: the **Terminal** app on macOS, a terminal on Linux, or **WSL/Ubuntu** on Windows (see the P2 reading for WSL setup). The RStudio **Terminal** tab also works for Part A.
+- **R** and **RStudio** installed on your laptop. If you don't have them yet: R from <https://cran.r-project.org/> and RStudio Desktop from <https://posit.co/download/rstudio-desktop/>.
+:::
+
+------------------------------------------------------------------------
+
+# Part A — The command line
+
+The shell is how you move around a computer, manage files, download data, and stream large genomic files through small composable tools. Everything below works the same on macOS, Linux, WSL, and Talapas.
+
+## A1. Where am I, and what's here?
+
+Open a terminal and orient yourself. A shell command is a **command** plus optional **options** (flags like `-l`) and **arguments** (what to act on).
+
+``` bash
+pwd                 # "print working directory" — the absolute path you're in
+ls                  # list files & folders in the current directory
+ls -F               # mark directories with /, executables with *
+ls -l               # long format: permissions, size, modified date
+ls -la              # long format + hidden (dot)files like .bashrc
+cd ~                # go to your home directory (~ is shorthand for it)
+pwd                 # confirm you moved
+```
+
+::: {.callout-important title="Think about it"}
+`ls` printed nothing at all in a folder, but `ls -la` printed several entries. Is the folder empty?
+
+<details><summary>Show answers</summary>
+
+No — it just contains only **hidden files**, whose names start with a dot (`.bashrc`, `.config`, `.ssh`, …). Plain `ls` hides those by convention; the `-a` ("all") flag reveals them. Every directory also has two special hidden entries: `.` (itself) and `..` (its parent). Hidden dotfiles are usually configuration, which is why they are tucked out of the way of everyday listings.
+
+</details>
+:::
+
+## A2. Absolute vs. relative paths
+
+An **absolute path** starts at the root `/` and is unambiguous from anywhere (`/Users/wcresko/Documents`). A **relative path** is interpreted from wherever you currently are (`../data`, `./scripts`). The shortcuts: `.` = here, `..` = one level up, `~` = your home, `-` = the directory you were in last.
+
+``` bash
+cd /                # jump to the root (absolute)
+ls                  # the top-level directories of the whole machine
+cd ~                # back home (absolute, via shortcut)
+cd ..               # up one level (relative)
+cd -                # back to where you just were (toggles)
+cd ~/Desktop        # absolute path built from home; adjust if you don't have Desktop
+pwd
+```
+
+::: {.callout-important title="Think about it"}
+You're in `/home/you/projects/scrnaseq/data`. Write **two** ways to get to `/home/you/projects/scrnaseq/scripts` — one absolute, one relative.
+
+<details><summary>Show answers</summary>
+
+- **Absolute:** `cd /home/you/projects/scrnaseq/scripts` — works from anywhere because it starts at `/`.
+- **Relative:** `cd ../scripts` — go up one level (out of `data`, into `scrnaseq`) then down into `scripts`.
+
+Relative paths are shorter and survive moving the whole project to a new location; absolute paths are unambiguous but brittle if anything above them moves.
+
+</details>
+:::
+
+## A3. Make, move, copy, and remove files & directories
+
+Create a small scratch workspace and practice the core file operations. A few rules: **the shell trusts you** — it deletes what you tell it to and overwrites same-named files without asking. Avoid spaces in names; stick to letters, numbers, `.`, `-`, and `_`.
+
+``` bash
+cd ~
+mkdir p2_practice            # make a new directory
+cd p2_practice
+
+touch notes.txt              # create an empty file
+echo "single cell RNA-seq" > notes.txt   # write one line into it (> overwrites)
+echo "day 0 refresher" >> notes.txt       # append a second line (>> appends)
+
+cp notes.txt notes_backup.txt   # copy
+mv notes.txt readme.txt          # rename (move within the same dir)
+mkdir archive
+mv notes_backup.txt archive/     # move a file into a subdirectory
+
+ls -F                            # see what you've made
+ls archive/
+```
+
+Now clean up selectively (you'll keep the folder for Part A4):
+
+``` bash
+rm archive/notes_backup.txt      # remove a file
+rmdir archive                    # remove an *empty* directory
+# rm -r somedir                  # remove a directory AND its contents (careful!)
+```
+
+::: {.callout-important title="Think about it"}
+`rmdir archive` worked only after you deleted the file inside it. What's the difference between `rmdir` and `rm -r`, and why is `rm -r` worth respecting?
+
+<details><summary>Show answers</summary>
+
+`rmdir` removes a directory **only if it is empty** — a built-in safety check. `rm -r` ("recursive") deletes a directory **and everything inside it**, no questions asked. It's powerful and irreversible: there is no Trash/Recycle Bin at the command line, and `rm -rf /` can wipe a system. Always look hard at the path before running `rm -r`, and never combine it with wildcards casually (`rm -r *` in the wrong folder ruins your day).
+
+</details>
+:::
+
+## A4. View file contents
+
+You rarely open data files in a GUI; you peek at them from the shell. Make a slightly bigger file first, then look at it different ways.
+
+``` bash
+cd ~/p2_practice
+# write 100 numbered lines into a file using a brace-expansion loop
+for i in {1..100}; do echo "line $i"; done > big.txt
+
+cat readme.txt          # dump a whole (small) file to the screen
+head big.txt            # first 10 lines (default)
+head -n 3 big.txt       # first 3 lines
+tail big.txt            # last 10 lines
+tail -n 3 big.txt       # last 3 lines
+wc -l big.txt           # count lines
+less big.txt            # page through: SPACE = down, b = up, /pattern = search, q = quit
+```
+
+::: {.callout-important title="Don't use cat on huge files"}
+`cat` dumps the **entire** file. That's fine for `readme.txt`, but a 3 GB genome file will flood your terminal and can stall your session. For big files use `head`, `tail`, `less`, or streaming tools — they never load the whole file into memory.
+:::
+
+## A5. Wildcards
+
+Wildcards let one command act on many files. `*` matches any run of characters, `?` matches exactly one, and `[...]` matches a character from a set.
+
+``` bash
+cd ~/p2_practice
+touch sample_01.fastq sample_02.fastq sample_03.fastq control.fastq notes.md
+
+ls *.fastq              # everything ending in .fastq
+ls sample_*.fastq       # the three sample files
+ls sample_0?.fastq      # ? matches a single char (same three here)
+ls sample_0[12].fastq   # only sample_01 and sample_02
+ls *.{fastq,md}         # brace expansion: .fastq OR .md
+```
+
+## A6. Pipes and redirection
+
+Two ideas power most command-line work. **Redirection** sends a command's output to (or input from) a file: `>` writes (overwriting), `>>` appends, `<` reads input, `2>` captures errors. **Pipes** (`|`) connect the output of one command straight into the input of the next — no temp files needed. This is the Unix philosophy: small tools that each do one thing, combined into pipelines.
+
+``` bash
+cd ~/p2_practice
+
+# redirection: save output to a file, then append
+ls -l > listing.txt          # write a directory listing (overwrites)
+echo "generated $(date)" >> listing.txt   # append a timestamp line
+wc -l < big.txt              # feed big.txt in as input; counts its lines
+
+# pipes: chain commands together
+cat big.txt | wc -l                       # same count, built with a pipe
+head -n 50 big.txt | tail -n 5            # lines 46–50 (first 50, then last 5 of those)
+ls *.fastq | wc -l                        # how many .fastq files are there?
+
+# a longer pipeline: count, sort, and show the most common words in readme
+cat readme.txt | tr ' ' '\n' | sort | uniq -c | sort -rn | head
+```
+
+The three standard streams a program reads and writes are **stdin** (0, input), **stdout** (1, normal output), and **stderr** (2, errors). You can redirect each independently — e.g. `command 2> errors.log` keeps error messages out of your results.
+
+::: {.callout-important title="Think about it"}
+What is the difference between `ls > out.txt` and `ls | wc -l`? When would you reach for redirection vs. a pipe?
+
+<details><summary>Show answers</summary>
+
+`>` is **redirection to a file**: `ls > out.txt` saves the listing to disk for later. `|` is a **pipe to another program**: `ls | wc -l` streams the listing straight into `wc -l`, which counts the lines (i.e., how many entries `ls` produced), and nothing is saved. Use **redirection** when you want to keep the output as a file; use a **pipe** when you want to immediately process the output with another tool. They combine freely: `ls | wc -l > count.txt` pipes *then* saves.
+
+</details>
+:::
+
+## A7. Downloading data with `wget`
+
+Genomic references and datasets usually come from a URL. `wget` (or `curl`) fetches them straight to the cluster or your laptop — no browser needed.
+
+``` bash
+cd ~/p2_practice
+
+# download a small text file to the current directory
+wget https://raw.githubusercontent.com/githubtraining/hellogitworld/master/README.txt
+
+# curl does the same; -o names the output file
+curl -o readme_copy.txt https://raw.githubusercontent.com/githubtraining/hellogitworld/master/README.txt
+
+ls -lh README.txt        # -h = human-readable file size
+head README.txt
+```
+
+`.gz` files are gzip-compressed; you can stream them without unpacking using `zcat file.gz | head` or peek with `zless`. The backslash `\` at the end of a line lets a long URL or command span multiple lines.
+
+When you're done with Part A, you can remove the whole practice folder:
+
+``` bash
+cd ~
+rm -r p2_practice        # deletes the folder and everything in it — intended here
+```
+
+------------------------------------------------------------------------
+
+# Part B — R & RStudio
+
+Now switch to **RStudio** (or R inside VS Code). This part is meant to be typed into the **Console**, line by line, watching what each does.
+
+## B1. The RStudio panes
+
+When RStudio opens you see four panes:
+
+- **Source** (top-left) — where you edit scripts (`.R`) and Quarto documents (`.qmd`). Run a line with *Ctrl/Cmd + Enter*.
+- **Console** (bottom-left) — the live R session. Type here and press Enter to run immediately.
+- **Environment / History** (top-right) — every object (variable, data frame) you've created this session.
+- **Files / Plots / Packages / Help** (bottom-right) — file browser, your plots, installed packages, and help pages.
+
+> Write code in the **Source** pane so it's saved and reproducible; use the **Console** for quick throwaway experiments.
+
+## B2. Assignment and basic math
+
+R assigns values with `<-`. Names are case-sensitive (`x` ≠ `X`) and must start with a letter.
+
+``` r
+4 * 4
+(4 + 3 * 2^2)        # R obeys PEMDAS; parentheses control order
+
+x <- 2               # assign 2 to x
+x * 3
+y <- x * 3           # store a result in a new variable
+y - 2
+
+log(16)              # natural log — a built-in function; argument goes in ()
+sqrt(81)
+log(1000, base = 10) # functions take arguments that modify behavior
+```
+
+## B3. Vectors — R's fundamental unit
+
+R "thinks in vectors": a vector is an ordered set of values of one type. Build one with `c()` ("concatenate"). Math and functions operate **element-wise**.
+
+``` r
+counts <- c(8, 3, 0, 12, 5, 1, 0, 9)
+counts
+counts * 2           # every element doubled
+counts + counts      # element-wise addition
+
+length(counts)       # how many elements
+sum(counts)
+mean(counts)
+median(counts)
+sd(counts)           # standard deviation
+max(counts); min(counts)
+
+# sequences
+s <- seq(0, 10, by = 2)   # 0 2 4 6 8 10
+s
+1:10                       # shorthand for an integer sequence
+```
+
+Vectors come in types: `dbl` (real numbers), `int` (integers), `chr` (character strings), `lgl` (logical `TRUE`/`FALSE`/`NA`), and `fctr` (factors — categorical with fixed levels). `NA` marks a missing value.
+
+``` r
+genes <- c("CD3D", "MS4A1", "LYZ", "NKG7")   # a character vector
+genes
+expressed <- c(TRUE, TRUE, FALSE, TRUE)       # a logical vector
+genes[expressed]                              # keep where TRUE — logical subsetting
+```
+
+::: {.callout-important title="Think about it"}
+`counts * 2` doubled every element without you writing any loop. Why does this matter, and what does `counts > 4` return?
+
+<details><summary>Show answers</summary>
+
+R **vectorizes** operations: they apply to every element at once, which is both faster and far more readable than a hand-written loop — and it's exactly how single-cell code processes thousands of cells or genes in one expression. `counts > 4` returns a **logical vector** the same length as `counts` — `TRUE` where the value exceeds 4, `FALSE` otherwise (`FALSE FALSE FALSE TRUE TRUE FALSE FALSE TRUE`). You then feed that logical vector back in (`counts[counts > 4]`) to keep just the matching elements. This "make a logical mask, then subset with it" pattern is everywhere in QC filtering.
+
+</details>
+:::
+
+## B4. Data frames
+
+A **data frame** is the workhorse for tabular data — columns can be different types (one type per column), rows are observations. Build one from vectors, inspect it, and index it.
+
+``` r
+cells <- data.frame(
+  barcode    = c("AAAC", "AAAG", "AAAT", "AACA"),
+  sample     = c("CTRL", "CTRL", "STIM", "STIM"),
+  nCount_RNA = c(8500, 12000, 6400, 9100),
+  nFeature   = c(2300, 3100, 1900, 2500)
+)
+
+cells                       # print the whole thing
+str(cells)                  # structure: columns, types, first values
+summary(cells)              # per-column summary stats
+nrow(cells); ncol(cells)
+colnames(cells)
+
+# indexing: [row, column]
+cells[1, ]                  # first row, all columns
+cells[, "nCount_RNA"]       # one column by name
+cells$nCount_RNA            # same column, with $ (the usual way)
+cells[cells$sample == "STIM", ]   # subset rows where sample is STIM
+mean(cells$nCount_RNA)
+```
+
+## B5. Lists and factors
+
+Two more structures you'll meet constantly. A **list** is the flexible container — each slot can hold anything (a number, a vector, a data frame, even another list). Seurat and `SingleCellExperiment` objects are lists underneath.
+
+``` r
+experiment <- list(
+  sample_id  = "donor_01_CTRL",
+  age        = 42,
+  cell_types = c("B cell", "CD4 T", "Monocyte", "NK")
+)
+experiment$sample_id        # access a named slot with $
+experiment[["cell_types"]]  # or [[ ]] by name/position — returns the content
+experiment[3]               # single [ ] returns a length-1 *list*, not the content
+```
+
+A **factor** is a categorical variable with a fixed, ordered set of allowed values ("levels"). It matters for statistics: the **first level is the reference** in a model.
+
+``` r
+condition <- factor(c("CTRL", "STIM", "CTRL", "STIM"),
+                    levels = c("CTRL", "STIM"))
+condition
+levels(condition)           # "CTRL" "STIM" — CTRL is the reference
+table(condition)            # counts per level
+```
+
+::: {.callout-important title="Think about it"}
+Why use `factor(condition, levels = c("CTRL","STIM"))` instead of leaving it as a plain character vector `c("CTRL","STIM",...)`?
+
+<details><summary>Show answers</summary>
+
+A plain character vector is just text — R has no idea the values form a designed comparison, and would sort them alphabetically with no notion of a "reference". A **factor** records the allowed **levels** and their order. In a differential-expression model (`~ condition`), the **first level is the reference**, so `levels = c("CTRL","STIM")` makes the contrast "STIM vs CTRL" — the biologically sensible direction. Flip the levels and the sign of every fold-change flips. In Seurat, `Idents()`, cluster labels, and metadata columns like `stim` are all factors for exactly this reason.
+
+</details>
+:::
+
+## B6. Writing your own functions
+
+You'll write short helper functions all the time — usually 5–15-line wrappers around Seurat/Bioconductor calls. The structure is `name <- function(args) { ... }`; the last expression is returned.
+
+``` r
+# coefficient of variation, with an option to drop missing values
+cv <- function(x, na.rm = TRUE) {
+  if (na.rm) x <- x[!is.na(x)]
+  sd(x) / mean(x)
+}
+
+cv(c(1, 2, 3, 4, 5))     # 0.527
+cv(c(1, 2, NA, 4, 5))    # NA dropped first
+
+# named vs positional arguments — named is self-documenting and order-proof
+round(3.14159, 2)               # positional
+round(x = 3.14159, digits = 2)  # named: clearer, survives signature changes
+```
+
+## B7. install.packages() vs library()
+
+This is the single most common point of confusion for new R users, so internalize it now:
+
+> **You *install* a package once; you *load* it every session.**
+
+- **`install.packages("pkg")`** downloads the package onto your machine. Do it **once** (from **CRAN**); for Bioconductor packages use **`BiocManager::install("pkg")`**.
+- **`library(pkg)`** makes that installed package's functions available in your **current** R session. Do it **every time you start R**.
+
+``` r
+install.packages("tidyverse")   # ONCE — downloads & installs
+library(tidyverse)              # EVERY SESSION — makes its functions usable now
+```
+
+Restarting R does **not** require re-installing — but it **does** require re-`library()`-ing. That's why every workshop tutorial starts with a `library(...)` block. You can also call one function without loading the whole package via `package::function()`, e.g. `muscData::Kang18_8vs8()`.
+
+## B8. The tidyverse and the pipe
+
+Most modern R for biology is written in **tidyverse** style. Six `dplyr` verbs — `filter()`, `select()`, `mutate()`, `arrange()`, `group_by()`, `summarise()` — cover most data-frame work, and the **pipe** `|>` chains them so the code reads top-to-bottom.
+
+``` r
+library(tidyverse)
+
+cells |>
+  filter(nCount_RNA > 7000) |>          # keep cells with > 7000 UMIs
+  mutate(genes_per_umi = nFeature / nCount_RNA) |>   # add a derived column
+  group_by(sample) |>                   # group by condition
+  summarise(
+    n_cells    = n(),
+    median_umi = median(nCount_RNA),
+    .groups    = "drop"
+  ) |>
+  arrange(desc(median_umi))             # sort, highest first
+```
+
+Read it as: "take `cells`, filter, add a column, group by sample, summarise to one row per group, then sort." This exact style appears throughout the workshop tutorials.
+
+## B9. Reading and writing data
+
+Get data in and out of R. Base R uses `read.csv()`/`write.csv()`; the tidyverse equivalents (`read_csv()`/`write_csv()`) return tibbles and are a bit faster and friendlier.
+
+``` r
+# write our data frame out, then read it back
+write_csv(cells, "cells_demo.csv")           # tidyverse writer
+back <- read_csv("cells_demo.csv")           # tidyverse reader (a tibble)
+back
+
+# base-R equivalents
+write.csv(cells, "cells_demo.csv", row.names = FALSE)
+back2 <- read.csv("cells_demo.csv")
+
+# tab-separated and Excel
+# back_tsv <- read_tsv("file.tsv")
+# library(readxl); back_xl <- read_excel("file.xlsx")
+```
+
+`header = TRUE` says the first row holds column names; `sep` sets the delimiter (`,` for CSV, `\t` for TSV).
+
+------------------------------------------------------------------------
+
+# Part C — Install the workshop packages
+
+This is the canonical place to install **everything the workshop needs**. Do it now, on your laptop, with time to spare — **not the morning of Day 1.** Paste the **entire block** into your R **Console**. The first run takes **20–60 minutes** depending on your machine and whether your platform builds from source.
+
+::: callout-note
+You only do this **once**. After it finishes, every workshop tutorial just needs its `library(...)` lines at the top — the packages are already on disk.
+:::
+
+## C1. CRAN, Bioconductor, and GitHub packages
+
+``` r
+# CRAN
+cran_pkgs <- c(
+  "tidyverse",     # dplyr, ggplot2, tidyr, readr, purrr, tibble, stringr, forcats
+  "Seurat",        # core scRNA-seq workflow (workshop default)
+  "remotes",       # GitHub installs
+  "BiocManager",   # Bioconductor installer
+  "patchwork",     # combining ggplots
+  "presto",        # fast Wilcoxon for FindMarkers
+  "harmony",       # batch integration
+  "clustree",      # picking clustering resolution
+  "ggrepel"        # readable labels on UMAPs
+)
+install.packages(setdiff(cran_pkgs, rownames(installed.packages())))
+
+# Bioconductor
+if (!require("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+bioc_pkgs <- c(
+  "SingleCellExperiment", "scran", "scater", "scuttle",
+  "DropletUtils",      # EmptyDrops, knee-point cell calling
+  "scDblFinder",       # doublet detection
+  "SoupX",             # ambient-RNA correction
+  "DESeq2", "edgeR", "limma",
+  "fgsea", "clusterProfiler", "ReactomePA", "enrichplot",
+  "org.Hs.eg.db", "org.Mm.eg.db",
+  "miloR",             # differential abundance
+  "SingleR", "celldex",
+  "muscData",          # ifnb (Kang18_8vs8) loader used in Tutorials 01–08
+  "Signac", "EnsDb.Hsapiens.v75"
+)
+BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
+                     update = FALSE, ask = FALSE)
+
+# GitHub / R-universe
+remotes::install_github("satijalab/seurat-data", quiet = TRUE, upgrade = "never")
+remotes::install_github("satijalab/azimuth",     quiet = TRUE, upgrade = "never")
+```
+
+## C2. Pre-cache the workshop datasets
+
+Pre-warm the data caches so the first tutorial run is instant rather than waiting on a download.
+
+``` r
+# Workshop datasets — pre-warm the caches so the first tutorial run is instant.
+# ifnb comes from muscData (Tutorials 01–08); the first call downloads
+# ~25 MB through ExperimentHub and caches it locally.
+invisible(muscData::Kang18_8vs8())
+SeuratData::InstallData("stxBrain")  # ~50 MB; used in Tutorial 16 (Spatial)
+```
+
+::: callout-note
+The first install will take 20–60 minutes depending on your machine and whether your platform is building from source. **Run it before the workshop, not the morning of.**
+:::
+
+## C3. (Optional) LaTeX for rendering Quarto to PDF
+
+Quarto renders to HTML with nothing extra, but rendering to **PDF** needs a LaTeX engine. The easiest cross-platform option is **TinyTeX**, installed from R:
+
+``` r
+install.packages("tinytex")
+tinytex::install_tinytex()   # one-time; ~1–2 min, no admin rights needed
+# tinytex::is_tinytex()      # after restarting RStudio, should return TRUE
+```
+
+## C4. Keeping packages up to date
+
+Stale packages can collide with newer code. Update occasionally:
+
+``` r
+update.packages(ask = FALSE)   # update CRAN packages
+BiocManager::install()         # check for / update Bioconductor packages
+BiocManager::valid()           # report packages that are out of sync
+```
+
+::: callout-warning
+**Major R upgrades need package re-installs.** Moving from R 4.3 to 4.4 (the *second* number) starts a fresh package library, so you'd re-run the install block in C1. *Minor* upgrades (4.4.0 → 4.4.1) keep your existing packages.
+:::
+
+::: {.callout-important title="Think about it"}
+You restarted R and a tutorial that worked yesterday now errors with `could not find function "ggplot"`. You did **not** reinstall anything. What happened, and what's the fix?
+
+<details><summary>Show answers</summary>
+
+Restarting R **clears the loaded packages** but does **not** uninstall them. `ggplot()` lives in `ggplot2` (part of the tidyverse), which is installed on disk but not **loaded** into the fresh session. The fix is simply to run `library(tidyverse)` (or `library(ggplot2)`) again — no reinstall needed. This is the `install.packages()`-once vs. `library()`-every-session distinction from B7 in action, and it's why every tutorial opens with a `library(...)` block.
+
+</details>
+:::
+
+## You're ready
+
+You've navigated the shell, manipulated files with pipes and redirection, worked through R's core data structures and the tidyverse pipe, and installed every package the workshop needs. On **Day 1** the analysis tutorials assume exactly this foundation. If the install block errored, the [FAQ](../FAQ.html) covers the common problems — and bring anything you can't resolve to the optional [Day 0](../Schedule.html#day-0-optional-computational-refresher) session.
+
+::: {.callout-note title="Where to go next"}
+First hour of Tuesday, on getting onto Talapas: [Tutorial P1 — Computer Systems & Talapas](Tutorial_P1_Computer_Systems.html). Then Day 1 begins with [Tutorial 00 — Get Up and Running](Tutorial_00_Setup_RStudio_Packages.html) and [Tutorial 01 — QC & Preprocessing](Tutorial_01_QC_Preprocessing.html).
+:::
