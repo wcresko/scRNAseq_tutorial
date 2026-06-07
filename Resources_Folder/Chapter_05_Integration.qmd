@@ -48,16 +48,16 @@ The workshop's `ifnb` shows the second pattern dramatically: PC1 is essentially 
 | Family | Examples | Mechanism | When to use |
 |---|---|---|---|
 | **Linear / regression** | ComBat, `sc.pp.regress_out` | Fit batch as a covariate; subtract its linear effect | Simple cases; rarely sufficient on its own for scRNA-seq |
-| **Mutual nearest neighbors** | MNN, fastMNN, Seurat anchors | Find pairs of cells that are nearest neighbors *across* batches; learn a correction from those anchors | Two or a few batches with similar cell-type compositions |
+| **Mutual nearest neighbors** | MNN [@haghverdi2018mnn], fastMNN, Seurat anchors [@stuart2019integration] | Find pairs of cells that are nearest neighbors *across* batches; learn a correction from those anchors | Two or a few batches with similar cell-type compositions |
 | **Soft clustering in PC space** | **Harmony** | Iteratively re-cluster cells with a batch-mixing penalty; shift centroids toward batch balance | Most-used in 2026 — fast, scales to atlas sizes, works well for 2–50 batches |
-| **Variational autoencoders** | scVI, scANVI | Learn a latent representation conditioned on batch; the decoder can be ignored, the latent used like PCs | Atlas-scale; especially with strong batch heterogeneity |
+| **Variational autoencoders** | scVI [@lopez2018scvi], scANVI [@xu2021scanvi] | Learn a latent representation conditioned on batch; the decoder can be ignored, the latent used like PCs | Atlas-scale; especially with strong batch heterogeneity |
 | **Graph-based** | BBKNN, Conos | Modify the kNN graph to balance cross-batch edges | Fast; works well on already-PCA'd data |
 
-The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks **Harmony** and **Seurat anchors** because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy.
+The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks **Harmony** and **Seurat anchors** because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy. There is no universally best method: large benchmarks of 14+ batch-correction tools, and the atlas-level integration benchmark, find that the right choice depends on dataset complexity and on the trade-off between *removing batch* and *conserving biological variation* — Harmony, Seurat, scVI and scANVI all rank near the top under different conditions [@tran2020benchmark; @luecken2022benchmarking].
 
 ## 5.4 Harmony in detail
 
-Harmony (Korsunsky et al. 2019, *Nat Methods*) operates in PC space — *after* you've run `RunPCA` on the joint object. It iterates four steps until convergence:
+Harmony [@korsunsky2019harmony] operates in PC space — *after* you've run `RunPCA` on the joint object. It iterates four steps until convergence:
 
 1. **Soft-cluster** cells with a batch-diversity penalty: each cell is assigned soft membership in $K$ clusters; the objective rewards clusters whose membership is balanced across batches
 2. **Compute centroids**: a global centroid per cluster, plus per-batch centroids per cluster
@@ -78,7 +78,7 @@ Harmony's weaknesses:
 
 ## 5.5 Seurat anchors in detail
 
-The Seurat workflow (Stuart, Butler et al. 2019, *Cell*) works in two stages:
+The Seurat anchor workflow [@stuart2019integration; @hao2021integrated] works in two stages:
 
 ### 5.5.1 Find anchors
 
@@ -174,14 +174,9 @@ This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
 
 ## 5.12 Going further
 
-::: incremental
-- **Korsunsky et al. 2019** — Harmony paper, [doi:10.1038/s41592-019-0619-0](https://doi.org/10.1038/s41592-019-0619-0)
-- **Stuart, Butler et al. 2019** — Seurat v3 / anchor integration, [doi:10.1016/j.cell.2019.05.031](https://doi.org/10.1016/j.cell.2019.05.031)
-- **Lopez et al. 2018** — scVI, [doi:10.1038/s41592-018-0229-2](https://doi.org/10.1038/s41592-018-0229-2)
-- **Luecken et al. 2022** — *Benchmarking atlas-level data integration*, the canonical comparison paper, [doi:10.1038/s41592-021-01336-8](https://doi.org/10.1038/s41592-021-01336-8)
-- **LISI / k-BET** — quantitative integration metrics; not yet in the workshop tutorials but are standard for benchmarking
-- **Tran et al. 2020, *Genome Biology*** — benchmark of 14 batch-correction methods, [doi:10.1186/s13059-019-1850-9](https://doi.org/10.1186/s13059-019-1850-9)
-- **Xu et al. 2021, *Mol Syst Biol*** — scANVI, semi-supervised integration + annotation, [doi:10.15252/msb.20209620](https://doi.org/10.15252/msb.20209620)
-- **Hao et al. 2021, *Cell*** — Seurat v4 anchor integration / WNN, [doi:10.1016/j.cell.2021.04.048](https://doi.org/10.1016/j.cell.2021.04.048)
-- **Full curated reading list:** [Key Papers, Reviews & Benchmarks](../Key_Papers.html)
+The two method papers the tutorial uses are Harmony [@korsunsky2019harmony] and Seurat anchors [@stuart2019integration; @hao2021integrated]; the deep-learning alternatives are scVI [@lopez2018scvi] and its semi-supervised extension scANVI [@xu2021scanvi], which also transfers labels. To choose among them, read the two benchmarks — of 14 batch-correction methods [@tran2020benchmark] and of atlas-level integration [@luecken2022benchmarking], the latter introducing the now-standard scoring that separates *batch removal* from *biological conservation* (metrics such as LISI and kBET). Mutual-nearest-neighbour correction [@haghverdi2018mnn] is the conceptual ancestor of the anchor approach. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
+
+## References
+
+::: {#refs}
 :::
