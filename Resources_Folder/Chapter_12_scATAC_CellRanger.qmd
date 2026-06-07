@@ -23,7 +23,7 @@ editor: visual
 
 ## 12.1 What scATAC measures, and why processing differs
 
-Single-cell RNA-seq measures **transcription**: it captures polyadenylated mRNA and counts molecules (UMIs) per gene. Single-cell ATAC-seq measures **chromatin accessibility**: a hyperactive Tn5 transposase cuts DNA preferentially where the chromatin is open, and the assay captures and sequences those cut fragments. The per-cell readout is not "how many copies of gene X" but "how many fragments fell in open region Y."
+Single-cell RNA-seq measures **transcription**: it captures polyadenylated mRNA and counts molecules (UMIs) per gene. Single-cell ATAC-seq measures **chromatin accessibility**: a hyperactive Tn5 transposase cuts DNA preferentially where the chromatin is open, and the assay captures and sequences those cut fragments [@buenrostro2013atacseq]. The per-cell readout is not "how many copies of gene X" but "how many fragments fell in open region Y" — a direct readout of the regulatory, rather than the expressed, state of the cell [@klemm2019chromatin].
 
 Because the underlying measurement differs, the raw-processing pipeline diverges from RNA at almost every output even though the surrounding machinery is the same. The table below lines them up:
 
@@ -48,7 +48,7 @@ Because the readout is positional, there is no fixed feature set analogous to a 
 
 ## 12.3 Peak calling: defining the features
 
-In RNA, the features are given to you: genes come from the annotation. In ATAC, the features must be *discovered* from the data, because the interesting units are the open regions, and where those fall depends on the cells you sequenced. `cellranger-atac count` therefore performs **de novo peak calling**: it pools fragments across all barcodes, finds genomic intervals where fragments pile up far above background (a MACS-style algorithm), and declares those intervals **peaks**. Each peak becomes a feature, and the experiment is summarized as a peaks-by-barcodes count matrix.
+In RNA, the features are given to you: genes come from the annotation. In ATAC, the features must be *discovered* from the data, because the interesting units are the open regions, and where those fall depends on the cells you sequenced. `cellranger-atac count` therefore performs **de novo peak calling**: it pools fragments across all barcodes, finds genomic intervals where fragments pile up far above background (a MACS-style algorithm [@zhang2008macs]), and declares those intervals **peaks**. Each peak becomes a feature, and the experiment is summarized as a peaks-by-barcodes count matrix.
 
 This step is the main reason an ATAC run takes roughly two to three times as long as an RNA run at the same cell count. The pipeline must align fragments to the **whole genome** rather than a small transcriptome, deduplicate at single-fragment resolution, run the peak caller (which is memory-hungry — on the order of 80 GB for ~10,000 cells), and then count fragments per peak per barcode. Budget your wall-clock time and memory accordingly; the tutorial gives concrete SLURM numbers.
 
@@ -108,7 +108,7 @@ outs/
   └── web_summary.html             # QC at a glance
 ```
 
-Signac loads the matrix with `Read10X_h5()` and builds a `ChromatinAssay` that points at the fragments file:
+Signac [@stuart2021signac] loads the matrix with `Read10X_h5()` and builds a `ChromatinAssay` that points at the fragments file:
 
 ```r
 library(Signac)
@@ -132,3 +132,10 @@ Finally, a note on **multiome**. If your library is a 10x Multiome — joint RNA
 - [Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix](Chapter_11_CellRanger.html) — the RNA companion
 - [Chapter 15 — Bulk and Single-Cell ATAC-seq](Chapter_15_ATAC.html) — the downstream Signac analysis
 - [10x Genomics Cell Ranger ATAC documentation](https://www.10xgenomics.com/support/software/cell-ranger-atac/latest)
+
+The primary methods behind this chapter are the ATAC-seq assay [@buenrostro2013atacseq], the chromatin-accessibility review [@klemm2019chromatin], MACS peak calling [@zhang2008macs], and Signac for the downstream analysis [@stuart2021signac].
+
+## References
+
+::: {#refs}
+:::
