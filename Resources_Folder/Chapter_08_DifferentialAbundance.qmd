@@ -42,14 +42,15 @@ The naive approach: count cells per (cluster, sample), make a 2×2 table per clu
 ::: incremental
 1. **Hard cluster boundaries are arbitrary.** A cell type that spans two clusters at one resolution and one cluster at another gives a different test result. Resolution-dependent inferences are bad.
 2. **Within-cluster heterogeneity is invisible.** A "T cell" cluster containing both expanding-activated and shrinking-naive subpopulations will show no net change at the cluster level — but real DA at finer resolution.
-3. **Cells aren't independent samples.** Cluster-level Fisher tests treat every cell as a replicate; the right unit is the donor, just like in DE.
+3. **Cells aren't independent samples.** Cluster-level Fisher tests treat every cell as a replicate; the right unit is the donor, just like in DE [@squair2021confronting].
+4. **Proportions are compositional.** Cell-type fractions in a sample sum to 1, so they are *not* independent — when one population expands, the others must shrink as a mathematical artifact, even if their absolute numbers are unchanged. Naive proportion tests ignore this; methods like scCODA model it explicitly [@buttner2021sccoda].
 :::
 
-The first two are particularly insidious. Cluster boundaries on a smooth biology gradient are dotted lines, not real ones, and proportion tests on dotted lines are unstable.
+The first two are particularly insidious. Cluster boundaries on a smooth biology gradient are dotted lines, not real ones, and proportion tests on dotted lines are unstable. A dedicated benchmark of six DA methods quantifies how these failure modes play out across datasets and is the reference for choosing a tool [@yi2024benchmarking].
 
 ## 8.3 The miloR approach — neighborhoods, not clusters
 
-`miloR` (Dann et al. 2022, *Nat Biotechnol*) replaces hard clusters with overlapping **neighborhoods** on the kNN graph. Each neighborhood is a representative cell plus its $k$ nearest neighbors; \~1000 neighborhoods are sampled to cover the data.
+`miloR` [@dann2022milo] replaces hard clusters with overlapping **neighborhoods** on the kNN graph. Each neighborhood is a representative cell plus its $k$ nearest neighbors; \~1000 neighborhoods are sampled to cover the data.
 
 The procedure:
 
@@ -67,7 +68,7 @@ Imagine a continuous biological gradient — naive T cells transitioning to effe
 
 If the perturbation shifts the *position* of the gradient (more cells now near the effector end), neighborhoods near the effector end show up-DA and neighborhoods near the naive end show down-DA. The cluster-level test, depending on where the boundary fell, might report the change correctly, or might miss it entirely if the boundary happened to sit in a stable region.
 
-For continuous biology, neighborhoods almost always recover more signal than clusters. For very discrete biology (B cells vs T cells), they give the same answer. So neighborhoods are at worst equivalent and often better.
+For continuous biology, neighborhoods almost always recover more signal than clusters. For very discrete biology (B cells vs T cells), they give the same answer. So neighborhoods are at worst equivalent and often better. The neighborhood approach is not the only valid design: **scCODA** treats composition as a Bayesian compositional problem [@buttner2021sccoda], **sccomp** jointly models composition *and* variability [@mangiola2023sccomp], and **propeller** offers a fast linear-model test on transformed proportions [@phipson2022propeller] — all are reasonable, cluster-based alternatives when you trust your cluster definitions.
 
 ## 8.5 Neighborhood size — the only parameter you'll tune
 
@@ -151,11 +152,9 @@ After the test, each neighborhood has a log-FC and SpatialFDR but no semantic la
 
 ## 8.12 Going further
 
-::: incremental
-- **Dann et al. 2022** — miloR paper, [doi:10.1038/s41587-021-01033-z](https://doi.org/10.1038/s41587-021-01033-z)
-- **Büttner et al. 2021** — `scCODA`, a Bayesian compositional alternative, [doi:10.1038/s41467-021-27150-6](https://doi.org/10.1038/s41467-021-27150-6)
-- **Phipson et al. 2022** — `propeller`, fast linear-model DA, [doi:10.1093/bioinformatics/btac582](https://doi.org/10.1093/bioinformatics/btac582)
-- **Mangiola et al. 2023, *PNAS*** — sccomp, joint composition + variability modeling, [doi:10.1073/pnas.2203828120](https://doi.org/10.1073/pnas.2203828120)
-- **Yi et al. 2024, *Genome Biology*** — benchmark of six differential-abundance methods, [doi:10.1186/s13059-023-03143-0](https://doi.org/10.1186/s13059-023-03143-0)
-- **Full curated reading list:** [Key Papers, Reviews & Benchmarks](../Key_Papers.html)
+The tutorial's method is Milo [@dann2022milo]; its main alternatives are scCODA [@buttner2021sccoda], sccomp [@mangiola2023sccomp], and propeller [@phipson2022propeller], and the benchmark of six DA methods [@yi2024benchmarking] is the reference for choosing among them. The pseudoreplication caution carries over directly from differential expression [@squair2021confronting]. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
+
+## References
+
+::: {#refs}
 :::
