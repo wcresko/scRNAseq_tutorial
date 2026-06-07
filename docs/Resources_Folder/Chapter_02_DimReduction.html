@@ -4135,10 +4135,6 @@ z-index: 1;
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link" href="../index.html"> 
-<span class="menu-text">Home</span></a>
-  </li>  
-  <li class="nav-item">
     <a class="nav-link" href="../about.html"> 
 <span class="menu-text">About</span></a>
   </li>  
@@ -4193,7 +4189,7 @@ z-index: 1;
   <li><a href="#build-the-k-nearest-neighbor-knn-graph" id="toc-build-the-k-nearest-neighbor-knn-graph" class="nav-link" data-scroll-target="#build-the-k-nearest-neighbor-knn-graph">2.4.1 Build the k-nearest-neighbor (kNN) graph</a></li>
   <li><a href="#promote-to-a-shared-nearest-neighbor-snn-graph" id="toc-promote-to-a-shared-nearest-neighbor-snn-graph" class="nav-link" data-scroll-target="#promote-to-a-shared-nearest-neighbor-snn-graph">2.4.2 Promote to a shared-nearest-neighbor (SNN) graph</a></li>
   </ul></li>
-  <li><a href="#leiden-community-detection" id="toc-leiden-community-detection" class="nav-link" data-scroll-target="#leiden-community-detection">2.5 Leiden community detection</a></li>
+  <li><a href="#graph-based-community-detection-louvain-leiden" id="toc-graph-based-community-detection-louvain-leiden" class="nav-link" data-scroll-target="#graph-based-community-detection-louvain-leiden">2.5 Graph-based community detection (Louvain &amp; Leiden)</a></li>
   <li><a href="#t-sne-and-umap-visualization-not-analysis" id="toc-t-sne-and-umap-visualization-not-analysis" class="nav-link" data-scroll-target="#t-sne-and-umap-visualization-not-analysis">2.6 t-SNE and UMAP: visualization, not analysis</a>
   <ul class="collapse">
   <li><a href="#t-sne" id="toc-t-sne" class="nav-link" data-scroll-target="#t-sne">2.6.1 t-SNE</a></li>
@@ -4259,7 +4255,7 @@ Note
 <p>Three steps fix this:</p>
 <ol type="1">
 <li><strong>Project</strong> to a lower-dimensional space that keeps the structured variance (PCA → 20–50 PCs)</li>
-<li><strong>Partition</strong> the cells into communities of mutually-similar neighbors (k-NN graph + Leiden)</li>
+<li><strong>Partition</strong> the cells into communities of mutually-similar neighbors (k-NN graph + Louvain/Leiden)</li>
 <li><strong>Paint</strong> the result onto a 2-D picture for inspection (UMAP or t-SNE)</li>
 </ol>
 <p>Each step is a separate idea with its own theory and failure modes. This chapter walks them in order.</p>
@@ -4315,16 +4311,16 @@ Note
 <p>Seurat’s <code>FindNeighbors(seu, dims = 1:30)</code> builds both. The SNN graph stored in <code>seu@graphs$RNA_snn</code> is then handed to <code>FindClusters</code>.</p>
 </section>
 </section>
-<section id="leiden-community-detection" class="level2">
-<h2 class="anchored" data-anchor-id="leiden-community-detection">2.5 Leiden community detection</h2>
-<p>The clustering algorithm of choice is <strong>Leiden</strong> (Traag, Waltman, van Eck 2019), which improves on Louvain by guaranteeing well-connected communities. The objective is <strong>modularity</strong> — a measure of how much denser within-community edges are than the random expectation.</p>
-<p>Leiden iterates:</p>
+<section id="graph-based-community-detection-louvain-leiden" class="level2">
+<h2 class="anchored" data-anchor-id="graph-based-community-detection-louvain-leiden">2.5 Graph-based community detection (Louvain &amp; Leiden)</h2>
+<p>Both algorithms optimize <strong>modularity</strong> — a measure of how much denser within-community edges are than the random expectation. <strong>Louvain</strong> is Seurat’s default and is what the <strong>workshop tutorials run</strong> (<code>FindClusters(seu, resolution = 0.5)</code>, i.e. <code>algorithm = 1</code>), because it has no extra dependencies. <strong>Leiden</strong> (Traag, Waltman, van Eck 2019) is the modern preferred refinement — it improves on Louvain by guaranteeing well-connected communities — but it needs the <code>leidenalg</code> Python package via <code>reticulate</code>, so we present it as the one-line upgrade rather than the default.</p>
+<p>Leiden iterates (Louvain follows the same first and third steps, without the refinement guarantee):</p>
 <ol type="1">
 <li>Local moves: each cell joins the neighbor’s community if doing so increases modularity</li>
-<li>Refinement: split sub-communities that have low internal connectivity</li>
+<li>Refinement (Leiden only): split sub-communities that have low internal connectivity</li>
 <li>Aggregation: collapse each community into a node and run again</li>
 </ol>
-<p>The final partition is a labeling of every cell into a numbered cluster. <code>FindClusters(seu, resolution = 0.5, algorithm = 4)</code> runs Leiden in Seurat (<code>algorithm = 4</code> selects Leiden; <code>1</code> is Louvain).</p>
+<p>The final partition is a labeling of every cell into a numbered cluster. To switch from the Louvain default to Leiden, add <code>algorithm = 4</code>: <code>FindClusters(seu, resolution = 0.5, algorithm = 4)</code> (<code>algorithm = 4</code> selects Leiden; <code>1</code> is Louvain) — once <code>leidenalg</code> is installed.</p>
 <p>The <strong>resolution parameter</strong> controls granularity:</p>
 <ul>
 <li>Low resolution (0.1–0.3) → few, broad clusters (immune cell families)</li>
