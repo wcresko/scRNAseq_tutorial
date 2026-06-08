@@ -1,5 +1,5 @@
 ---
-title: "Tutorial 04 — Reference-based Annotation (SingleR + Azimuth)"
+title: "Tutorial 04 — Reference-based Annotation (Azimuth)"
 subtitle: "Map cells against a labeled reference for fast, reproducible cell-type calls"
 author: "Single Cell RNA-seq Workshop"
 format:
@@ -29,7 +29,7 @@ Every code chunk here is tagged with `#| eval: false`, so the published page sho
 
 ## About this tutorial
 
-A short hands-on companion to **[Lecture 04 — Reference-based Annotation](../Lecture_Folder/Lecture_04_Reference_Annotation.html)**. We start from the **annotated object saved at the end of Tutorial 03** (`ifnb_annotated.rds`) — reference-based methods like SingleR and Azimuth run per cell and don't need your own integration, so this step slots in right after manual annotation and before integration. We:
+A short hands-on companion to **[Lecture 04 — Reference-based Annotation](../Lecture_Folder/Lecture_04_Reference_Annotation.html)**. We start from the **annotated object saved at the end of Tutorial 03** (`ifnb_annotated.rds`) — reference-based methods like Azimuth run per cell and don't need your own integration, so this step slots in right after manual annotation and before integration. We:
 
 
 ::: callout-note
@@ -37,13 +37,12 @@ A short hands-on companion to **[Lecture 04 — Reference-based Annotation](../L
 :::
 
 
--   Run `SingleR` against a built-in `celldex` reference
 -   Run `Azimuth` against the PBMC reference (a perfect fit for this dataset)
--   Compare the two automatic calls against the manual labels you assigned in Tutorial 03 *and* against the author-curated `seurat_annotations` ground truth
+-   Compare the automatic calls against the manual labels you assigned in Tutorial 03 *and* against the author-curated `seurat_annotations` ground truth
 -   Reconcile disagreements and save a final, reference-validated annotation
 
 ::: callout-note
-**Why this works particularly cleanly for `ifnb`.** The dataset is human PBMCs — exactly what the Azimuth `pbmcref` and `celldex::HumanPrimaryCellAtlasData()` references are built for. You should expect **high agreement** between methods. That's a feature, not a coincidence: it's the easy regime, where reference-based annotation shines. In the **bonus raw-data track** — the [Full Talapas run from raw FASTQs](../Resources_Folder/Talapas_FullRun_FromFASTQs.html) on the NSCLC tumor dataset — you'll see what happens when the data includes tumor / non-immune cells outside the reference's support: the harder regime.
+**Why this works particularly cleanly for `ifnb`.** The dataset is human PBMCs — exactly what the Azimuth `pbmcref` reference is built for. You should expect **high agreement** between the automatic labels and your manual ones. That's a feature, not a coincidence: it's the easy regime, where reference-based annotation shines. In the **bonus raw-data track** — the [Full Talapas run from raw FASTQs](../Resources_Folder/Talapas_FullRun_FromFASTQs.html) on the NSCLC tumor dataset — you'll see what happens when the data includes tumor / non-immune cells outside the reference's support: the harder regime.
 :::
 
 ::: {.callout-tip title="How to use this page"}
@@ -56,11 +55,11 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 
 
 ::: {.callout-warning title="Common errors / things that bite"}
-**`celldex::HumanPrimaryCellAtlasData()` fails or hangs** — the underlying data is in `ExperimentHub`. First-time download is \~500 MB and can hit firewalls. Run `setExperimentHubOption("PROXY", Sys.getenv("HTTP_PROXY"))` if behind a corporate proxy. The cached version is reused on subsequent runs.
-
 **`RunAzimuth` errors during reference download** — the PBMC reference is \~1 GB and downloads on first call. Confirm internet, sufficient disk, and no `tar` corruption. If it fails midway, delete the partial cache directory (`~/.cache/Azimuth/` or similar) and retry.
 
-**SingleR labels are mostly "T_cells", "B_cell"** — the `HumanPrimaryCellAtlasData` reference is broad. For finer resolution, use `label.fine` instead of `label.main`, or switch to a more specific reference like `MonacoImmuneData` for PBMCs.
+**STIM cells get lower mapping scores than CTRL** — that's expected, not a bug: the interferon-β response shifts cells off the resting-PBMC reference manifold even though their *cell-type* identity is unchanged. Read it as a confidence flag, not a wrong label.
+
+**Many cells labeled with a coarse type** — `predicted.celltype.l1` is broad by design. Use `predicted.celltype.l2` (or `l3`) for finer resolution.
 :::
 
 
@@ -79,9 +78,6 @@ If you're running a graded course, link the rendered solutions page from your LM
 #| label: setup
 #| fig-cap: "Manual cell-type annotations (from Tutorial 03) on the unintegrated UMAP — the starting point for reference-based annotation."
 library(Seurat)
-library(SingleR)
-library(celldex)
-library(SingleCellExperiment)
 library(tidyverse)
 library(patchwork)
 
@@ -114,106 +110,9 @@ ggsave(file.path(out_dir, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap,
        width = 7, height = 6, dpi = 300)
 ```
 
-## Path 1 — `SingleR` against a `celldex` reference
+## Azimuth — Seurat reference mapping
 
-`SingleR` correlates each query cell's expression against per-label reference profiles and returns the best-matching label.
-
-### Pick a reference
-
-```{r}
-#| label: singler-ref
-# Bulk reference covering 37 main cell types from purified human samples
-ref <- celldex::HumanPrimaryCellAtlasData()
-
-# Run SingleR on the (log-)normalized counts
-sce  <- as.SingleCellExperiment(ifnb)
-pred <- SingleR(test = sce, ref = ref,
-                labels = ref$label.main,
-                assay.type.test = "logcounts",
-                BPPARAM = BiocParallel::SerialParam())
-table(pred$labels)
-
-# --- Table out: number of cells assigned to each SingleR label -------------
-tibble::enframe(table(pred$labels),
-                name = "singler_label", value = "n_cells") |>
-  dplyr::mutate(n_cells = as.integer(n_cells)) |>
-  dplyr::arrange(dplyr::desc(n_cells)) |>
-  readr::write_csv(file.path(out_dir, "Mod4_C2_singler_label_counts.csv"))
-```
-
-Attach the calls back to the Seurat object:
-
-```{r}
-#| label: singler-attach
-#| fig-cap: "SingleR reference-based labels (celldex HumanPrimaryCellAtlas) projected onto the unintegrated UMAP."
-
-ifnb$singler_label <- pred$labels
-ifnb$singler_score <- apply(pred$scores, 1, max)
-
-p_singler_umap <- DimPlot(ifnb, group.by = "singler_label", reduction = "umap",
-        label = TRUE, repel = TRUE) +
-  NoLegend() +
-  labs(
-    title = "SingleR labels on the unintegrated UMAP",
-    subtitle = "celldex HumanPrimaryCellAtlas reference (label.main)",
-    x = "UMAP 1",
-    y = "UMAP 2"
-  )
-p_singler_umap
-
-ggsave(file.path(out_dir, "Mod4_C3_singler_labels_umap.png"), p_singler_umap,
-       width = 7, height = 6, dpi = 300)
-```
-
-### Score-distribution plot — a built-in confidence check
-
-```{r}
-#| label: singler-confidence
-#| fig-cap: "SingleR confidence diagnostics: per-label score heatmap and the per-cell delta (top-label score minus median) distribution."
-
-p_score_heatmap <- plotScoreHeatmap(pred)
-p_score_heatmap
-
-p_delta <- plotDeltaDistribution(pred) +
-  labs(
-    title = "SingleR delta distribution by assigned label",
-    subtitle = "delta = top-label score minus median score; small delta = low-confidence call",
-    x = "Assigned label",
-    y = "Delta (score gap)"
-  )
-p_delta
-
-ggsave(file.path(out_dir, "Mod4_C4_singler_score_heatmap.png"), p_score_heatmap,
-       width = 9, height = 7, dpi = 300)
-ggsave(file.path(out_dir, "Mod4_C4_singler_delta_distribution.png"), p_delta,
-       width = 9, height = 5, dpi = 300)
-```
-
-::: {.callout-important title="Think about it"}
-Some cells will get a label like `"T_cells"` with `delta` close to zero. What does that mean and what should you do about it?
-
-<details>
-
-<summary>Click for answer</summary>
-
-`delta` is the gap between the cell's top-label score and the median score across all labels. A small `delta` means the reference can't decide — the cell either looks ambiguous (multiple types fit equally well) or is a type the reference doesn't contain.
-
-In practice: prune low-confidence calls (`pruneScores()` from SingleR), and trust your manual marker-based label more for those cells.
-
-</details>
-:::
-
-```{r}
-#| label: singler-prune
-
-ifnb$singler_label_pruned <- ifelse(
-  is.na(SingleR::pruneScores(pred)), NA, pred$labels
-)
-```
-
-## Path 2 — Azimuth (Seurat reference mapping)
-
-Azimuth wraps Seurat's anchor-based reference mapping with curated atlases. The PBMC reference is the most widely tested.
+Azimuth wraps Seurat's anchor-based reference mapping with curated atlases, and returns hierarchical labels (`predicted.celltype.l1` / `l2` / `l3`) plus a per-cell **mapping score**. The PBMC reference (`pbmcref`) is the most widely tested and is a perfect fit for `ifnb`.
 
 ```{r}
 #| label: azimuth
@@ -229,7 +128,7 @@ head(ifnb@meta.data[, grep("predicted", colnames(ifnb@meta.data))])
 # --- Table out: per-cell Azimuth predictions (l1/l2/l3 + scores) -----------
 ifnb@meta.data[, grep("predicted", colnames(ifnb@meta.data)), drop = FALSE] |>
   tibble::rownames_to_column("cell") |>
-  readr::write_csv(file.path(out_dir, "Mod4_C6_azimuth_predictions.csv"))
+  readr::write_csv(file.path(out_dir, "Mod4_C2_azimuth_predictions.csv"))
 
 p_azimuth_umap <- DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = "umap",
         label = TRUE, repel = TRUE) +
@@ -242,7 +141,26 @@ p_azimuth_umap <- DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = 
   )
 p_azimuth_umap
 
-ggsave(file.path(out_dir, "Mod4_C6_azimuth_labels_umap.png"), p_azimuth_umap,
+ggsave(file.path(out_dir, "Mod4_C2_azimuth_labels_umap.png"), p_azimuth_umap,
+       width = 7, height = 6, dpi = 300)
+```
+
+### Reading the mapping score — a built-in confidence check
+
+```{r}
+#| label: azimuth-confidence
+#| fig-cap: "Azimuth mapping scores on the UMAP. Low-scoring cells project poorly into the reference manifold — treat their labels with caution."
+
+p_mapping <- FeaturePlot(ifnb, features = "mapping.score", reduction = "umap") +
+  labs(
+    title = "Azimuth mapping score per cell",
+    subtitle = "High (~0.7–1.0) = projects cleanly into the reference; low = off-manifold",
+    x = "UMAP 1",
+    y = "UMAP 2"
+  )
+p_mapping
+
+ggsave(file.path(out_dir, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -253,40 +171,31 @@ Azimuth's PBMC reference is built for **resting** PBMCs. The `ifnb` STIM cells a
 
 <summary>Click for answer</summary>
 
-Azimuth still assigns the best-matching label, but the **mapping score** (`mapping.score`) reflects how well the cell's neighborhood projects into the reference space. Plot `FeaturePlot(ifnb, "mapping.score")` — if STIM cells have **systematically lower mapping scores** than CTRL cells, that's evidence that the IFN response is shifting STIM cells off the reference manifold even though their *cell-type* identity is unchanged.
+Azimuth still assigns the best-matching label, but the **mapping score** (`mapping.score`) reflects how well the cell's neighborhood projects into the reference space. In the plot above, if STIM cells have **systematically lower mapping scores** than CTRL cells, that's evidence that the IFN response is shifting STIM cells off the reference manifold even though their *cell-type* identity is unchanged.
 
-In practice the PBMC reference is robust enough that this effect is mild — but it's a great teaching example of how a "good" reference can still under-represent a perturbation state.
+In practice the PBMC reference is robust enough that this effect is mild — but it's a great teaching example of how a "good" reference can still under-represent a perturbation state. Compare the means with `tapply(ifnb$mapping.score, ifnb$stim, mean)`.
 
 </details>
 :::
 
-## Compare the three annotations
+## Compare Azimuth against the manual / ground-truth labels
 
 ```{r}
 #| label: compare
 
 ann <- ifnb@meta.data |>
   select(seurat_annotations,                  # ground truth (Kang authors)
-         singler_label_pruned,                # SingleR (pruned)
          predicted.celltype.l2)               # Azimuth
 
-table(ann$seurat_annotations, ann$singler_label_pruned, useNA = "ifany")
 table(ann$seurat_annotations, ann$predicted.celltype.l2, useNA = "ifany")
 
-# --- Tables out: ground-truth vs each automatic method cross-tabulations ----
-as.data.frame(
-  table(seurat_annotations = ann$seurat_annotations,
-        singler_label_pruned = ann$singler_label_pruned, useNA = "ifany"),
-  responseName = "n_cells"
-) |>
-  readr::write_csv(file.path(out_dir, "Mod4_C7_truth_vs_singler.csv"))
-
+# --- Table out: ground-truth vs Azimuth cross-tabulation -------------------
 as.data.frame(
   table(seurat_annotations = ann$seurat_annotations,
         predicted_celltype_l2 = ann$predicted.celltype.l2, useNA = "ifany"),
   responseName = "n_cells"
 ) |>
-  readr::write_csv(file.path(out_dir, "Mod4_C7_truth_vs_azimuth.csv"))
+  readr::write_csv(file.path(out_dir, "Mod4_C4_truth_vs_azimuth.csv"))
 ```
 
 A cleaner cross-tabulation as a heatmap:
@@ -308,19 +217,18 @@ p_compare_heatmap <- ann |>
        fill = "Cells")
 p_compare_heatmap
 
-ggsave(file.path(out_dir, "Mod4_C8_truth_vs_azimuth_heatmap.png"), p_compare_heatmap,
+ggsave(file.path(out_dir, "Mod4_C5_truth_vs_azimuth_heatmap.png"), p_compare_heatmap,
        width = 8, height = 6, dpi = 300)
 ```
 
 ## Reconcile disagreements
 
-A simple "agree-or-flag" rule: keep the ground-truth label if at least one automatic method agrees; otherwise mark for review.
+A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review.
 
 ```{r}
 #| label: reconcile
 
 ifnb$celltype_final <- with(ifnb@meta.data, dplyr::case_when(
-  as.character(seurat_annotations) == singler_label_pruned     ~ as.character(seurat_annotations),
   as.character(seurat_annotations) == predicted.celltype.l2    ~ as.character(seurat_annotations),
   TRUE                                                         ~ paste0("REVIEW:", seurat_annotations)
 ))
@@ -332,7 +240,7 @@ tibble::enframe(table(ifnb$celltype_final),
                 name = "celltype_final", value = "n_cells") |>
   dplyr::mutate(n_cells = as.integer(n_cells)) |>
   dplyr::arrange(dplyr::desc(n_cells)) |>
-  readr::write_csv(file.path(out_dir, "Mod4_C9_celltype_final_counts.csv"))
+  readr::write_csv(file.path(out_dir, "Mod4_C6_celltype_final_counts.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -342,7 +250,7 @@ A reviewer asks you to "use Azimuth labels instead of your manual ones because t
 
 <summary>Click for answer</summary>
 
-Reproducibility is necessary but not sufficient. Azimuth is reproducible *and* biased by its reference: any cell type absent from the reference will be silently re-labeled. The right answer is to use both, as the tutorial does, and document where they disagree — not to pick one because it's mechanical.
+Reproducibility is necessary but not sufficient. Azimuth is reproducible *and* biased by its reference: any cell type absent from the reference will be silently re-labeled. The right answer is to use both, as the tutorial does — manual marker-based labels and the automatic reference call — and document where they disagree, not to pick one because it's mechanical.
 
 </details>
 :::
@@ -359,13 +267,12 @@ saveRDS(ifnb, "../data/ifnb_annotated_final.rds")
 
 You now have:
 
--   A `SingleR` label per cell (with confidence pruning)
 -   An Azimuth label per cell (with a mapping score)
 -   A reconciled `celltype_final` you can carry into Tutorial 06 (DESeq2 + pseudobulk DE) or downstream analyses
 
 ::: {.callout-tip title="Going further"}
--   Try a tissue-appropriate reference: `celldex::BlueprintEncodeData()`, the [Tabula Sapiens](https://tabula-sapiens-portal.ds.czbiohub.org/) atlas, or the [HCA Lung Cell Atlas](https://data.humancellatlas.org/).
--   Repeat with **CellTypist** (Python) for a third opinion.
+-   Try a tissue-appropriate reference: another Azimuth atlas (`lungref`, `bonemarrowref`, …), the [Tabula Sapiens](https://tabula-sapiens-portal.ds.czbiohub.org/) atlas, or the [HCA Lung Cell Atlas](https://data.humancellatlas.org/).
+-   For a second opinion from a different annotation paradigm, try a **correlation-based** method (`SingleR` with a `celldex` reference) or a **classifier-based** one (**CellTypist**, Python). These aren't installed for the workshop — Azimuth alone is enough here — but they're worth knowing; see [Chapter 4](../Resources_Folder/Chapter_04_Reference_Annotation.html) for how they compare.
 -   For tumor data, look at **TumorDecon** or **ProjecTILs** to handle the tumor/immune mix more carefully — see also the parallel reference-annotation example in the **Talapas Advanced series**.
 :::
 
@@ -374,5 +281,4 @@ You now have:
 -   [Lecture 04 — Reference-based Annotation](../Lecture_Folder/Lecture_04_Reference_Annotation.html)
 -   [Lecture 03 — Markers & Manual Annotation](../Lecture_Folder/Lecture_03_Markers_Annotation.html)
 -   [Glossary — Cell type annotation](../Resources_Folder/Glossary.html#c)
--   `SingleR` book: [bioconductor.org/books/release/SingleRBook](https://bioconductor.org/books/release/SingleRBook/)
 -   Azimuth web tool: [azimuth.hubmapconsortium.org](https://azimuth.hubmapconsortium.org/)

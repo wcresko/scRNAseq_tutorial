@@ -1,5 +1,5 @@
 ---
-title: "Lecture 04 — Reference-based Annotation: SingleR & Azimuth"
+title: "Lecture 04 — Reference-based Annotation: Azimuth"
 author: "Bill Cresko"
 format:
   revealjs:
@@ -37,13 +37,14 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 -   Next: [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
 -   **Companion tutorial:** [Tutorial 04 — Reference-based Annotation](../Exercise_Folder/Tutorial_04_Reference_Annotation.html)
 -   **Companion book chapter:** [Chapter 4 — Reference-based Annotation](../Resources_Folder/Chapter_04_Reference_Annotation.html)
--   **Parallel reading:** [scNotebooks Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html) (automated annotation with celldex + SingleR)
+-   **Parallel reading:** [scNotebooks Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html) (automated cell-type annotation)
 
 ## Goals of this lecture
 
 ::: incremental
 -   See what an **annotated reference** is and how it's used
--   Understand the two big paradigms — **correlation** (SingleR) and **mapping** (Azimuth)
+-   Run **Azimuth** — anchor-based reference mapping — as our hands-on method
+-   Know the other paradigms you'll meet: **correlation** (SingleR) and **classifiers** (CellTypist)
 -   Read confidence scores so you know when *not* to trust the label
 -   Reconcile reference labels against the manual labels from Lec 03
 :::
@@ -52,24 +53,7 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 **Why a second annotation method?** Manual annotation (Lec 03) is interpretable but biased by the annotator's experience. Reference-based annotation is reproducible but biased by the reference's coverage. Running both and reconciling is the modern best practice.
 :::
 
-# Two paradigms {background-color="#2c3e50"}
-
-## SingleR — correlation against a reference
-
-::: incremental
--   For each query cell, compute its **Spearman correlation** with each reference profile
--   Iteratively prune low-confidence labels (Aran et al. 2019)
--   Works on **bulk references** (e.g. `HumanPrimaryCellAtlasData`) *and* sc references
--   No batch correction needed — operates on rank-transformed expression
-:::
-
-``` r
-library(SingleR); library(celldex)
-ref <- HumanPrimaryCellAtlasData()
-pred <- SingleR(test = as.SingleCellExperiment(seu),
-                ref = ref, labels = ref$label.main)
-seu$singleR <- pred$labels
-```
+# Azimuth — our hands-on method {background-color="#2c3e50"}
 
 ## Azimuth — anchor-based reference mapping
 
@@ -77,7 +61,7 @@ seu$singleR <- pred$labels
 -   Built on Seurat's **anchor finding** + supervised classification on a published reference
 -   Best for tissues with a **curated Azimuth reference** (PBMC, lung, kidney, BMMC, ...)
 -   Returns labels at multiple **resolutions** (l1 broad → l3 fine) plus a per-cell mapping score
--   Performs **integration** with the reference under the hood
+-   Downloads its reference on demand — **no Bioconductor reference-data packages to install**
 :::
 
 ``` r
@@ -86,24 +70,20 @@ seu <- RunAzimuth(seu, reference = "pbmcref")
 DimPlot(seu, group.by = "predicted.celltype.l2", label = TRUE)
 ```
 
-## CellTypist — pre-trained logistic regression (Python)
+## Other paradigms you'll meet
 
--   `scanpy` ecosystem; many tissues, including a flagship Immune All-Low / All-High model
--   Returns a probability per class; thresholds on `majority_voting` are easy to interpret
--   Often the fastest option for atlas-scale data
+You'll see these in the literature; we don't install them for the workshop, but it's worth knowing how they differ from Azimuth.
+
+::: incremental
+-   **SingleR** — *correlation*: Spearman-correlate each cell against per-label reference profiles (Aran et al. 2019). Works on **bulk** references (classically via `celldex`); returns a `delta` confidence margin.
+-   **CellTypist** — *classifier* (Python): pre-trained logistic-regression models per cell type; fast, returns a probability per class; the largest model library.
+:::
+
+::: callout-note
+All three degrade the same way when the reference doesn't cover your cells — the lesson is identical: **read the confidence score and reconcile against markers.**
+:::
 
 # Confidence — how to read the scores {background-color="#2c3e50"}
-
-## SingleR diagnostics
-
-``` r
-plotScoreHeatmap(pred)         # per-label score per cell
-plotDeltaDistribution(pred)    # margin between top and runner-up label
-```
-
-::: callout-tip
-**Rule of thumb.** A **delta** (score margin) below \~0.05 means the cell could plausibly be either of two labels — flag those cells as "uncertain" rather than forcing a call.
-:::
 
 ## Azimuth diagnostics
 
@@ -112,6 +92,10 @@ plotDeltaDistribution(pred)    # margin between top and runner-up label
 | `predicted.celltype.l2` | the label | — |
 | `predicted.celltype.l2.score` | classification confidence | \> 0.7 = strong |
 | `mapping.score` | how well the cell projects onto the reference manifold | \> 0.7 = mappable; lower = novel state |
+
+``` r
+FeaturePlot(seu, features = "mapping.score")   # spot off-manifold cells
+```
 
 ::: callout-warning
 **Low mapping score = the reference doesn't cover this cell type.** Don't take the label at face value — your data may contain a population the reference doesn't know about (a tumour-specific state, a perturbed phenotype, a developmental intermediate).
@@ -130,7 +114,7 @@ plotDeltaDistribution(pred)    # margin between top and runner-up label
 ## A workable reconciliation workflow
 
 1.  Cluster + name manually (Lec 03)
-2.  Run SingleR + Azimuth, store both as metadata columns
+2.  Run Azimuth, store its labels as metadata columns
 3.  Cross-tabulate: `table(seu$manual, seu$predicted.celltype.l2)`
 4.  For each cluster, accept the agreement; investigate the disagreements
 5.  Persist a **`celltype_final`** column with the resolved label and a **`celltype_method`** column ("manual" / "azimuth" / "consensus")
@@ -163,7 +147,7 @@ LLM tools (and wrappers like GPTCelltype) can suggest labels from a cluster's ma
 -   **Reproducibility is weak** — model versions drift between runs
 
 ::: callout-warning
-**Treat an LLM suggestion like an over-eager rotation student:** a source of hypotheses to verify against markers and a real reference (SingleR / Azimuth), never the final call. Anything you keep must be backed by a marker `DotPlot` and the literature.
+**Treat an LLM suggestion like an over-eager rotation student:** a source of hypotheses to verify against markers and a real reference (Azimuth), never the final call. Anything you keep must be backed by a marker `DotPlot` and the literature.
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
@@ -172,8 +156,8 @@ LLM tools (and wrappers like GPTCelltype) can suggest labels from a cluster's ma
 
 ::: incremental
 -   This is the automated complement to the **manual annotation** of [Lec 03](Lecture_03_Markers_Annotation.html) — for model organisms it is often the first pass; for non-model systems, manual markers still lead
--   **SingleR** = correlation, light-touch, works on bulk refs
--   **Azimuth** = anchor mapping + supervised classifier, best when a curated ref exists for your tissue
+-   **Azimuth** = anchor mapping + supervised classifier, best when a curated ref exists for your tissue; downloads its reference, nothing extra to install
+-   **SingleR** (correlation) and **CellTypist** (classifier) are the other paradigms you'll meet
 -   **Always read confidence scores** — they tell you when the reference doesn't cover your biology
 -   The output of an annotation pass is *a label plus a confidence flag*, not just a label
 :::
