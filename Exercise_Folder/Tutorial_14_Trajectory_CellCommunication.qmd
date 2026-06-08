@@ -70,7 +70,8 @@ DefaultAssay(seu) <- "RNA"
 `slingshot` fits smooth principal curves through your clusters in a reduced space. You give it a **start cluster** (the root) — here we *pretend* one cell type is the progenitor purely to demonstrate the mechanics.
 
 ```{r}
-#| label: M14-pseudotime_values_one_column
+#| label: lst-M14-pseudotime_values_one_column
+#| lst-cap: "Run Slingshot pseudotime, inspect per-lineage pseudotime values, and overlay lineage curves on the UMAP."
 #| eval: false
 sce <- as.SingleCellExperiment(seu)
 sce <- slingshot(sce,
@@ -88,6 +89,10 @@ plot(reducedDims(sce)$UMAP, pch = 16, cex = 0.5, col = "grey70")
 lines(SlingshotDataSet(sce), lwd = 2, col = "black")
 ```
 
+::: {.callout-tip title="Reading the output"}
+The scatter plot shows every cell in UMAP space (grey dots), with the inferred Slingshot lineage curves drawn over the top as black lines. Each curve is a separate trajectory branch; cells are ordered left-to-right (or whichever UMAP direction) by increasing pseudotime from the `start.clus` root. The `head(pt)` table above it shows raw pseudotime values: one column per lineage, `NA` for cells not assigned to that branch. Cells at the start of a lineage have values near 0; cells at the terminus have the highest values. Because `ifnb` is not a developmental dataset, treat these curves as a mechanics demo rather than meaningful biology — on a real differentiation dataset you would colour each cell by its pseudotime value to see the gradient.
+:::
+
 ::: {.callout-important title="Think about it"}
 The `start.clus` argument flips the direction of the whole pseudotime. What evidence (markers, prior biology, CytoTRACE) would you need before trusting "CD14 Mono" as a root for a *real* dataset?
 
@@ -99,7 +104,8 @@ You'd want an independent reason the start cells are the least-differentiated: k
 ### Monocle3 alternative
 
 ```{r}
-#| label: M14-library_monocle3
+#| label: lst-M14-library_monocle3
+#| lst-cap: "Monocle3 alternative: build a cell_data_set, learn the trajectory graph, order cells, and plot pseudotime UMAP."
 #| eval: false
 library(monocle3)
 cds <- as.cell_data_set(seu)                 # SeuratWrappers
@@ -108,6 +114,10 @@ cds <- learn_graph(cds)
 cds <- order_cells(cds)                       # interactive: pick the root node
 plot_cells(cds, color_cells_by = "pseudotime")
 ```
+
+::: {.callout-tip title="Reading the output"}
+`plot_cells()` returns a UMAP where each cell is coloured by its Monocle3 pseudotime value: cells at the root (the node you interactively chose with `order_cells()`) are dark/purple and cells at the terminus are yellow/light. The trajectory graph (learned by `learn_graph()`) is drawn as a set of connected edges overlaid on the UMAP; branch points appear where lineages diverge. Unlike Slingshot, Monocle3 can handle tree-shaped trajectories with multiple branch points, making it better suited to complex developmental hierarchies. `UMAP` coordinates are inherited from the Seurat object, so the cell layout is the same as your standard Seurat UMAP.
+:::
 
 ## Part B — RNA velocity (scVelo, Python sketch)
 
@@ -118,7 +128,8 @@ This Python step is also packaged as a downloadable script — **`14_rna_velocit
 :::
 
 ```{python}
-#| label: M14-import_scvelo_as_scv
+#| label: lst-M14-import_scvelo_as_scv
+#| lst-cap: "scVelo RNA velocity pipeline: read loom file, preprocess, compute dynamical velocity, and plot the embedding stream."
 #| eval: false
 import scvelo as scv, scanpy as sc
 adata = scv.read("ifnb_velocyto.loom")        # spliced + unspliced layers
@@ -129,6 +140,10 @@ scv.tl.velocity_graph(adata)
 scv.pl.velocity_embedding_stream(adata, basis="umap")
 ```
 
+::: {.callout-tip title="Reading the output"}
+`velocity_embedding_stream` overlays a streamline plot on the UMAP: each arrow or flow line points in the direction a cell is predicted to move in transcriptional state space, based on the ratio of unspliced to spliced RNA for each gene. Cells with many unspliced transcripts relative to spliced (i.e., genes that are being actively induced) have arrows pointing toward states that over-express those genes. Coherent arrow fields pointing consistently from one cluster to another support a directional trajectory; disorganized or circular arrows suggest the dataset lacks a clear velocity signal (common in steady-state or stimulation data like `ifnb`). A flat or near-zero field usually means the unspliced layer was too sparse or the dynamical model failed to converge.
+:::
+
 ::: callout-warning
 If you only have the filtered matrix, you **cannot** run velocity — there is no unspliced layer to model. This is the most common reason a velocity run "fails" silently or returns flat arrows.
 :::
@@ -136,7 +151,8 @@ If you only have the filtered matrix, you **cannot** run velocity — there is n
 ### CytoTRACE cross-check
 
 ```{r}
-#| label: M14-library_cytotrace
+#| label: lst-M14-library_cytotrace
+#| lst-cap: "Run CytoTRACE to score differentiation state per cell, then visualise the score on the UMAP."
 #| eval: false
 library(CytoTRACE)
 cyto <- CytoTRACE(as.matrix(GetAssayData(seu, slot = "counts")))
@@ -144,10 +160,15 @@ seu$cytotrace <- cyto$CytoTRACE
 FeaturePlot(seu, "cytotrace")   # higher = less differentiated (more genes detected)
 ```
 
+::: {.callout-tip title="Reading the output"}
+`FeaturePlot` colours each cell in UMAP space by its CytoTRACE score (0–1): **high scores (yellow/light) indicate less-differentiated cells** that express a larger number of genes, while low scores (purple/dark) indicate terminally differentiated cells with a more restricted transcriptome. Use this as an independent cross-check on your Slingshot root: if CytoTRACE scores are highest in the cluster you chose as `start.clus`, the root is consistent with transcriptome breadth. A mismatch (CytoTRACE peaks in a different cluster) suggests the root assignment may need revisiting. Note that CytoTRACE is sensitive to sequencing depth; cells with systematically more reads will score higher regardless of biology.
+:::
+
 ## Part C — Cell–cell communication with CellChat
 
 ```{r}
-#| label: M14-network_who_signals_whom
+#| label: lst-M14-network_who_signals_whom
+#| lst-cap: "Build a CellChat object, infer ligand–receptor communication probabilities, aggregate the network, and visualise with circle plots."
 #| eval: false
 library(CellChat)
 cc  <- createCellChat(object = seu, group.by = "seurat_annotations")
@@ -166,6 +187,10 @@ netVisual_circle(cc@net$weight, weight.scale = TRUE,
 # Drill into one pathway
 netVisual_aggregate(cc, signaling = "MIF", layout = "circle")
 ```
+
+::: {.callout-tip title="Reading the output"}
+The first circle plot (from `netVisual_circle`) shows every cell type as a node around the ring; directed arcs between nodes represent predicted signaling, with arc width proportional to the aggregated interaction strength (number of interactions × probability). Thick arcs indicate strong predicted cross-talk; self-loops mean the cell type signals to itself (autocrine or juxtacrine). The second circle plot drills into a single pathway (here MIF), showing only the ligand–receptor pairs in that pathway. Because `ifnb` is a two-condition PBMC stimulation dataset rather than a tissue, any CellChat output here is a technical demonstration: real CellChat results should be interpreted alongside spatial transcriptomics or perturbation data to validate that the predicted sender and receiver cells are actually co-localised. `netVisual_bubble()` is an alternative that shows individual L–R pairs as bubbles sized by probability.
+:::
 
 ::: {.callout-important title="Think about it"}
 CellChat reports a strong predicted interaction between two clusters. List three reasons this might **not** reflect real signaling in the tissue.

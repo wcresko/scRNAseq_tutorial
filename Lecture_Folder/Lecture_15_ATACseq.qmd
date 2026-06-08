@@ -149,6 +149,18 @@ A `tabix` index (`.tbi`) is built so `Signac` can pull fragments for any genomic
 **Download the fragment file even if you only have the peak matrix.** Many downstream operations (gene activity, motif scoring, coverage plots) re-count fragments per region from scratch.
 :::
 
+## Tutorial dataset — PBMC 10k v1, hg19
+
+::: callout-note
+The tutorial (Module 15) uses the **10x PBMC 10k scATAC v1** dataset, which is mapped to **hg19 / GRCh37**. This requires:
+
+-   `EnsDb.Hsapiens.v75` (last Ensembl annotation pinned to hg19)
+-   Chromosome names with `chr` prefix — add `seqlevels(annotations) <- paste0("chr", seqlevels(annotations))`
+-   The **v1** file prefix `atac_v1_pbmc_10k_*` (not the Next GEM `atac_v1_pbmc_10k_nextgem_*` which is hg38)
+
+Mixing build and annotation causes bizarre coordinate errors — always confirm the build before loading the `EnsDb`.
+:::
+
 ## scATAC QC metrics — what to look at
 
 | Metric | Healthy range | What it catches |
@@ -239,12 +251,21 @@ pbmc <- AddMetaData(pbmc, pred)
 ## Downstream you can reach for
 
 -   **Differential accessibility** — `FindMarkers(test.use = "LR", latent.vars = "nCount_peaks")`
--   **Motif enrichment** — `Signac::FindMotifs` against `JASPAR2020`
+-   **Motif enrichment** — `Signac::FindMotifs` against `JASPAR2020`, or **HOMER** (`findMotifsGenome.pl`) from the command line
 -   **Per-cell TF activity** — `chromVAR` deviations
 -   **Coverage plots** — `CoveragePlot()` to visualize fragment pileups by cell type
 
 ::: callout-tip
 **Latent variable matters.** Use `latent.vars = "nCount_peaks"` (or `"peak_region_fragments"`) for differential accessibility — depth varies wildly across cells and otherwise drives spurious "DA peaks".
+:::
+
+## Design considerations
+
+::: incremental
+-   **QC thresholds are dataset-specific.** The vignette thresholds (`nCount_ATAC > 3000`, `TSS.enrichment > 3`, etc.) are starting points — always inspect the violin plots and density scatters first before cutting.
+-   **`min.cutoff = "q0"` vs `"q5"`** in `FindTopFeatures` — `"q0"` keeps all peaks; `"q5"` drops the lowest-frequency 5%. Use `"q0"` if you have few cells or rare cell types.
+-   **SLM (algorithm 3) vs Louvain/Leiden** — SLM (algorithm 3) often gives more stable partitions on noisy scATAC graphs; Leiden (algorithm 4) is the modern default for RNA but either is fine.
+-   **Gene activity is a proxy** — open chromatin near a gene loosely correlates with expression; a gene can be open without being transcribed (poised) or transcribed via a distal enhancer. Use gene activity for labelling, not expression quantification.
 :::
 
 # Recap & what's next {background-color="#2c3e50"}

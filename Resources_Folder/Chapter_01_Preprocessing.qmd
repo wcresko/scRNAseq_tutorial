@@ -70,6 +70,8 @@ The distribution across cells is typically log-normal-shaped, with a peak at 5,0
 
 Numerical signpost: a healthy cell has at least \~1,000 UMIs; below 500 is almost always noise. The exact lower threshold depends on the tissue (some cell types — neutrophils, plasma cells — are biologically transcriptionally lower than lymphocytes). The distinction between **UMIs** and **reads** matters here: UMI counting collapses PCR duplicates so that each counted molecule is (ideally) a real captured transcript, which is what makes `nCount_RNA` a meaningful biological quantity rather than a sequencing artefact. The UMI deduplication that produces these counts is itself a non-trivial step ([Chapter 11](Chapter_11_CellRanger.html)).
 
+**Reading the UMI-vs-gene scatter.** Plotting `nCount_RNA` on x against `nFeature_RNA` on y produces one of the most informative single QC plots. Healthy cells fall on a tight, near-linear trend. Points far *below* the trend (many UMIs but few unique genes) are low-complexity — over-amplifying a small repertoire; common in degraded libraries or red-blood-cell contamination. Points far *above* the trend in the upper-right corner have both high UMI counts and many unique genes — the classic doublet signature (two cells' worth of RNA in one barcode). Coloring the scatter by `percent.mt` overlays the dying-cell signal: points that sit low on the trend *and* show high mitochondrial fraction are apoptotic cells, not droplets to keep.
+
 ### 1.3.2 `nFeature_RNA` — number of unique genes detected
 
 The count of distinct genes with at least one UMI in the cell. Strongly correlated with `nCount_RNA` but **plateaus** at the saturation of the cell's expressed transcriptome. A typical PBMC has 1,500–4,000 detected genes; a metabolically active cell or doublet pushes higher.
@@ -232,7 +234,9 @@ After steps 1–8, the `Seurat` object holds:
 - `VariableFeatures(seu)` — vector of \~2,000 HVG names
 - `@meta.data` — per-cell metadata (sample, QC metrics, doublet calls)
 
-In Seurat v5 the assay is **layered** — after `merge()` you may see `counts.CTRL`/`counts.STIM` layers that must be recombined with `JoinLayers()` before single-matrix tools (e.g. `FindMarkers`) will work; the tutorial does this explicitly. The next chapter ([Chapter 2 — Dimensionality Reduction & Clustering](Chapter_02_DimReduction.html)) takes the scaled HVG matrix and turns it into clusters and a UMAP.
+**Typical cell counts for the workshop `ifnb` dataset.** Starting from `muscData::Kang18_8vs8()` and keeping only annotated singlets yields \~24,500 cells across both conditions (\~12,000 CTRL + \~12,000 STIM). After the QC filter (`nFeature_RNA > 200 & < 2500`, `percent.mt < 5`, `scDblFinder.class == "singlet"`), the retained count is approximately **\~23,000 cells**. These post-QC cells are what every downstream module in the workshop uses.
+
+In Seurat v5 the assay is **layered** — after `merge()` you may see `counts.CTRL`/`counts.STIM` layers that must be recombined with `JoinLayers()` before single-matrix tools (e.g. `FindMarkers`, `FindVariableFeatures`, `AddModuleScore`) will work; the tutorial does this explicitly after the per-sample doublet-detection merge. If you skip `JoinLayers()`, downstream calls will either error with "data layers are not joined" or silently skip every gene and return an empty table. The next chapter ([Chapter 2 — Dimensionality Reduction & Clustering](Chapter_02_DimReduction.html)) takes the scaled HVG matrix and turns it into clusters and a UMAP.
 
 ## 1.12 Common errors and what they mean
 

@@ -348,7 +348,13 @@ The full DESeq2-style design framework is available — including interactions, 
 ## Five mistakes worth knowing
 
 ::: incremental
-1.  **Running on the unintegrated kNN graph.** If batch effect dominates the embedding, neighbourhoods cluster by sample, and DA falsely "detects" composition shifts that are really batch artifacts. Always run miloR on the **integrated** reduction.
+1.  **Running on the unintegrated kNN graph.** If batch effect dominates the embedding, neighbourhoods cluster by sample, and DA falsely "detects" composition shifts that are really batch artifacts. Always run miloR on the **integrated** reduction. In Tutorial 08, the Harmony reduction from Tutorial 05 is stored under the name `"HARMONY"` (all caps), so the call is:
+
+    ``` r
+    milo <- buildGraph(milo, k = 30, d = 20, reduced.dim = "HARMONY")
+    ```
+
+    If you use Seurat CCA instead, pass `reduced.dim = "integrated"`. The default `reduced.dim = "PCA"` will give you the unintegrated graph — wrong for a multi-sample dataset.
 2.  **Synthetic donor splits passed as biological replicates.** Splitting one large library into "pseudo-donors" gives miloR fake degrees of freedom — the test is anti-conservative. The workshop tutorial flags this with a `set.seed(2026)` synthetic split for illustration only; never report those p-values as real findings.
 3.  **Imbalanced sample sizes.** 8 STIM vs 1 CTRL gives almost no information about the CTRL distribution. Aim for balanced designs.
 4.  **Ignoring `seurat_annotations` mapping.** Without `annotateNhoods()`, you'll get neighbourhood-level results but no easy way to summarise by cell type. Always run `annotateNhoods` after `testNhoods`.

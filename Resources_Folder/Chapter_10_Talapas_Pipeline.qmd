@@ -71,7 +71,7 @@ The hand-off format is R's native serialization, `.rds` (with `.csv` for the tab
 - **The contract between steps is inspectable.** The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.
 :::
 
-The cost of this pattern is the discipline it demands: **you must confirm each step truly succeeded before launching the next.** A job that runs out of memory or time mid-write leaves behind a *truncated, corrupt* `.rds` — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.6) before chaining onward.
+The cost of this pattern is the discipline it demands: **you must confirm each step truly succeeded before launching the next.** A job that runs out of memory or time mid-write leaves behind a *truncated, corrupt* `.rds` — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.5c) before chaining onward.
 
 This explicit-checkpoint pattern is a hand-rolled version of what dedicated workflow managers automate: **Snakemake** [@molder2021snakemake] and **Nextflow** [@ditommaso2017nextflow] track the file-level dependency graph for you, re-running only the steps whose inputs changed and parallelizing independent branches. For an eight-step teaching pipeline, shell wrappers are clear and sufficient; once a pipeline grows or must run on many datasets, moving to one of these managers — combined with per-tool environments from **Bioconda** [@gruning2018bioconda] and containers such as **Singularity/Apptainer** [@kurtzer2017singularity] for full reproducibility — is the natural next step.
 
@@ -92,6 +92,19 @@ After this, the data sit in your local `ExperimentHub` cache, and script 01 find
 ``` bash
 export DATA_DIR=/scratch/<PIRG>/<duckid>/ifnb/data
 ```
+
+## 10.5b Design consideration: one allocation vs per-step jobs
+
+The two wrapper scripts embody opposite trade-offs. `run_rscript.sbatch` gives fine control — each step is its own SLURM job, can request its own memory and time, and can be re-run individually if something fails. The cost is that you must monitor the queue and wait between submissions. `run_core_pipeline.sbatch` is hands-off — submit once and come back — but the whole chain occupies a single large allocation, so the memory ceiling must accommodate the most memory-hungry step (pseudobulk DE and differential abundance, which each benefit from `--mem=96G`) even when earlier steps need far less. For a first run or for learning, `run_core_pipeline.sbatch` is simplest. For production runs on large or evolving datasets, the per-step approach wastes less shared compute and lets you re-run only the failing step.
+
+## 10.5c Reading the output: confirming each step succeeded
+
+Before launching the next script in the chain, confirm the preceding step genuinely completed. Two checks in combination:
+
+1. Look at the `.out` log for the `Wrote ...` line each script prints when it successfully writes its hand-off object to disk.
+2. Run `seff <jobid>` and verify `State: COMPLETED` — not `OUT_OF_MEMORY` or `TIMEOUT`, either of which would have left a truncated, unreadable `.rds` on disk.
+
+A job killed mid-write by an OOM or timeout leaves a file that exists and appears to have a non-zero size, but the `.rds` is corrupt and the following `readRDS()` call will fail with a confusing error. The `Wrote ...` message in the log is the true signal that the object was fully written.
 
 ## 10.6 Running the pipeline: the two wrappers
 

@@ -83,7 +83,15 @@ You can't reuse a counts matrix you can't interpret. "Sample 1, Sample 2, Sample
 
 For human samples: also consent type, age range (often binned for de-identification), self-reported sex / gender, and ancestry.
 
-The CELLxGENE schema [@czi2025cellxgene] is the most demanding of the major repositories and also the most reusable. Its insistence on ontology-typed fields is exactly what makes cross-dataset atlases possible [@osumisutherland2021cell]. Meeting CELLxGENE's bar gets you GEO + HCA "for free". Required fields:
+The CELLxGENE schema [@czi2025cellxgene] is the most demanding of the major repositories and also the most reusable. Its insistence on ontology-typed fields is exactly what makes cross-dataset atlases possible [@osumisutherland2021cell]. Meeting CELLxGENE's bar gets you GEO + HCA "for free".
+
+Three fields deserve a brief explanation that is easy to get wrong:
+
+- **`disease_ontology_term_id`** encodes the *clinical disease state* of the donor, not the experimental treatment. For an *in vitro* perturbation (IFN-β stimulation, a CRISPR knock-out), both the stimulated and unstimulated cells are biologically normal (`PATO:0000461`). The perturbation goes in a free-text `treatment` column alongside the required schema fields. Encoding an experimental treatment as a disease term breaks atlas integration.
+- **`is_primary_data`** is a Boolean flag: `TRUE` for data deposited by the generating lab for the first time; `FALSE` for a re-analysis of someone else's data. This flag is how atlases avoid double-counting the same cells.
+- **`suspension_type`** distinguishes `cell` (dissociated whole cells, the usual case) from `nucleus` (single-nucleus RNA-seq / snRNA-seq). This field matters for atlas integration because snRNA-seq counts are systematically lower than scRNA-seq counts for the same cell type.
+
+Required fields:
 
 | Field | Vocabulary |
 |---|---|
@@ -127,6 +135,12 @@ The biggest mistake: thinking about deposition only after the manuscript is in r
 **Do this instead:** at experimental design time, build the **canonical sample sheet** ([Tutorial 17](../Exercise_Folder/Tutorial_17_FAIR_Metadata.html) ships a template). Include every field you'll need at deposition. Version-control it alongside your code. As samples come in, update the sheet. At the end of the project, the sheet *is* your BioSample / SRA / GEO upload.
 
 This single discipline will save you a week of frantic data archeology at submission time.
+
+## 17.6b Design consideration: one canonical sheet as the single source of truth
+
+The three NCBI upload templates (BioSample, SRA, and GEO) all use `sample_id` as the join key that links records across portals. NCBI's accession-linking is case-sensitive and literal: "donor1_CTRL" and "Donor1_CTRL" will not link. Manual transcription of sample names across three spreadsheets is the single most common cause of broken cross-links in a submission.
+
+The solution is to maintain **one canonical sample sheet** in version control and programmatically derive all upload templates from it with `transmute()` or equivalent. Every name, date, and ontology ID appears in one place; all three submissions are generated from the same object. Inconsistencies must be fixed in the sheet — they then propagate correctly to all outputs. Tutorial 17 demonstrates this pattern end-to-end.
 
 ## 17.7 The end-to-end submission workflow
 

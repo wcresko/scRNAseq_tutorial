@@ -148,6 +148,8 @@ res_shrunk <- lfcShrink(dds, coef = "condition_treated_vs_untreated",
 
 `apeglm` [@zhu2019apeglm] is the recommended estimator. It pulls noisy LFCs toward zero, weighted by their uncertainty. High-confidence genes barely change; low-count noisy genes shrink dramatically.
 
+**Coefficient naming.** `apeglm` requires the exact coefficient name, not a contrast vector. The name is always of the form `<variable>_<level>_vs_<reference>` — e.g. `dex_treated_vs_untreated` for the airway dataset after renaming, or `condition_STIM_vs_CTRL` for the `ifnb` pseudobulk loop. Get the exact string with `resultsNames(dds)` before calling `lfcShrink`; a mismatch gives a confusing "coefficient not found" error. If you renamed factor levels (as Tutorial 06 does for `airway`'s `trt`→`treated`/`untrt`→`untreated`), the coefficient name reflects the new level names.
+
 Always shrink before:
 
 - Volcano plots
@@ -306,7 +308,7 @@ de_all <- map_dfr(unique(meta_pb$celltype), run_de) |>
   filter(!is.na(padj))
 ```
 
-Note the design: `~ donor + stim`, not just `~ stim`. This blocks on donor (a paired-sample design); the `stim` effect is now estimated *within each donor*. Much more powerful than `~ stim` alone whenever donors are paired.
+Note: [Tutorial 06](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) uses the simpler `design = ~ condition` for portability (it works whether donors are real or synthetic), which is why the `Going further` section there shows upgrading to `~ donor + condition`. When you have real paired donors (as the `muscData::Kang18_8vs8()` loader provides via the `ind` column — eight lupus donors, each measured in both CTRL and STIM), adding donor as a blocking variable is the right choice — it blocks on donor-level variance, the effect is estimated *within each donor*, and power increases substantially compared to `~ condition` alone. The `ifnb` pseudobulk workflow starts from the \~23,000 post-QC cells retained after Tutorial 01's filtering step, aggregated per (donor × condition × cell type).
 
 ## 6.15 Why per-cell-type, not a single joint test?
 
@@ -351,11 +353,11 @@ Pseudobulk's honesty depends on having enough donors. Power scales with the numb
 
 If you have only 2 vs 2, you can still run pseudobulk — it'll be honest — but you should expect few significant hits and report sample size openly. If you have only 1 vs 1, no DE method can give you valid p-values; report descriptive fold-changes only.
 
-## 6.18 The `ifnb` synthetic-donor caveat
+## 6.18 Donor IDs in the workshop `ifnb` dataset
 
-The workshop's `ifnb` dataset, as distributed by `SeuratData`, has lost the per-cell donor IDs from the original Kang et al. 2017 paper. To run a meaningful pseudobulk demonstration, the [tutorial](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) creates **synthetic pseudo-donors** by random cell assignment — 4 pseudo-donors per condition.
+The workshop loads `ifnb` via `muscData::Kang18_8vs8()` from Bioconductor (see [Tutorial 01](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)), which **preserves the real per-cell donor IDs** from the original Kang et al. (2017) study in the `ind` column — eight lupus donors, each measured in both CTRL and STIM. Tutorial 06 detects this column automatically and uses the eight real donors as biological replicates, producing biologically meaningful pseudobulk p-values.
 
-This is a teaching shortcut. The synthetic donors are not biological replicates, so the resulting p-values are not biologically meaningful. The workflow is correct; the specific p-values are not. If you want real pseudobulk on the Kang et al. dataset, load it via `scRNAseq::Kang18Combine()` from Bioconductor — that distribution preserves donor metadata.
+A **synthetic pseudo-donor fallback** is included for objects that arrive without donor metadata (e.g. older `SeuratData`-sourced `ifnb` objects, which lost the `ind` column). In that fallback, four pseudo-donors per condition are created by random cell assignment — a teaching shortcut that makes the DESeq2 mechanics run correctly but produces p-values with no biological validity. If you trigger the fallback, the tutorial prints a clear warning; don't report those results in a paper.
 
 For your own data with real donor IDs, the workflow gives valid inferences without modification.
 

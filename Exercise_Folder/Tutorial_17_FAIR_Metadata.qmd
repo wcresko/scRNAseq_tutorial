@@ -81,8 +81,6 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
 - **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_17_FAIR_Metadata.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
-
-If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
 
 ## Setup
@@ -117,7 +115,8 @@ ifnb
 ## Step 1 — Audit what's actually in the object
 
 ```{r}
-#| label: M17-audit
+#| label: lst-M17-audit
+#| lst-cap: "Audit the ifnb object's per-cell metadata columns and per-sample cell counts."
 
 # Per-cell metadata columns
 colnames(ifnb@meta.data)
@@ -134,6 +133,10 @@ tibble::enframe(table(ifnb$stim),
   dplyr::mutate(n_cells = as.integer(n_cells)) |>
   readr::write_csv(file.path(out_dir, "Mod17_C2_cells_per_sample.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+`colnames(ifnb@meta.data)` prints the inventory of per-cell metadata columns currently in the object. You should see QC metrics (`nCount_RNA`, `nFeature_RNA`, `percent.mt`), the condition label (`stim`), doublet calls, cluster assignments, and cell-type labels from Tutorial 04. `table(ifnb$stim)` shows the cell count per condition: roughly equal numbers in CTRL and STIM is expected for this dataset. The **gap between what's present and what submission requires** is the key observation — species, tissue ontology, assay type, and donor ID are conspicuously absent, which is what the rest of this tutorial adds.
+:::
 
 Most Seurat objects you'll meet have **rich per-cell** metadata (cluster, cell-type label, QC metrics) and **almost no sample-level metadata** (just `stim` here). Submission needs both.
 
@@ -154,7 +157,8 @@ A 2030-era reanalyzer would not be able to determine species (the paper says hum
 Load the example sheet and adapt it for the `ifnb` study. In a real study, you'd build this **at experimental design time** and version-control it alongside your code.
 
 ```{r}
-#| label: M17-canonical_sheet
+#| label: lst-M17-canonical_sheet
+#| lst-cap: "Load and inspect the canonical per-sample metadata sheet."
 
 canonical <- read_csv("../Resources_Folder/metadata_templates/canonical_sample_sheet.csv")
 canonical
@@ -162,6 +166,10 @@ canonical
 # --- Table out: the canonical sample sheet as loaded -----------------------
 readr::write_csv(canonical, file.path(out_dir, "Mod17_C3_canonical_sample_sheet.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+When you run this chunk, the console prints the canonical sheet as a tibble — one row per sample, one column per metadata field. Scan across the columns: every field that appears here (organism, tissue, assay, disease, sex, treatment, donor ID, and their ontology-term-ID counterparts) is a field that some downstream database or atlas integration will need. If a column is `NA` for a real study, that's a gap to fill before submission. The `_uberon`, `_efo`, `_mondo` columns are the machine-readable ontology IDs that make the table interoperable; the plain-text columns (e.g. `tissue = "blood"`) are for human readability only.
+:::
 
 The sheet contains everything a downstream consumer needs. Note the **paired columns**: `tissue` (human-readable) + `tissue_uberon` (ontology ID). Always carry both — the ontology ID is what makes the metadata interoperable.
 
@@ -190,7 +198,8 @@ CELLxGENE Discover requires a small set of per-cell columns to be present, with 
 Build a per-cell metadata frame from the canonical sheet + author cell types:
 
 ```{r}
-#| label: M17-per_cell_metadata
+#| label: lst-M17-per_cell_metadata
+#| lst-cap: "Build the per-cell CELLxGENE-schema metadata frame by joining the CL map and study-level fields."
 
 # Map seurat_annotations -> Cell Ontology IDs.
 cl_map <- tribble(
@@ -242,6 +251,10 @@ sum(is.na(per_cell$cell_type_ontology_term_id))   # any unmapped cell types?
 readr::write_csv(per_cell, file.path(out_dir, "Mod17_C4_per_cell_metadata.csv"))
 ```
 
+::: {.callout-tip title="Reading the output"}
+`head(per_cell)` prints the first six rows of the schema-conformant per-cell table: each row is one cell barcode, and the columns should now include `cell_type_ontology_term_id`, `tissue_ontology_term_id`, `assay_ontology_term_id`, `disease_ontology_term_id`, and the other required CELLxGENE fields. Check that the `CL:` IDs look plausible for the cell types in that first handful of rows. The `sum(is.na(...))` line is the critical quality check: if it returns anything other than `0`, at least one `seurat_annotations` label did not match any row in `cl_map` and you need to add it to the look-up table before proceeding.
+:::
+
 ::: {.callout-important title="Think about it"}
 The CELLxGENE schema does NOT have a `condition` field — it has `disease`. How would you encode "IFN-β stimulation" in a strictly schema-conformant way?
 
@@ -257,7 +270,8 @@ CELLxGENE distinguishes between **disease state** (a clinical condition) and **e
 ## Step 4 — Attach the new metadata back to the Seurat object
 
 ```{r}
-#| label: M17-attach
+#| label: lst-M17-attach
+#| lst-cap: "Attach the CELLxGENE metadata back to the Seurat object and verify the cell-type ontology distribution."
 
 # Make sure cell ordering matches
 stopifnot(identical(per_cell$cell_barcode, colnames(ifnb)))
@@ -277,6 +291,10 @@ tibble::enframe(table(ifnb$cell_type_ontology_term_id),
   dplyr::arrange(dplyr::desc(n_cells)) |>
   readr::write_csv(file.path(out_dir, "Mod17_C5_cells_per_ontology_term.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+`table(ifnb$cell_type_ontology_term_id)` prints a frequency table of `CL:` term IDs across all cells. Cross-check it against what you'd expect from the original `seurat_annotations` distribution: if `CL:0000236` (B cell) has roughly the same count as `B` + `B Activated` combined, the join worked. Any `NA` entries here mean the ontology column didn't attach cleanly — re-run the `stopifnot()` check and confirm cell ordering. If the `stopifnot` silently passes (no error), the new metadata is in the right cell slots.
+:::
 
 ## Step 5 — Convert Seurat → AnnData (`.h5ad`)
 
@@ -340,6 +358,10 @@ biosample
 # --- Table out: BioSample upload template ----------------------------------
 readr::write_csv(biosample, file.path(out_dir, "Mod17_C7_biosample_template.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+The tibble printed by `biosample` is the BioSample upload template — one row per sequencing sample. Check that `sample_name` is unique and consistently named (it becomes the join key that links BioSample, SRA, and GEO records), and that `bioproject_accession` is filled in (or flagged as `PRJNA<TBD>` for now). Any `NA` in a required field will cause a portal error at submission time. For the SRA and GEO templates in the next two sub-steps the column names change but the logic is the same: all rows derive from the same canonical sheet, so inconsistencies must be fixed there first.
+:::
 
 ### 7b. SRA metadata TSV (one row per sequencing run)
 

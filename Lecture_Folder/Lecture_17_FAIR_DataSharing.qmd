@@ -186,6 +186,21 @@ This is roughly the **CELLxGENE schema v5.0** — the most demanding of the majo
 **Seurat `.rds` files are not future-proof.** They lock the data to the Seurat version that wrote them. For long-term archival use **AnnData (`.h5ad`)** — it's a versioned, language-agnostic HDF5-based format readable by Scanpy, Seurat 5, and `anndata-rs`.
 :::
 
+## Seurat → AnnData conversion (the tutorial workflow)
+
+The tutorial (Module 17) uses a two-step bridge via `SeuratDisk`:
+
+``` r
+SaveH5Seurat(ifnb, filename = "ifnb_for_submission.h5Seurat")
+Convert("ifnb_for_submission.h5Seurat", dest = "h5ad")
+```
+
+::: incremental
+-   `SeuratDisk` may fail on Seurat v5's `Assay5` class — check the tutorial's error notes
+-   After conversion, run `cellxgene-schema validate ifnb_for_submission.h5ad` to confirm all required columns are present and all ontology IDs are recognized
+-   The validator pulls fresh ontology releases — an ID that worked a year ago may now be deprecated; use [OLS](https://www.ebi.ac.uk/ols4/) to look up the current term
+:::
+
 # The submission workflow {background-color="#2c3e50"}
 
 ## A complete scRNA-seq submission, end to end
@@ -253,6 +268,21 @@ This is roughly the **CELLxGENE schema v5.0** — the most demanding of the majo
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
+
+## Reading the audit output (Step 1 of the tutorial)
+
+::: callout-note
+`colnames(ifnb@meta.data)` reveals what metadata is already in the object — QC metrics, condition (`stim`), cluster assignments, cell-type labels. What is **missing**: species, tissue ontology, assay type, per-cell donor ID. This gap is the whole point of the tutorial. A dataset with rich per-cell labels but no sample-level metadata is only half-FAIR.
+:::
+
+## Design considerations
+
+::: incremental
+-   **Derive all submission TSVs from one canonical sheet** — a single-source CSV in version control that generates the BioSample, SRA, and GEO upload templates programmatically. Manual transcription across three forms accumulates case mismatches and broken join keys.
+-   **`is_primary_data`** — set to `FALSE` if you are re-depositing someone else's data. Omitting this breaks atlas-level de-duplication.
+-   **CELLxGENE schema version changes** — the schema is updated; always check the current version number before submission. The validator may accept a file locally that the portal rejects if versions differ.
+-   **Disease vs treatment** — CELLxGENE has no `condition` field. IFN-β stimulation is an experimental treatment (encode in a custom `treatment` column), not a disease (`disease_ontology_term_id = "PATO:0000461"` for both CTRL and STIM).
+:::
 
 ## What to remember from Lecture 17
 

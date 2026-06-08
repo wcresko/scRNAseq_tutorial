@@ -32,7 +32,7 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 
 ## Where this lecture fits
 
--   Previous: [Lec 15 — Bulk + scATAC-seq](Lecture_15_ATACseq.html)
+-   **Bonus track** — self-paced after the core workshop; order is: Lec 15 → Lec 13 → Lec 16 → Lec 14 → Lec 17
 -   **You are here:** Lec 13 — *finding co-expressed gene modules and tying them to phenotype*
 -   Next: [Lec 16 — Spatial Transcriptomics](Lecture_16_Spatial.html)
 -   **Companion tutorial:** [Tutorial 13 — WGCNA on GSE152418](../Exercise_Folder/Tutorial_13_WGCNA.html)
@@ -193,17 +193,76 @@ seu <- ConstructNetwork(seu, soft_power = 9, setDatExpr = FALSE)
 
 # Part 5 — A workable WGCNA workflow {background-color="#2c3e50"}
 
+## `cor` shadowing — a common R footgun
+
+::: callout-warning
+**WGCNA overwrites `base::cor`.** Save and restore it around `blockwiseModules`:
+
+```r
+temp_cor <- cor
+cor      <- WGCNA::cor
+bwnet    <- blockwiseModules(norm.counts, ...)
+cor      <- temp_cor   # restore — otherwise unrelated downstream code breaks
+```
+
+Forgetting this causes confusing failures in any code that calls `cor()` after WGCNA runs.
+:::
+
+## Step 0 — Data orientation gotcha
+
+::: callout-warning
+**WGCNA expects samples-as-rows, genes-as-columns.** Most RNA-seq count tables are genes-as-rows × samples-as-columns. Always transpose before calling `pickSoftThreshold` or `blockwiseModules`:
+
+```r
+norm.counts <- assay(dds_norm) |> t()   # now: samples x genes
+```
+
+Getting this backwards produces silently wrong results — no error, wrong modules.
+:::
+
+## Sample-level outlier detection
+
+Before networking, look at your samples:
+
+```r
+# Hierarchical clustering of samples in raw-count space
+htree <- hclust(dist(t(data)), method = "average")
+plot(htree)
+
+# PCA — more sensitive on small N
+pca <- prcomp(t(data))
+plot(pca$x[, 1:2])
+```
+
+::: incremental
+-   The dendrogram's **y-axis is merge height** (Euclidean distance). A sample merging at 2–3× the height of all others is an outlier candidate.
+-   **PCA is more sensitive on small N** — a sample can look borderline in the dendrogram but clearly isolated on PC1/PC2. Trust the PCA.
+-   `goodSamplesGenes()` additionally flags genes or samples with too many missing values.
+-   Drop outliers *before* normalization — they bias VST dispersion estimates.
+:::
+
+## Reading the module–trait heatmap
+
+::: incremental
+-   Each cell shows Pearson **r** between a module eigengene and a severity trait, with a p-value
+-   Modules with |r| > 0.5 and p < 0.05 are candidates for follow-up
+-   **Hub genes** = highest **kME** (gene–module correlation) within a strong module — these are your priority follow-ups
+-   Always run GO/pathway enrichment on the full module gene list to give it a biological label
+-   Multiple testing applies: prefer FDR-adjusted p-values, and check that hits survive permutation of trait labels
+:::
+
 ## Checklist
 
 ::: incremental
-1.  **QC**: `goodSamplesGenes()`, drop sample/gene outliers
-2.  **Normalize**: VST (`DESeq2::vst`) for bulk; log-normalize per cell type for pseudobulk
-3.  **Cluster samples** (`hclust` on Euclidean distance) — drop visible outliers before networking
-4.  **Pick power**: `pickSoftThreshold` to scale-free $R^2 \gtrsim 0.8$
-5.  **Build network**: `blockwiseModules` (signed, TOMType = "signed")
-6.  **Correlate** module eigengenes with traits; flag |r| \> 0.5
-7.  **Hub genes** by `kME`; functional enrichment per module
-8.  **Validate** in an independent dataset before claiming biology
+1.  **QC**: `goodSamplesGenes()`, drop sample/gene outliers — before normalization (outliers bias VST)
+2.  **Normalize**: VST (`DESeq2::vst`, design `~ 1`) for bulk; log-normalize per cell type for pseudobulk
+3.  **Cluster samples** (`hclust` + PCA) — drop visible outliers; PCA is more sensitive on small N
+4.  **Pick power**: `pickSoftThreshold` to scale-free $R^2 \gtrsim 0.8$; smallest β that crosses the line
+5.  **Build network**: `blockwiseModules` (signed, TOMType = "signed", `randomSeed` set)
+6.  **Restore `cor`** after `blockwiseModules` (see the cor-shadowing note)
+7.  **Correlate** module eigengenes with traits; flag |r| > 0.5
+8.  **Hub genes** by `kME`; functional enrichment per module
+9.  **Validate** in an independent dataset before claiming biology
 :::
 
 ::: callout-tip

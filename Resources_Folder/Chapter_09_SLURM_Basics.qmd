@@ -86,9 +86,17 @@ Most of the core scRNA-seq pipeline runs comfortably on `compute`. You reach for
 
 ## 9.6 Interactive vs batch: two ways to use a compute node
 
-There are two fundamentally different ways to get work onto a compute node, and choosing between them is mostly a question of whether you intend to *watch* the job or *walk away* from it.
+There are two fundamentally different ways to get work onto a compute node, and choosing between them is mostly a question of whether you intend to *watch* the job or *walk away* from it. Use an **interactive session** (`srun`/`salloc`) when you'll sit and watch: testing or debugging a script, exploring data by hand, or running something short. Use a **batch job** (`sbatch`) for anything long-running, or anything you want to start and walk away from — a batch job keeps running after you log out.
 
 **Interactive sessions** (`srun --pty bash` or `salloc`) give you a live shell *on a compute node*. You type commands, you see output immediately, and the session stays alive as long as you keep it open or until its time limit is reached. This is the right mode when you are testing or debugging a script, exploring data by hand, or running something short enough to sit and wait for. A minimal interactive request looks like this:
+
+For quick, short sessions the `interactive` partition is usually faster to start than `compute`:
+
+``` bash
+srun --account=<myPIRG> --partition=interactive --time=2:00:00 --mem=8G --pty bash
+```
+
+If you need a GPU interactively, use `--partition=interactivegpu` and add `--gpus=1 --constraint=gpu-10gb` (or `gpu-40gb`/`gpu-80gb` for the appropriate memory tier). For graphical tools such as RStudio, the recommended path is **Open OnDemand** (<https://ondemand.talapas.uoregon.edu/>): sign in with your Duck ID and launch an RStudio or Jupyter session from the web portal — no X server or X11 forwarding required.
 
 ``` bash
 srun --account=<myPIRG> --partition=compute \
@@ -128,8 +136,12 @@ The most useful `#SBATCH` flags map directly onto the resource contract:
 - `--mem=<size>` or `--mem-per-cpu=<size>` — memory, total or per core.
 - `--cpus-per-task=<N>` — cores for a multi-threaded step.
 - `--gpus=<N>` with `--constraint=gpu-40gb` — GPUs and the memory tier you need.
+- `--mail-type=END,FAIL` plus `--mail-user=you@uoregon.edu` — email notification when the job ends or fails; useful for long runs.
+- `--array=1-N` — submit N independent sub-jobs from one script, each reading a sample name from a list file; the index is available as `$SLURM_ARRAY_TASK_ID`. This is the standard pattern for running Cell Ranger (or any per-sample step) at scale without writing N separate scripts.
 - `%j` in a filename expands to the job ID, keeping each run's logs distinct.
 :::
+
+A related pair of flags controls behavior near maintenance windows: `--time-min=<HH:MM:SS>` tells SLURM the minimum time your job actually needs, allowing it to start the job in a shorter gap even if it cannot guarantee the full `--time`. This is the recommended fix for jobs sitting in the queue with reason `ReqNodeNotAvail, Reserved for maintenance`.
 
 ## 9.7 Submitting, monitoring, and reading the result
 
@@ -140,6 +152,7 @@ sbatch hostname.sbatch        # -> Submitted batch job 123456
 squeue -u $USER               # all of your jobs
 squeue -j 123456              # one specific job
 scancel 123456                # cancel a queued or running job
+scancel -u $USER -t PENDING   # cancel all your pending (not yet running) jobs
 ```
 
 In `squeue` you will see a state code for each job. `PD` means **pending** — it is queued but not yet running. `R` means **running**. `CG` means **completing** — it has finished and SLURM is cleaning up. When the job finishes, the `.out` (stdout) and `.err` (stderr) files appear in the directory you submitted from; the `.err` file is where R errors land, so it is the first place to look when something went wrong.
@@ -190,6 +203,26 @@ Because Talapas is shared across the whole university, the etiquette of using it
 - **Back up anything you care about.** RACS does not back up Talapas; a disk failure or an accidental delete is final unless you have your own copy.
 - If you have a genuine deadline that needs special scheduling, email RACS rather than trying to outmaneuver the queue.
 :::
+
+## 9.10b Reading the output: what a finished batch job leaves behind
+
+After a batch job completes, check two things in combination before treating the run as successful.
+
+First, look at the `.out` log (stdout). For jobs that print a "Wrote ..." or "Done" line when they finish successfully (as the workshop R scripts do), the presence of that line is the true signal of completion — a job killed mid-run by an OOM or timeout may still write a file, but the log will not contain the success message.
+
+Second, run `seff <jobid>` and verify that **`State: COMPLETED`**. The states `OUT_OF_MEMORY` and `TIMEOUT` mean SLURM killed the job before it finished. Both can leave a partial output file on disk that *appears* valid but is corrupt — the next step in the pipeline will then fail with a confusing downstream error rather than the root cause.
+
+The two fields to read in `seff` output are **CPU Efficiency** (for future tuning), **Memory Efficiency** (if you requested 64 GB and used 12 GB, your next run can ask for far less), and **Job Wall-clock time** (to judge whether the time limit was adequate). If `seff` shows zero for CPU efficiency, the job was almost certainly killed before it could run.
+
+## 9.10c Workshop scripts: `hello_world.R` and the generic wrappers
+
+The Talapas scripts folder ships two items that the tutorial uses directly:
+
+- **`hello_world.R`** — a minimal base-R demo (no extra packages) that prints the compute node it ran on and writes a PDF plot and a CSV summary. It is the first thing you run on an interactive compute node to confirm the environment works: load R (`module load R`), then `Rscript hello_world.R`. Note: `module load R` must be run *on the compute node*, inside the interactive session or batch script — the module does not carry over from the login node.
+- **`run_rscript.sbatch`** — a generic batch wrapper whose essential line is `Rscript "${SCRIPT}"`. Rather than writing a separate `.sbatch` file for every R script, you pass the R script as an argument and override `--job-name` per run: `sbatch --job-name=qc run_rscript.sbatch 01_qc_preprocessing.R`. This is the pattern used throughout the Module 10 pipeline. After submission, follow the job with `squeue -u $USER` and read the `.out`/`.err` logs in `logs/` when it finishes; the `.err` file is where R error messages and warnings land.
+- **`run_core_pipeline.sbatch`** — runs all eight core analysis scripts (01–08) in sequence inside a single SLURM allocation (~12 hours, 96 GB). Submit once with `sbatch run_core_pipeline.sbatch` after `mkdir -p logs` and pre-caching the `ifnb` dataset; confirm completion with `seff <jobid>`.
+
+All three require a `logs/` subdirectory in the directory you submit from. SLURM will not create it for you; run `mkdir -p logs` once before submitting any job.
 
 ## 9.11 Where this leads
 

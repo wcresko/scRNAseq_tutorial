@@ -103,6 +103,8 @@ For a quick analysis the pre-called peaks are fine. For publication-quality cell
 
 ChromVAR [@schep2017chromvar] computes per-cell **motif accessibility** scores: for each known TF binding motif, how enriched is its presence in this cell's peaks vs the genome-wide expectation? The score is per-cell, so you can plot it on UMAP, do DE on it, etc.
 
+An alternative for motif enrichment is **HOMER** (`findMotifsGenome.pl`) — a command-line tool that takes a BED file of peaks (or a subset of peaks such as a cluster's differential peaks) and reports known motif enrichment against a background. HOMER is not per-cell (it works on a peak set, not individual cells), making it better suited to the question "which TF motifs are enriched in this cluster's peaks relative to all other peaks?" rather than the per-cell question chromVAR answers. Input to HOMER is a tab-separated BED-format file with `chr / start / end / strand` columns; the `-size` flag should be set to roughly the width of a typical peak (~200 bp for `-size given` is appropriate for ATAC peaks that average 500–1000 bp). The genome assembly specified to HOMER must match the alignment build of your peaks.
+
 The ATAC pipeline often ends with:
 
 - Cluster cells by chromatin accessibility (LSI + Leiden)
@@ -111,6 +113,18 @@ The ATAC pipeline often ends with:
 - Identify positive TF regulators by joining motif accessibility with gene expression (TFs whose motif is up *and* whose gene expression is up)
 
 For tutorial-level worked examples of all of this, see [scNotebooks Module 11](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module11/module11.html) — the ArchR walkthrough on Kumegawa et al. 2022 breast-cancer data is more complete than our Signac one.
+
+## 15.7b Clustering algorithm choice in scATAC
+
+The tutorial uses `FindClusters(algorithm = 3)` — the **SLM (Smart Local Moving)** algorithm — rather than the default Louvain (`algorithm = 1`). SLM allows within-cluster re-optimization after each pass, producing more stable partitions on large, noisy graphs such as scATAC data. **Leiden** (`algorithm = 4`) is the modern default in many pipelines and generally preferred for its convergence guarantees. Either SLM or Leiden is a reasonable choice for scATAC; the key decision is to avoid the basic Louvain on noisy data where small parameter changes produce unstable clusterings.
+
+## 15.7c Coordinate conversion: liftOver
+
+If you need to bring a third-party peak set, motif reference, or annotation onto a different genome build than your data (for example, overlaying an hg38 ENCODE peak set onto an hg19-aligned experiment), use coordinate **liftOver** with `rtracklayer` and a UCSC chain file. Do not attempt to remap by gene name — coordinate offsets between hg19 and hg38 are nontrivial (insertions, deletions, chromosome rearrangements). The chain files (`hg19ToHg38.over.chain`, `hg38ToHg19.over.chain`, mouse equivalents `mm9ToMm10`, `mm10ToMm39`) are available from UCSC. `liftOver()` returns a `GRangesList`; always check `lengths(result) == 1` to confirm each interval mapped to exactly one target interval before downstream use.
+
+## 15.7d QC threshold design consideration
+
+The thresholds in the Signac PBMC vignette (and echoed in the tutorial) are a reasonable starting point for healthy PBMC data but should not be applied mechanically to other tissues or datasets. An adaptive alternative is MAD-based outlier detection via `scater::isOutlier()`: flag cells whose metrics are more than 3 MADs below (or above, for nucleosome signal) the sample median. This approach scales automatically as overall library quality shifts and is less sensitive to the exact distribution than fixed thresholds.
 
 ## 15.8 hg19 vs hg38 — a non-trivial pitfall
 

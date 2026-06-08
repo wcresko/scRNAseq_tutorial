@@ -96,8 +96,6 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
 - **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_02_DimReduction_Clustering.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
-
-If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
 
 ## Setup
@@ -147,7 +145,8 @@ ifnb
 ## Step 1 — Linear dimensionality reduction (PCA)
 
 ```{r}
-#| label: M2-pca
+#| label: lst-M2-pca
+#| lst-cap: "Run PCA on the 2,000 HVGs, print top gene loadings for PCs 1–5, and draw the PC1 loading heatmap."
 #| fig-cap: "PC1 gene-loading heatmap on 500 cells — the axis is dominated by interferon-stimulated genes (the batch/condition signal)."
 
 ifnb <- RunPCA(
@@ -190,6 +189,10 @@ save_fig(file.path(out_dir, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap,
        width = 7, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The `print()` call shows the top 5 positive and negative gene loadings for PCs 1–5: these are the genes that push cells to the high or low end of each PC. In the `ifnb` data, PC1's positive loadings are dominated by interferon-stimulated genes (`ISG15`, `IFI6`, `IFIT1`, etc.), telling you that the IFN-β condition effect — not cell-type identity — explains the most variance in the unintegrated data. The heatmap rows are genes and columns are the 500 cells with the most extreme PC1 scores (ordered by score); a clear split into two expression blocks on PC1 is the visual signature of the batch/condition axis. Later PCs should start to show cell-type-specific patterns (e.g. monocyte genes on one PC, T-cell genes on another).
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  Look at the top genes loading PC1. Do you recognize any **interferon-stimulated genes** (ISG15, IFI6, IFIT1, IFIT3, ISG20, MX1, OAS1)? What does that suggest about what PC1 is encoding?
 2.  PCA here runs on HVGs, not all genes. What would change if we included all genes?
@@ -207,7 +210,8 @@ save_fig(file.path(out_dir, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap,
 ## Step 2 — Choose how many PCs to keep
 
 ```{r}
-#| label: M2-elbow
+#| label: lst-M2-elbow
+#| lst-cap: "ElbowPlot of per-PC standard deviation across 40 PCs — used to choose a defensible PC cutoff."
 #| fig-cap: "Elbow plot of per-PC standard deviation — used to pick a defensible number of PCs (the elbow sits around PC15–20)."
 
 p_elbow <- ElbowPlot(ifnb, ndims = 40) +
@@ -223,6 +227,10 @@ p_elbow
 save_fig(file.path(out_dir, "Mod2_C4_elbow.png"), p_elbow,
        width = 7, height = 5, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+The x-axis is the principal component number (1 to 40) and the y-axis is its standard deviation (how much variance it explains). A healthy elbow plot starts high on the left, drops steeply for the first few PCs, then flattens into a near-horizontal plateau. The "elbow" — the kink where the curve stops falling noticeably — is your cutoff: PCs before it carry signal, PCs after it carry mostly noise. For `ifnb`, the elbow sits around PC 15–20; choosing anywhere from 15 to 30 gives similar downstream results, so err on the generous side.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  Where is "the elbow" on an ElbowPlot, and why does it suggest a cutoff?
@@ -269,7 +277,8 @@ ifnb <- FindNeighbors(ifnb, dims = 1:n_pcs)
 ## Step 4 — Cluster at several resolutions
 
 ```{r}
-#| label: M2-cluster
+#| label: lst-M2-cluster
+#| lst-cap: "Run Louvain clustering at five resolutions and inspect the resulting metadata columns."
 
 ifnb <- FindClusters(
   ifnb,
@@ -278,6 +287,10 @@ ifnb <- FindClusters(
 
 head(ifnb@meta.data)
 ```
+
+::: {.callout-tip title="Reading the output"}
+The `head()` call shows the first few rows of `meta.data`; the key columns to notice are `RNA_snn_res.0.1`, `RNA_snn_res.0.3`, `RNA_snn_res.0.5`, `RNA_snn_res.0.7`, and `RNA_snn_res.1` — one integer cluster assignment per cell for each resolution you ran. Lower-resolution columns will show fewer unique values (coarser clusters); higher-resolution columns will show more. The `seurat_clusters` column always tracks the *most recent* resolution called, so it currently equals `RNA_snn_res.1`. Use `Idents(ifnb) <- "RNA_snn_res.0.5"` to switch the active identity before plotting.
+:::
 
 ::: callout-note
 `FindClusters()` here uses Seurat's default **Louvain** algorithm (`algorithm = 1`). Lecture 02 introduces **Leiden** (`algorithm = 4`) as the modern preferred method; we use the Louvain default for portability because Leiden needs the `leidenalg` Python package via `reticulate`. To switch, add `algorithm = 4` to the call above once that dependency is installed.
@@ -300,7 +313,8 @@ head(ifnb@meta.data)
 ## Step 5 — UMAP
 
 ```{r}
-#| label: M2-umap
+#| label: lst-M2-umap
+#| lst-cap: "Compute UMAP on the top 20 PCs and plot with Louvain clusters (resolution 0.5) as colors."
 #| fig-cap: "UMAP of the unintegrated ifnb cells coloured by graph cluster (resolution 0.5)."
 
 ifnb <- RunUMAP(ifnb, dims = 1:n_pcs)
@@ -321,12 +335,17 @@ save_fig(file.path(out_dir, "Mod2_C8_umap_clusters.png"), p_umap_clusters,
        width = 7, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each point is a cell projected into 2-D by UMAP; nearby points share similar transcriptomes in PC space. Colors represent the Louvain clusters at resolution 0.5 — each island or peninsula should correspond to a cell type or subpopulation. Well-separated, compact blobs indicate a clean cluster; ragged or poorly-separated shapes suggest either that the resolution is too high or that those populations are transcriptionally similar. Because this is the **unintegrated** data, you may already notice that some clusters appear in two nearby sub-clouds — a preview of the CTRL/STIM split you will quantify in Step 6.
+:::
+
 ## Step 6 — Diagnose the batch effect
 
-This is the key exercise. The UMAP above is colored by cluster. Now color the *same UMAP* by **sample** and by **author cell-type label** and compare.
+This is the key exercise. The UMAP in @lst-M2-umap is colored by cluster. Now color the *same UMAP* by **sample** and by **author cell-type label** and compare.
 
 ```{r}
-#| label: M2-batch_diagnostic
+#| label: lst-M2-batch_diagnostic
+#| lst-cap: "Color the UMAP by sample (stim) and by author cell-type label to diagnose the batch effect."
 #| fig-cap: "The same unintegrated UMAP coloured by sample (left/top) and by author cell-type label — revealing per-sample islands driven by the batch effect."
 
 p_by_sample <- DimPlot(ifnb, reduction = "umap", group.by = "stim") +
@@ -368,6 +387,10 @@ save_fig(file.path(out_dir, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,
        width = 13, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The **left panel** colors each cell by sample (`CTRL` vs `STIM`): if the two colors are well-mixed across every island the data is batch-free; if they form largely separate regions or parallel sub-clouds, a condition/batch effect is dominating the embedding. The **right panel** uses the author cell-type labels: each label should ideally form one coherent blob, but on unintegrated data you'll typically see each cell type split into two sister clouds — one CTRL-colored, one STIM-colored — because PC1 separates by condition rather than cell type. Seeing that split here is the intended outcome: it motivates integration in Tutorial 05.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  In the **by-sample** plot, do the CTRL and STIM cells overlap, or do they form parallel islands?
 2.  In the **by-cell-type** plot, does each cell type form one cluster or several? If a cell type splits, how does its split correlate with sample?
@@ -389,7 +412,8 @@ save_fig(file.path(out_dir, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,
 ## Step 7 — Cross-tab clusters vs cell types vs samples
 
 ```{r}
-#| label: M2-crosstab
+#| label: lst-M2-crosstab
+#| lst-cap: "Cross-tabulate cluster membership by sample and by author cell-type label to measure how mixed and how pure the unintegrated clusters are."
 
 # Clusters × samples — how mixed is each cluster across CTRL / STIM?
 cluster_by_sample <- prop.table(
@@ -409,6 +433,10 @@ as.data.frame(cluster_by_sample) |>
 as.data.frame(cluster_by_celltype) |>
   readr::write_csv(file.path(out_dir, "Mod2_C10_cluster_by_celltype.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+`cluster_by_sample` is a clusters × samples proportion table (rows sum to 1): each number is the fraction of that cluster's cells coming from CTRL or STIM. A value near 1.0 in one column means that cluster is almost entirely one sample — the hallmark of an unintegrated, condition-split cluster. `cluster_by_celltype` is a raw count table: ideally each row (cluster) would have counts concentrated in a single column (cell type), indicating a pure cluster; spread across multiple columns flags a mixed or ambiguous cluster.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  A "good" cluster on integrated data would be \~50/50 CTRL/STIM (because both samples have all cell types) and dominated by a single cell-type label. Are any of your unintegrated clusters like that already? Why might some be more sample-mixed than others?
@@ -438,6 +466,6 @@ Continue with **Tutorial 03 — Markers & Cell Type Annotation**. We'll do annot
 
 ## Credits
 
--   Dataset: `ifnb` from the `SeuratData` package — Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94
+-   Dataset: `ifnb` via Bioconductor's `muscData::Kang18_8vs8()` — Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94
 -   Reference vignettes: [Seurat integration tutorial](https://satijalab.org/seurat/articles/integration_introduction.html) · [clustree](https://cran.r-project.org/package=clustree)
 -   Inspiration: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/)

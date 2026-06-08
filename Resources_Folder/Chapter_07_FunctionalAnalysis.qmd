@@ -93,7 +93,7 @@ The big-five gene-set databases:
 | **GO Biological Process** | Comprehensive, hierarchical | Always run as a baseline |
 | **GO Molecular Function** | Function & catalysis | When BP is dominated by generic terms |
 | **GO Cellular Component** | Subcellular localization | Probing trafficking / structural biology |
-| **Reactome** | Curated signaling pathways | Immune / signaling biology |
+| **Reactome** | Curated signaling pathways | Immune / signaling biology — accessed via `ReactomePA::enrichPathway()` in R |
 | **KEGG** | Classic metabolic pathways | Metabolism; legacy comparison |
 | **MSigDB Hallmark** | 50 well-known broad biological states | Headline figures, low-noise summaries |
 | **WikiPathways** | Community-curated, fast updates | Niche pathways missing elsewhere |
@@ -157,6 +157,16 @@ de_mapped <- de |>
 ```
 
 Some symbols won't map — deprecated symbols, lncRNAs without ENTREZ entries, pseudogenes. A 5–10% unmapped rate is normal; check the unmapped list. If it's mostly gene symbols (not pseudogenes), update `org.Hs.eg.db`.
+
+## 7.8b Reading the GSEA running-enrichment plot
+
+The `gseaplot2()` output from `enrichplot` has three stacked panels:
+
+- **Top panel — running enrichment score.** The y-axis is the running ES as you walk from the most up-regulated gene (left) to the most down-regulated (right). A positively enriched set climbs steeply on the left, reaches a peak somewhere in the middle or upper left, then drifts back down. The **peak value is the ES**; where in the ranking the peak falls tells you whether the up-regulated or down-regulated genes dominate. For the `ifnb` IFN-β contrast, interferon-pathway gene sets should peak very early (left side) because the ISGs are the most strongly up-regulated genes in STIM.
+- **Middle panel — rug.** Each tick marks where one gene from the set falls in the full ranked list. A dense cluster of ticks on the left means the set's genes are concentrated among the most up-regulated genes — a "clean" leading-edge enrichment. Scattered ticks across the whole ranking produce a flat, uninformative curve.
+- **Bottom panel — ranked metric.** The bar shows the ranking score (log2FC) from positive (red) to negative (blue). Use this to confirm that the leading-edge genes are genuinely up-regulated (left side is red) rather than the enrichment being driven by the low-expression/low-variance end.
+
+A borderline NES (close to ±1) with a `p.adjust` just under 0.05 and diffuse rug marks should be treated skeptically — run `gseaplot2()` to inspect visually before reporting.
 
 ## 7.9 Pitfalls
 

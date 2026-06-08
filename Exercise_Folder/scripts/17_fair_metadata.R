@@ -33,9 +33,7 @@ seu$assay_ontology_term_id    <- "EFO:0009922"      # 10x 3' — ifnb is v1; set
 seu$suspension_type           <- "cell"
 seu$is_primary_data           <- TRUE
 
-# Step 5 — Convert Seurat -> AnnData (.h5ad). SeuratDisk's SaveH5Seurat/Convert is the
-# classic bridge but can fail on some Seurat v5 objects; sceasy::convertFormat is a
-# robust alternative (see the notebook).
+# Step 5 — Convert Seurat -> AnnData (.h5ad); sceasy preferred, SeuratDisk as fallback. See Tutorial_17.qmd.
 out_h5ad <- file.path(DATA_DIR, "ifnb_for_submission.h5ad")
 if (requireNamespace("sceasy", quietly = TRUE)) {
   sceasy::convertFormat(seu, from = "seurat", to = "anndata", outFile = out_h5ad)

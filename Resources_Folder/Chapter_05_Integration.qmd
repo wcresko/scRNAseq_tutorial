@@ -72,6 +72,8 @@ Harmony's strengths:
 - **Conservative** — preserves rare populations well
 - **Single-tunable**: `theta` (default 2) controls how aggressively to mix batches; rarely needs adjustment
 
+**Pre-processing for Harmony:** before running Harmony, the typical workflow is: (1) split by sample, (2) normalize and select 2,000 HVGs **per sample**, (3) identify features that are variable across *most* samples with `SelectIntegrationFeatures(object.list = ...)` — this avoids letting one dominant sample dictate the feature set, (4) merge the per-sample objects back with `merge()` and call `JoinLayers()` (Seurat v5 `merge()` leaves per-sample split layers; `JoinLayers()` collapses them so `AddModuleScore` and `FindAllMarkers` work on the RNA assay later), (5) run PCA on the integration features, then (6) call `RunHarmony()`.
+
 Harmony's weaknesses:
 
 - Less effective on very heterogeneous batches (cell types absent in one but present in another); works best when most cell types are shared
@@ -154,6 +156,8 @@ The discipline:
 - Switch back to `DefaultAssay(seu) <- "RNA"` *after* clustering, *before* `FindMarkers`, `FindAllMarkers`, marker scoring, or any DE work
 
 This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
+
+**Over-correction false positive.** A subtle trap specific to the over-correction diagnostic: if you score cells on a biological signal (e.g. an ISG module score) *after* forgetting to switch back to the `RNA` assay, you will score on the integrated (batch-corrected) expression values. Since integration explicitly reduces the STIM–CTRL difference in the corrected space, the ISG score gap will appear to be zero or near-zero — falsely suggesting over-correction. The fix is `DefaultAssay(seu) <- "RNA"` immediately before `AddModuleScore`. The same applies to any `FeaturePlot` used to visualize a gene's expression post-integration: always verify the active assay before drawing.
 
 ## 5.10 Common errors
 

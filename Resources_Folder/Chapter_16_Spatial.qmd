@@ -73,13 +73,13 @@ The lab pipeline:
 
 The bioinformatic pipeline:
 
-1. **Load** the Cell Ranger Spatial output (`spaceranger` produces a `Visium`-class assay with counts + image + spot coordinates)
-2. **QC** per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus **always plot them on the tissue**, because spatial outliers are tissue artifacts (folds, bubbles), not random noise
-3. **Normalize** with `SCTransform` — preferred over `LogNormalize` for spatial because spot-level counts have wider dynamic range (each spot pools 1–15 cells)
-4. **Run PCA + clustering** as in scRNA — but expect clusters to recover **anatomical regions**, not single-cell-type populations
-5. **Spatially variable features** with **Moran's I** — see §16.6
-6. **Integrate** sections if you have multiple — same Harmony / anchor methods as scRNA
-7. **Deconvolute** to get cell-type fractions per spot (§16.7)
+1. **Load** the `spaceranger` output into Seurat. The resulting object's `@images` slot holds a `VisiumV1` object containing four things: the **histology image** (low-resolution JPEG), the **per-spot tissue coordinates** (which pixel each spot maps to in the image), the **scale factors** (ratios between the full-res, low-res, and hi-res coordinate systems), and a flag for which barcodes are "in tissue". `SpatialFeaturePlot` uses all four to draw expression over the H&E.
+2. **QC** per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus **always plot them on the tissue**, because spatial outliers are tissue artifacts (folds, bubbles), not random noise.
+3. **Normalize** with `SCTransform` — preferred over `LogNormalize` for spatial because each spot captures the transcriptome of 1–15 cells rather than one. This wider dynamic range means count distributions are further from the Poisson assumption that `LogNormalize` implicitly relies on; `SCTransform`'s regularized negative binomial model adjusts per-spot dispersion and handles outlier spots more robustly.
+4. **Run PCA + clustering** as in scRNA — but expect clusters to recover **anatomical regions**, not single-cell-type populations.
+5. **Spatially variable features** with **Moran's I** — see §16.6.
+6. **Integrate** sections if you have multiple — same Harmony / anchor methods as scRNA, using the SCT integration path.
+7. **Deconvolute** to get cell-type fractions per spot (§16.7).
 
 ## 16.5 Spatial QC — *always* plot metrics on the tissue
 
@@ -156,6 +156,14 @@ These produce smoother, more biologically interpretable spatial domains. Worth u
 - **Lecture:** [Lecture 16](../Lecture_Folder/Lecture_16_Spatial.html)
 - **Tutorial:** [Tutorial 16](../Exercise_Folder/Tutorial_16_Spatial_Transcriptomics.html)
 - **scNotebooks Module 10** — parallel walkthrough on 10x Visium breast cancer
+
+## 16.10b Additional design considerations
+
+**Cell–cell communication in space.** Standard CellChat (Chapter 14) asks which ligand–receptor pairs are co-expressed between clusters but ignores whether the sender and receiver cells are spatially adjacent. `LIANA+` (Python) extends the LIANA framework to spatial data by weighting predicted interactions by the physical proximity of spots, substantially reducing false positives from cell types that are co-expressed but never co-localized.
+
+**Image-aware normalization.** Standard `SCTransform` does not account for tissue-section-edge effects, where spots at the periphery of the section are only partially covered and therefore show systematically lower UMI counts. `STUtility` and its successor `semla` add a tissue-image-based normalization step that corrects for spatial gradients in coverage before downstream analysis — particularly useful for sections with irregular edges or tissue damage.
+
+**Spot-level `percent.mt` pattern.** In mouse brain, mitochondrial percentage typically varies systematically: it can be elevated at tissue edges (partial spots, damaged cells), and some cell types (neurons under stress) show higher baseline mitochondrial expression. Before filtering on `percent.mt`, plot it spatially; a ring of elevated signal around the section periphery is expected and does not warrant removing interior spots.
 
 ## 16.11 Going further
 

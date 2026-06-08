@@ -36,12 +36,12 @@ A trajectory method (i) embeds cells in a reduced space, (ii) fits a graph, tree
 
 Widely used tools:
 
--   **Slingshot** [@street2018slingshot] — fits smooth principal curves through the cluster structure; robust, needs a start cluster.
--   **Monocle3** [@trapnell2014monocle; @cao2019monocle3] — learns a principal *graph* and supports branch points; `learn_graph()` then `order_cells()`.
+-   **Slingshot** [@street2018slingshot] — fits smooth principal curves through the cluster structure; robust, needs a start cluster specified via `start.clus`. Returns a `pt` matrix with one column per inferred lineage; `NA` indicates a cell was not assigned to that lineage.
+-   **Monocle3** [@trapnell2014monocle; @cao2019monocle3] — learns a principal *graph* and supports branch points; `learn_graph()` then `order_cells()`. Note: `order_cells()` is **interactive** — it opens a plot in which the user clicks the root node. This step cannot be automated in a batch script, which is why the Module 14 Talapas script keeps it as a commented sketch.
 -   **PAGA** (scanpy) — builds an abstracted graph of cluster connectivity; the best first question is often *"is there even a continuum?"*, which PAGA answers well.
 -   **Diffusion pseudotime** — random-walk distance from a root cell.
 
-The single most important user choice is the **root**: pseudotime has no inherent direction, so the biologist must declare which end is the start (usually from a known progenitor marker). A wrong root reverses the entire narrative.
+The single most important user choice is the **root**: pseudotime has no inherent direction, so the biologist must declare which end is the start (usually from a known progenitor marker). A wrong root reverses the entire narrative. Three independent lines of evidence give the strongest justification for a root: (1) known progenitor markers expressed in the candidate start cluster; (2) CytoTRACE scores (less-differentiated cells express more genes, so the start cluster should have the highest scores); (3) agreement from RNA velocity arrows pointing *away from* the root.
 
 The deepest pitfall is more basic: **the algorithm will return a trajectory even when none exists.** The benchmark of 45 trajectory methods [@saelens2019comparison] shows method choice matters enormously and that discrete data forced through trajectory tools produce confident nonsense. Decide *a priori* whether a continuum is biologically plausible.
 
@@ -58,7 +58,7 @@ The original steady-state model is velocyto [@lamanno2018rnavelocity]; the dynam
 scRNA-seq cannot observe receptor binding, but it can ask whether a **ligand** is expressed in one cell type and its **receptor** in another. Combined with curated ligand–receptor databases, per-cluster expression yields a predicted signaling network [@armingol2021deciphering; @armingol2024diversifying]. Tools differ in emphasis:
 
 -   **CellPhoneDB** (Python) — permutation test for significance; models multi-subunit complexes.
--   **CellChat** [@jin2021cellchat] (R) — aggregates pairs into signaling *pathways*; strong circle/chord visualizations.
+-   **CellChat** [@jin2021cellchat] (R) — aggregates pairs into signaling *pathways*; strong circle/chord visualizations. The standard workflow: `createCellChat()` → set DB → `identifyOverExpressedGenes()` → `computeCommunProb()` → `filterCommunication()` → `aggregateNet()`. Results are visualized with `netVisual_circle()` (aggregate network) or `netVisual_bubble()` (individual L–R pairs per pathway), and individual pathways drilled into with `netVisual_aggregate()`.
 -   **NicheNet** (R) — links a ligand to the *downstream target genes* it should induce in the receiver.
 -   **LIANA** [@dimitrov2022comparison] (R/Python) — runs many methods/databases and reports a *consensus*, after a systematic comparison found that method and resource choice substantially change the predicted interactions.
 

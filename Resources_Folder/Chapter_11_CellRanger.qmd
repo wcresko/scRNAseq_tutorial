@@ -88,7 +88,7 @@ Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a
 
 ## 11.7 Reading `web_summary.html`
 
-Every `count` run writes a `web_summary.html`. It is the single most informative QC document in the entire pipeline, and it should be the *first* thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in `metrics_summary.csv` for programmatic use. Save the `web_summary.html` alongside your raw data, because reviewers and collaborators will ask for it.
+Every `count` run writes a `web_summary.html`. It is the single most informative QC document in the entire pipeline, and it should be the *first* thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in `metrics_summary.csv` for programmatic use. Save the `web_summary.html` alongside your raw data, because reviewers and collaborators will ask for it. To inspect it on Talapas without downloading, use VS Code's "Remote - SSH" extension and simply double-click the `.html` file in the explorer panel, or `scp` the file to your laptop.
 
 A short list of the numbers that most often reveal a problem:
 
@@ -128,9 +128,13 @@ There is a companion folder, `raw_feature_bc_matrix/`, that contains *all* barco
 
 ## 11.9 Scaling beyond one sample, and pitfalls
 
-A single `count` run is a long, single-process, multi-threaded job. On a cluster it scales by **cores within one task** (`--cpus-per-task`), not by MPI tasks (`--ntasks`), because Cell Ranger is one Rust+Python process, not an MPI program. Give its `--localcores` the cores you allocated, and set its `--localmem` slightly *below* the scheduler's memory ceiling so that I/O buffers and brief spikes do not push the job over the hard limit and trigger a silent kill. A "Killed" with no error message is, nine times out of ten, exactly this.
+A single `count` run is a long, single-process, multi-threaded job. On a cluster it scales by **cores within one task** (`--cpus-per-task`), not by MPI tasks (`--ntasks`), because Cell Ranger is one Rust+Python process, not an MPI program. Give its `--localcores` the cores you allocated, and set its `--localmem` slightly *below* the scheduler's memory ceiling so that I/O buffers and brief spikes do not push the job over the hard limit and trigger a silent kill. A "Killed" with no error message is, nine times out of ten, exactly this. In practice a job requesting `--mem=128G` should pass `--localmem=120` to Cell Ranger.
 
-For many samples, do not write many scripts. A scheduler **array job** runs one sub-job per sample from a single script, reading the sample name from a list file — the same script scaling from one sample to dozens. The tutorial walks through the SLURM specifics.
+The `--create-bam=true` flag writes the aligned BAM file to `outs/possorted_genome_bam.bam`. This is optional (BAMs are large — 10–30 GB per sample) but required for re-alignment, splice-junction analysis, or any downstream tool that works on aligned reads rather than counts. For a fresh analysis where you only need the counts matrix, omit it to save disk. Once a run finishes, monitor its progress in real time with `tail -f logs/cellranger_<jobid>.out`; Cell Ranger prints stage names as it advances so you can tell how far along it is without cancelling the job.
+
+For many samples, do not write many scripts. A scheduler **array job** runs one sub-job per sample from a single script, reading the sample name from a list file indexed by `$SLURM_ARRAY_TASK_ID` — the same script scaling from one sample to dozens. The tutorial walks through the SLURM specifics.
+
+**Design consideration: `cellranger aggr` vs Seurat merge + integration.** After generating multiple `count` outputs you have two paths to a combined matrix. `cellranger aggr` performs a count-normalized merge at the Cell Ranger level, producing one combined `filtered_feature_bc_matrix/` — fast and consistent, but it applies only a simple depth normalization and has no batch correction. The workshop path (Seurat `merge()` + Harmony/anchor integration in Module 05) keeps samples separate until the R analysis, where you can apply the full integration pipeline and retain per-sample metadata. Use `aggr` only for technical replicates of the same library that need combining before any analysis; for multiple biological samples from different conditions or donors, let Seurat handle the integration.
 
 A few recurring pitfalls are worth internalizing:
 

@@ -19,10 +19,7 @@ dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # --- Figure saving --------------------------------------------------------
-# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
-# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
-# .svg is written alongside with the same basename. (.svg uses the 'svglite'
-# package, installed in Tutorial 00.)
+# save_fig(): write each figure as .png + .svg (vector). See Tutorial_01_QC_Preprocessing.qmd.
 save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
   ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
   svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
@@ -31,19 +28,12 @@ save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
                                        " - install 'svglite'? ", conditionMessage(e), ")"))
 }
 
-# Step 1 — Load ifnb from Bioconductor's ExperimentHub (cached after the first
-# download). Keep singlets that have an author-assigned cell-type label, and mirror
-# the metadata names the rest of the series expects:
-#   - `stim`               CTRL / STIM condition
-#   - `seurat_annotations` author-curated cell types
-#   - `donor` (= `ind`)    the 8 real lupus donors used downstream for DE / DA
+# Step 1 — Load ifnb (ExperimentHub cache); keep singlets with a cell-type label.
+# Adds stim / seurat_annotations / donor metadata used throughout the series.
 sce <- Kang18_8vs8()
 sce <- sce[, sce$multiplets == "singlet" & !is.na(sce$cell)]
-# muscData's Kang18_8vs8 stores features as SYMBOL_ENSEMBLID (e.g.
-# "ISG15_ENSG00000187608"). Keep only the SYMBOL so markers / Azimuth /
-# org.Hs.eg.db match. Strip ONLY a trailing "_ENSEMBLID" suffix (NOT everything
-# after the first dash — real symbols like HLA-A / MT-CO1 contain dashes); keep
-# the original name where there is no symbol; de-duplicate collapsed symbols.
+# Strip trailing "_ENSEMBLID" suffix from feature names to get plain gene symbols;
+# keep originals where no symbol exists; de-duplicate. See Tutorial_01.qmd for details.
 cm   <- counts(sce)
 orig <- rownames(cm)
 sym  <- sub("_ENS[A-Z]*[0-9]+(\\.[0-9]+)?$", "", orig)
@@ -69,8 +59,7 @@ enframe(table(seu$stim), name = "sample", value = "n_cells") |>
 seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
 seu[["percent.rb"]] <- PercentageFeatureSet(seu, pattern = "^RP[SL]")
 
-# Figure out: per-sample QC violins (Mod1_C5). Plotted pre-normalization on QC
-# metadata, so wrap to silence the expected "data layer empty, using counts" note.
+# Figure out: per-sample QC violins (Mod1_C5). suppressWarnings silences expected pre-norm note.
 p_qc_vln <- suppressWarnings(VlnPlot(seu,
         features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
         group.by = "stim", ncol = 4, pt.size = 0) &

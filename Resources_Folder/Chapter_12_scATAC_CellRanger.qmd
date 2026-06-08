@@ -95,6 +95,10 @@ Three of these deserve a sentence of intuition:
 - **FRiP** (fraction of reads/fragments in peaks). If most fragments fall *inside* called peaks, your library captured real accessibility; if they are spread across the genome, you mostly captured noise. Low FRiP and low TSS enrichment tend to move together.
 - **Nucleosome signal.** Fragment lengths carry a physical fingerprint: a clean library shows a nucleosome-free population below ~100 bp, then mono-nucleosomal (~200 bp) and di-nucleosomal (~400 bp) humps reflecting fragments that spanned one or two nucleosomes. A flat, featureless fragment-size distribution signals poor tagmentation or contamination.
 
+## 12.6b Reading the output: ATAC `web_summary.html` and `summary.csv`
+
+When `cellranger-atac count` finishes, open `web_summary.html` first — before loading any files into R. The ATAC summary page looks similar to the RNA one but its numbers mean different things. `summary.csv` (note: ATAC uses `summary.csv` rather than RNA's `metrics_summary.csv`) has the same numbers in a machine-readable form. The six metrics worth checking immediately are listed in §12.6; in the ATAC summary page they appear under "Cells" and "Sequencing" sections. A TSS enrichment below 4 or a fraction of fragments in peaks below 0.4 are the clearest flags that something went wrong at the library or reference level — fix those upstream before proceeding to Signac, because no amount of downstream filtering recovers a library with fundamentally low signal.
+
 ## 12.7 The hand-off to Signac
 
 What `cellranger-atac count` writes is exactly what the downstream Signac analysis (Chapter 15) expects — no reformatting required. The files that matter are:
@@ -118,6 +122,10 @@ chrom  <- CreateChromatinAssay(counts, fragments = "data/fragments.tsv.gz")
 ```
 
 The single most common transit error is losing the `.tbi` index. `fragments.tsv.gz` and `fragments.tsv.gz.tbi` must always travel together; with the index missing, Signac cannot perform the region queries it depends on.
+
+## 12.7b Design consideration: re-calling peaks per cluster
+
+The peak set produced by `cellranger-atac count` is called on the aggregate of all cells. For a first pass this is sufficient, but it misses **cell-type-specific peaks** that are open in only one cell type and therefore pile up too little signal in the bulk-equivalent to exceed the calling threshold. The recommended approach for publication-quality analysis is to cluster the cells using the Cell Ranger peak set, then re-call peaks within each cluster using MACS2 or MACS3 and re-quantify fragments against the merged cluster-specific peak set. Signac's `CallPeaks()` automates this pattern. The cost is additional compute time; the payoff is a feature set that captures cell-type regulatory elements the initial call missed — this matters most for motif enrichment and differential accessibility analyses.
 
 ## 12.8 Pitfalls and the multiome note
 
