@@ -306,16 +306,35 @@ The `compareCluster` plot is the **single most informative figure** in cross-cel
 
 # Part 5 — A workable workflow {background-color="#2c3e50"}
 
+## Step 0 — convert gene symbols to ENTREZ IDs
+
+`clusterProfiler`'s ORA and GSEA functions (`enrichGO`, `enrichPathway`, `gseGO`, …) require **ENTREZ integer IDs**, not gene symbols. The required first step in Tutorial 07 is:
+
+``` r
+library(clusterProfiler); library(org.Hs.eg.db)
+
+# Convert all tested gene symbols to ENTREZ IDs
+id_map <- bitr(rownames(de_table),
+               fromType = "SYMBOL",
+               toType   = "ENTREZID",
+               OrgDb    = org.Hs.eg.db)
+```
+
+::: callout-warning
+`bitr()` will silently drop genes it cannot map (~5–15% of symbols, depending on version). **Always build your universe from the *mapped* set**, not from the raw gene list, so the denominator in the hypergeometric test is consistent.
+:::
+
 ## The recommended pipeline
 
 ::: incremental
 1.  Take per-cell-type pseudobulk DE table (Tut 06)
-2.  For each cell type, define a **strict significant set** (`padj < 0.05 & |log2FC| > 0.5`) and a **universe** (all tested genes)
-3.  Run **ORA** against MSigDB Hallmark, Reactome, GO BP — three databases
-4.  Run **GSEA** against the same three, using the full log2FC ranking
-5.  Build a **`compareCluster`** dot plot across cell types for ORA-significant terms
-6.  Pick the top 5–10 themes by **cross-database agreement**
-7.  Make a per-theme **gene-level table** showing which DE genes drove each enrichment
+2.  **Convert symbols → ENTREZ IDs with `bitr()`** (Step 0 above) — build both the significant list and the universe from the *mapped* genes
+3.  For each cell type, define a **strict significant set** (`padj < 0.05 & |log2FC| > 0.5`) and a **universe** (all tested genes that mapped)
+4.  Run **ORA** against MSigDB Hallmark, Reactome, GO BP — three databases
+5.  Run **GSEA** against the same three, using the full log2FC ranking
+6.  Build a **`compareCluster`** dot plot across cell types for ORA-significant terms
+7.  Pick the top 5–10 themes by **cross-database agreement**
+8.  Make a per-theme **gene-level table** showing which DE genes drove each enrichment
 :::
 
 ## Tools we use
