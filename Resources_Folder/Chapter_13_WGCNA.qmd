@@ -27,9 +27,21 @@ Differential expression and functional analysis (Chapters 6–7) ask "which gene
 
 Genes that consistently rise and fall together across samples are likely **functionally related** — they participate in the same pathway, are co-regulated by the same TF, or are responding to the same upstream signal. This "guilt by association" premise is the basis of all co-expression analysis [@vandam2018gene]. WGCNA [@zhang2005general; @langfelder2008wgcna] finds groups of such co-expressed genes (called **modules**) and connects each module to phenotypes via correlation with sample traits.
 
-This is a **systems-level** analytical lens, complementary to per-gene DE. A module of 200 genes co-expressed and correlated with disease severity is often more informative than a list of 200 individually-significant DE genes.
+This is a **systems-level** analytical lens, complementary to per-gene DE. A module of 200 genes co-expressed and correlated with disease severity is often more informative than a list of 200 individually-significant DE genes. A DE list of 800 genes is hard to interpret; a handful of co-regulated modules — each summarized by an eigengene and tied to a trait — is actionable. WGCNA reframes "which genes change?" as "which transcriptional programs change?"
+
+::: {.callout-note .key-concept title="🔑 Key concept — co-expression modules and the guilt-by-association principle"}
+A co-expression module is a group of genes whose expression levels rise and fall together across samples, measured by Pearson correlation. Genes in the same module are assumed to be functionally linked — co-regulated by the same transcription factor, acting in the same pathway, or responding to the same upstream signal — even without prior knowledge of their function. This "guilt by association" logic [@vandam2018gene] is what makes WGCNA biologically productive: once a module is linked to a phenotype, every gene in it becomes a candidate for that biology, including uncharacterized genes co-expressed with well-known ones.
+:::
+
+::: {.callout-note .key-concept title="🔑 Key concept — the module eigengene as a module's summary"}
+A module eigengene (ME) is the first principal component of the expression matrix formed by the module's member genes across all samples. It is a single number per sample per module — the dominant axis of co-variation — that captures the average "activity" of the module in each sample. Because it is a PC score, the ME can be positive or negative; the sign is arbitrary, but the relative values across samples are meaningful. Once computed, an ME can be correlated with any sample-level trait (disease severity, age, treatment, etc.), converting hundreds of gene-level measurements into one tractable correlation test. Modules with similar MEs are candidates for merging (controlled by `mergeCutHeight`); modules with divergent MEs represent distinct biological programs.
+:::
+
+The tutorial works through a **bulk** RNA-seq dataset (GSE152418, COVID-19 PBMC bulk RNA-seq from Arunachalam et al. 2020) as the foundational worked example, because classic WGCNA was designed for bulk data and the interpretive logic is most transparent there. For single-cell adaptations see §13.6.
 
 ## 13.1b Pre-processing steps before network construction
+
+The workflow in @tbl-ch13-workflow covers eight steps, but the first three — data pre-processing — are where subtle mistakes propagate most silently into the final network. Understanding *why* each step is done in this specific order is as important as knowing the function calls.
 
 Three pre-processing steps precede network building and each has a non-obvious choice:
 
@@ -40,6 +52,8 @@ Three pre-processing steps precede network building and each has a non-obvious c
 3. **Gene filtering** before running `pickSoftThreshold`. The tutorial retains genes with at least 15 counts in three-quarters of the samples (`rowSums(counts(dds) >= 15) >= 24`). Lowly expressed genes contribute noise to pairwise correlations; filtering improves scale-free network fit and reduces the size of the TOM matrix.
 
 Note that WGCNA expects the expression matrix as **samples × genes** (rows = samples, columns = genes) — the transpose of the standard RNA-seq convention of genes × samples. This is the most common orientation error and the tutorial transposes explicitly before passing to `pickSoftThreshold`.
+
+Note also that WGCNA operates on a gene-by-gene correlation matrix, so statistical power depends on the number of *samples*, not cells. As a rule of thumb, the downstream module–trait correlation tests are meaningless below about N = 10 samples; the soft-threshold scan often fails to reach R² > 0.8 with fewer than ~15 samples; and reliable modules typically require N ≥ 20–30 [@langfelder2008wgcna]. If you have fewer samples than this, WGCNA will still run but its results should be treated as exploratory.
 
 The three pre-processing steps and the four network-construction/downstream steps are summarized in @tbl-ch13-workflow.
 
@@ -56,6 +70,8 @@ The three pre-processing steps and the four network-construction/downstream step
 
 : The eight-step WGCNA workflow: pre-processing through hub-gene identification. Each step lists the primary R call, the key user choice, and the most common pitfall. {#tbl-ch13-workflow}
 
+Reading @tbl-ch13-workflow: work down the rows in order — each step's output feeds the next. The most consequential user choices are in the "Key choice" column: the intercept-only design formula (row 2) prevents double-dipping; the gene-count filter (row 3) directly controls memory for the TOM step; and the soft-threshold power (row 4) determines the network's sparsity. If you change any one of these, re-run all subsequent steps. The "Common pitfall" column maps to the error table in §13.9.
+
 ## 13.2 The network construction
 
 Three steps build the gene co-expression network:
@@ -70,9 +86,17 @@ Raise the absolute correlation to a power $\beta$:
 
 $$a_{ij} = |\mathrm{cor}(x_i, x_j)|^\beta$$
 
-This is the **adjacency**. Why power-transform? Real biological networks tend to be **scale-free** — a small number of genes have high connectivity (hubs), and most genes have low connectivity. Without a power transform, every pair gets a similarity score and the network is uniformly dense, hiding hub structure. With a power $\beta = 6$ to $12$, weak correlations are suppressed and strong ones are amplified, producing a network whose degree distribution looks scale-free.
+This is the **adjacency**. Why power-transform? Real biological networks tend to be **scale-free** — a small number of genes have high connectivity (hubs), and most genes have low connectivity. Without a power transform, every pair gets a similarity score and the network is uniformly dense, hiding hub structure. With a power $\beta = 6$ to $12$, weak correlations are suppressed and strong ones are amplified, producing a network whose degree distribution looks scale-free. @zhang2005general showed empirically that this soft-thresholding approach produces more biologically meaningful modules than hard-thresholded (binary) networks because it preserves the correlation gradient rather than discarding all information below a cutoff.
 
-The right $\beta$ is data-dependent. WGCNA's `pickSoftThreshold` scans a range of $\beta$ values and reports the scale-free fit ($R^2$ of the linear fit between log degree and log frequency). Pick the smallest $\beta$ at which $R^2 > 0.8$. For typical bulk RNA-seq, that's $\beta = 6$–$12$.
+The right $\beta$ is data-dependent. WGCNA's `pickSoftThreshold` scans a range of $\beta$ values and reports the scale-free fit ($R^2$ of the linear fit between log degree and log frequency). Pick the smallest $\beta$ at which $R^2 > 0.8$. For typical bulk RNA-seq, that's $\beta = 6$–$12$ for unsigned networks or $12$–$20$ for signed networks (which use the sign of the correlation to distinguish activation from repression).
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — pickSoftThreshold / power (soft-threshold β)"}
+`blockwiseModules(power = ...)` sets the soft-threshold exponent β. **No universal default** — you must choose it using `pickSoftThreshold()`: scan powers 1–20 (or up to 30 for signed networks) and pick the **smallest** β at which the scale-free topology fit R² exceeds 0.8. Typical values: β = 6–12 for unsigned networks, β = 12–20 for signed networks. Raising β further than necessary suppresses connectivity, making modules harder to detect; choosing a β at which R² < 0.8 means the network is not scale-free and downstream module biology may be unreliable.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — blockwiseModules / mergeCutHeight"}
+`blockwiseModules(mergeCutHeight = 0.25)` controls how similar two module eigengenes must be before the modules are fused into one. **Default: 0.25** (merge modules whose eigengenes have a dissimilarity ≤ 0.25, i.e., a correlation ≥ 0.75). Lowering it (e.g. 0.15) creates more, smaller, more distinct modules; raising it (e.g. 0.35–0.40) merges more aggressively, producing fewer but broader modules. If your heatmap shows many modules with near-identical trait correlations, raise `mergeCutHeight`. If you lose a biologically interesting sub-module, lower it.
+:::
 
 ### 13.2.3 Topological overlap
 
@@ -86,14 +110,18 @@ The dissimilarity is $1 - \mathrm{TOM}$, which is what's clustered in the next s
 
 ## 13.3 Module detection — hierarchical clustering with dynamic cutting
 
-Run hierarchical clustering on the TOM dissimilarity matrix. The result is a dendrogram. To call modules, **cut the dendrogram dynamically** — `cutreeDynamic` finds branches whose internal connectivity is high relative to their connection to the rest of the tree.
+Run hierarchical clustering on the TOM dissimilarity matrix. The result is a dendrogram. To call modules, **cut the dendrogram dynamically** — `cutreeDynamic` finds branches whose internal connectivity is high relative to their connection to the rest of the tree. The key advantage over a fixed-height cut is that it handles branches of different sizes and connectivity levels naturally: a tight, highly-connected small module and a loose large module will both be detected even though they would require very different fixed-height thresholds.
 
 Typical parameters:
 
 - `minModuleSize = 30` — modules smaller than 30 genes are merged into a "grey" module of un-grouped genes
 - `deepSplit = 2` — moderate sensitivity; higher values give more, smaller modules
 
-The output is a colored **module assignment** per gene: each module gets a color label (turquoise, blue, brown, ...) and the un-grouped genes get grey.
+The output is a colored **module assignment** per gene: each module gets a color label (turquoise, blue, brown, ...) and the un-grouped genes get grey. The color labels themselves are arbitrary — they are simply WGCNA's internal naming convention, and the same network run twice with a different random seed may assign a different color label to the same biological module. Never rely on a color label across datasets; always identify modules by their member genes or their eigengene correlation profile.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — blockwiseModules / minModuleSize"}
+`blockwiseModules(minModuleSize = 30)` sets the minimum number of genes required for a branch to be called a module rather than assigned to grey. **Default: 30.** Lowering it (e.g. to 15 or 20) recovers smaller but potentially noisier modules; raising it (e.g. to 50–100) produces larger modules with better-supported eigengenes. If many genes accumulate in grey, lower `minModuleSize`. If you get dozens of tiny modules with no clear biological theme, raise it. For single-cell pseudobulk data with fewer genes, values of 15–20 are common.
+:::
 
 ### 13.3b Reading the gene dendrogram
 
