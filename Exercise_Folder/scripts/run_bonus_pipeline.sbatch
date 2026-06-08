@@ -25,7 +25,7 @@
 #
 # RNA velocity (Module 14) is a PYTHON step (scVelo) and is NOT run here; submit
 # it separately:  sbatch run_python.sbatch 14_rna_velocity_scvelo.py
-# Raw-data Cell Ranger (Modules 11-12) are separate jobs: cellranger_count.sbatch
+# Raw-data Cell Ranger (Modules 11-12) are separate jobs: cellranger_RNA_count.sbatch
 # and cellranger_atac_count.sbatch.
 #
 # PREREQUISITES (one time, from this scripts/ folder):

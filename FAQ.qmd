@@ -63,17 +63,24 @@ Then restart R.
 
 ### `celldex` / `alabaster.base` "had non-zero exit status"
 
-`celldex` (the SingleR reference loader, Module 04) sits on Bioconductor's **alabaster/gypsum** stack, so a failed `alabaster.base` build takes `celldex` down with it. Two fixes, in order:
+`celldex` (the SingleR reference loader, Module 04) sits on Bioconductor's **alabaster/gypsum** stack, so a failed `alabaster.base` build takes `celldex` down with it (`dependency 'alabaster.base' is not available for package 'celldex'`). **Scroll up in the log to see *why* `alabaster.base` failed** — there are two common causes:
 
-1.  Make sure your compiler toolchain is set up ([Software Setup §3](Software_Setup.qmd)) — `alabaster.base` builds C++ from source.
-2.  Re-install with dependency updates allowed (the usual cause is a stale dependency from an older install):
+**Cause A — R is compiling everything from source because there's no prebuilt binary.** Repeated `HTTP status was '404 Not Found'` lines for `.../bin/macosx/sonoma-arm64/contrib/4.6/PACKAGES` mean Bioconductor doesn't yet ship Mac/arm64 binaries for your R version. A just-released R (e.g. R 4.6 / Bioconductor 3.23) often has none for weeks. **Switch to a released R** — install **R 4.5.x (Bioconductor 3.21)** from [CRAN](https://cran.r-project.org), point RStudio at it (*Tools ▸ Global Options ▸ General*), and re-run; with binaries available it installs in minutes, no compiler needed. (`type = "binary"` won't help — there's no binary to fetch.)
 
-    ``` r
-    BiocManager::install("celldex", update = TRUE, ask = FALSE)
-    BiocManager::valid()   # lists anything still out of sync
-    ```
+**Cause B — the source build fails at the link step:** `ld: library 'ssl' not found` / `clang++: error: linker command failed`. OpenSSL isn't on the linker path. On macOS:
 
-It's only needed for Module 04, so you can keep going and come back to it.
+``` bash
+brew install openssl@3
+mkdir -p ~/.R
+cat >> ~/.R/Makevars <<'EOF'
+LDFLAGS += -L/opt/homebrew/opt/openssl@3/lib
+CPPFLAGS += -I/opt/homebrew/opt/openssl@3/include
+EOF
+```
+
+Restart R and re-run `BiocManager::install("celldex", update = TRUE, ask = FALSE)`. (Intel Macs: `/usr/local/opt/openssl@3`.) `BiocManager::valid()` lists anything still out of sync.
+
+Either way, `celldex` is only needed for Module 04's **SingleR** path — the **Azimuth** path needs no `celldex` — so you can keep going and come back to it.
 
 ## Datasets
 
