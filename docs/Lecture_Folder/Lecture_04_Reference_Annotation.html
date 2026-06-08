@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 04 — Reference-based Annotation: SingleR &amp; Azimuth</title>
+  <title>Single Cell RNA-seq Workshop – Lecture 04 — Reference-based Annotation: Azimuth</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1160,7 +1160,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 04 — Reference-based Annotation: SingleR &amp; Azimuth</h1>
+  <h1 class="title">Lecture 04 — Reference-based Annotation: Azimuth</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1184,14 +1184,15 @@ Bill Cresko
 <li>Next: <a href="Lecture_05_Integration.html">Lec 05 — Multi-Sample Integration</a></li>
 <li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_04_Reference_Annotation.html">Tutorial 04 — Reference-based Annotation</a></li>
 <li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_04_Reference_Annotation.html">Chapter 4 — Reference-based Annotation</a></li>
-<li><strong>Parallel reading:</strong> <a href="https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html">scNotebooks Module 04</a> (automated annotation with celldex + SingleR)</li>
+<li><strong>Parallel reading:</strong> <a href="https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html">scNotebooks Module 04</a> (automated cell-type annotation)</li>
 </ul>
 </section>
 <section id="goals-of-this-lecture" class="slide level2">
 <h2>Goals of this lecture</h2>
 <ul>
 <li class="fragment">See what an <strong>annotated reference</strong> is and how it’s used</li>
-<li class="fragment">Understand the two big paradigms — <strong>correlation</strong> (SingleR) and <strong>mapping</strong> (Azimuth)</li>
+<li class="fragment">Run <strong>Azimuth</strong> — anchor-based reference mapping — as our hands-on method</li>
+<li class="fragment">Know the other paradigms you’ll meet: <strong>correlation</strong> (SingleR) and <strong>classifiers</strong> (CellTypist)</li>
 <li class="fragment">Read confidence scores so you know when <em>not</em> to trust the label</li>
 <li class="fragment">Reconcile reference labels against the manual labels from Lec 03</li>
 </ul>
@@ -1210,23 +1211,9 @@ Bill Cresko
 </div>
 </section></section>
 <section>
-<section id="two-paradigms" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Two paradigms</h1>
+<section id="azimuth-our-hands-on-method" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Azimuth — our hands-on method</h1>
 
-</section>
-<section id="singler-correlation-against-a-reference" class="slide level2">
-<h2>SingleR — correlation against a reference</h2>
-<ul>
-<li class="fragment">For each query cell, compute its <strong>Spearman correlation</strong> with each reference profile</li>
-<li class="fragment">Iteratively prune low-confidence labels (Aran et al. 2019)</li>
-<li class="fragment">Works on <strong>bulk references</strong> (e.g. <code>HumanPrimaryCellAtlasData</code>) <em>and</em> sc references</li>
-<li class="fragment">No batch correction needed — operates on rank-transformed expression</li>
-</ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(SingleR); <span class="fu">library</span>(celldex)</span>
-<span id="cb1-2"><a></a>ref <span class="ot">&lt;-</span> <span class="fu">HumanPrimaryCellAtlasData</span>()</span>
-<span id="cb1-3"><a></a>pred <span class="ot">&lt;-</span> <span class="fu">SingleR</span>(<span class="at">test =</span> <span class="fu">as.SingleCellExperiment</span>(seu),</span>
-<span id="cb1-4"><a></a>                <span class="at">ref =</span> ref, <span class="at">labels =</span> ref<span class="sc">$</span>label.main)</span>
-<span id="cb1-5"><a></a>seu<span class="sc">$</span>singleR <span class="ot">&lt;-</span> pred<span class="sc">$</span>labels</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="azimuth-anchor-based-reference-mapping" class="slide level2">
 <h2>Azimuth — anchor-based reference mapping</h2>
@@ -1234,42 +1221,37 @@ Bill Cresko
 <li class="fragment">Built on Seurat’s <strong>anchor finding</strong> + supervised classification on a published reference</li>
 <li class="fragment">Best for tissues with a <strong>curated Azimuth reference</strong> (PBMC, lung, kidney, BMMC, …)</li>
 <li class="fragment">Returns labels at multiple <strong>resolutions</strong> (l1 broad → l3 fine) plus a per-cell mapping score</li>
-<li class="fragment">Performs <strong>integration</strong> with the reference under the hood</li>
+<li class="fragment">Downloads its reference on demand — <strong>no Bioconductor reference-data packages to install</strong></li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a><span class="fu">library</span>(Azimuth)</span>
-<span id="cb2-2"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(seu, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
-<span id="cb2-3"><a></a><span class="fu">DimPlot</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(Azimuth)</span>
+<span id="cb1-2"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(seu, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
+<span id="cb1-3"><a></a><span class="fu">DimPlot</span>(seu, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
-<section id="celltypist-pre-trained-logistic-regression-python" class="slide level2">
-<h2>CellTypist — pre-trained logistic regression (Python)</h2>
+<section id="other-paradigms-youll-meet" class="slide level2">
+<h2>Other paradigms you’ll meet</h2>
+<p>You’ll see these in the literature; we don’t install them for the workshop, but it’s worth knowing how they differ from Azimuth.</p>
 <ul>
-<li><code>scanpy</code> ecosystem; many tissues, including a flagship Immune All-Low / All-High model</li>
-<li>Returns a probability per class; thresholds on <code>majority_voting</code> are easy to interpret</li>
-<li>Often the fastest option for atlas-scale data</li>
+<li class="fragment"><strong>SingleR</strong> — <em>correlation</em>: Spearman-correlate each cell against per-label reference profiles (Aran et al. 2019). Works on <strong>bulk</strong> references (classically via <code>celldex</code>); returns a <code>delta</code> confidence margin.</li>
+<li class="fragment"><strong>CellTypist</strong> — <em>classifier</em> (Python): pre-trained logistic-regression models per cell type; fast, returns a probability per class; the largest model library.</li>
 </ul>
-</section></section>
-<section>
-<section id="confidence-how-to-read-the-scores" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Confidence — how to read the scores</h1>
-
-</section>
-<section id="singler-diagnostics" class="slide level2">
-<h2>SingleR diagnostics</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">plotScoreHeatmap</span>(pred)         <span class="co"># per-label score per cell</span></span>
-<span id="cb3-2"><a></a><span class="fu">plotDeltaDistribution</span>(pred)    <span class="co"># margin between top and runner-up label</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
 <div class="callout-icon-container">
 <i class="callout-icon"></i>
 </div>
-<p><strong>Tip</strong></p>
+<p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Rule of thumb.</strong> A <strong>delta</strong> (score margin) below ~0.05 means the cell could plausibly be either of two labels — flag those cells as “uncertain” rather than forcing a call.</p>
+<p>All three degrade the same way when the reference doesn’t cover your cells — the lesson is identical: <strong>read the confidence score and reconcile against markers.</strong></p>
 </div>
 </div>
 </div>
+</section></section>
+<section>
+<section id="confidence-how-to-read-the-scores" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Confidence — how to read the scores</h1>
+
 </section>
 <section id="azimuth-diagnostics" class="slide level2">
 <h2>Azimuth diagnostics</h2>
@@ -1304,6 +1286,7 @@ Bill Cresko
 </tr>
 </tbody>
 </table>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a><span class="fu">FeaturePlot</span>(seu, <span class="at">features =</span> <span class="st">&quot;mapping.score&quot;</span>)   <span class="co"># spot off-manifold cells</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="callout callout-warning callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1335,7 +1318,7 @@ Bill Cresko
 <h2>A workable reconciliation workflow</h2>
 <ol type="1">
 <li>Cluster + name manually (Lec 03)</li>
-<li>Run SingleR + Azimuth, store both as metadata columns</li>
+<li>Run Azimuth, store its labels as metadata columns</li>
 <li>Cross-tabulate: <code>table(seu$manual, seu$predicted.celltype.l2)</code></li>
 <li>For each cluster, accept the agreement; investigate the disagreements</li>
 <li>Persist a <strong><code>celltype_final</code></strong> column with the resolved label and a <strong><code>celltype_method</code></strong> column (“manual” / “azimuth” / “consensus”)</li>
@@ -1398,7 +1381,7 @@ Bill Cresko
 <p><strong>Warning</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Treat an LLM suggestion like an over-eager rotation student:</strong> a source of hypotheses to verify against markers and a real reference (SingleR / Azimuth), never the final call. Anything you keep must be backed by a marker <code>DotPlot</code> and the literature.</p>
+<p><strong>Treat an LLM suggestion like an over-eager rotation student:</strong> a source of hypotheses to verify against markers and a real reference (Azimuth), never the final call. Anything you keep must be backed by a marker <code>DotPlot</code> and the literature.</p>
 </div>
 </div>
 </div>
@@ -1412,8 +1395,8 @@ Bill Cresko
 <h2>What to remember from Lecture 04</h2>
 <ul>
 <li class="fragment">This is the automated complement to the <strong>manual annotation</strong> of <a href="Lecture_03_Markers_Annotation.html">Lec 03</a> — for model organisms it is often the first pass; for non-model systems, manual markers still lead</li>
-<li class="fragment"><strong>SingleR</strong> = correlation, light-touch, works on bulk refs</li>
-<li class="fragment"><strong>Azimuth</strong> = anchor mapping + supervised classifier, best when a curated ref exists for your tissue</li>
+<li class="fragment"><strong>Azimuth</strong> = anchor mapping + supervised classifier, best when a curated ref exists for your tissue; downloads its reference, nothing extra to install</li>
+<li class="fragment"><strong>SingleR</strong> (correlation) and <strong>CellTypist</strong> (classifier) are the other paradigms you’ll meet</li>
 <li class="fragment"><strong>Always read confidence scores</strong> — they tell you when the reference doesn’t cover your biology</li>
 <li class="fragment">The output of an annotation pass is <em>a label plus a confidence flag</em>, not just a label</li>
 </ul>

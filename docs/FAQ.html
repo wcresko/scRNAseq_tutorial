@@ -4332,27 +4332,13 @@ z-index: 1;
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">&quot;Matrix&quot;</span>, <span class="st">&quot;SeuratObject&quot;</span>, <span class="st">&quot;Seurat&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Then restart R.</p>
 </section>
-<section id="celldex-alabaster.base-had-non-zero-exit-status" class="level3">
-<h3 class="anchored" data-anchor-id="celldex-alabaster.base-had-non-zero-exit-status"><code>celldex</code> / <code>alabaster.base</code> “had non-zero exit status”</h3>
-<p><code>celldex</code> (the SingleR reference loader, Module 04) sits on Bioconductor’s <strong>alabaster/gypsum</strong> stack, so a failed <code>alabaster.base</code> build takes <code>celldex</code> down with it (<code>dependency &#39;alabaster.base&#39; is not available for package &#39;celldex&#39;</code>). <strong>Scroll up in the log to see <em>why</em> <code>alabaster.base</code> failed</strong> — there are two common causes:</p>
-<p><strong>Cause A — R is compiling everything from source because there’s no prebuilt binary.</strong> Repeated <code>HTTP status was &#39;404 Not Found&#39;</code> lines for <code>.../bin/macosx/sonoma-arm64/contrib/4.6/PACKAGES</code> mean Bioconductor doesn’t yet ship Mac/arm64 binaries for your R version. A just-released R (e.g. R 4.6 / Bioconductor 3.23) often has none for weeks. <strong>Switch to a released R</strong> — install <strong>R 4.5.x (Bioconductor 3.21)</strong> from <a href="https://cran.r-project.org">CRAN</a>, point RStudio at it (<em>Tools ▸ Global Options ▸ General</em>), and re-run; with binaries available it installs in minutes, no compiler needed. (<code>type = &quot;binary&quot;</code> won’t help — there’s no binary to fetch.)</p>
-<p><strong>Cause B — the source build fails at the link step:</strong> <code>ld: library &#39;ssl&#39; not found</code> / <code>clang++: error: linker command failed</code>. OpenSSL isn’t on the linker path. On macOS:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">brew</span> install openssl@3</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ~/.R</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> <span class="op">&gt;&gt;</span> ~/.R/Makevars <span class="op">&lt;&lt;&#39;EOF&#39;</span></span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="st">LDFLAGS += -L/opt/homebrew/opt/openssl@3/lib</span></span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">CPPFLAGS += -I/opt/homebrew/opt/openssl@3/include</span></span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Restart R and re-run <code>BiocManager::install(&quot;celldex&quot;, update = TRUE, ask = FALSE)</code>. (Intel Macs: <code>/usr/local/opt/openssl@3</code>.) <code>BiocManager::valid()</code> lists anything still out of sync.</p>
-<p>Either way, <code>celldex</code> is only needed for Module 04’s <strong>SingleR</strong> path — the <strong>Azimuth</strong> path needs no <code>celldex</code> — so you can keep going and come back to it.</p>
-</section>
 </section>
 <section id="datasets" class="level2">
 <h2 class="anchored" data-anchor-id="datasets">Datasets</h2>
 <section id="read10x-says-barcode-file-missing-or-matrix-file-missing" class="level3">
 <h3 class="anchored" data-anchor-id="read10x-says-barcode-file-missing-or-matrix-file-missing"><code>Read10X()</code> says “Barcode file missing” or “matrix file missing”</h3>
 <p>You almost certainly pointed at the wrong directory. The argument should be the <strong>folder</strong> containing <code>barcodes.tsv.gz</code>, <code>features.tsv.gz</code>, and <code>matrix.mtx.gz</code>, <strong>not</strong> any of those files. Run:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">list.files</span>(<span class="st">&quot;data/filtered_feature_bc_matrix&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">list.files</span>(<span class="st">&quot;data/filtered_feature_bc_matrix&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>You should see exactly those three filenames.</p>
 </section>
 <section id="tutorial-says-..data...-but-my-data-is-in-data" class="level3">
@@ -4365,9 +4351,9 @@ z-index: 1;
 <section id="my-umap-doesnt-match-the-slide-handout-exactly" class="level3">
 <h3 class="anchored" data-anchor-id="my-umap-doesnt-match-the-slide-handout-exactly">My UMAP doesn’t match the slide / handout exactly</h3>
 <p>Expected. UMAP and clustering both depend on a random seed. The cluster identities and overall topology should match; rotation/reflection of the embedding will not. To reproduce exactly, set:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(seu, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, <span class="at">seed.use =</span> <span class="dv">2026</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(seu, <span class="at">random.seed =</span> <span class="dv">2026</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(seu, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, <span class="at">seed.use =</span> <span class="dv">2026</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(seu, <span class="at">random.seed =</span> <span class="dv">2026</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="findmarkers-is-slow" class="level3">
 <h3 class="anchored" data-anchor-id="findmarkers-is-slow"><code>FindMarkers</code> is slow</h3>
@@ -4376,8 +4362,8 @@ z-index: 1;
 <section id="i-get-warnings-about-future-parallelization" class="level3">
 <h3 class="anchored" data-anchor-id="i-get-warnings-about-future-parallelization">I get warnings about future / parallelization</h3>
 <p>Most are safe to ignore. To silence and pick a sensible default, add at the top of your script:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">future.globals.maxSize =</span> <span class="dv">8</span> <span class="sc">*</span> <span class="dv">1024</span><span class="sc">^</span><span class="dv">3</span>)   <span class="co"># 8 GB</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>future<span class="sc">::</span><span class="fu">plan</span>(<span class="st">&quot;multicore&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)         <span class="co"># or &quot;multisession&quot; on Windows</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">future.globals.maxSize =</span> <span class="dv">8</span> <span class="sc">*</span> <span class="dv">1024</span><span class="sc">^</span><span class="dv">3</span>)   <span class="co"># 8 GB</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>future<span class="sc">::</span><span class="fu">plan</span>(<span class="st">&quot;multicore&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)         <span class="co"># or &quot;multisession&quot; on Windows</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="cannot-allocate-vector-of-size-xx-gb" class="level3">
 <h3 class="anchored" data-anchor-id="cannot-allocate-vector-of-size-xx-gb">“Cannot allocate vector of size XX Gb”</h3>

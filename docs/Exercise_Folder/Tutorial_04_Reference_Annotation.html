@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Tutorial 04 — Reference-based Annotation (SingleR + Azimuth)</title>
+<title>Tutorial 04 — Reference-based Annotation (Azimuth)</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -2210,13 +2210,11 @@ vertical-align: -.125em;
   <ul>
   <li><a href="#about-this-tutorial" id="toc-about-this-tutorial" class="nav-link active" data-scroll-target="#about-this-tutorial">About this tutorial</a></li>
   <li><a href="#setup" id="toc-setup" class="nav-link" data-scroll-target="#setup">Setup</a></li>
-  <li><a href="#path-1-singler-against-a-celldex-reference" id="toc-path-1-singler-against-a-celldex-reference" class="nav-link" data-scroll-target="#path-1-singler-against-a-celldex-reference">Path 1 — <code>SingleR</code> against a <code>celldex</code> reference</a>
+  <li><a href="#azimuth-seurat-reference-mapping" id="toc-azimuth-seurat-reference-mapping" class="nav-link" data-scroll-target="#azimuth-seurat-reference-mapping">Azimuth — Seurat reference mapping</a>
   <ul class="collapse">
-  <li><a href="#pick-a-reference" id="toc-pick-a-reference" class="nav-link" data-scroll-target="#pick-a-reference">Pick a reference</a></li>
-  <li><a href="#score-distribution-plot-a-built-in-confidence-check" id="toc-score-distribution-plot-a-built-in-confidence-check" class="nav-link" data-scroll-target="#score-distribution-plot-a-built-in-confidence-check">Score-distribution plot — a built-in confidence check</a></li>
+  <li><a href="#reading-the-mapping-score-a-built-in-confidence-check" id="toc-reading-the-mapping-score-a-built-in-confidence-check" class="nav-link" data-scroll-target="#reading-the-mapping-score-a-built-in-confidence-check">Reading the mapping score — a built-in confidence check</a></li>
   </ul></li>
-  <li><a href="#path-2-azimuth-seurat-reference-mapping" id="toc-path-2-azimuth-seurat-reference-mapping" class="nav-link" data-scroll-target="#path-2-azimuth-seurat-reference-mapping">Path 2 — Azimuth (Seurat reference mapping)</a></li>
-  <li><a href="#compare-the-three-annotations" id="toc-compare-the-three-annotations" class="nav-link" data-scroll-target="#compare-the-three-annotations">Compare the three annotations</a></li>
+  <li><a href="#compare-azimuth-against-the-manual-ground-truth-labels" id="toc-compare-azimuth-against-the-manual-ground-truth-labels" class="nav-link" data-scroll-target="#compare-azimuth-against-the-manual-ground-truth-labels">Compare Azimuth against the manual / ground-truth labels</a></li>
   <li><a href="#reconcile-disagreements" id="toc-reconcile-disagreements" class="nav-link" data-scroll-target="#reconcile-disagreements">Reconcile disagreements</a></li>
   <li><a href="#save-the-final-annotated-object" id="toc-save-the-final-annotated-object" class="nav-link" data-scroll-target="#save-the-final-annotated-object">Save the final annotated object</a></li>
   <li><a href="#wrap-up" id="toc-wrap-up" class="nav-link" data-scroll-target="#wrap-up">Wrap-up</a></li>
@@ -2228,7 +2226,7 @@ vertical-align: -.125em;
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Tutorial 04 — Reference-based Annotation (SingleR + Azimuth)</h1>
+<h1 class="title">Tutorial 04 — Reference-based Annotation (Azimuth)</h1>
 <p class="subtitle lead">Map cells against a labeled reference for fast, reproducible cell-type calls</p>
 </div>
 
@@ -2272,7 +2270,7 @@ vertical-align: -.125em;
 </div>
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
-<p>A short hands-on companion to <strong><a href="../Lecture_Folder/Lecture_04_Reference_Annotation.html">Lecture 04 — Reference-based Annotation</a></strong>. We start from the <strong>annotated object saved at the end of Tutorial 03</strong> (<code>ifnb_annotated.rds</code>) — reference-based methods like SingleR and Azimuth run per cell and don’t need your own integration, so this step slots in right after manual annotation and before integration. We:</p>
+<p>A short hands-on companion to <strong><a href="../Lecture_Folder/Lecture_04_Reference_Annotation.html">Lecture 04 — Reference-based Annotation</a></strong>. We start from the <strong>annotated object saved at the end of Tutorial 03</strong> (<code>ifnb_annotated.rds</code>) — reference-based methods like Azimuth run per cell and don’t need your own integration, so this step slots in right after manual annotation and before integration. We:</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2287,9 +2285,8 @@ Note
 </div>
 </div>
 <ul>
-<li>Run <code>SingleR</code> against a built-in <code>celldex</code> reference</li>
 <li>Run <code>Azimuth</code> against the PBMC reference (a perfect fit for this dataset)</li>
-<li>Compare the two automatic calls against the manual labels you assigned in Tutorial 03 <em>and</em> against the author-curated <code>seurat_annotations</code> ground truth</li>
+<li>Compare the automatic calls against the manual labels you assigned in Tutorial 03 <em>and</em> against the author-curated <code>seurat_annotations</code> ground truth</li>
 <li>Reconcile disagreements and save a final, reference-validated annotation</li>
 </ul>
 <div class="callout callout-style-default callout-note callout-titled">
@@ -2302,7 +2299,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Why this works particularly cleanly for <code>ifnb</code>.</strong> The dataset is human PBMCs — exactly what the Azimuth <code>pbmcref</code> and <code>celldex::HumanPrimaryCellAtlasData()</code> references are built for. You should expect <strong>high agreement</strong> between methods. That’s a feature, not a coincidence: it’s the easy regime, where reference-based annotation shines. In the <strong>bonus raw-data track</strong> — the <a href="../Resources_Folder/Talapas_FullRun_FromFASTQs.html">Full Talapas run from raw FASTQs</a> on the NSCLC tumor dataset — you’ll see what happens when the data includes tumor / non-immune cells outside the reference’s support: the harder regime.</p>
+<p><strong>Why this works particularly cleanly for <code>ifnb</code>.</strong> The dataset is human PBMCs — exactly what the Azimuth <code>pbmcref</code> reference is built for. You should expect <strong>high agreement</strong> between the automatic labels and your manual ones. That’s a feature, not a coincidence: it’s the easy regime, where reference-based annotation shines. In the <strong>bonus raw-data track</strong> — the <a href="../Resources_Folder/Talapas_FullRun_FromFASTQs.html">Full Talapas run from raw FASTQs</a> on the NSCLC tumor dataset — you’ll see what happens when the data includes tumor / non-immune cells outside the reference’s support: the harder regime.</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled" title="How to use this page">
@@ -2333,9 +2330,9 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong><code>celldex::HumanPrimaryCellAtlasData()</code> fails or hangs</strong> — the underlying data is in <code>ExperimentHub</code>. First-time download is ~500 MB and can hit firewalls. Run <code>setExperimentHubOption(&quot;PROXY&quot;, Sys.getenv(&quot;HTTP_PROXY&quot;))</code> if behind a corporate proxy. The cached version is reused on subsequent runs.</p>
 <p><strong><code>RunAzimuth</code> errors during reference download</strong> — the PBMC reference is ~1 GB and downloads on first call. Confirm internet, sufficient disk, and no <code>tar</code> corruption. If it fails midway, delete the partial cache directory (<code>~/.cache/Azimuth/</code> or similar) and retry.</p>
-<p><strong>SingleR labels are mostly “T_cells”, “B_cell”</strong> — the <code>HumanPrimaryCellAtlasData</code> reference is broad. For finer resolution, use <code>label.fine</code> instead of <code>label.main</code>, or switch to a more specific reference like <code>MonacoImmuneData</code> for PBMCs.</p>
+<p><strong>STIM cells get lower mapping scores than CTRL</strong> — that’s expected, not a bug: the interferon-β response shifts cells off the resting-PBMC reference manifold even though their <em>cell-type</em> identity is unchanged. Read it as a confidence flag, not a wrong label.</p>
+<p><strong>Many cells labeled with a coarse type</strong> — <code>predicted.celltype.l1</code> is broad by design. Use <code>predicted.celltype.l2</code> (or <code>l3</code>) for finer resolution.</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
@@ -2361,162 +2358,83 @@ Note
 <h2 class="anchored" data-anchor-id="setup">Setup</h2>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleR)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(celldex)</span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SingleCellExperiment)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Output directory for this module&#39;s figures and tables.</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Every figure/table chunk below writes a file named  Mod4_C&lt;chunk&gt;_&lt;name&gt;</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># into ../output/Mod4/ so it can be cross-referenced from the rest of the site.</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   Mod4 = Module 4 (this tutorial);  C&lt;n&gt; = the nth code chunk.</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod4&quot;</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Output directory for this module&#39;s figures and tables.</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Every figure/table chunk below writes a file named  Mod4_C&lt;chunk&gt;_&lt;name&gt;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># into ../output/Mod4/ so it can be cross-referenced from the rest of the site.</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co">#   Mod4 = Module 4 (this tutorial);  C&lt;n&gt; = the nth code chunk.</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod4&quot;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_annotated.rds&quot;</span>)</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(ifnb) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span>
 <span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_annotated.rds&quot;</span>)</span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(ifnb) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>p_setup_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;seurat_annotations&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Manual cell-type annotations on the unintegrated UMAP&quot;</span>,</span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Author-curated seurat_annotations carried from Tutorial 03&quot;</span>,</span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>p_setup_umap</span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C1_manual_annotations_umap.png&quot;</span>), p_setup_umap,</span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>p_setup_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;seurat_annotations&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Manual cell-type annotations on the unintegrated UMAP&quot;</span>,</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Author-curated seurat_annotations carried from Tutorial 03&quot;</span>,</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>p_setup_umap</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C1_manual_annotations_umap.png&quot;</span>), p_setup_umap,</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
-<section id="path-1-singler-against-a-celldex-reference" class="level2">
-<h2 class="anchored" data-anchor-id="path-1-singler-against-a-celldex-reference">Path 1 — <code>SingleR</code> against a <code>celldex</code> reference</h2>
-<p><code>SingleR</code> correlates each query cell’s expression against per-label reference profiles and returns the best-matching label.</p>
-<section id="pick-a-reference" class="level3">
-<h3 class="anchored" data-anchor-id="pick-a-reference">Pick a reference</h3>
+<section id="azimuth-seurat-reference-mapping" class="level2">
+<h2 class="anchored" data-anchor-id="azimuth-seurat-reference-mapping">Azimuth — Seurat reference mapping</h2>
+<p>Azimuth wraps Seurat’s anchor-based reference mapping with curated atlases, and returns hierarchical labels (<code>predicted.celltype.l1</code> / <code>l2</code> / <code>l3</code>) plus a per-cell <strong>mapping score</strong>. The PBMC reference (<code>pbmcref</code>) is the most widely tested and is a perfect fit for <code>ifnb</code>.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bulk reference covering 37 main cell types from purified human samples</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>ref <span class="ot">&lt;-</span> celldex<span class="sc">::</span><span class="fu">HumanPrimaryCellAtlasData</span>()</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Run SingleR on the (log-)normalized counts</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>sce  <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(ifnb)</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>pred <span class="ot">&lt;-</span> <span class="fu">SingleR</span>(<span class="at">test =</span> sce, <span class="at">ref =</span> ref,</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>                <span class="at">labels =</span> ref<span class="sc">$</span>label.main,</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>                <span class="at">assay.type.test =</span> <span class="st">&quot;logcounts&quot;</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                <span class="at">BPPARAM =</span> BiocParallel<span class="sc">::</span><span class="fu">SerialParam</span>())</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(pred<span class="sc">$</span>labels)</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: number of cells assigned to each SingleR label -------------</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">enframe</span>(<span class="fu">table</span>(pred<span class="sc">$</span>labels),</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>                <span class="at">name =</span> <span class="st">&quot;singler_label&quot;</span>, <span class="at">value =</span> <span class="st">&quot;n_cells&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">n_cells =</span> <span class="fu">as.integer</span>(n_cells)) <span class="sc">|&gt;</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(dplyr<span class="sc">::</span><span class="fu">desc</span>(n_cells)) <span class="sc">|&gt;</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C2_singler_label_counts.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Will download the PBMC reference on first use (~1 GB)</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(ifnb, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="co"># New columns: predicted.celltype.l1 / l2 / l3 + scores</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data))])</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: per-cell Azimuth predictions (l1/l2/l3 + scores) -----------</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)), drop <span class="ot">=</span> <span class="cn">FALSE</span>] <span class="sc">|&gt;</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;cell&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C2_azimuth_predictions.csv&quot;</span>))</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Azimuth predicted cell types (level 2) on the unintegrated UMAP&quot;</span>,</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Anchor-based mapping against the Azimuth pbmcref reference&quot;</span>,</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C2_azimuth_labels_umap.png&quot;</span>), p_azimuth_umap,</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Attach the calls back to the Seurat object:</p>
+<section id="reading-the-mapping-score-a-built-in-confidence-check" class="level3">
+<h3 class="anchored" data-anchor-id="reading-the-mapping-score-a-built-in-confidence-check">Reading the mapping score — a built-in confidence check</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>singler_label <span class="ot">&lt;-</span> pred<span class="sc">$</span>labels</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>singler_score <span class="ot">&lt;-</span> <span class="fu">apply</span>(pred<span class="sc">$</span>scores, <span class="dv">1</span>, max)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>p_singler_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;singler_label&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;SingleR labels on the unintegrated UMAP&quot;</span>,</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;celldex HumanPrimaryCellAtlas reference (label.main)&quot;</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>p_singler_umap</span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C3_singler_labels_umap.png&quot;</span>), p_singler_umap,</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-</section>
-<section id="score-distribution-plot-a-built-in-confidence-check" class="level3">
-<h3 class="anchored" data-anchor-id="score-distribution-plot-a-built-in-confidence-check">Score-distribution plot — a built-in confidence check</h3>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>p_score_heatmap <span class="ot">&lt;-</span> <span class="fu">plotScoreHeatmap</span>(pred)</span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>p_score_heatmap</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>p_delta <span class="ot">&lt;-</span> <span class="fu">plotDeltaDistribution</span>(pred) <span class="sc">+</span></span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;SingleR delta distribution by assigned label&quot;</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;delta = top-label score minus median score; small delta = low-confidence call&quot;</span>,</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Assigned label&quot;</span>,</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Delta (score gap)&quot;</span></span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>p_delta</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C4_singler_score_heatmap.png&quot;</span>), p_score_heatmap,</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">9</span>, <span class="at">height =</span> <span class="dv">7</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C4_singler_delta_distribution.png&quot;</span>), p_delta,</span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">9</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div class="callout callout-style-default callout-important callout-titled" title="Think about it">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span>Think about it
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p>Some cells will get a label like <code>&quot;T_cells&quot;</code> with <code>delta</code> close to zero. What does that mean and what should you do about it?</p>
-<details>
-<summary>
-Click for answer
-</summary>
-<p><code>delta</code> is the gap between the cell’s top-label score and the median score across all labels. A small <code>delta</code> means the reference can’t decide — the cell either looks ambiguous (multiple types fit equally well) or is a type the reference doesn’t contain.</p>
-<p>In practice: prune low-confidence calls (<code>pruneScores()</code> from SingleR), and trust your manual marker-based label more for those cells.</p>
-</details>
-</div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>singler_label_pruned <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">is.na</span>(SingleR<span class="sc">::</span><span class="fu">pruneScores</span>(pred)), <span class="cn">NA</span>, pred<span class="sc">$</span>labels</span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-</section>
-</section>
-<section id="path-2-azimuth-seurat-reference-mapping" class="level2">
-<h2 class="anchored" data-anchor-id="path-2-azimuth-seurat-reference-mapping">Path 2 — Azimuth (Seurat reference mapping)</h2>
-<p>Azimuth wraps Seurat’s anchor-based reference mapping with curated atlases. The PBMC reference is the most widely tested.</p>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Will download the PBMC reference on first use (~1 GB)</span></span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(ifnb, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># New columns: predicted.celltype.l1 / l2 / l3 + scores</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data))])</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: per-cell Azimuth predictions (l1/l2/l3 + scores) -----------</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)), drop <span class="ot">=</span> <span class="cn">FALSE</span>] <span class="sc">|&gt;</span></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;cell&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_azimuth_predictions.csv&quot;</span>))</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Azimuth predicted cell types (level 2) on the unintegrated UMAP&quot;</span>,</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Anchor-based mapping against the Azimuth pbmcref reference&quot;</span>,</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_azimuth_labels_umap.png&quot;</span>), p_azimuth_umap,</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>p_mapping <span class="ot">&lt;-</span> <span class="fu">FeaturePlot</span>(ifnb, <span class="at">features =</span> <span class="st">&quot;mapping.score&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>) <span class="sc">+</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Azimuth mapping score per cell&quot;</span>,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;High (~0.7–1.0) = projects cleanly into the reference; low = off-manifold&quot;</span>,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>p_mapping</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C3_azimuth_mapping_score.png&quot;</span>), p_mapping,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2533,75 +2451,66 @@ Click for answer
 <summary>
 Click for answer
 </summary>
-<p>Azimuth still assigns the best-matching label, but the <strong>mapping score</strong> (<code>mapping.score</code>) reflects how well the cell’s neighborhood projects into the reference space. Plot <code>FeaturePlot(ifnb, &quot;mapping.score&quot;)</code> — if STIM cells have <strong>systematically lower mapping scores</strong> than CTRL cells, that’s evidence that the IFN response is shifting STIM cells off the reference manifold even though their <em>cell-type</em> identity is unchanged.</p>
-<p>In practice the PBMC reference is robust enough that this effect is mild — but it’s a great teaching example of how a “good” reference can still under-represent a perturbation state.</p>
+<p>Azimuth still assigns the best-matching label, but the <strong>mapping score</strong> (<code>mapping.score</code>) reflects how well the cell’s neighborhood projects into the reference space. In the plot above, if STIM cells have <strong>systematically lower mapping scores</strong> than CTRL cells, that’s evidence that the IFN response is shifting STIM cells off the reference manifold even though their <em>cell-type</em> identity is unchanged.</p>
+<p>In practice the PBMC reference is robust enough that this effect is mild — but it’s a great teaching example of how a “good” reference can still under-represent a perturbation state. Compare the means with <code>tapply(ifnb$mapping.score, ifnb$stim, mean)</code>.</p>
 </details>
 </div>
 </div>
 </section>
-<section id="compare-the-three-annotations" class="level2">
-<h2 class="anchored" data-anchor-id="compare-the-three-annotations">Compare the three annotations</h2>
+</section>
+<section id="compare-azimuth-against-the-manual-ground-truth-labels" class="level2">
+<h2 class="anchored" data-anchor-id="compare-azimuth-against-the-manual-ground-truth-labels">Compare Azimuth against the manual / ground-truth labels</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>ann <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(seurat_annotations,                  <span class="co"># ground truth (Kang authors)</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>         singler_label_pruned,                <span class="co"># SingleR (pruned)</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>         predicted.celltype.l2)               <span class="co"># Azimuth</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ann<span class="sc">$</span>seurat_annotations, ann<span class="sc">$</span>singler_label_pruned, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ann<span class="sc">$</span>seurat_annotations, ann<span class="sc">$</span>predicted.celltype.l2, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Tables out: ground-truth vs each automatic method cross-tabulations ----</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(</span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">table</span>(<span class="at">seurat_annotations =</span> ann<span class="sc">$</span>seurat_annotations,</span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>        <span class="at">singler_label_pruned =</span> ann<span class="sc">$</span>singler_label_pruned, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>),</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">responseName =</span> <span class="st">&quot;n_cells&quot;</span></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C7_truth_vs_singler.csv&quot;</span>))</span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">table</span>(<span class="at">seurat_annotations =</span> ann<span class="sc">$</span>seurat_annotations,</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>        <span class="at">predicted_celltype_l2 =</span> ann<span class="sc">$</span>predicted.celltype.l2, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>),</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">responseName =</span> <span class="st">&quot;n_cells&quot;</span></span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C7_truth_vs_azimuth.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>ann <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(seurat_annotations,                  <span class="co"># ground truth (Kang authors)</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>         predicted.celltype.l2)               <span class="co"># Azimuth</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ann<span class="sc">$</span>seurat_annotations, ann<span class="sc">$</span>predicted.celltype.l2, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: ground-truth vs Azimuth cross-tabulation -------------------</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">table</span>(<span class="at">seurat_annotations =</span> ann<span class="sc">$</span>seurat_annotations,</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">predicted_celltype_l2 =</span> ann<span class="sc">$</span>predicted.celltype.l2, <span class="at">useNA =</span> <span class="st">&quot;ifany&quot;</span>),</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">responseName =</span> <span class="st">&quot;n_cells&quot;</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C4_truth_vs_azimuth.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <p>A cleaner cross-tabulation as a heatmap:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>p_compare_heatmap <span class="ot">&lt;-</span> ann <span class="sc">|&gt;</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(seurat_annotations, predicted.celltype.l2) <span class="sc">|&gt;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(predicted.celltype.l2, seurat_annotations, <span class="at">fill =</span> n)) <span class="sc">+</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>() <span class="sc">+</span></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>() <span class="sc">+</span></span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>)) <span class="sc">+</span></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Ground truth (rows) vs. Azimuth (cols)&quot;</span>,</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">&quot;Tile colour = number of cells with that (truth, Azimuth) label pair&quot;</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;Azimuth predicted.celltype.l2&quot;</span>,</span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">&quot;Author seurat_annotations&quot;</span>,</span>
-<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">fill =</span> <span class="st">&quot;Cells&quot;</span>)</span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>p_compare_heatmap</span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C8_truth_vs_azimuth_heatmap.png&quot;</span>), p_compare_heatmap,</span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>p_compare_heatmap <span class="ot">&lt;-</span> ann <span class="sc">|&gt;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(seurat_annotations, predicted.celltype.l2) <span class="sc">|&gt;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(predicted.celltype.l2, seurat_annotations, <span class="at">fill =</span> n)) <span class="sc">+</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>() <span class="sc">+</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>() <span class="sc">+</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>)) <span class="sc">+</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Ground truth (rows) vs. Azimuth (cols)&quot;</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">&quot;Tile colour = number of cells with that (truth, Azimuth) label pair&quot;</span>,</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;Azimuth predicted.celltype.l2&quot;</span>,</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">&quot;Author seurat_annotations&quot;</span>,</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">fill =</span> <span class="st">&quot;Cells&quot;</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>p_compare_heatmap</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C5_truth_vs_azimuth_heatmap.png&quot;</span>), p_compare_heatmap,</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="reconcile-disagreements" class="level2">
 <h2 class="anchored" data-anchor-id="reconcile-disagreements">Reconcile disagreements</h2>
-<p>A simple “agree-or-flag” rule: keep the ground-truth label if at least one automatic method agrees; otherwise mark for review.</p>
+<p>A simple “agree-or-flag” rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype_final <span class="ot">&lt;-</span> <span class="fu">with</span>(ifnb<span class="sc">@</span>meta.data, dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.character</span>(seurat_annotations) <span class="sc">==</span> singler_label_pruned     <span class="sc">~</span> <span class="fu">as.character</span>(seurat_annotations),</span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.character</span>(seurat_annotations) <span class="sc">==</span> predicted.celltype.l2    <span class="sc">~</span> <span class="fu">as.character</span>(seurat_annotations),</span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="cn">TRUE</span>                                                         <span class="sc">~</span> <span class="fu">paste0</span>(<span class="st">&quot;REVIEW:&quot;</span>, seurat_annotations)</span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>))</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>celltype_final)</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: final reconciled cell-type call counts ---------------------</span></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">enframe</span>(<span class="fu">table</span>(ifnb<span class="sc">$</span>celltype_final),</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>                <span class="at">name =</span> <span class="st">&quot;celltype_final&quot;</span>, <span class="at">value =</span> <span class="st">&quot;n_cells&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">n_cells =</span> <span class="fu">as.integer</span>(n_cells)) <span class="sc">|&gt;</span></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(dplyr<span class="sc">::</span><span class="fu">desc</span>(n_cells)) <span class="sc">|&gt;</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C9_celltype_final_counts.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype_final <span class="ot">&lt;-</span> <span class="fu">with</span>(ifnb<span class="sc">@</span>meta.data, dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">as.character</span>(seurat_annotations) <span class="sc">==</span> predicted.celltype.l2    <span class="sc">~</span> <span class="fu">as.character</span>(seurat_annotations),</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="cn">TRUE</span>                                                         <span class="sc">~</span> <span class="fu">paste0</span>(<span class="st">&quot;REVIEW:&quot;</span>, seurat_annotations)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>))</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>celltype_final)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: final reconciled cell-type call counts ---------------------</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">enframe</span>(<span class="fu">table</span>(ifnb<span class="sc">$</span>celltype_final),</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                <span class="at">name =</span> <span class="st">&quot;celltype_final&quot;</span>, <span class="at">value =</span> <span class="st">&quot;n_cells&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">n_cells =</span> <span class="fu">as.integer</span>(n_cells)) <span class="sc">|&gt;</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(dplyr<span class="sc">::</span><span class="fu">desc</span>(n_cells)) <span class="sc">|&gt;</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_celltype_final_counts.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2618,7 +2527,7 @@ Click for answer
 <summary>
 Click for answer
 </summary>
-<p>Reproducibility is necessary but not sufficient. Azimuth is reproducible <em>and</em> biased by its reference: any cell type absent from the reference will be silently re-labeled. The right answer is to use both, as the tutorial does, and document where they disagree — not to pick one because it’s mechanical.</p>
+<p>Reproducibility is necessary but not sufficient. Azimuth is reproducible <em>and</em> biased by its reference: any cell type absent from the reference will be silently re-labeled. The right answer is to use both, as the tutorial does — manual marker-based labels and the automatic reference call — and document where they disagree, not to pick one because it’s mechanical.</p>
 </details>
 </div>
 </div>
@@ -2626,14 +2535,13 @@ Click for answer
 <section id="save-the-final-annotated-object" class="level2">
 <h2 class="anchored" data-anchor-id="save-the-final-annotated-object">Save the final annotated object</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(ifnb, <span class="st">&quot;../data/ifnb_annotated_final.rds&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">saveRDS</span>(ifnb, <span class="st">&quot;../data/ifnb_annotated_final.rds&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="wrap-up" class="level2">
 <h2 class="anchored" data-anchor-id="wrap-up">Wrap-up</h2>
 <p>You now have:</p>
 <ul>
-<li>A <code>SingleR</code> label per cell (with confidence pruning)</li>
 <li>An Azimuth label per cell (with a mapping score)</li>
 <li>A reconciled <code>celltype_final</code> you can carry into Tutorial 06 (DESeq2 + pseudobulk DE) or downstream analyses</li>
 </ul>
@@ -2648,8 +2556,8 @@ Click for answer
 </div>
 <div class="callout-body-container callout-body">
 <ul>
-<li>Try a tissue-appropriate reference: <code>celldex::BlueprintEncodeData()</code>, the <a href="https://tabula-sapiens-portal.ds.czbiohub.org/">Tabula Sapiens</a> atlas, or the <a href="https://data.humancellatlas.org/">HCA Lung Cell Atlas</a>.</li>
-<li>Repeat with <strong>CellTypist</strong> (Python) for a third opinion.</li>
+<li>Try a tissue-appropriate reference: another Azimuth atlas (<code>lungref</code>, <code>bonemarrowref</code>, …), the <a href="https://tabula-sapiens-portal.ds.czbiohub.org/">Tabula Sapiens</a> atlas, or the <a href="https://data.humancellatlas.org/">HCA Lung Cell Atlas</a>.</li>
+<li>For a second opinion from a different annotation paradigm, try a <strong>correlation-based</strong> method (<code>SingleR</code> with a <code>celldex</code> reference) or a <strong>classifier-based</strong> one (<strong>CellTypist</strong>, Python). These aren’t installed for the workshop — Azimuth alone is enough here — but they’re worth knowing; see <a href="../Resources_Folder/Chapter_04_Reference_Annotation.html">Chapter 4</a> for how they compare.</li>
 <li>For tumor data, look at <strong>TumorDecon</strong> or <strong>ProjecTILs</strong> to handle the tumor/immune mix more carefully — see also the parallel reference-annotation example in the <strong>Talapas Advanced series</strong>.</li>
 </ul>
 </div>
@@ -2661,7 +2569,6 @@ Click for answer
 <li><a href="../Lecture_Folder/Lecture_04_Reference_Annotation.html">Lecture 04 — Reference-based Annotation</a></li>
 <li><a href="../Lecture_Folder/Lecture_03_Markers_Annotation.html">Lecture 03 — Markers &amp; Manual Annotation</a></li>
 <li><a href="../Resources_Folder/Glossary.html#c">Glossary — Cell type annotation</a></li>
-<li><code>SingleR</code> book: <a href="https://bioconductor.org/books/release/SingleRBook/">bioconductor.org/books/release/SingleRBook</a></li>
 <li>Azimuth web tool: <a href="https://azimuth.hubmapconsortium.org/">azimuth.hubmapconsortium.org</a></li>
 </ul>
 </section>
