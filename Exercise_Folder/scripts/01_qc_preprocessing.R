@@ -16,6 +16,7 @@ OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")   # every step reads/writes pipel
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod1") # figures/tables, named to match Tutorial_01.qmd
 dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Load ifnb from Bioconductor's ExperimentHub (cached after the first
 # download). Keep singlets that have an author-assigned cell-type label, and mirror

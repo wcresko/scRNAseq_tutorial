@@ -15,8 +15,10 @@ set.seed(2026)
 DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OBJ_DIR  <- Sys.getenv("OBJ_DIR",  "../objects")
 OUT_DIR  <- Sys.getenv("OUT_DIR",  "../output/Mod13") # figures/tables, named to match Tutorial_13.qmd
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)  # input datasets land here
 dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Load counts + GEO metadata, reshape to a counts matrix
 data <- read.delim(file.path(DATA_DIR, "GSE152418_p20047_Study1_RawCounts.txt"), header = TRUE)

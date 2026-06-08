@@ -13,8 +13,10 @@ set.seed(2026)
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
 FUN_DIR <- file.path(OBJ_DIR, "functional")          # pipeline per-cell-type result CSVs
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod7")    # figures/tables, named to match Tutorial_07.qmd
+dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(FUN_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 de <- read_csv(file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"), show_col_types = FALSE)
 
