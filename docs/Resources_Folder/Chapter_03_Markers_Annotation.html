@@ -4203,6 +4203,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4513,7 +4544,13 @@ Note
 </section>
 <section id="finding-markers-the-statistical-core" class="level2">
 <h2 class="anchored" data-anchor-id="finding-markers-the-statistical-core">3.2 Finding markers — the statistical core</h2>
-<p><code>FindAllMarkers(seu)</code> runs, for each cluster <span class="math inline">\(c\)</span>, a Wilcoxon rank-sum test comparing the gene’s expression in cluster <span class="math inline">\(c\)</span> vs all other clusters combined. The output is a per-cluster ranked gene list with:</p>
+<p><code>FindAllMarkers(seu)</code> runs, for each cluster <span class="math inline">\(c\)</span>, a Wilcoxon rank-sum test comparing the gene’s expression in cluster <span class="math inline">\(c\)</span> vs all other clusters combined. The output is a per-cluster ranked gene list. <a href="#tbl-ch03-findmarkers" class="quarto-xref">Table 1</a> describes each output column and how to read it. The table captures five key quantities per gene per cluster; knowing how to read each column is the prerequisite for turning the output into a useful annotation. Most columns are self-explanatory in isolation but become informative only in combination: a high <code>avg_log2FC</code> with a low <code>pct.1</code> is a gene that is highly upregulated on average but barely expressed in any individual cell of the cluster — a mathematical artifact of the ratio, not a biologically useful marker. Similarly, a high <code>pct.1</code> with a high <code>pct.2</code> means the gene is broadly expressed across most cell types and provides no discriminatory power. The most useful markers simultaneously have high <code>pct.1</code>, low <code>pct.2</code>, and high <code>avg_log2FC</code>.</p>
+<div id="tbl-ch03-findmarkers" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch03-findmarkers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Columns returned by <code>FindAllMarkers</code> and <code>FindConservedMarkers</code>. A “good” marker has high <code>pct.1</code>, low <code>pct.2</code>, and high <code>avg_log2FC</code>; ranking by <code>avg_log2FC</code> (or the derived score <code>pct.1 - pct.2</code>) gives a practical top-N list per cluster.
+</figcaption>
+<div aria-describedby="tbl-ch03-findmarkers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -4556,8 +4593,24 @@ Note
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 <p>A “good” marker has high <code>pct.1</code>, low <code>pct.2</code>, and high <code>avg_log2FC</code>. The ranking by <code>avg_log2FC</code> (or a score like <code>pct.1 - pct.2</code>) gets you a top-N list per cluster.</p>
 <p><strong>Why the Wilcoxon test?</strong> Seurat defaults to the non-parametric Wilcoxon rank-sum test, and the large benchmark of single-cell DE methods found that simple tests like Wilcoxon are surprisingly robust and competitive for marker detection — the more elaborate model-based methods do not consistently beat it<span class="citation" data-cites="soneson2018bias"><sup><a href="#ref-soneson2018bias" role="doc-biblioref">2</a></sup></span>. (<code>presto</code> provides a fast Wilcoxon implementation Seurat uses automatically when installed.) A crucial distinction from Chapter 6: marker detection here is a <em>descriptive, within-dataset</em> ranking used to name clusters, <strong>not</strong> a cross-condition inference about which genes change with treatment — that question requires pseudobulk and is the subject of Chapter 6<span class="citation" data-cites="squair2021confronting"><sup><a href="#ref-squair2021confronting" role="doc-biblioref">3</a></sup></span>.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — marker detection vs. differential expression">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — marker detection vs. differential expression
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindAllMarkers</code> and the Chapter 6 pseudobulk DESeq2 workflow are often confused but answer entirely different questions. Marker detection asks: “which genes are enriched in cluster <span class="math inline">\(c\)</span> relative to all other cells in this same dataset?” It is a descriptive ranking within a single object, and its purpose is to name clusters by their characteristic genes. Differential expression across conditions asks: “does gene <span class="math inline">\(X\)</span> change between treatment and control groups?” It is an inferential test that requires biological replicates and appropriate statistical calibration. Using <code>FindAllMarkers</code> to detect condition effects produces anti-conservative p-values (cells treated as independent replicates), while using DESeq2 across donors to find cluster markers ignores the within-cluster information. Keep the two workflows separate.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -4569,6 +4622,19 @@ Warning
 </div>
 <div class="callout-body-container callout-body">
 <p><strong><code>FindAllMarkers</code> finds genes <em>enriched</em> in a cluster, not necessarily canonical markers.</strong> A gene can top the list of cluster <span class="math inline">\(c\)</span> either because it’s a literature lineage marker (good) or because some technical / state effect happens to differentiate the cluster (e.g. ISGs in the unintegrated <code>ifnb</code> data). Cross-check the top hits against canonical panels before naming clusters from them.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — FindAllMarkers min.pct, logfc.threshold, only.pos">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — FindAllMarkers min.pct, logfc.threshold, only.pos
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindAllMarkers(seu, min.pct = 0.1, logfc.threshold = 0.25, only.pos = FALSE)</code>. <strong>Defaults: min.pct = 0.1, logfc.threshold = 0.25, only.pos = FALSE.</strong> <code>min.pct</code> filters out genes detected in fewer than the specified fraction of cells in <em>either</em> group — raising it to 0.25 (the workshop default) significantly reduces runtime and cuts low-detection noise genes; lowering it can recover rare markers in small clusters. <code>logfc.threshold</code> is a pre-filter on the log2 fold-change that prevents testing genes with trivial effect sizes; the default 0.25 is conservative for marker purposes. <code>only.pos = TRUE</code> restricts output to upregulated markers — almost always what you want when naming a cluster by what it <em>is</em> rather than what it lacks. For small clusters (&lt;50 cells), loosen both thresholds (e.g. <code>min.pct = 0.1</code>, <code>logfc.threshold = 0.1</code>) to avoid returning an empty table.</p>
 </div>
 </div>
 </section>
@@ -4584,7 +4650,64 @@ Warning
 </section>
 <section id="the-five-marker-visualizations" class="level2">
 <h2 class="anchored" data-anchor-id="the-five-marker-visualizations">3.4 The five marker visualizations</h2>
-<p><a href="../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers">Tutorial 03 §3</a> walks five canonical plot types. Each is best for a different question.</p>
+<p><a href="../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers">Tutorial 03 §3</a> walks five canonical plot types. Each answers a different diagnostic question; choosing the right one speeds interpretation and produces clearer figures. <a href="#tbl-ch03-viztools" class="quarto-xref">Table 2</a> summarizes the five, then the subsections explain when each pays off. A common mistake is to pick one plot type and use it for everything — the <code>DotPlot</code> is elegant for a publication panel but hides bimodal expression that <code>VlnPlot</code> reveals immediately; the <code>FeaturePlot</code> shows spatial context that the <code>DotPlot</code> compresses away. For a rigorous annotation, you should consult at least two plot types per cluster: one to confirm specificity (e.g. <code>DotPlot</code>) and one to confirm distributional properties (e.g. <code>VlnPlot</code>).</p>
+<div id="tbl-ch03-viztools" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch03-viztools-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: The five Seurat marker visualization functions, their primary diagnostic use case, and their main limitation. <code>DotPlot</code> is the most widely used in publications; <code>VlnPlot</code> is best at the single-gene investigation stage.
+</figcaption>
+<div aria-describedby="tbl-ch03-viztools-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Function</th>
+<th>Best question to ask</th>
+<th>Strength</th>
+<th>Caveat</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>VlnPlot</code></td>
+<td>Is this gene on/off in exactly one cluster?</td>
+<td>Shows full distribution; reveals bimodality</td>
+<td>One gene per panel; clutters above 8 genes</td>
+</tr>
+<tr class="even">
+<td><code>FeaturePlot</code></td>
+<td>Where on the UMAP does this gene concentrate?</td>
+<td>Reveals spatial/topological structure</td>
+<td>Overplotting in dense regions; use <code>order = TRUE</code></td>
+</tr>
+<tr class="odd">
+<td><code>DotPlot</code></td>
+<td>Which markers define which clusters, at a glance?</td>
+<td>Many genes × clusters in one compact figure</td>
+<td>Hides bimodality; means can mask high-expressing minorities</td>
+</tr>
+<tr class="even">
+<td><code>DoHeatmap</code></td>
+<td>Does the global cluster ↔︎ marker block structure look right?</td>
+<td>Shows whole-dataset diagonal block pattern</td>
+<td>Dominant clusters monopolize space; noisy at high cell counts</td>
+</tr>
+<tr class="odd">
+<td><code>RidgePlot</code></td>
+<td>Is this a graded / continuum marker?</td>
+<td>Density curves capture soft boundaries</td>
+<td>Less compact than VlnPlot; best for 3–8 clusters</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 <section id="vlnplot-distribution-per-cluster-one-gene-at-a-time" class="level3">
 <h3 class="anchored" data-anchor-id="vlnplot-distribution-per-cluster-one-gene-at-a-time">3.4.1 VlnPlot — distribution per cluster, one gene at a time</h3>
 <p>Best for <strong>bimodality, outliers, comparing 4–8 candidate markers side-by-side</strong>. A “good” marker has one cluster’s violin bulging while the rest sit at zero. If two clusters bulge similarly, the marker is shared by two cell types — keep looking.</p>
@@ -4626,7 +4749,26 @@ Warning
 <li><strong>Assign labels</strong> with <code>RenameIdents</code>, store in <code>seu$celltype_manual</code></li>
 <li><strong>Document</strong> <em>why</em> you assigned each label — write a sentence per cluster in your lab notebook (a future reviewer or future-you will thank you)</li>
 </ol>
-<p>For the workshop’s <code>ifnb</code> PBMCs, the canonical panel is small and highly stereotyped (see also §3.5 above for how the unintegrated embedding changes how many clusters you will label):</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — cluster identity is a biological claim, not a data property">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — cluster identity is a biological claim, not a data property
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A cluster number is an arbitrary label assigned by community-detection software; it has no biological meaning until you interpret it. Assigning “CD14+ Monocyte” to cluster 3 is a hypothesis — you are asserting that the cells in this group share a lineage, a developmental origin, a set of functional capabilities, and a canonical literature context. That hypothesis is supported by (1) high specificity of monocyte markers in the DotPlot, (2) absence of markers for competing identities, and (3) concordance with reference annotation (Chapter 4). The label becomes less defensible when any of those supports is weak. In practice, the annotation step is also the first place where novel biology becomes visible: a cluster with no good match in the canonical panel is either a technical artifact (doublet, ambient contamination — inspect per §3.8) or a cell state worth investigating further.</p>
+</div>
+</div>
+<p>For the workshop’s <code>ifnb</code> PBMCs, the canonical panel is small and highly stereotyped (see also §3.5 above for how the unintegrated embedding changes how many clusters you will label). <a href="#tbl-ch03-pbmc-markers" class="quarto-xref">Table 3</a> lists the ten major PBMC populations and their most reliable lineage markers.</p>
+<div id="tbl-ch03-pbmc-markers" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch03-pbmc-markers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Canonical lineage markers for the ten major PBMC populations in the workshop <code>ifnb</code> dataset. Markers are chosen for high <code>pct.1</code> / low <code>pct.2</code> on healthy donor PBMCs; expression patterns shift with activation state and may require <code>FindConservedMarkers</code> on multi-condition data.
+</figcaption>
+<div aria-describedby="tbl-ch03-pbmc-markers-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -4677,6 +4819,9 @@ Warning
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 <p>These panels are not folklore — they are curated in searchable databases such as <strong>PanglaoDB</strong><span class="citation" data-cites="franzen2019panglaodb"><sup><a href="#ref-franzen2019panglaodb" role="doc-biblioref">4</a></sup></span> and <strong>CellMarker 2.0</strong><span class="citation" data-cites="hu2023cellmarker2"><sup><a href="#ref-hu2023cellmarker2" role="doc-biblioref">5</a></sup></span>, which compile cell-type markers from thousands of single-cell studies. For tumor / non-immune tissues, the panel is much larger and more disputed; consult tissue-specific atlases.</p>
 </section>
 <section id="validating-against-a-ground-truth-reading-the-confusion-table" class="level2">
@@ -4693,14 +4838,11 @@ Warning
 </section>
 <section id="risks-and-how-to-avoid-them" class="level2">
 <h2 class="anchored" data-anchor-id="risks-and-how-to-avoid-them">3.8 Risks and how to avoid them</h2>
-<div class="incremental">
-<ul class="incremental">
-<li><strong>Single-marker labels.</strong> A cluster top-marked by <code>CD3D</code> is “T cell” — but is it CD4 or CD8? Naive or memory? Activated or resting? Always label from <strong>combinations</strong>: marker presence <em>plus</em> absence of competing markers.</li>
-<li><strong>Marker leakage from ambient RNA.</strong> If you skipped SoupX (Chapter 1) and your suspension was complex, low-level marker expression in the wrong cluster may be ambient bleed, not real expression. Symptom: every cluster shows low non-zero <code>HBB</code>. Fix: re-run with SoupX.</li>
-<li><strong>Treatment-state mistaken for cell type.</strong> ISGs (interferon-stimulated genes) lighting up half a dataset usually means a stimulation, not a new cell type. Use <code>FindConservedMarkers</code> (§3.3).</li>
-<li><strong>Doublet-driven “intermediate” types.</strong> A “T-myeloid intermediate” cluster expressing both <code>CD3D</code> and <code>CD14</code> is almost always doublets. Verify with <code>scDblFinder</code> per-cluster doublet fraction; if elevated, drop the cluster.</li>
-</ul>
-</div>
+<p>Four annotation mistakes account for the majority of published errors in single-cell cell-type assignments.</p>
+<p><strong>Single-marker labels</strong> are the most common. A cluster top-marked by <code>CD3D</code> is “T cell” — but is it CD4 or CD8? Naive or memory? Activated or resting? Always label from <strong>combinations</strong>: marker presence <em>plus</em> absence of competing markers. The <code>DotPlot</code> format is ideally suited to this because it places the confirmatory and exclusionary markers side-by-side across all clusters simultaneously.</p>
+<p><strong>Marker leakage from ambient RNA</strong> can mislead annotation when the cell suspension was complex or had high cell death. If you skipped SoupX (Chapter 1), low-level marker expression in the wrong cluster may reflect ambient bleed rather than genuine expression. The classic symptom is every cluster showing low non-zero <code>HBB</code> — hemoglobin is a dominant ambient contaminant in whole-blood or bone-marrow samples. The fix is to re-run from Chapter 1 with SoupX applied.</p>
+<p><strong>Treatment state mistaken for cell type</strong> is a recurrent trap in perturbation studies. Interferon-stimulated genes (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT1</code>, <code>MX1</code>) lighting up half a dataset usually reflects a stimulation condition, not a new cell type. Use <code>FindConservedMarkers</code> (§3.3) to see whether the lineage markers underneath the ISG signal are consistent with known types.</p>
+<p><strong>Doublet-driven “intermediate” types</strong> appear when two highly distinct cell populations (e.g. T and myeloid cells) end up doublet-enriched in the same cluster. A “T-myeloid intermediate” expressing both <code>CD3D</code> and <code>CD14</code> is almost always a doublet artifact. Verify by inspecting the <code>scDblFinder.class</code> distribution per cluster — a cluster where &gt;15–20% of cells were called doublets by <code>scDblFinder</code> should be discarded, not annotated.</p>
 </section>
 <section id="the-relationship-to-the-cell-ontology" class="level2">
 <h2 class="anchored" data-anchor-id="the-relationship-to-the-cell-ontology">3.9 The relationship to the Cell Ontology</h2>
@@ -4714,6 +4856,13 @@ Warning
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">3.10 Common errors</h2>
+<p><a href="#tbl-ch03-errors" class="quarto-xref">Table 4</a> lists the most common mistakes at the marker-detection and annotation stage, their root causes, and the fixes.</p>
+<div id="tbl-ch03-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch03-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 4: Common errors encountered during marker detection and manual annotation. The most consequential is using the <code>&quot;integrated&quot;</code> assay for <code>FindAllMarkers</code> — always reset <code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> before running marker tests.
+</figcaption>
+<div aria-describedby="tbl-ch03-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4755,6 +4904,9 @@ Warning
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">3.11 Where this material is also discussed</h2>

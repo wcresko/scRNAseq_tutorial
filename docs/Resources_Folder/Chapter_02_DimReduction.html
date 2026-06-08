@@ -4203,6 +4203,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4513,6 +4544,19 @@ Note
 <li><strong>Paint</strong> the result onto a 2-D picture for inspection (UMAP or t-SNE)</li>
 </ol>
 <p>Each step is a separate idea with its own theory and failure modes. This chapter walks them in order.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — the three-step pipeline is a strict dependency chain">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — the three-step pipeline is a strict dependency chain
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Projection, partitioning, and painting are conceptually independent but computationally sequential: PCA produces the coordinate space that the neighbor graph requires; the neighbor graph produces the community structure that clustering formalizes; and UMAP or t-SNE produces the 2-D picture of the clustering, not a replacement for it. A common mistake is to draw conclusions from the UMAP shape without realizing that the clusters shown on it were computed in PC space — the UMAP layout can differ substantially between runs with different random seeds, but the cluster assignments are determined by the SNN graph and do not change with the UMAP. Read the clusters first; consult the UMAP only as a visual summary.</p>
+</div>
+</div>
 </section>
 <section id="pca-what-it-does-and-why-it-works-first" class="level2">
 <h2 class="anchored" data-anchor-id="pca-what-it-does-and-why-it-works-first">2.2 PCA — what it does and why it works first</h2>
@@ -4525,19 +4569,89 @@ Note
 <li><span class="math inline">\(\sigma_i^2 / \sum \sigma_j^2\)</span> is the <strong>fraction of variance explained</strong> by PC <span class="math inline">\(i\)</span></li>
 </ul>
 <p>In scRNA-seq the first ~10 PCs usually separate <strong>major cell-type axes</strong> (T vs B vs myeloid; epithelial vs stromal vs immune); PCs 10–30 resolve subtypes (CD4 vs CD8, naive vs memory); beyond ~50, you’re almost entirely in noise.</p>
-<p>Why PCA <em>first</em>? Three reasons:</p>
-<div class="incremental">
-<ol class="incremental" type="1">
-<li><strong>Compression.</strong> 2,000 genes → 30 PCs. Faster everything downstream.</li>
-<li><strong>Denoising.</strong> The discarded high-PC directions are dominated by per-cell sampling noise, not signal.</li>
-<li><strong>Decorrelation.</strong> PCs are orthogonal by construction, so Euclidean distance in PC space behaves the way intuition expects (which it does <em>not</em> in raw HVG space).</li>
-</ol>
-</div>
+<p>Why PCA <em>first</em>? Three reasons work together. First, <strong>compression</strong>: 2,000 genes collapse to 30 PCs, making every downstream step faster. Second, <strong>denoising</strong>: the discarded high-PC directions are dominated by per-cell sampling noise rather than biological signal, so dropping them actually improves the quality of neighbor graphs and cluster solutions. Third, <strong>decorrelation</strong>: PCs are orthogonal by construction, so Euclidean distance in PC space behaves the way intuition expects — which it does <em>not</em> in raw HVG space, where correlated genes inflate distances along shared axes.</p>
 <p>UMAP and clustering operate on PCs, not raw expression, exactly because of (3). Skip PCA and try to UMAP the scaled HVG matrix and you’ll get visibly worse embeddings, slower runtime, and unstable cluster solutions. In practice the SVD is computed by a <strong>randomized / truncated</strong> solver (<code>irlba</code> in Seurat, <code>scanpy</code>’s <code>arpack</code>/randomized backends), which returns only the top ~50 components and scales to atlas-sized matrices where a full eigendecomposition would be intractable<span class="citation" data-cites="amezquita2020orchestrating"><sup><a href="#ref-amezquita2020orchestrating" role="doc-biblioref">1</a></sup></span>. The choice of PCA as the linear backbone of the single-cell workflow is shared across Seurat, Scanpy, and Bioconductor<span class="citation" data-cites="satija2015spatial wolf2018scanpy amezquita2020orchestrating"><sup><a href="#ref-amezquita2020orchestrating" role="doc-biblioref">1</a>–<a href="#ref-wolf2018scanpy" role="doc-biblioref">3</a></sup></span>.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what a principal component captures">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what a principal component captures
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each PC is a linear combination of all HVGs — a weighted sum of gene expression values — chosen so that cell scores along that axis have maximum variance, subject to the constraint of being orthogonal to all previous PCs. In biological terms, PC1 captures the largest source of transcriptional variation in the dataset (often a cell-type axis, or a batch/condition axis on unintegrated data); PC2 captures the next largest source, uncorrelated with PC1; and so on. Because PCA finds axes of maximum variance in a <em>linear</em> sense, it is interpretable: the loadings tell you exactly which genes drive cells apart along each PC, making it the only major dimensionality reduction in the workflow where you can inspect a component and understand its biology. UMAP and t-SNE lack this interpretability entirely.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — RunPCA npcs">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — RunPCA npcs
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>RunPCA(seu, npcs = 50)</code>. <strong>Default: 50.</strong> Sets the maximum number of principal components computed. More PCs cost more computation but ensure you don’t miss a low-variance biological axis. For <code>ElbowPlot</code> to be informative you need at least as many PCs as you expect to use (typically 30–50); requesting 50 upfront is a safe standard. Note that <code>npcs</code> is the maximum computed — you then <em>choose</em> a subset (e.g. <code>dims = 1:20</code>) for <code>FindNeighbors</code> and <code>RunUMAP</code>. Increasing <code>npcs</code> beyond 50 rarely helps for standard 10x runs of &lt; 200k cells.</p>
+</div>
+</div>
 </section>
 <section id="choosing-how-many-pcs-to-keep" class="level2">
 <h2 class="anchored" data-anchor-id="choosing-how-many-pcs-to-keep">2.3 Choosing how many PCs to keep</h2>
-<p>The standard tool is the <strong>scree plot</strong> (sometimes called an elbow plot): for each PC, plot the variance it explains, in descending order. The shape is a steep initial drop, an <strong>elbow</strong>, and a long noise floor.</p>
+<p>The standard tool is the <strong>scree plot</strong> (sometimes called an elbow plot): for each PC, plot the variance it explains, in descending order. The shape is a steep initial drop, an <strong>elbow</strong>, and a long noise floor. <a href="#tbl-ch02-pc-selection" class="quarto-xref">Table 1</a> summarizes the main PC-selection strategies, their cost, and when to reach for each.</p>
+<div id="tbl-ch02-pc-selection" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch02-pc-selection-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: PC-selection strategies and when to use each. Leaning high is the safer error: an extra few noise PCs slow runtime minimally but a discarded PC carrying a rare subtype cannot be recovered.
+</figcaption>
+<div aria-describedby="tbl-ch02-pc-selection-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Strategy</th>
+<th>How it works</th>
+<th>Typical result</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Scree / elbow plot (visual)</td>
+<td>Identify the “elbow” in variance-explained curve</td>
+<td>PC 15–30 for 5–50k-cell runs</td>
+<td>Fast; subjective but usually fine</td>
+</tr>
+<tr class="even">
+<td>JackStraw permutation test</td>
+<td>Compare each PC’s variance to a null by random permutation</td>
+<td>Statistically principled cutoff</td>
+<td>Very slow for &gt;50k cells</td>
+</tr>
+<tr class="odd">
+<td>Fixed high bound (e.g. 50 PCs)</td>
+<td>Accept more noise dimensions in exchange for not missing low-variance subtypes</td>
+<td>Typical for atlas-scale (&gt;100k cells)</td>
+<td>Safest default when in doubt</td>
+</tr>
+<tr class="even">
+<td>Marker-based sanity check</td>
+<td>Inspect gene loadings; confirm biology not QC drives the retained PCs</td>
+<td>Flags mito/ribo-dominated PCs</td>
+<td>Should always accompany any other method</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 <p>Rules of thumb:</p>
 <ul>
 <li>The elbow is usually between PC15 and PC30 for 10x runs of 5–50k cells</li>
@@ -4558,12 +4672,25 @@ Note
 <p>The modern alternative is <strong>graph-based clustering</strong>, which has two stages:</p>
 <section id="build-the-k-nearest-neighbor-knn-graph" class="level3">
 <h3 class="anchored" data-anchor-id="build-the-k-nearest-neighbor-knn-graph">2.4.1 Build the k-nearest-neighbor (kNN) graph</h3>
-<p>For each cell, find its <span class="math inline">\(k\)</span> nearest neighbors in PC space (typically <span class="math inline">\(k = 20\)</span>). Connect each cell to its neighbors with edges. The result is a graph where every cell has degree <span class="math inline">\(k\)</span>.</p>
+<p>For each cell, find its <span class="math inline">\(k\)</span> nearest neighbors in PC space (typically <span class="math inline">\(k = 20\)</span>). Connect each cell to its neighbors with edges. The result is a graph where every cell has degree <span class="math inline">\(k\)</span>. The <code>k</code> here is the knob that controls how local or global the neighborhood concept is: small <code>k</code> (5–10) makes each cell’s community very tight and local, while large <code>k</code> (30–50) creates broader, fuzzier communities that survive noise better but can blend nearby populations.</p>
 </section>
 <section id="promote-to-a-shared-nearest-neighbor-snn-graph" class="level3">
 <h3 class="anchored" data-anchor-id="promote-to-a-shared-nearest-neighbor-snn-graph">2.4.2 Promote to a shared-nearest-neighbor (SNN) graph</h3>
-<p>For every edge <span class="math inline">\((i, j)\)</span> in the kNN graph, weight it by how many of <span class="math inline">\(i\)</span>’s neighbors are also <span class="math inline">\(j\)</span>’s neighbors — the <strong>Jaccard similarity</strong> of their neighborhoods. Edges between cells in the same dense region get high weight; edges between cells on the boundary of a cluster get low weight. The SNN graph is what clustering actually runs on.</p>
+<p>For every edge <span class="math inline">\((i, j)\)</span> in the kNN graph, weight it by how many of <span class="math inline">\(i\)</span>’s neighbors are also <span class="math inline">\(j\)</span>’s neighbors — the <strong>Jaccard similarity</strong> of their neighborhoods. Edges between cells in the same dense region get high weight; edges between cells on the boundary of a cluster get low weight. The SNN graph is what clustering actually runs on. The Jaccard re-weighting is important: it makes the graph robust to “hub” cells — cells with unusually high connectivity that would otherwise dominate naive kNN clustering — by requiring that shared-neighborhood structure, not just raw proximity, defines community membership.</p>
 <p>Seurat’s <code>FindNeighbors(seu, dims = 1:30)</code> builds both. The SNN graph stored in <code>seu@graphs$RNA_snn</code> is then handed to <code>FindClusters</code>.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — FindNeighbors k.param">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — FindNeighbors k.param
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindNeighbors(seu, dims = 1:30, k.param = 20)</code>. <strong>Default: k.param = 20.</strong> Sets the number of nearest neighbors per cell in PC space. Increasing <code>k.param</code> (e.g. to 30–50) makes clusters larger and more robust to noise but can merge genuinely distinct subtypes; decreasing it (e.g. to 10) emphasizes fine-grained local structure and tends to produce more, smaller clusters. For most 10x datasets in the 5k–100k cell range, the default of 20 is appropriate; rare populations benefit from a modest increase (25–30) to ensure they are not isolated as disconnected singleton nodes. <code>dims</code> should match the number of PCs you selected in §2.3.</p>
+</div>
+</div>
 </section>
 </section>
 <section id="graph-based-community-detection-louvain-leiden" class="level2">
@@ -4583,26 +4710,126 @@ Note
 <li>High (1.0+) → many small clusters; subdivides cell states</li>
 </ul>
 <p>There is <strong>no single “right” resolution.</strong> The right one is the one that matches your biological question. Run several and inspect with <a href="https://cran.r-project.org/package=clustree"><code>clustree</code></a> to see how clusters split as resolution increases. Resolutions where the clustree topology is <strong>stable</strong> (clusters don’t shuffle membership across nearby resolutions) are defensible. Modularity optimization has a known <strong>resolution limit</strong> — it can fail to detect communities smaller than a scale set by the total graph size — which is part of why a single global resolution rarely resolves both abundant and rare populations well, and why iterative subclustering of a coarse partition is often more effective than pushing one global resolution very high. Unsupervised clustering remains one of the harder, less-settled steps of the pipeline; systematic comparisons find that no method dominates across datasets and that the recovered cluster count is method- and parameter-dependent<span class="citation" data-cites="kiselev2019challenges duo2018systematic yu2022benchmarking"><sup><a href="#ref-kiselev2019challenges" role="doc-biblioref">4</a>,<a href="#ref-yu2022benchmarking" role="doc-biblioref">5</a>,<a href="#ref-duo2018systematic" role="doc-biblioref">8</a></sup></span>.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — FindClusters resolution">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — FindClusters resolution
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindClusters(seu, resolution = 0.8)</code>. <strong>Default: 0.8.</strong> Controls the granularity of community detection: higher values yield more, smaller clusters; lower values yield fewer, larger clusters. There is no universally correct resolution — the right value depends on your biological question. A practical workflow is to run several resolutions (e.g. <code>c(0.1, 0.3, 0.5, 0.8, 1.0)</code>) simultaneously, visualize the hierarchy with <code>clustree</code>, and choose the resolution where each cluster can be given a defensible biological identity. For the workshop <code>ifnb</code> PBMC dataset, <code>resolution = 0.5</code> is the tutorial default; on unintegrated data this typically yields 15–20 clusters (more than the ~13 biologically distinct types, because condition-split duplicates appear). Post-integration, the same resolution usually collapses to ~13 clean clusters.</p>
+</div>
+</div>
 </section>
 <section id="t-sne-and-umap-visualization-not-analysis" class="level2">
 <h2 class="anchored" data-anchor-id="t-sne-and-umap-visualization-not-analysis">2.6 t-SNE and UMAP: visualization, not analysis</h2>
 <p>Once you have clusters defined on the SNN graph, you want a 2-D picture of them. Two non-linear methods dominate:</p>
+<p><a href="#tbl-ch02-viz" class="quarto-xref">Table 2</a> summarizes both methods side by side before the subsections walk the details.</p>
+<div id="tbl-ch02-viz" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch02-viz-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Comparison of t-SNE and UMAP embedding methods for scRNA-seq visualization. Both algorithms are designed for visualization only — do not measure distances, densities, or trajectory direction from either plot. Global-structure preservation in UMAP is largely an artifact of PCA-based initialization rather than the algorithm itself<span class="citation" data-cites="kobak2021initialization"><sup><a href="#ref-kobak2021initialization" role="doc-biblioref">9</a></sup></span>.
+</figcaption>
+<div aria-describedby="tbl-ch02-viz-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Property</th>
+<th>t-SNE</th>
+<th>UMAP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Objective</td>
+<td>Minimize KL divergence between Gaussian (high-D) and Student-<span class="math inline">\(t\)</span> (low-D) neighborhood distributions</td>
+<td>Minimize cross-entropy between fuzzy topological graph representations</td>
+</tr>
+<tr class="even">
+<td>Loss symmetry</td>
+<td><strong>Asymmetric</strong> — penalizes wrong-far neighbors heavily; barely penalizes wrong-close</td>
+<td><strong>Symmetric</strong> — penalizes both directions</td>
+</tr>
+<tr class="odd">
+<td>Local neighborhood preservation</td>
+<td>Excellent</td>
+<td>Good</td>
+</tr>
+<tr class="even">
+<td>Global structure preservation</td>
+<td>Poor (inter-cluster distances not meaningful)</td>
+<td>Moderate (positions roughly interpretable)</td>
+</tr>
+<tr class="odd">
+<td>Key tuning parameter</td>
+<td><strong>Perplexity</strong> (default 30): lower → more local; higher → smoother</td>
+<td><strong><code>n.neighbors</code></strong> (default 30) + <strong><code>min.dist</code></strong> (default 0.3)</td>
+</tr>
+<tr class="even">
+<td>Stability across parameter sweep</td>
+<td>Sensitive to perplexity</td>
+<td>More stable across <code>n.neighbors</code></td>
+</tr>
+<tr class="odd">
+<td>Workshop default?</td>
+<td>No (available via <code>RunTSNE</code>)</td>
+<td><strong>Yes</strong> (<code>RunUMAP</code>)</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 <section id="t-sne" class="level3">
 <h3 class="anchored" data-anchor-id="t-sne">2.6.1 t-SNE</h3>
-<p>Models pairwise distances in high-D as a probability distribution (Gaussian, with bandwidth set per-cell to match a target perplexity), and tries to find a 2-D arrangement whose distance distribution (Student’s <span class="math inline">\(t\)</span> in low-D, hence “t” in t-SNE) has minimal Kullback–Leibler divergence to the original<span class="citation" data-cites="vandermaaten2008tsne"><sup><a href="#ref-vandermaaten2008tsne" role="doc-biblioref">9</a></sup></span>. The heavy-tailed Student’s <span class="math inline">\(t\)</span> in the low-D space is what solves the “crowding problem” of the original SNE — it gives moderately distant points room to spread out in 2-D.</p>
+<p>Models pairwise distances in high-D as a probability distribution (Gaussian, with bandwidth set per-cell to match a target perplexity), and tries to find a 2-D arrangement whose distance distribution (Student’s <span class="math inline">\(t\)</span> in low-D, hence “t” in t-SNE) has minimal Kullback–Leibler divergence to the original<span class="citation" data-cites="vandermaaten2008tsne"><sup><a href="#ref-vandermaaten2008tsne" role="doc-biblioref">10</a></sup></span>. The heavy-tailed Student’s <span class="math inline">\(t\)</span> in the low-D space is what solves the “crowding problem” of the original SNE — it gives moderately distant points room to spread out in 2-D.</p>
 <p>The KL loss is <strong>asymmetric</strong>: it heavily penalizes putting true neighbors far apart but only weakly penalizes putting unrelated cells nearby. This is why t-SNE preserves <strong>local neighborhoods</strong> beautifully and why <strong>cluster-to-cluster distances on a t-SNE plot are not meaningful</strong>.</p>
-<p>The <strong>perplexity</strong> parameter (default 30) is roughly “how many neighbors does each cell consider”. Low perplexity (5–15) emphasizes very local structure; high (50+) smooths over fine subtypes. Worth running at multiple perplexities and looking for stable structure across them; Kobak &amp; Berens give practical, single-cell-specific guidance on perplexity, learning rate, and initialization<span class="citation" data-cites="kobak2019art"><sup><a href="#ref-kobak2019art" role="doc-biblioref">10</a></sup></span>.</p>
+<p>The <strong>perplexity</strong> parameter (default 30) is roughly “how many neighbors does each cell consider”. Low perplexity (5–15) emphasizes very local structure; high (50+) smooths over fine subtypes. Worth running at multiple perplexities and looking for stable structure across them; Kobak &amp; Berens give practical, single-cell-specific guidance on perplexity, learning rate, and initialization<span class="citation" data-cites="kobak2019art"><sup><a href="#ref-kobak2019art" role="doc-biblioref">11</a></sup></span>.</p>
 </section>
 <section id="umap" class="level3">
 <h3 class="anchored" data-anchor-id="umap">2.6.2 UMAP</h3>
 <p>Builds a fuzzy weighted graph of local neighborhoods (per-cell normalization makes points in dense and sparse regions both still see their own local neighbors) and finds a 2-D embedding by stochastic gradient descent on a cross-entropy objective.</p>
-<p>The cross-entropy is <strong>symmetric</strong> in its penalty structure (both “wrong-far” and “wrong-close” errors are penalized), so UMAP preserves more global topology than t-SNE — <em>not perfectly</em>, but enough that cluster <em>positions</em> are roughly meaningful (still don’t measure pseudotime in UMAP coordinates)<span class="citation" data-cites="mcinnes2018umap becht2019umap"><sup><a href="#ref-mcinnes2018umap" role="doc-biblioref">11</a>,<a href="#ref-becht2019umap" role="doc-biblioref">12</a></sup></span>. An important caveat from the methods literature: much of the <em>global</em> structure that t-SNE and UMAP appear to preserve actually comes from the <strong>initialization</strong> (PCA-based initialization preserves global layout; random initialization does not), rather than from the algorithms themselves — so the common claim that “UMAP preserves global structure better than t-SNE” is largely an artifact of their default initializations<span class="citation" data-cites="kobak2021initialization"><sup><a href="#ref-kobak2021initialization" role="doc-biblioref">13</a></sup></span>.</p>
+<p>The cross-entropy is <strong>symmetric</strong> in its penalty structure (both “wrong-far” and “wrong-close” errors are penalized), so UMAP preserves more global topology than t-SNE — <em>not perfectly</em>, but enough that cluster <em>positions</em> are roughly meaningful (still don’t measure pseudotime in UMAP coordinates)<span class="citation" data-cites="mcinnes2018umap becht2019umap"><sup><a href="#ref-mcinnes2018umap" role="doc-biblioref">12</a>,<a href="#ref-becht2019umap" role="doc-biblioref">13</a></sup></span>. An important caveat from the methods literature: much of the <em>global</em> structure that t-SNE and UMAP appear to preserve actually comes from the <strong>initialization</strong> (PCA-based initialization preserves global layout; random initialization does not), rather than from the algorithms themselves — so the common claim that “UMAP preserves global structure better than t-SNE” is largely an artifact of their default initializations<span class="citation" data-cites="kobak2021initialization"><sup><a href="#ref-kobak2021initialization" role="doc-biblioref">9</a></sup></span>.</p>
 <p>UMAP is the workshop default. Two parameters:</p>
 <ul>
 <li><code>n.neighbors</code> (default 30): smaller = more local; larger = more global</li>
 <li><code>min.dist</code> (default 0.3): smaller = tighter clusters with clear gaps; larger = spread-out, good for continua</li>
 </ul>
 <p>UMAP is <strong>noticeably more stable</strong> across <code>n.neighbors</code> than t-SNE is across perplexity. Usually one well-chosen UMAP is enough.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what UMAP does and does not preserve">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what UMAP does and does not preserve
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>UMAP optimizes a cross-entropy objective over a fuzzy weighted neighborhood graph: it penalizes both placing true neighbors too far apart (attraction) and placing unrelated cells too close together (repulsion). This symmetric penalty preserves more <em>global</em> topology than t-SNE, which only penalizes the first error. However, “more global” does not mean “faithful” — inter-cluster distances on a UMAP are not a reliable measure of biological dissimilarity, and apparent density differences are artifacts of the <code>min.dist</code> parameter, not cell-type frequencies. UMAP is correctly read as a visualization of the cluster solution (computed on the SNN graph in PC space), not as a geometric analysis in its own right. It is valid for: showing cluster assignments, overlaying gene expression as a continuous gradient (<code>FeaturePlot</code>), and spotting dramatic batch effects as parallel sample islands. It is not valid for: distance-based statistics, trajectory direction, or density quantification.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — RunUMAP n.neighbors and min.dist">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — RunUMAP n.neighbors and min.dist
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>RunUMAP(seu, dims = 1:30, n.neighbors = 30, min.dist = 0.3)</code>. <strong>Defaults: n.neighbors = 30, min.dist = 0.3.</strong> <code>n.neighbors</code> sets how many nearest neighbors each cell considers when building UMAP’s local graph — smaller values (5–10) emphasize very local detail and produce more fragmented embeddings; larger values (50+) emphasize global topology and can blur subtypes together. <code>min.dist</code> sets the minimum separation between points in the 2-D embedding — smaller values (0.05–0.1) produce tight, compact clusters with clear gaps between them (best for discrete cell types); larger values (0.5–0.8) spread cells across continuous gradients (best for developmental trajectories or smooth state transitions). For the workshop <code>ifnb</code> PBMC dataset, the defaults produce a clean, interpretable embedding.</p>
+</div>
+</div>
 </section>
 </section>
 <section id="what-umaps-do-not-tell-you" class="level2">
@@ -4643,12 +4870,57 @@ Tip
 </section>
 <section id="reading-the-pc-loadings-output" class="level2">
 <h2 class="anchored" data-anchor-id="reading-the-pc-loadings-output">2.8 Reading the PC loadings output</h2>
-<p>When you print PCA results with <code>print(seu[[&quot;pca&quot;]], dims = 1:5, nfeatures = 5)</code>, you see the top 5 positive and negative gene loadings for the first five PCs. These are the genes pushing cells to the high or low end of each PC axis. What to look for:</p>
+<p>When you print PCA results with <code>print(seu[[&quot;pca&quot;]], dims = 1:5, nfeatures = 5)</code>, you see the top 5 positive and negative gene loadings for the first five PCs. These are the genes pushing cells to the high or low end of each PC axis. <a href="#tbl-ch02-loadings" class="quarto-xref">Table 3</a> shows the three canonical patterns and their interpretation. What to look for:</p>
 <ul>
 <li><strong>PC1 dominated by interferon-stimulated genes</strong> (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT1</code>, <code>MX1</code>, etc.) signals that a condition/batch effect is the dominant source of variance — the axis is separating STIM from CTRL, not cell types. This is the expected starting state for the unintegrated <code>ifnb</code> data.</li>
 <li><strong>Later PCs (2–5) showing cell-type markers</strong> (<code>LYZ</code>, <code>CD14</code> for monocytes; <code>MS4A1</code>, <code>CD79A</code> for B cells; <code>GNLY</code>, <code>NKG7</code> for NK) are reassuring — cell-type biology is still recoverable even when a condition effect dominates PC1.</li>
 <li><strong>A PC dominated by mitochondrial or ribosomal genes</strong> is a red flag for insufficient QC: those axes are tracking cell quality, not biology.</li>
 </ul>
+<div id="tbl-ch02-loadings" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch02-loadings-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Canonical PC loading patterns and their interpretation. Reading the top 5 positive and negative loadings per PC is the fastest sanity check after <code>RunPCA</code>.
+</figcaption>
+<div aria-describedby="tbl-ch02-loadings-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pattern in top loadings</th>
+<th>Interpretation</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>ISGs (<code>ISG15</code>, <code>IFI6</code>, <code>MX1</code>) dominate PC1</td>
+<td>Stimulation / condition effect is the largest variance axis</td>
+<td>Expected for multi-condition data; proceed to integration (Chapter 5)</td>
+</tr>
+<tr class="even">
+<td>Cell-type markers (<code>CD14</code>, <code>MS4A1</code>, <code>GNLY</code>) in PCs 2–5</td>
+<td>Cell-type biology is recoverable despite batch in PC1</td>
+<td>Keep these PCs; reassuring sign</td>
+</tr>
+<tr class="odd">
+<td>Mitochondrial genes (<code>MT-ND1</code>, <code>MT-CO1</code>) dominate any PC</td>
+<td>Cell-quality axis survived filtering</td>
+<td>Re-examine QC thresholds; consider regressing <code>percent.mt</code></td>
+</tr>
+<tr class="even">
+<td>Ribosomal genes (<code>RPL</code>, <code>RPS</code>) dominate any PC</td>
+<td>Translational-activity axis; often confounded with cell state</td>
+<td>Exclude <code>^RP[SL]</code> from HVGs or regress <code>percent.rb</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 <p><code>DimHeatmap(seu, dims = 1, cells = 500, balanced = TRUE)</code> provides a complementary view: rows are genes (top positive and negative loadings), columns are the 500 cells with the most extreme PC1 scores. A clean two-block structure on PC1 is the visual signature of a strong batch or condition axis.</p>
 </section>
 <section id="the-cross-tabulation-diagnostic" class="level2">
@@ -4665,6 +4937,13 @@ Tip
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">2.11 Common errors</h2>
+<p><a href="#tbl-ch02-errors" class="quarto-xref">Table 4</a> collects the errors most frequently encountered during dimensionality reduction and clustering, together with their root cause and the fix.</p>
+<div id="tbl-ch02-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch02-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 4: Common errors in dimensionality reduction and clustering, their root cause, and the fix.
+</figcaption>
+<div aria-describedby="tbl-ch02-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4706,6 +4985,9 @@ Tip
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">2.12 Where this material is also discussed</h2>
@@ -4720,7 +5002,7 @@ Tip
 </section>
 <section id="going-further" class="level2">
 <h2 class="anchored" data-anchor-id="going-further">2.13 Going further</h2>
-<p>For the embedding methods, go to the primary sources: the t-SNE<span class="citation" data-cites="vandermaaten2008tsne"><sup><a href="#ref-vandermaaten2008tsne" role="doc-biblioref">9</a></sup></span> and UMAP<span class="citation" data-cites="mcinnes2018umap"><sup><a href="#ref-mcinnes2018umap" role="doc-biblioref">11</a></sup></span> papers, UMAP’s single-cell debut<span class="citation" data-cites="becht2019umap"><sup><a href="#ref-becht2019umap" role="doc-biblioref">12</a></sup></span>, and the two essential “how to use them responsibly” papers<span class="citation" data-cites="kobak2019art kobak2021initialization"><sup><a href="#ref-kobak2019art" role="doc-biblioref">10</a>,<a href="#ref-kobak2021initialization" role="doc-biblioref">13</a></sup></span>. For clustering, the challenges review<span class="citation" data-cites="kiselev2019challenges"><sup><a href="#ref-kiselev2019challenges" role="doc-biblioref">4</a></sup></span> and two benchmarks — of clustering methods<span class="citation" data-cites="duo2018systematic"><sup><a href="#ref-duo2018systematic" role="doc-biblioref">8</a></sup></span> and of cell-number estimation<span class="citation" data-cites="yu2022benchmarking"><sup><a href="#ref-yu2022benchmarking" role="doc-biblioref">5</a></sup></span> — are the references to consult when choosing an algorithm and resolution. Hands-on intuition is best built with Google PAIR’s interactive <strong><a href="https://pair-code.github.io/understanding-umap/">Understanding UMAP</a></strong> and DataCamp’s written <strong><a href="https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction">guide to dimensionality reduction</a></strong>. Two further tools worth knowing: <strong><code>densMAP</code></strong>, a UMAP variant that also preserves cluster densities (addressing limitation 2 in §2.7), and <strong><code>openTSNE</code></strong>, a faster, more controllable t-SNE implementation. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
+<p>For the embedding methods, go to the primary sources: the t-SNE<span class="citation" data-cites="vandermaaten2008tsne"><sup><a href="#ref-vandermaaten2008tsne" role="doc-biblioref">10</a></sup></span> and UMAP<span class="citation" data-cites="mcinnes2018umap"><sup><a href="#ref-mcinnes2018umap" role="doc-biblioref">12</a></sup></span> papers, UMAP’s single-cell debut<span class="citation" data-cites="becht2019umap"><sup><a href="#ref-becht2019umap" role="doc-biblioref">13</a></sup></span>, and the two essential “how to use them responsibly” papers<span class="citation" data-cites="kobak2019art kobak2021initialization"><sup><a href="#ref-kobak2021initialization" role="doc-biblioref">9</a>,<a href="#ref-kobak2019art" role="doc-biblioref">11</a></sup></span>. For clustering, the challenges review<span class="citation" data-cites="kiselev2019challenges"><sup><a href="#ref-kiselev2019challenges" role="doc-biblioref">4</a></sup></span> and two benchmarks — of clustering methods<span class="citation" data-cites="duo2018systematic"><sup><a href="#ref-duo2018systematic" role="doc-biblioref">8</a></sup></span> and of cell-number estimation<span class="citation" data-cites="yu2022benchmarking"><sup><a href="#ref-yu2022benchmarking" role="doc-biblioref">5</a></sup></span> — are the references to consult when choosing an algorithm and resolution. Hands-on intuition is best built with Google PAIR’s interactive <strong><a href="https://pair-code.github.io/understanding-umap/">Understanding UMAP</a></strong> and DataCamp’s written <strong><a href="https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction">guide to dimensionality reduction</a></strong>. Two further tools worth knowing: <strong><code>densMAP</code></strong>, a UMAP variant that also preserves cluster densities (addressing limitation 2 in §2.7), and <strong><code>openTSNE</code></strong>, a faster, more controllable t-SNE implementation. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
 </section>
 <section id="references" class="level2">
 <h2 class="anchored" data-anchor-id="references">References</h2>
@@ -4749,20 +5031,20 @@ Tip
 <div id="ref-duo2018systematic" class="csl-entry" role="listitem">
 <div class="csl-left-margin">8. </div><div class="csl-right-inline">Duò, A., Robinson, M. D. &amp; Soneson, C. <a href="https://doi.org/10.12688/f1000research.15666.3">A systematic performance evaluation of clustering methods for single-cell <span>RNA</span>-seq data</a>. <em>F1000Research</em> <strong>7</strong>, 1141 (2018).</div>
 </div>
+<div id="ref-kobak2021initialization" class="csl-entry" role="listitem">
+<div class="csl-left-margin">9. </div><div class="csl-right-inline">Kobak, D. &amp; Linderman, G. C. <a href="https://doi.org/10.1038/s41587-020-00809-z">Initialization is critical for preserving global data structure in both t-<span>SNE</span> and <span>UMAP</span></a>. <em>Nature Biotechnology</em> <strong>39</strong>, 156–157 (2021).</div>
+</div>
 <div id="ref-vandermaaten2008tsne" class="csl-entry" role="listitem">
-<div class="csl-left-margin">9. </div><div class="csl-right-inline">Maaten, L. van der &amp; Hinton, G. Visualizing data using t-<span>SNE</span>. <em>Journal of Machine Learning Research</em> <strong>9</strong>, 2579–2605 (2008).</div>
+<div class="csl-left-margin">10. </div><div class="csl-right-inline">Maaten, L. van der &amp; Hinton, G. Visualizing data using t-<span>SNE</span>. <em>Journal of Machine Learning Research</em> <strong>9</strong>, 2579–2605 (2008).</div>
 </div>
 <div id="ref-kobak2019art" class="csl-entry" role="listitem">
-<div class="csl-left-margin">10. </div><div class="csl-right-inline">Kobak, D. &amp; Berens, P. <a href="https://doi.org/10.1038/s41467-019-13056-x">The art of using t-<span>SNE</span> for single-cell transcriptomics</a>. <em>Nature Communications</em> <strong>10</strong>, 5416 (2019).</div>
+<div class="csl-left-margin">11. </div><div class="csl-right-inline">Kobak, D. &amp; Berens, P. <a href="https://doi.org/10.1038/s41467-019-13056-x">The art of using t-<span>SNE</span> for single-cell transcriptomics</a>. <em>Nature Communications</em> <strong>10</strong>, 5416 (2019).</div>
 </div>
 <div id="ref-mcinnes2018umap" class="csl-entry" role="listitem">
-<div class="csl-left-margin">11. </div><div class="csl-right-inline">McInnes, L., Healy, J. &amp; Melville, J. <span>UMAP</span>: Uniform manifold approximation and projection for dimension reduction. <em>arXiv</em> <a href="https://doi.org/10.48550/arXiv.1802.03426">https://doi.org/10.48550/arXiv.1802.03426</a> (2018) doi:<a href="https://doi.org/10.48550/arXiv.1802.03426">10.48550/arXiv.1802.03426</a>.</div>
+<div class="csl-left-margin">12. </div><div class="csl-right-inline">McInnes, L., Healy, J. &amp; Melville, J. <span>UMAP</span>: Uniform manifold approximation and projection for dimension reduction. <em>arXiv</em> <a href="https://doi.org/10.48550/arXiv.1802.03426">https://doi.org/10.48550/arXiv.1802.03426</a> (2018) doi:<a href="https://doi.org/10.48550/arXiv.1802.03426">10.48550/arXiv.1802.03426</a>.</div>
 </div>
 <div id="ref-becht2019umap" class="csl-entry" role="listitem">
-<div class="csl-left-margin">12. </div><div class="csl-right-inline">Becht, E. <em>et al.</em> <a href="https://doi.org/10.1038/nbt.4314">Dimensionality reduction for visualizing single-cell data using <span>UMAP</span></a>. <em>Nature Biotechnology</em> <strong>37</strong>, 38–44 (2019).</div>
-</div>
-<div id="ref-kobak2021initialization" class="csl-entry" role="listitem">
-<div class="csl-left-margin">13. </div><div class="csl-right-inline">Kobak, D. &amp; Linderman, G. C. <a href="https://doi.org/10.1038/s41587-020-00809-z">Initialization is critical for preserving global data structure in both t-<span>SNE</span> and <span>UMAP</span></a>. <em>Nature Biotechnology</em> <strong>39</strong>, 156–157 (2021).</div>
+<div class="csl-left-margin">13. </div><div class="csl-right-inline">Becht, E. <em>et al.</em> <a href="https://doi.org/10.1038/nbt.4314">Dimensionality reduction for visualizing single-cell data using <span>UMAP</span></a>. <em>Nature Biotechnology</em> <strong>37</strong>, 38–44 (2019).</div>
 </div>
 </div>
 

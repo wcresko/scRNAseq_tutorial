@@ -4203,6 +4203,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4499,19 +4530,92 @@ Note
 <h2 class="anchored" data-anchor-id="the-next-zoom-out-from-genes-to-themes">7.1 The next zoom-out: from genes to themes</h2>
 <p>Pseudobulk DE produces a long list of significant genes per cell type. For <code>ifnb</code> STIM vs CTRL, that list is hundreds of genes long for the responding cell types. You can’t put a 300-gene list in a paper figure or in a 30-second talk. You need to collapse those lists into a smaller number of <strong>biological themes</strong> — pathways, functional categories, signaling cascades.</p>
 <p>That’s functional analysis. The output is the same: a ranked list of <em>terms</em> — Gene Ontology Biological Process terms<span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span>, Reactome pathways<span class="citation" data-cites="gillespie2022reactome"><sup><a href="#ref-gillespie2022reactome" role="doc-biblioref">2</a></sup></span>, KEGG pathways<span class="citation" data-cites="kanehisa2000kegg"><sup><a href="#ref-kanehisa2000kegg" role="doc-biblioref">3</a></sup></span>, or MSigDB Hallmarks<span class="citation" data-cites="liberzon2015msigdb"><sup><a href="#ref-liberzon2015msigdb" role="doc-biblioref">4</a></sup></span> — with associated p-values and effect sizes. The terms are interpretable in a way the gene list isn’t. A decade-plus of methodology is reviewed in Khatri et al.’s “Ten years of pathway analysis,” still the best orientation to the field’s three generations of methods<span class="citation" data-cites="khatri2012ten"><sup><a href="#ref-khatri2012ten" role="doc-biblioref">5</a></sup></span>.</p>
+<p>The three generations Khatri et al. describe are worth briefly naming. <strong>First-generation methods</strong> (ORA, hypergeometric test) take a binary significant/not gene list and ask whether any predefined set is over-represented — fast and interpretable but discards ranking and direction. <strong>Second-generation methods</strong> (GSEA and its relatives) use the full ranked list, capturing coordinated modest shifts that ORA misses but requiring a valid ranking metric (more on this below). <strong>Third-generation methods</strong> model the actual network topology of pathways, propagating signals through known protein-protein interactions — powerful in principle but computationally expensive and highly sensitive to incomplete network annotations. The workshop covers the first two generations, which together handle the great majority of real scRNA-seq functional questions.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — over-representation vs enrichment">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — over-representation vs enrichment
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Over-Representation Analysis (ORA) and Gene-Set Enrichment Analysis (GSEA) answer related but distinct questions. ORA asks whether a predefined gene set appears <em>more often than expected by chance</em> among the genes you declared significant — a simple count-based test that treats each gene as either in or out. GSEA asks whether the genes of a predefined set are <em>preferentially concentrated at the top or bottom of a ranked list</em> of all tested genes, where rank is determined by the magnitude and direction of the fold-change. The key practical difference is that ORA requires you to choose a significance threshold (and is sensitive to that choice), while GSEA uses the full ranked list and detects coordinated, modest changes across a whole pathway even when no single gene clears a significance cutoff. In practice, a pathway of 60 genes all slightly up-regulated (LFC ≈ 0.5) produces a very high GSEA normalized enrichment score but shows no ORA signal because few individual genes are significant. Both analyses belong in a thorough functional report.</p>
+</div>
+</div>
 </section>
 <section id="two-methods-two-questions" class="level2">
 <h2 class="anchored" data-anchor-id="two-methods-two-questions">7.2 Two methods, two questions</h2>
 <p><strong>Over-Representation Analysis (ORA)</strong> asks: among my <strong>significant gene set</strong>, are any predefined gene sets enriched relative to a background? Input: a binary set of “significant” genes plus a “universe” of all tested genes. Test: hypergeometric / Fisher’s exact per gene set.</p>
 <p><strong>Gene-Set Enrichment Analysis (GSEA)</strong><span class="citation" data-cites="subramanian2005gsea"><sup><a href="#ref-subramanian2005gsea" role="doc-biblioref">6</a></sup></span> asks: when my genes are <strong>ranked</strong> by direction-and-strength of change, do any predefined sets cluster at the top or bottom of the ranking? Input: a ranked vector of all tested genes (typically by signed log-fold-change). Test: a permutation test on the running enrichment statistic.</p>
-<p>Both answer the question “which biological themes are over-represented in my DE result?” but with different sensitivities:</p>
-<div class="incremental">
-<ul class="incremental">
-<li><strong>ORA</strong> is fast, easy to read, intuitive. Best when you have a clear cutoff (e.g. <code>padj &lt; 0.05 &amp; |log2FC| &gt; 1</code>) and a moderate-sized gene list.</li>
-<li><strong>GSEA</strong> uses the <em>full</em> ranking and is more sensitive when the effect is broad-but-modest — e.g. an entire ISG family slightly up rather than a few super-significant hits.</li>
-</ul>
+<p>Both answer the question “which biological themes are over-represented in my DE result?” but with different sensitivities. <a href="#tbl-ch07-methods" class="quarto-xref">Table 1</a> summarizes their differences; the subsections below explain each method in detail.</p>
+<div id="tbl-ch07-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch07-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Comparison of Over-Representation Analysis (ORA) and Gene-Set Enrichment Analysis (GSEA). In practice, run both; cross-method agreement on the top terms is the strongest evidence of real biology. A benchmark against a curated gold standard confirmed that well-implemented versions of both methods recover known biology reliably<span class="citation" data-cites="geistlinger2021toward"><sup><a href="#ref-geistlinger2021toward" role="doc-biblioref">7</a></sup></span>.
+</figcaption>
+<div aria-describedby="tbl-ch07-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Attribute</th>
+<th>ORA</th>
+<th>GSEA</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Input</td>
+<td>Binary significant/not list + universe</td>
+<td>All tested genes ranked by signed LFC</td>
+</tr>
+<tr class="even">
+<td>Test</td>
+<td>Hypergeometric / Fisher’s exact</td>
+<td>Permutation test on running enrichment score</td>
+</tr>
+<tr class="odd">
+<td>Threshold required?</td>
+<td>Yes — must choose <code>padj</code> and <code>|LFC|</code> cutoffs</td>
+<td>No — uses the complete ranking</td>
+</tr>
+<tr class="even">
+<td>Direction-aware?</td>
+<td>Only if run separately on up- and down-regulated lists</td>
+<td>Yes — positive NES = up, negative NES = down</td>
+</tr>
+<tr class="odd">
+<td>Sensitive to</td>
+<td>Discrete, strong hits</td>
+<td>Coordinated, modest changes across a pathway</td>
+</tr>
+<tr class="even">
+<td>Implementation</td>
+<td><code>clusterProfiler::enrichGO/enrichKEGG</code><span class="citation" data-cites="wu2021clusterprofiler"><sup><a href="#ref-wu2021clusterprofiler" role="doc-biblioref">8</a></sup></span></td>
+<td><code>clusterProfiler::gseGO/gseKEGG</code> via <code>fgsea</code><span class="citation" data-cites="korotkevich2021fgsea"><sup><a href="#ref-korotkevich2021fgsea" role="doc-biblioref">9</a></sup></span></td>
+</tr>
+<tr class="odd">
+<td>Speed</td>
+<td>Fast</td>
+<td>Slower (permutation iterations)</td>
+</tr>
+<tr class="even">
+<td>Best used when</td>
+<td>Clear threshold; moderate gene list</td>
+<td>Effect is broad; all genes have reliable LFC estimates</td>
+</tr>
+</tbody>
+</table>
 </div>
-<p>In practice, run both. If they agree on the top themes, you have a robust finding. If they disagree, GSEA is usually closer to the truth (it doesn’t depend on a threshold choice).</p>
+</figure>
+</div>
+<p>In practice, run both. If they agree on the top themes, you have a robust finding. If they disagree, GSEA is usually closer to the truth because it does not depend on an arbitrary threshold choice — the full ranked gene list preserves information that a binary significant/not split discards.</p>
 </section>
 <section id="the-hypergeometric-test-ora-in-detail" class="level2">
 <h2 class="anchored" data-anchor-id="the-hypergeometric-test-ora-in-detail">7.3 The hypergeometric test (ORA in detail)</h2>
@@ -4526,6 +4630,33 @@ Note
 <p><span class="math display">\[P(X \ge k) = \sum_{j=k}^{\min(K, n)} \frac{\binom{n}{j}\binom{N-n}{K-j}}{\binom{N}{K}}\]</span></p>
 <p>Apply BH correction across all gene sets tested. Filter on <code>q &lt; 0.05</code>.</p>
 <p>The key parameter is the <strong>universe</strong>. The default is “all genes annotated for the organism”, but the <strong>correct universe</strong> is “all genes you tested in DESeq2” — which after filtering and per-cell-type subsetting is much smaller. Using the default inflates the apparent enrichment of common terms (housekeeping pathways), making everything look significant. Always pass <code>universe = uni</code> explicitly.</p>
+<p><strong>Reading the enrichGO output table.</strong> The <code>@result</code> slot of an <code>enrichGO</code> object contains several columns worth understanding: <code>ID</code> is the GO accession (e.g. GO:0034340); <code>Description</code> is the human-readable term name; <code>GeneRatio</code> is <code>k/K</code> — the fraction of your significant genes that fall in this term; <code>BgRatio</code> is <code>n/N</code> — the fraction of universe genes that fall in this term; <code>pvalue</code> is the raw hypergeometric p-value; <code>p.adjust</code> is the BH-corrected value (use this); <code>Count</code> is <span class="math inline">\(k\)</span> (the raw overlap count). A <code>GeneRatio</code> much higher than <code>BgRatio</code> signals a genuine enrichment — the term’s genes are more concentrated in your significant list than in the background. A high <code>Count</code> with a small <code>GeneRatio</code> means the term’s gene set is very large (e.g. “metabolic process”) and almost any significant list will overlap it by chance — large, generic terms are typically less informative than smaller, specific ones at the same significance level.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — enrichGO / gseGO pvalueCutoff and qvalueCutoff">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — enrichGO / gseGO pvalueCutoff and qvalueCutoff
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>enrichGO(pvalueCutoff = 0.05, qvalueCutoff = 0.10)</code> sets the significance thresholds for reported terms. <strong>Default: <code>pvalueCutoff = 0.05</code>, <code>qvalueCutoff = 0.20</code>.</strong> The <code>qvalueCutoff</code> controls BH-adjusted p-value retention. With GO’s 30,000 terms, the default cutoffs often return hundreds of terms per cell type — more than can be interpreted. Tightening to <code>pvalueCutoff = 0.01, qvalueCutoff = 0.05</code> reduces the list to the most confident hits and cuts redundancy substantially. For the <code>compareCluster</code> cross-cell-type plot, starting with these tighter cutoffs usually produces a cleaner, more interpretable figure. Loosening cutoffs is occasionally justified when a dataset has very few DE genes (short gene list → low ORA power) but should be accompanied by explicit acknowledgment in the methods.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — enrichGO / gseGO pAdjustMethod">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — enrichGO / gseGO pAdjustMethod
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>enrichGO(pAdjustMethod = &quot;BH&quot;)</code> sets the multiple-testing correction. <strong>Default: <code>&quot;BH&quot;</code> (Benjamini–Hochberg FDR).</strong> Other options include <code>&quot;bonferroni&quot;</code> (very conservative; rarely useful with 30,000 gene sets), <code>&quot;fdr&quot;</code> (identical to <code>&quot;BH&quot;</code> in this context), and <code>&quot;none&quot;</code>. Changing this from <code>&quot;BH&quot;</code> to <code>&quot;none&quot;</code> is common in exploratory analyses to see the raw p-value ranking, but results must never be reported without correction applied. The <code>p.adjust</code> column in the output is the corrected value; the <code>pvalue</code> column is the raw hypergeometric p-value — always report <code>p.adjust</code>.</p>
+</div>
+</div>
 </section>
 <section id="gsea-in-detail" class="level2">
 <h2 class="anchored" data-anchor-id="gsea-in-detail">7.4 GSEA in detail</h2>
@@ -4537,7 +4668,7 @@ Note
 <li>Permute the gene labels many times to build a null ES distribution</li>
 <li>The <strong>Normalized Enrichment Score (NES)</strong> is the ES rescaled by the null distribution; the p-value is the fraction of permutations with NES at least as extreme as the observed</li>
 </ol>
-<p>A positive NES means the set’s genes are concentrated at the <strong>top</strong> of the ranking (up in the contrast). A negative NES means concentrated at the <strong>bottom</strong> (down in the contrast). The running-enrichment plot<span class="citation" data-cites="subramanian2005gsea"><sup><a href="#ref-subramanian2005gsea" role="doc-biblioref">6</a></sup></span> shows the walk visually. In practice the permutation step is done by the fast preranked implementation <code>fgsea</code><span class="citation" data-cites="korotkevich2021fgsea"><sup><a href="#ref-korotkevich2021fgsea" role="doc-biblioref">7</a></sup></span>, which <code>clusterProfiler</code><span class="citation" data-cites="yu2012clusterprofiler wu2021clusterprofiler"><sup><a href="#ref-yu2012clusterprofiler" role="doc-biblioref">8</a>,<a href="#ref-wu2021clusterprofiler" role="doc-biblioref">9</a></sup></span> wraps.</p>
+<p>A positive NES means the set’s genes are concentrated at the <strong>top</strong> of the ranking (up in the contrast). A negative NES means concentrated at the <strong>bottom</strong> (down in the contrast). The running-enrichment plot<span class="citation" data-cites="subramanian2005gsea"><sup><a href="#ref-subramanian2005gsea" role="doc-biblioref">6</a></sup></span> shows the walk visually. In practice the permutation step is done by the fast preranked implementation <code>fgsea</code><span class="citation" data-cites="korotkevich2021fgsea"><sup><a href="#ref-korotkevich2021fgsea" role="doc-biblioref">9</a></sup></span>, which <code>clusterProfiler</code><span class="citation" data-cites="yu2012clusterprofiler wu2021clusterprofiler"><sup><a href="#ref-wu2021clusterprofiler" role="doc-biblioref">8</a>,<a href="#ref-yu2012clusterprofiler" role="doc-biblioref">10</a></sup></span> wraps.</p>
 <p>GSEA’s strengths:</p>
 <ul>
 <li>No threshold choice — uses the whole ranking</li>
@@ -4550,62 +4681,100 @@ Note
 <li>Requires the full DE table, not a filtered list</li>
 </ul>
 <p>For the workshop’s <code>ifnb</code> STIM-vs-CTRL contrast, GSEA reliably finds the IFN response pathways (Reactome’s “Interferon Signaling”, MSigDB’s “INTERFERON_ALPHA_RESPONSE”, etc.) at very high NES.</p>
+<p><strong>Choosing the ranking metric.</strong> The choice of what to rank genes by in GSEA is consequential and often under-discussed. Three common choices are:</p>
+<ol type="1">
+<li><strong>Signed log-fold-change</strong> (<code>log2FoldChange</code> from DESeq2): the most direct measure of direction and magnitude of change. Appropriate when you trust the LFC estimates (i.e. after <code>lfcShrink(type=&quot;apeglm&quot;)</code>). The apeglm-shrunken LFC is preferable because it prevents low-count genes with noisy raw LFCs from dominating the extremes of the ranking.</li>
+<li><strong>Signed -log10(p-value) × sign(LFC)</strong>: a “signal-to-noise” statistic that combines magnitude and confidence. Genes significant in both dimension rank highest. Can produce cleaner GSEA results when the LFC distribution is noisy.</li>
+<li><strong>Wald statistic</strong> (<code>stat</code> column from DESeq2): similar to signed p-value-based ranking; already accounts for the LFC’s standard error and is a natural ranking metric. Some GSEA implementations use this directly.</li>
+</ol>
+<p>Avoid ranking by raw unshrunk <code>log2FoldChange</code> — this puts noisy low-count genes at the extreme ranks and inflates the apparent enrichment score of gene sets that happen to contain those genes. Always use shrunken LFCs or a statistic that naturally accounts for uncertainty.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — gseGO / gseKEGG minGSSize and maxGSSize">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — gseGO / gseKEGG minGSSize and maxGSSize
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>gseGO(minGSSize = 10, maxGSSize = 500)</code> controls which gene sets enter the GSEA test by their size. <strong>Default: <code>minGSSize = 10</code>, <code>maxGSSize = 500</code>.</strong> Gene sets with fewer than 10 genes have too little statistical power (the running enrichment score cannot peak significantly with only 5–8 genes scattered in 15,000); sets with more than 500 genes are so broad that even a uniform distribution of their members across the ranking produces a detectable enrichment by chance — these “giant” GO terms like “metabolic process” or “biological process” are nearly always significant and nearly always uninformative. Tightening <code>maxGSSize</code> to 200 or even 100 eliminates the most redundant and uninformative terms, producing a results table dominated by specific pathways. For KEGG and Reactome (where most pathways have 20–200 genes), the defaults are usually appropriate.</p>
+</div>
+</div>
 </section>
 <section id="picking-a-database" class="level2">
 <h2 class="anchored" data-anchor-id="picking-a-database">7.5 Picking a database</h2>
-<p>The big-five gene-set databases:</p>
+<p>The major gene-set databases are compared in <a href="#tbl-ch07-databases" class="quarto-xref">Table 2</a>. Run <strong>multiple</strong> databases and look for <strong>consensus</strong> terms. The same biology will appear in different forms across databases — “type I interferon signaling pathway” (GO BP<span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span>), “Interferon Signaling” (Reactome<span class="citation" data-cites="gillespie2022reactome"><sup><a href="#ref-gillespie2022reactome" role="doc-biblioref">2</a></sup></span>), “INTERFERON_ALPHA_RESPONSE” (Hallmark<span class="citation" data-cites="liberzon2015msigdb"><sup><a href="#ref-liberzon2015msigdb" role="doc-biblioref">4</a></sup></span>) — and cross-database agreement is the strongest evidence that a finding is real biology rather than a database-specific artifact.</p>
+<p><strong>A practical database selection workflow.</strong> Start with MSigDB Hallmark for your headline figure: 50 well-curated, non-redundant gene sets capture the major known biological states, the results are immediately interpretable to any biologist, and reviewer objections to specific GO-term redundancy do not apply. Then run GO Biological Process and Reactome as supplementary analyses to identify the specific molecular mechanisms within each Hallmark category. If the Hallmark analysis returns nothing significant (which can happen for subtle or novel biology not captured by the 50 canonical states), escalate to GO BP with a moderate <code>maxGSSize</code> cutoff. For immune cell types and signaling biology specifically, Reactome is often more informative than KEGG because Reactome has more extensively curated human immune pathway content and is updated far more frequently. Use KEGG primarily when you need metabolic pathway analysis or when comparing to older literature that used KEGG exclusively.</p>
+<div id="tbl-ch07-databases" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch07-databases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Major gene-set databases for functional enrichment analysis, their scope, and recommended use cases. Cross-database agreement on the same biological theme is the strongest evidence that a result reflects real biology.
+</figcaption>
+<div aria-describedby="tbl-ch07-databases-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>Database</th>
+<th>Coverage</th>
 <th>Strength</th>
 <th>When to start here</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><strong>GO Biological Process</strong></td>
+<td><strong>GO Biological Process</strong><span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span></td>
+<td>~30,000 terms</td>
 <td>Comprehensive, hierarchical</td>
 <td>Always run as a baseline</td>
 </tr>
 <tr class="even">
-<td><strong>GO Molecular Function</strong></td>
+<td><strong>GO Molecular Function</strong><span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span></td>
+<td>~10,000 terms</td>
 <td>Function &amp; catalysis</td>
 <td>When BP is dominated by generic terms</td>
 </tr>
 <tr class="odd">
-<td><strong>GO Cellular Component</strong></td>
+<td><strong>GO Cellular Component</strong><span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span></td>
+<td>~4,000 terms</td>
 <td>Subcellular localization</td>
 <td>Probing trafficking / structural biology</td>
 </tr>
 <tr class="even">
-<td><strong>Reactome</strong></td>
+<td><strong>Reactome</strong><span class="citation" data-cites="gillespie2022reactome"><sup><a href="#ref-gillespie2022reactome" role="doc-biblioref">2</a></sup></span></td>
+<td>~2,600 pathways</td>
 <td>Curated signaling pathways</td>
-<td>Immune / signaling biology — accessed via <code>ReactomePA::enrichPathway()</code> in R</td>
+<td>Immune / signaling biology — via <code>ReactomePA::enrichPathway()</code></td>
 </tr>
 <tr class="odd">
-<td><strong>KEGG</strong></td>
+<td><strong>KEGG</strong><span class="citation" data-cites="kanehisa2000kegg"><sup><a href="#ref-kanehisa2000kegg" role="doc-biblioref">3</a></sup></span></td>
+<td>~550 pathways</td>
 <td>Classic metabolic pathways</td>
 <td>Metabolism; legacy comparison</td>
 </tr>
 <tr class="even">
-<td><strong>MSigDB Hallmark</strong></td>
-<td>50 well-known broad biological states</td>
-<td>Headline figures, low-noise summaries</td>
+<td><strong>MSigDB Hallmark</strong><span class="citation" data-cites="liberzon2015msigdb"><sup><a href="#ref-liberzon2015msigdb" role="doc-biblioref">4</a></sup></span></td>
+<td>50 gene sets</td>
+<td>Well-known broad biological states</td>
+<td>Headline figures; low-redundancy summaries</td>
 </tr>
 <tr class="odd">
 <td><strong>WikiPathways</strong></td>
+<td>Community-variable</td>
 <td>Community-curated, fast updates</td>
 <td>Niche pathways missing elsewhere</td>
 </tr>
 </tbody>
 </table>
-<p>Run <strong>multiple</strong> databases and look for <strong>consensus</strong> terms. The same biology will appear in different forms across databases — “type I interferon signaling pathway” (GO BP<span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span>), “Interferon Signaling” (Reactome<span class="citation" data-cites="gillespie2022reactome"><sup><a href="#ref-gillespie2022reactome" role="doc-biblioref">2</a></sup></span>), “INTERFERON_ALPHA_RESPONSE” (Hallmark<span class="citation" data-cites="liberzon2015msigdb"><sup><a href="#ref-liberzon2015msigdb" role="doc-biblioref">4</a></sup></span>) — and cross-database agreement is the strongest evidence that a finding is real biology rather than a database-specific artifact. Which enrichment <em>method</em> to trust has itself been benchmarked against a curated gold standard, with the encouraging conclusion that well-implemented ORA and GSEA recover known biology reliably when run correctly<span class="citation" data-cites="geistlinger2021toward"><sup><a href="#ref-geistlinger2021toward" role="doc-biblioref">10</a></sup></span>.</p>
+</div>
+</figure>
+</div>
 </section>
 <section id="the-redundancy-problem" class="level2">
 <h2 class="anchored" data-anchor-id="the-redundancy-problem">7.6 The redundancy problem</h2>
@@ -4613,13 +4782,19 @@ Note
 <blockquote class="blockquote">
 <p><em>response to virus / type I interferon signaling pathway / cellular response to type I interferon / regulation of type I interferon signaling pathway / response to interferon-beta / …</em></p>
 </blockquote>
-<p>These are the same biology described eight ways. Three fixes:</p>
-<div class="incremental">
-<ol class="incremental" type="1">
-<li><strong>Use a smaller curated database for the headline.</strong> MSigDB Hallmark has only 50 sets. Lead with that.</li>
-<li><strong>Cluster similar terms.</strong> <code>enrichplot::pairwise_termsim()</code> + <code>treeplot()</code> builds a similarity tree, lets you collapse branches.</li>
-<li><strong>Tighter cutoffs.</strong> <code>pvalueCutoff = 0.01</code>, <code>qvalueCutoff = 0.05</code> so the top 5 terms aren’t 50 redundant ones.</li>
-</ol>
+<p>These are the same biology described eight ways. Three practical fixes address this. First, <strong>lead with a smaller curated database</strong>: MSigDB Hallmark has only 50 sets and was specifically designed to minimize within-database redundancy — a paper headline built on Hallmarks is immediately interpretable. Second, <strong>cluster similar terms</strong> using <code>enrichplot::pairwise_termsim()</code> + <code>treeplot()</code>, which builds a semantic similarity tree so you can collapse related branches before reporting. Third, <strong>apply tighter cutoffs</strong> (<code>pvalueCutoff = 0.01</code>, <code>qvalueCutoff = 0.05</code>) so the top five displayed terms aren’t simply the most-specific sub-children of a single parent node. Using all three practices together — Hallmarks for the main figure, a clustered GO treeplot as a supplement, and strict cutoffs throughout — produces clean, reviewer-friendly results.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what the NES measures in GSEA">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what the NES measures in GSEA
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The Normalized Enrichment Score (NES) in GSEA is a standardized measure of how much a gene set’s members are concentrated at the extreme ends of a ranked gene list. A raw Enrichment Score (ES) is computed by walking from the most up-regulated to the most down-regulated gene, incrementing a running statistic when a gene from the set is encountered and decrementing otherwise — the peak of this running statistic is the ES. The NES divides the ES by the mean ES obtained from permuting gene labels many times, correcting for differences in gene-set size and list length. A positive NES means the gene set is enriched at the top (genes up-regulated in the numerator condition); a negative NES means enriched at the bottom (down-regulated genes). NES values above ±1.5 with <code>p.adjust &lt; 0.05</code> are conventionally considered strong hits. Unlike ORA p-values, NES values can be meaningfully compared across gene sets of different sizes and across different experiments, making them useful for quantitative comparison of pathway activity.</p>
+</div>
 </div>
 </section>
 <section id="the-comparecluster-plot" class="level2">
@@ -4650,13 +4825,15 @@ Note
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>de_mapped <span class="ot">&lt;-</span> de <span class="sc">|&gt;</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">symbol =</span> gene) <span class="sc">|&gt;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bitr</span>(<span class="fu">unique</span>(.<span class="sc">$</span>symbol),</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bitr</span>(<span class="fu">unique</span>(de<span class="sc">$</span>gene),</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">fromType =</span> <span class="st">&quot;SYMBOL&quot;</span>,</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">toType   =</span> <span class="st">&quot;ENTREZID&quot;</span>,</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">OrgDb    =</span> org.Hs.eg.db),</span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;symbol&quot;</span> <span class="ot">=</span> <span class="st">&quot;SYMBOL&quot;</span>)</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Some symbols won’t map — deprecated symbols, lncRNAs without ENTREZ entries, pseudogenes. A 5–10% unmapped rate is normal; check the unmapped list. If it’s mostly gene symbols (not pseudogenes), update <code>org.Hs.eg.db</code>.</p>
+<p><strong>Why ENTREZ IDs and not gene symbols?</strong> <code>OrgDb</code> annotation packages like <code>org.Hs.eg.db</code> organize all their annotations — GO terms, pathway memberships, cross-references — around ENTREZ integer IDs as the primary key. Gene symbols are secondary keys that can be ambiguous (the same symbol used in different organisms, or symbols that change when the HGNC renames a gene), while ENTREZ IDs are stable, unambiguous integers assigned by NCBI. When you run <code>bitr(fromType = &quot;SYMBOL&quot;, toType = &quot;ENTREZID&quot;)</code>, you are converting from the naming convention your DESeq2 results use (gene symbols from the 10x reference genome) to the integer primary key that GO and pathway databases use internally. Note that the <code>inner_join</code> after <code>bitr</code> means you lose genes that did not map — it is therefore critical to build both your significant gene list <em>and</em> your universe from the <em>same post-mapping table</em>, so the denominator of the hypergeometric test counts only genes that successfully mapped, not the full pre-mapping set.</p>
+<p><strong>For mouse data.</strong> Replace <code>org.Hs.eg.db</code> with <code>org.Mm.eg.db</code> (mouse) throughout. Gene symbol capitalization follows mouse convention (<code>Cd3d</code> rather than <code>CD3D</code>), which <code>bitr</code> handles correctly, but double-check that your DE table’s gene symbols match the mouse convention before mapping.</p>
 </section>
 <section id="b-reading-the-gsea-running-enrichment-plot" class="level2">
 <h2 class="anchored" data-anchor-id="b-reading-the-gsea-running-enrichment-plot">7.8b Reading the GSEA running-enrichment plot</h2>
@@ -4670,18 +4847,34 @@ Note
 </section>
 <section id="pitfalls" class="level2">
 <h2 class="anchored" data-anchor-id="pitfalls">7.9 Pitfalls</h2>
-<div class="incremental">
-<ol class="incremental" type="1">
-<li><strong>Wrong universe.</strong> ORA with the default genome-wide universe inflates “common term” p-values. Always use the tested-gene universe.</li>
-<li><strong>All terms are technical artifacts.</strong> GO is full of terms like “translation” and “ribosomal subunit assembly”. If those top your list, your QC was insufficient — re-check before claiming biology.</li>
-<li><strong>No multiple-testing across databases.</strong> Running ORA against 4 databases × 30,000 terms is 120,000 tests. BH per database; report the database with the result.</li>
-<li><strong>Reporting raw p-values.</strong> Always report <code>p.adjust</code> (BH) or <code>q-value</code>.</li>
-<li><strong>ORA on the all-DE list.</strong> ORA on “any DE gene” can’t distinguish up- from down-regulated. Run separately on each side, or use GSEA which handles direction natively.</li>
-</ol>
+<p>Five pitfalls account for the majority of functional-analysis errors in published scRNA-seq papers. The most consequential is <strong>wrong universe</strong>: ORA with the default genome-wide universe inflates “common-term” p-values because it treats every unannotated gene as a possible negative, not just the genes you actually tested. Always pass <code>universe = uni</code> where <code>uni</code> is the vector of genes present in your DESeq2 output table <em>after ENTREZ mapping</em> — not the raw gene list before mapping, because unmapped genes are implicitly excluded from the test.</p>
+<p>A close second is <strong>technical artifact inflation</strong>: GO contains terms like “translation” and “ribosomal subunit assembly” that appear significant whenever ribosomal genes are present in a DE list — which happens routinely after insufficient QC filtering. If those terms top your result, revisit QC before claiming biology. Similarly, terms related to “regulation of apoptotic process” or “response to oxidative stress” frequently appear in low-quality datasets where damaged cells contribute noisy DE signal. The expert sanity check is to read the top 10 term names aloud and ask whether they match the biology of your experimental contrast: for <code>ifnb</code> STIM vs CTRL, interferon-related terms are the expected answer; if your top terms are “ribosome biogenesis” and “mitochondrial fission,” something is wrong.</p>
+<p>The third pitfall is <strong>ignoring the multiple-testing burden across databases</strong>. Running ORA against four databases each with ~30,000 terms generates roughly 120,000 hypothesis tests. BH correction applied per-database does not account for the database-selection step. Report the database, state it was pre-specified, and treat concordance across databases as the primary evidence of reliability rather than p-value magnitude within a single database.</p>
+<p>Fourth: <strong>always report <code>p.adjust</code> (BH) or <code>q-value</code></strong>, never raw p-values. A raw p-value of 0.001 from a test of 30,000 gene sets is expected by chance alone. The adjusted value is the scientifically relevant quantity.</p>
+<p>Fifth: <strong>ORA on the combined up-and-down DE list cannot distinguish direction</strong>. A pathway with half its genes up and half down will score poorly against a pathway where all genes move together. Run ORA separately on up-regulated and down-regulated gene lists, or use GSEA, which handles direction natively through the sign of the NES.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — why the universe matters for ORA">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — why the universe matters for ORA
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The hypergeometric test in ORA asks whether a gene set is over-represented in your significant list <em>relative to the background</em>. The background (universe) defines the sampling pool from which your significant genes were drawn. If you use the whole human genome (~20,000 protein-coding genes) as the universe but you only actually tested 8,000 genes in your DESeq2 run (the rest were filtered out as low-count), then your denominator <span class="math inline">\(N\)</span> is wrong: it is 20,000 instead of 8,000. This makes every gene set appear as if its background frequency is lower than it really is, which inflates the apparent enrichment. The consequence is false positive GO terms: “housekeeping” pathways whose genes happen to include many commonly expressed genes will score as enriched not because they are biologically active in your experiment, but because the inflated denominator makes any overlap look improbable by chance. Passing <code>universe = uni</code> — where <code>uni</code> is the ENTREZ IDs of all genes in your DESeq2 table after ENTREZ mapping — directly corrects this. This is the single most important ORA parameter to set correctly.</p>
+</div>
 </div>
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">7.10 Common errors</h2>
+<p><a href="#tbl-ch07-errors" class="quarto-xref">Table 3</a> collects the errors most frequently encountered when running functional analysis.</p>
+<div id="tbl-ch07-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch07-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common functional analysis errors, their causes, and fixes. The universe error and symbol-mapping errors together account for the majority of incorrect null results and false positives in published analyses.
+</figcaption>
+<div aria-describedby="tbl-ch07-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4721,8 +4914,16 @@ Note
 <td>Random seed differences in GSEA permutation test</td>
 <td><code>set.seed(2026)</code> before <code>gseGO</code></td>
 </tr>
+<tr class="even">
+<td>ORA returns hundreds of significant terms</td>
+<td>Default genome-wide universe inflating enrichment</td>
+<td>Pass <code>universe = uni</code> (all genes in your DESeq2 table)</td>
+</tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">7.11 Where this material is also discussed</h2>
@@ -4736,7 +4937,7 @@ Note
 </section>
 <section id="going-further" class="level2">
 <h2 class="anchored" data-anchor-id="going-further">7.12 Going further</h2>
-<p>The foundational method paper is GSEA<span class="citation" data-cites="subramanian2005gsea"><sup><a href="#ref-subramanian2005gsea" role="doc-biblioref">6</a></sup></span>; the field review is “Ten years of pathway analysis”<span class="citation" data-cites="khatri2012ten"><sup><a href="#ref-khatri2012ten" role="doc-biblioref">5</a></sup></span>; and the gold-standard benchmark for choosing an enrichment method is Geistlinger et al.<span class="citation" data-cites="geistlinger2021toward"><sup><a href="#ref-geistlinger2021toward" role="doc-biblioref">10</a></sup></span>. The tooling: <code>clusterProfiler</code><span class="citation" data-cites="yu2012clusterprofiler wu2021clusterprofiler"><sup><a href="#ref-yu2012clusterprofiler" role="doc-biblioref">8</a>,<a href="#ref-wu2021clusterprofiler" role="doc-biblioref">9</a></sup></span> (and its free online <strong><a href="https://yulab-smu.top/biomedical-knowledge-mining-book/">Biomedical Knowledge Mining book</a></strong>), the fast <code>fgsea</code> engine<span class="citation" data-cites="korotkevich2021fgsea"><sup><a href="#ref-korotkevich2021fgsea" role="doc-biblioref">7</a></sup></span>, and <strong><code>gprofiler2</code></strong> for a multi-organism web API. The gene-set databases are GO<span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span>, KEGG<span class="citation" data-cites="kanehisa2000kegg"><sup><a href="#ref-kanehisa2000kegg" role="doc-biblioref">3</a></sup></span>, Reactome<span class="citation" data-cites="gillespie2022reactome"><sup><a href="#ref-gillespie2022reactome" role="doc-biblioref">2</a></sup></span>, and MSigDB Hallmark<span class="citation" data-cites="liberzon2015msigdb"><sup><a href="#ref-liberzon2015msigdb" role="doc-biblioref">4</a></sup></span>. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
+<p>The foundational method paper is GSEA<span class="citation" data-cites="subramanian2005gsea"><sup><a href="#ref-subramanian2005gsea" role="doc-biblioref">6</a></sup></span>; the field review is “Ten years of pathway analysis”<span class="citation" data-cites="khatri2012ten"><sup><a href="#ref-khatri2012ten" role="doc-biblioref">5</a></sup></span>; and the gold-standard benchmark for choosing an enrichment method is Geistlinger et al.<span class="citation" data-cites="geistlinger2021toward"><sup><a href="#ref-geistlinger2021toward" role="doc-biblioref">7</a></sup></span>. The tooling: <code>clusterProfiler</code><span class="citation" data-cites="yu2012clusterprofiler wu2021clusterprofiler"><sup><a href="#ref-wu2021clusterprofiler" role="doc-biblioref">8</a>,<a href="#ref-yu2012clusterprofiler" role="doc-biblioref">10</a></sup></span> (and its free online <strong><a href="https://yulab-smu.top/biomedical-knowledge-mining-book/">Biomedical Knowledge Mining book</a></strong>), the fast <code>fgsea</code> engine<span class="citation" data-cites="korotkevich2021fgsea"><sup><a href="#ref-korotkevich2021fgsea" role="doc-biblioref">9</a></sup></span>, and <strong><code>gprofiler2</code></strong> for a multi-organism web API. The gene-set databases are GO<span class="citation" data-cites="ashburner2000go"><sup><a href="#ref-ashburner2000go" role="doc-biblioref">1</a></sup></span>, KEGG<span class="citation" data-cites="kanehisa2000kegg"><sup><a href="#ref-kanehisa2000kegg" role="doc-biblioref">3</a></sup></span>, Reactome<span class="citation" data-cites="gillespie2022reactome"><sup><a href="#ref-gillespie2022reactome" role="doc-biblioref">2</a></sup></span>, and MSigDB Hallmark<span class="citation" data-cites="liberzon2015msigdb"><sup><a href="#ref-liberzon2015msigdb" role="doc-biblioref">4</a></sup></span>. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
 </section>
 <section id="references" class="level2">
 <h2 class="anchored" data-anchor-id="references">References</h2>
@@ -4759,17 +4960,17 @@ Note
 <div id="ref-subramanian2005gsea" class="csl-entry" role="listitem">
 <div class="csl-left-margin">6. </div><div class="csl-right-inline">Subramanian, A. <em>et al.</em> <a href="https://doi.org/10.1073/pnas.0506580102">Gene set enrichment analysis: A knowledge-based approach for interpreting genome-wide expression profiles</a>. <em>Proceedings of the National Academy of Sciences</em> <strong>102</strong>, 15545–15550 (2005).</div>
 </div>
-<div id="ref-korotkevich2021fgsea" class="csl-entry" role="listitem">
-<div class="csl-left-margin">7. </div><div class="csl-right-inline">Korotkevich, G. <em>et al.</em> Fast gene set enrichment analysis. <em>bioRxiv</em> <a href="https://doi.org/10.1101/060012">https://doi.org/10.1101/060012</a> (2021) doi:<a href="https://doi.org/10.1101/060012">10.1101/060012</a>.</div>
-</div>
-<div id="ref-yu2012clusterprofiler" class="csl-entry" role="listitem">
-<div class="csl-left-margin">8. </div><div class="csl-right-inline">Yu, G., Wang, L.-G., Han, Y. &amp; He, Q.-Y. <a href="https://doi.org/10.1089/omi.2011.0118"><span class="nocase">clusterProfiler</span>: An <span>R</span> package for comparing biological themes among gene clusters</a>. <em>OMICS: A Journal of Integrative Biology</em> <strong>16</strong>, 284–287 (2012).</div>
+<div id="ref-geistlinger2021toward" class="csl-entry" role="listitem">
+<div class="csl-left-margin">7. </div><div class="csl-right-inline">Geistlinger, L. <em>et al.</em> <a href="https://doi.org/10.1093/bib/bbz158">Toward a gold standard for benchmarking gene set enrichment analysis</a>. <em>Briefings in Bioinformatics</em> <strong>22</strong>, 545–556 (2021).</div>
 </div>
 <div id="ref-wu2021clusterprofiler" class="csl-entry" role="listitem">
-<div class="csl-left-margin">9. </div><div class="csl-right-inline"><span class="nocase">Wu, T. <em>et al.</em></span> <a href="https://doi.org/10.1016/j.xinn.2021.100141"><span class="nocase">clusterProfiler</span> 4.0: A universal enrichment tool for interpreting omics data</a>. <em>The Innovation</em> <strong>2</strong>, 100141 (2021).</div>
+<div class="csl-left-margin">8. </div><div class="csl-right-inline"><span class="nocase">Wu, T. <em>et al.</em></span> <a href="https://doi.org/10.1016/j.xinn.2021.100141"><span class="nocase">clusterProfiler</span> 4.0: A universal enrichment tool for interpreting omics data</a>. <em>The Innovation</em> <strong>2</strong>, 100141 (2021).</div>
 </div>
-<div id="ref-geistlinger2021toward" class="csl-entry" role="listitem">
-<div class="csl-left-margin">10. </div><div class="csl-right-inline">Geistlinger, L. <em>et al.</em> <a href="https://doi.org/10.1093/bib/bbz158">Toward a gold standard for benchmarking gene set enrichment analysis</a>. <em>Briefings in Bioinformatics</em> <strong>22</strong>, 545–556 (2021).</div>
+<div id="ref-korotkevich2021fgsea" class="csl-entry" role="listitem">
+<div class="csl-left-margin">9. </div><div class="csl-right-inline">Korotkevich, G. <em>et al.</em> Fast gene set enrichment analysis. <em>bioRxiv</em> <a href="https://doi.org/10.1101/060012">https://doi.org/10.1101/060012</a> (2021) doi:<a href="https://doi.org/10.1101/060012">10.1101/060012</a>.</div>
+</div>
+<div id="ref-yu2012clusterprofiler" class="csl-entry" role="listitem">
+<div class="csl-left-margin">10. </div><div class="csl-right-inline">Yu, G., Wang, L.-G., Han, Y. &amp; He, Q.-Y. <a href="https://doi.org/10.1089/omi.2011.0118"><span class="nocase">clusterProfiler</span>: An <span>R</span> package for comparing biological themes among gene clusters</a>. <em>OMICS: A Journal of Integrative Biology</em> <strong>16</strong>, 284–287 (2012).</div>
 </div>
 </div>
 

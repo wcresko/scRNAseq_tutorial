@@ -134,8 +134,7 @@ Each point is a cell, positioned by the unintegrated UMAP from Tutorial 02–03,
 Azimuth wraps Seurat's anchor-based reference mapping with curated atlases, and returns hierarchical labels (`predicted.celltype.l1` / `l2` / `l3`) plus a per-cell **mapping score**. The PBMC reference (`pbmcref`) is the most widely tested and is a perfect fit for `ifnb`.
 
 ```{r}
-#| label: lst-M4-azimuth
-#| lst-cap: "Run Azimuth (pbmcref) to predict hierarchical cell-type labels, then plot level-2 calls on the UMAP."
+#| label: M4-azimuth
 #| fig-cap: "Azimuth (pbmcref) level-2 predicted cell types projected onto the unintegrated UMAP."
 library(Azimuth)
 
@@ -172,8 +171,7 @@ The `head()` table shows each cell's Azimuth predictions at three granularity le
 ### Reading the mapping score — a built-in confidence check
 
 ```{r}
-#| label: lst-M4-azimuth_confidence
-#| lst-cap: "FeaturePlot of per-cell Azimuth mapping scores — cells that project poorly into the reference appear in dark/cool colours."
+#| label: M4-azimuth_confidence
 #| fig-cap: "Azimuth mapping scores on the UMAP. Low-scoring cells project poorly into the reference manifold — treat their labels with caution."
 
 p_mapping <- FeaturePlot(ifnb, features = "mapping.score", reduction = "umap") +
@@ -209,9 +207,10 @@ In practice the PBMC reference is robust enough that this effect is mild — but
 
 ## Compare Azimuth against the manual / ground-truth labels
 
+[]{#lst-M4-compare}
+
 ```{r}
-#| label: lst-M4-compare
-#| lst-cap: "Raw cross-tabulation of author ground-truth labels vs Azimuth level-2 predictions."
+#| label: M4-compare
 
 ann <- ifnb@meta.data |>
   select(seurat_annotations,                  # ground truth (Kang authors)
@@ -229,14 +228,15 @@ as.data.frame(
 ```
 
 ::: {.callout-tip title="Reading the output"}
-The `table()` printout (@lst-M4-compare) is a contingency matrix with ground-truth cell types on rows and Azimuth `predicted.celltype.l2` labels on columns; each cell value is the number of cells with that combination. For a clean PBMC dataset like `ifnb`, most cells should land in one off-diagonal cell per row — you want large numbers concentrated near the "correct" column. Zero rows or columns indicate a label present in one system but not the other. The heatmap below (@lst-M4-compare_heatmap) makes patterns easier to read at a glance.
+The `table()` printout ([code](#lst-M4-compare)) is a contingency matrix with ground-truth cell types on rows and Azimuth `predicted.celltype.l2` labels on columns; each cell value is the number of cells with that combination. For a clean PBMC dataset like `ifnb`, most cells should land in one off-diagonal cell per row — you want large numbers concentrated near the "correct" column. Zero rows or columns indicate a label present in one system but not the other. The heatmap below ([code](#lst-M4-compare_heatmap)) makes patterns easier to read at a glance.
 :::
 
-A cleaner cross-tabulation as a heatmap (@lst-M4-compare_heatmap):
+A cleaner cross-tabulation as a heatmap ([code](#lst-M4-compare_heatmap)):
+
+[]{#lst-M4-compare_heatmap}
 
 ```{r}
-#| label: lst-M4-compare_heatmap
-#| lst-cap: "Confusion heatmap of author ground-truth labels vs Azimuth level-2 predictions."
+#| label: M4-compare_heatmap
 #| fig-cap: "Confusion heatmap of author ground-truth labels (rows) against Azimuth level-2 predictions (columns)."
 
 p_compare_heatmap <- ann |>
@@ -262,15 +262,16 @@ The rows are the author ground-truth labels (`seurat_annotations`) and the colum
 
 ## Reconcile disagreements
 
-A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review (@lst-M4-reconcile).
+A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review ([code](#lst-M4-reconcile)).
 
 ::: callout-important
 **You can't compare the labels as raw strings.** The author ground truth (`seurat_annotations`, from `muscData`) and Azimuth use **different vocabularies and granularities** — e.g. `CD14+ Monocytes` (truth) vs `CD14 Mono` (Azimuth l2) vs `Mono` (Azimuth l1); `B cells` vs `B naive`/`B memory`. A direct `==` would flag *everything* as a disagreement even when the calls actually agree. So we **harmonize both to a common coarse vocabulary** and reconcile at Azimuth **level 1** (`predicted.celltype.l1`), the granularity that matches the coarse ground truth.
 :::
 
+[]{#lst-M4-reconcile}
+
 ```{r}
-#| label: lst-M4-reconcile
-#| lst-cap: "Harmonize ground-truth and Azimuth labels to a coarse vocabulary, flag disagreements, and tabulate the final calls."
+#| label: M4-reconcile
 
 # Map the author ground-truth labels onto Azimuth's coarse level-1 vocabulary
 # (B, CD4 T, CD8 T, NK, DC, Mono). Anything without a clean level-1 counterpart

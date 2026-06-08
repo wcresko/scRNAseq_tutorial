@@ -4168,6 +4168,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4406,6 +4437,7 @@ z-index: 1;
   <li><a href="#find-anchors" id="toc-find-anchors" class="nav-link" data-scroll-target="#find-anchors">5.5.1 Find anchors</a></li>
   <li><a href="#apply-the-correction" id="toc-apply-the-correction" class="nav-link" data-scroll-target="#apply-the-correction">5.5.2 Apply the correction</a></li>
   </ul></li>
+  <li><a href="#b-harmony-vs.-seurat-anchors-a-direct-comparison" id="toc-b-harmony-vs.-seurat-anchors-a-direct-comparison" class="nav-link" data-scroll-target="#b-harmony-vs.-seurat-anchors-a-direct-comparison">5.5b Harmony vs. Seurat anchors — a direct comparison</a></li>
   <li><a href="#the-over-correction-problem" id="toc-the-over-correction-problem" class="nav-link" data-scroll-target="#the-over-correction-problem">5.6 The over-correction problem</a></li>
   <li><a href="#the-under-correction-problem" id="toc-the-under-correction-problem" class="nav-link" data-scroll-target="#the-under-correction-problem">5.7 The under-correction problem</a></li>
   <li><a href="#the-three-diagnostics-in-order" id="toc-the-three-diagnostics-in-order" class="nav-link" data-scroll-target="#the-three-diagnostics-in-order">5.8 The three diagnostics, in order</a></li>
@@ -4469,6 +4501,19 @@ Note
 <p>If the colors <strong>interleave</strong> within every cluster, you don’t need integration: the technical and biological structures are aligned, and downstream analyses can proceed.</p>
 <p>If the samples form <strong>parallel structures</strong> — every cell type appearing twice, once per sample — you have a <strong>batch effect</strong>. PC1 of the joint dataset is now tracking <em>which sample the cell came from</em> rather than <em>what cell type it is</em>. Clusters at the standard resolution will be sample-specific rather than cell-type-specific. Pseudobulk DE between samples becomes non-comparable because you have no shared definition of “the same cell type” across them.</p>
 <p><strong>Integration</strong> is the family of methods that warp the embedding so the same cell type from different samples ends up in the same cluster, while preserving any <em>real</em> biological differences between samples (e.g. an activated state present in one sample but not another).</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what integration actually aligns">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what integration actually aligns
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Integration does not align raw expression values; it aligns the geometric positions of cells in PC space. A batch effect in scRNA-seq is not a simple additive shift (as in bulk RNA-seq) but a complex non-linear warp: the same cell type measured in two libraries can sit in two distinct PC-space clouds, with different variances, different inter-cluster distances, and often different numbers of recovered clusters. Integration methods identify which cells from different batches are most likely the same type — either by finding mutual nearest-neighbor pairs across batches (Seurat anchors, MNN) or by penalizing cluster centroids that are batch-unbalanced (Harmony) — and apply a correction that moves those cells toward each other. The correction is applied in PC space (Harmony) or in a corrected expression assay (Seurat anchors), but in both cases the downstream biological signal — stored in the original RNA assay — is untouched. This is why you always switch back to <code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> before any differential expression or module scoring.</p>
+</div>
+</div>
 </section>
 <section id="the-diagnostic-when-do-you-need-integration" class="level2">
 <h2 class="anchored" data-anchor-id="the-diagnostic-when-do-you-need-integration">5.2 The diagnostic: when do you need integration?</h2>
@@ -4483,6 +4528,13 @@ Note
 </section>
 <section id="the-conceptual-taxonomy-of-integration-methods" class="level2">
 <h2 class="anchored" data-anchor-id="the-conceptual-taxonomy-of-integration-methods">5.3 The conceptual taxonomy of integration methods</h2>
+<p>The methods that have been developed for batch correction span a wide range of conceptual approaches, from simple linear regression to deep generative models. <a href="#tbl-ch05-methods" class="quarto-xref">Table 1</a> places the five main families in context; the two the workshop implements in depth are Harmony and Seurat anchors.</p>
+<div id="tbl-ch05-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch05-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: The five conceptual families of single-cell batch-correction methods. There is no universally best method: large benchmarks find that the right choice depends on dataset complexity and the trade-off between batch removal and biological-variation conservation<span class="citation" data-cites="tran2020benchmark luecken2022benchmarking"><sup><a href="#ref-tran2020benchmark" role="doc-biblioref">1</a>,<a href="#ref-luecken2022benchmarking" role="doc-biblioref">2</a></sup></span>.
+</figcaption>
+<div aria-describedby="tbl-ch05-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 25%">
@@ -4507,19 +4559,19 @@ Note
 </tr>
 <tr class="even">
 <td><strong>Mutual nearest neighbors</strong></td>
-<td>MNN<span class="citation" data-cites="haghverdi2018mnn"><sup><a href="#ref-haghverdi2018mnn" role="doc-biblioref">1</a></sup></span>, fastMNN, Seurat anchors<span class="citation" data-cites="stuart2019integration"><sup><a href="#ref-stuart2019integration" role="doc-biblioref">2</a></sup></span></td>
+<td>MNN<span class="citation" data-cites="haghverdi2018mnn"><sup><a href="#ref-haghverdi2018mnn" role="doc-biblioref">3</a></sup></span>, fastMNN, Seurat anchors<span class="citation" data-cites="stuart2019integration"><sup><a href="#ref-stuart2019integration" role="doc-biblioref">4</a></sup></span></td>
 <td>Find pairs of cells that are nearest neighbors <em>across</em> batches; learn a correction from those anchors</td>
 <td>Two or a few batches with similar cell-type compositions</td>
 </tr>
 <tr class="odd">
 <td><strong>Soft clustering in PC space</strong></td>
-<td><strong>Harmony</strong></td>
+<td><strong>Harmony</strong><span class="citation" data-cites="korsunsky2019harmony"><sup><a href="#ref-korsunsky2019harmony" role="doc-biblioref">5</a></sup></span></td>
 <td>Iteratively re-cluster cells with a batch-mixing penalty; shift centroids toward batch balance</td>
 <td>Most-used in 2026 — fast, scales to atlas sizes, works well for 2–50 batches</td>
 </tr>
 <tr class="even">
 <td><strong>Variational autoencoders</strong></td>
-<td>scVI<span class="citation" data-cites="lopez2018scvi"><sup><a href="#ref-lopez2018scvi" role="doc-biblioref">3</a></sup></span>, scANVI<span class="citation" data-cites="xu2021scanvi"><sup><a href="#ref-xu2021scanvi" role="doc-biblioref">4</a></sup></span></td>
+<td>scVI<span class="citation" data-cites="lopez2018scvi"><sup><a href="#ref-lopez2018scvi" role="doc-biblioref">6</a></sup></span>, scANVI<span class="citation" data-cites="xu2021scanvi"><sup><a href="#ref-xu2021scanvi" role="doc-biblioref">7</a></sup></span></td>
 <td>Learn a latent representation conditioned on batch; the decoder can be ignored, the latent used like PCs</td>
 <td>Atlas-scale; especially with strong batch heterogeneity</td>
 </tr>
@@ -4531,18 +4583,21 @@ Note
 </tr>
 </tbody>
 </table>
-<p>The workshop’s <a href="../Exercise_Folder/Tutorial_05_Integration.html">Tutorial 05</a> walks <strong>Harmony</strong> and <strong>Seurat anchors</strong> because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy. There is no universally best method: large benchmarks of 14+ batch-correction tools, and the atlas-level integration benchmark, find that the right choice depends on dataset complexity and on the trade-off between <em>removing batch</em> and <em>conserving biological variation</em> — Harmony, Seurat, scVI and scANVI all rank near the top under different conditions<span class="citation" data-cites="tran2020benchmark luecken2022benchmarking"><sup><a href="#ref-tran2020benchmark" role="doc-biblioref">5</a>,<a href="#ref-luecken2022benchmarking" role="doc-biblioref">6</a></sup></span>.</p>
+</div>
+</figure>
+</div>
+<p>The workshop’s <a href="../Exercise_Folder/Tutorial_05_Integration.html">Tutorial 05</a> walks <strong>Harmony</strong> and <strong>Seurat anchors</strong> because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy. Harmony, Seurat, scVI and scANVI all rank near the top under different conditions in the benchmarks, with no single winner across all datasets<span class="citation" data-cites="tran2020benchmark luecken2022benchmarking"><sup><a href="#ref-tran2020benchmark" role="doc-biblioref">1</a>,<a href="#ref-luecken2022benchmarking" role="doc-biblioref">2</a></sup></span>.</p>
 </section>
 <section id="harmony-in-detail" class="level2">
 <h2 class="anchored" data-anchor-id="harmony-in-detail">5.4 Harmony in detail</h2>
-<p>Harmony<span class="citation" data-cites="korsunsky2019harmony"><sup><a href="#ref-korsunsky2019harmony" role="doc-biblioref">7</a></sup></span> operates in PC space — <em>after</em> you’ve run <code>RunPCA</code> on the joint object. It iterates four steps until convergence:</p>
+<p>Harmony<span class="citation" data-cites="korsunsky2019harmony"><sup><a href="#ref-korsunsky2019harmony" role="doc-biblioref">5</a></sup></span> operates in PC space — <em>after</em> you’ve run <code>RunPCA</code> on the joint object. It iterates four steps until convergence:</p>
 <ol type="1">
 <li><strong>Soft-cluster</strong> cells with a batch-diversity penalty: each cell is assigned soft membership in <span class="math inline">\(K\)</span> clusters; the objective rewards clusters whose membership is balanced across batches</li>
 <li><strong>Compute centroids</strong>: a global centroid per cluster, plus per-batch centroids per cluster</li>
 <li><strong>Compute correction factors</strong>: the difference between each per-batch centroid and the global centroid</li>
 <li><strong>Shift each cell</strong> by a soft-cluster-weighted combination of those correction factors</li>
 </ol>
-<p>The output is a <code>harmony</code> reduction that is a drop-in replacement for <code>pca</code> in <code>FindNeighbors</code> and <code>RunUMAP</code>. The original PCs are preserved separately.</p>
+<p>The output is a <code>harmony</code> reduction that is a drop-in replacement for <code>pca</code> in <code>FindNeighbors</code> and <code>RunUMAP</code>. The original PCs are preserved separately. The soft-clustering approach is what distinguishes Harmony from hard-assignment methods: because each cell belongs to <em>multiple</em> clusters with fractional membership, the correction is smooth and continuous — a cell on the boundary between two populations is shifted by a weighted average of both populations’ correction factors, rather than being abruptly assigned to one population’s correction. This continuity makes Harmony robust to rare populations that straddle cluster boundaries in the pre-correction PC space.</p>
 <p>Harmony’s strengths:</p>
 <ul>
 <li><strong>Fast</strong> — minutes for atlas-scale (~M cells) data</li>
@@ -4554,10 +4609,36 @@ Note
 <ul>
 <li>Less effective on very heterogeneous batches (cell types absent in one but present in another); works best when most cell types are shared</li>
 </ul>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — RunHarmony theta">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — RunHarmony theta
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>RunHarmony(seu, group.by.vars = &quot;stim&quot;, theta = 2)</code>. <strong>Default: theta = 2.</strong> Controls how aggressively Harmony penalizes batch imbalance in its soft-clustering objective. Higher <code>theta</code> (e.g. 4–6) forces more aggressive mixing across batches — useful for strong, hard-to-correct batch effects but risks erasing real biological variation between conditions. Lower <code>theta</code> (e.g. 1) is less aggressive and is appropriate when batches are nearly comparable already or when biological differences between samples are strong and should not be over-corrected. For most multi-sample scRNA-seq studies the default of 2 is a sensible starting point; the ISG-score diagnostic in §5.6 is the practical test of whether you’ve pushed too hard.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — SelectIntegrationFeatures nfeatures">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — SelectIntegrationFeatures nfeatures
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>SelectIntegrationFeatures(object.list = ifnb.list, nfeatures = 2000)</code>. <strong>Default: 2000.</strong> Selects genes that are among the top HVGs in the most samples, producing a feature set that is robust across batches rather than dominated by any single sample. Increasing <code>nfeatures</code> (e.g. 3000–5000) includes more genes and can recover rarer cell-type markers, at the cost of including more batch-specific noise genes. For most two-sample designs (like <code>ifnb</code>), 2000 is sufficient; for highly heterogeneous multi-tissue or multi-protocol atlases, raising to 3000–4000 is common practice. These features are then used to scale the merged object and run PCA before Harmony or <code>IntegrateLayers</code>.</p>
+</div>
+</div>
 </section>
 <section id="seurat-anchors-in-detail" class="level2">
 <h2 class="anchored" data-anchor-id="seurat-anchors-in-detail">5.5 Seurat anchors in detail</h2>
-<p>The Seurat anchor workflow<span class="citation" data-cites="stuart2019integration hao2021integrated"><sup><a href="#ref-stuart2019integration" role="doc-biblioref">2</a>,<a href="#ref-hao2021integrated" role="doc-biblioref">8</a></sup></span> works in two stages:</p>
+<p>The Seurat anchor workflow<span class="citation" data-cites="stuart2019integration hao2021integrated"><sup><a href="#ref-stuart2019integration" role="doc-biblioref">4</a>,<a href="#ref-hao2021integrated" role="doc-biblioref">8</a></sup></span> works in two stages:</p>
 <section id="find-anchors" class="level3">
 <h3 class="anchored" data-anchor-id="find-anchors">5.5.1 Find anchors</h3>
 <p>For each pair of samples:</p>
@@ -4585,6 +4666,88 @@ Note
 </ul>
 </section>
 </section>
+<section id="b-harmony-vs.-seurat-anchors-a-direct-comparison" class="level2">
+<h2 class="anchored" data-anchor-id="b-harmony-vs.-seurat-anchors-a-direct-comparison">5.5b Harmony vs. Seurat anchors — a direct comparison</h2>
+<p>Because the workshop implements both methods, it is worth pausing to contrast them explicitly before working through their shared failure modes. <a href="#tbl-ch05-harmony-vs-anchors" class="quarto-xref">Table 2</a> places them side by side on the dimensions that most affect the analysis decision.</p>
+<div id="tbl-ch05-harmony-vs-anchors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch05-harmony-vs-anchors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Direct comparison of Harmony and Seurat anchors on the dimensions most relevant to choosing between them. For most PBMC-scale studies (10k–200k cells), both work well; Harmony is the practical default for speed; Seurat anchors can provide more conservative correction when cell-type compositions are very unequal across batches.
+</figcaption>
+<div aria-describedby="tbl-ch05-harmony-vs-anchors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Dimension</th>
+<th>Harmony</th>
+<th>Seurat anchors</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Speed</strong></td>
+<td>Fast — minutes for millions of cells</td>
+<td>Slow — hours for large datasets</td>
+</tr>
+<tr class="even">
+<td><strong>Operating space</strong></td>
+<td>PC space (corrects coordinates)</td>
+<td>Gene expression space (corrects an assay)</td>
+</tr>
+<tr class="odd">
+<td><strong>Output slot</strong></td>
+<td><code>reductions$harmony</code> (drop-in for <code>pca</code>)</td>
+<td><code>assays$integrated</code> (separate assay)</td>
+</tr>
+<tr class="even">
+<td><strong>Memory footprint</strong></td>
+<td>Low</td>
+<td>High (stores corrected expression matrix)</td>
+</tr>
+<tr class="odd">
+<td><strong>Rare cell conservation</strong></td>
+<td>Good</td>
+<td>Good to excellent (anchor scoring filters bad pairs)</td>
+</tr>
+<tr class="even">
+<td><strong>Key tuning parameter</strong></td>
+<td><code>theta</code> (default 2; higher = more aggressive mixing)</td>
+<td><code>k.filter</code>, <code>k.anchor</code>, <code>dims</code></td>
+</tr>
+<tr class="odd">
+<td><strong>Downstream DE</strong></td>
+<td>Always use <code>RNA</code> assay</td>
+<td>Always use <code>RNA</code> assay — integrated assay is not valid for DE</td>
+</tr>
+<tr class="even">
+<td><strong>Atlas scale (&gt;500k cells)</strong></td>
+<td>Yes</td>
+<td>Not recommended</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — the over-correction vs. under-correction trade-off">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — the over-correction vs. under-correction trade-off
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Integration methods operate on a fundamental tension: every algorithm that moves cells from different samples together risks also moving cells with <em>different biology</em> together. A Harmony run with <code>theta = 10</code> will produce a perfectly sample-mixed UMAP, but at the cost of flattening the IFN-β response, the tumor microenvironment gradient, or any other biology that correlates with the sample label. The core diagnostic is therefore not “is the UMAP sample-mixed?” but “are real biological signals preserved <em>within</em> the mixed clusters?” The ISG-score gap test (§5.6) is the canonical check for the <code>ifnb</code> dataset: if STIM cells still score higher on interferon-stimulated genes than CTRL cells of the same cluster type, the biology is intact. If the gap is zero, you’ve over-corrected. No integration metric should ever be interpreted in isolation from a biology-preservation check.</p>
+</div>
+</div>
+</section>
 <section id="the-over-correction-problem" class="level2">
 <h2 class="anchored" data-anchor-id="the-over-correction-problem">5.6 The over-correction problem</h2>
 <p>The cardinal failure mode of integration is <strong>erasing real biological differences</strong> by being too aggressive. If your two samples are <em>biologically</em> different (CTRL vs IFN-β–stimulated), and integration spatially mixes them too completely, you also erase the IFN response — which is the actual biology of the experiment.</p>
@@ -4600,12 +4763,7 @@ Note
 <section id="the-under-correction-problem" class="level2">
 <h2 class="anchored" data-anchor-id="the-under-correction-problem">5.7 The under-correction problem</h2>
 <p>The opposite failure: clusters <em>remain</em> sample-specific after integration. There are two interpretations and they require different responses:</p>
-<div class="incremental">
-<ol class="incremental" type="1">
-<li><strong>Genuinely sample-specific biology.</strong> A cell type that exists in one sample but not the other (e.g. an “activated” T-cell state present only in stimulated samples) <em>should</em> remain sample-specific after integration — that’s real biology, not residual batch effect. Integration <em>should not</em> mix it.</li>
-<li><strong>Residual batch effect.</strong> A cell type clearly present in both samples but still split into two clusters after integration. That’s under-correction; push integration harder.</li>
-</ol>
-</div>
+<p>Two interpretations are possible and they require different responses. The first is <strong>genuinely sample-specific biology</strong>: a cell state that exists in one sample but not the other — for example, an interferon-activated T-cell subpopulation present only in the stimulated condition — <em>should</em> remain sample-specific after integration, because that’s real biological information, not a technical artifact. Integration that erases it is over-correcting, not under-correcting. The second is a <strong>residual batch effect</strong>: a cell type that is clearly present in both samples but still splits into two clusters after integration. Here the method has not fully aligned the shared population, and pushing integration harder (higher Harmony <code>theta</code>, or more stringent anchor filtering in Seurat) is warranted.</p>
 <p>Distinguishing them requires biological knowledge and careful inspection of cluster markers. If the sample-specific cluster’s markers match an <em>activation state</em> (cytokines, ISGs) rather than a <em>lineage</em> (CD4, CD79A), it’s likely real biology. If the markers are the same lineage markers as a sample-mixed cluster, it’s under-correction.</p>
 </section>
 <section id="the-three-diagnostics-in-order" class="level2">
@@ -4632,6 +4790,13 @@ Note
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">5.10 Common errors</h2>
+<p><a href="#tbl-ch05-errors" class="quarto-xref">Table 3</a> collects the errors most frequently encountered during integration and the integrated-object diagnostics. The single most important habit to develop is checking <code>DefaultAssay</code> before any expression-level operation.</p>
+<div id="tbl-ch05-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch05-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common errors in multi-sample integration, their root causes, and fixes. The <code>DefaultAssay</code> confusion (integrated vs. RNA) is the single most common bug; always be explicit about which assay is active before each analysis step.
+</figcaption>
+<div aria-describedby="tbl-ch05-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -4661,8 +4826,21 @@ Note
 <td>Seurat v5 / v4 API mismatch</td>
 <td>In v5, anchor integration produces a layered Assay5; consult the <a href="https://satijalab.org/seurat/articles/seurat5_integration">Seurat v5 vignette</a></td>
 </tr>
+<tr class="odd">
+<td><code>FindAllMarkers</code> returns empty results after integration</td>
+<td>DefaultAssay is still <code>&quot;integrated&quot;</code></td>
+<td><code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> before marker tests</td>
+</tr>
+<tr class="even">
+<td><code>JoinLayers</code> errors on a non-merged object</td>
+<td>Object was never <code>merge()</code>-d</td>
+<td><code>JoinLayers</code> is only needed after <code>merge()</code> creates split layers</td>
+</tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">5.11 Where this material is also discussed</h2>
@@ -4676,31 +4854,31 @@ Note
 </section>
 <section id="going-further" class="level2">
 <h2 class="anchored" data-anchor-id="going-further">5.12 Going further</h2>
-<p>The two method papers the tutorial uses are Harmony<span class="citation" data-cites="korsunsky2019harmony"><sup><a href="#ref-korsunsky2019harmony" role="doc-biblioref">7</a></sup></span> and Seurat anchors<span class="citation" data-cites="stuart2019integration hao2021integrated"><sup><a href="#ref-stuart2019integration" role="doc-biblioref">2</a>,<a href="#ref-hao2021integrated" role="doc-biblioref">8</a></sup></span>; the deep-learning alternatives are scVI<span class="citation" data-cites="lopez2018scvi"><sup><a href="#ref-lopez2018scvi" role="doc-biblioref">3</a></sup></span> and its semi-supervised extension scANVI<span class="citation" data-cites="xu2021scanvi"><sup><a href="#ref-xu2021scanvi" role="doc-biblioref">4</a></sup></span>, which also transfers labels. To choose among them, read the two benchmarks — of 14 batch-correction methods<span class="citation" data-cites="tran2020benchmark"><sup><a href="#ref-tran2020benchmark" role="doc-biblioref">5</a></sup></span> and of atlas-level integration<span class="citation" data-cites="luecken2022benchmarking"><sup><a href="#ref-luecken2022benchmarking" role="doc-biblioref">6</a></sup></span>, the latter introducing the now-standard scoring that separates <em>batch removal</em> from <em>biological conservation</em> (metrics such as LISI and kBET). Mutual-nearest-neighbour correction<span class="citation" data-cites="haghverdi2018mnn"><sup><a href="#ref-haghverdi2018mnn" role="doc-biblioref">1</a></sup></span> is the conceptual ancestor of the anchor approach. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
+<p>The two method papers the tutorial uses are Harmony<span class="citation" data-cites="korsunsky2019harmony"><sup><a href="#ref-korsunsky2019harmony" role="doc-biblioref">5</a></sup></span> and Seurat anchors<span class="citation" data-cites="stuart2019integration hao2021integrated"><sup><a href="#ref-stuart2019integration" role="doc-biblioref">4</a>,<a href="#ref-hao2021integrated" role="doc-biblioref">8</a></sup></span>; the deep-learning alternatives are scVI<span class="citation" data-cites="lopez2018scvi"><sup><a href="#ref-lopez2018scvi" role="doc-biblioref">6</a></sup></span> and its semi-supervised extension scANVI<span class="citation" data-cites="xu2021scanvi"><sup><a href="#ref-xu2021scanvi" role="doc-biblioref">7</a></sup></span>, which also transfers labels. To choose among them, read the two benchmarks — of 14 batch-correction methods<span class="citation" data-cites="tran2020benchmark"><sup><a href="#ref-tran2020benchmark" role="doc-biblioref">1</a></sup></span> and of atlas-level integration<span class="citation" data-cites="luecken2022benchmarking"><sup><a href="#ref-luecken2022benchmarking" role="doc-biblioref">2</a></sup></span>, the latter introducing the now-standard scoring that separates <em>batch removal</em> from <em>biological conservation</em> (metrics such as LISI and kBET). Mutual-nearest-neighbour correction<span class="citation" data-cites="haghverdi2018mnn"><sup><a href="#ref-haghverdi2018mnn" role="doc-biblioref">3</a></sup></span> is the conceptual ancestor of the anchor approach. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
 </section>
 <section id="references" class="level2">
 <h2 class="anchored" data-anchor-id="references">References</h2>
 <div id="refs" class="references csl-bib-body" data-entry-spacing="0" data-line-spacing="2" role="list">
-<div id="ref-haghverdi2018mnn" class="csl-entry" role="listitem">
-<div class="csl-left-margin">1. </div><div class="csl-right-inline">Haghverdi, L., Lun, A. T. L., Morgan, M. D. &amp; Marioni, J. C. <a href="https://doi.org/10.1038/nbt.4091">Batch effects in single-cell <span>RNA</span>-sequencing data are corrected by matching mutual nearest neighbors</a>. <em>Nature Biotechnology</em> <strong>36</strong>, 421–427 (2018).</div>
-</div>
-<div id="ref-stuart2019integration" class="csl-entry" role="listitem">
-<div class="csl-left-margin">2. </div><div class="csl-right-inline">Stuart, T. <em>et al.</em> <a href="https://doi.org/10.1016/j.cell.2019.05.031">Comprehensive integration of single-cell data</a>. <em>Cell</em> <strong>177</strong>, 1888–1902 (2019).</div>
-</div>
-<div id="ref-lopez2018scvi" class="csl-entry" role="listitem">
-<div class="csl-left-margin">3. </div><div class="csl-right-inline">Lopez, R., Regier, J., Cole, M. B., Jordan, M. I. &amp; Yosef, N. <a href="https://doi.org/10.1038/s41592-018-0229-2">Deep generative modeling for single-cell transcriptomics</a>. <em>Nature Methods</em> <strong>15</strong>, 1053–1058 (2018).</div>
-</div>
-<div id="ref-xu2021scanvi" class="csl-entry" role="listitem">
-<div class="csl-left-margin">4. </div><div class="csl-right-inline">Xu, C. <em>et al.</em> <a href="https://doi.org/10.15252/msb.20209620">Probabilistic harmonization and annotation of single-cell transcriptomics data with deep generative models</a>. <em>Molecular Systems Biology</em> <strong>17</strong>, e9620 (2021).</div>
-</div>
 <div id="ref-tran2020benchmark" class="csl-entry" role="listitem">
-<div class="csl-left-margin">5. </div><div class="csl-right-inline">Tran, H. T. N. <em>et al.</em> <a href="https://doi.org/10.1186/s13059-019-1850-9">A benchmark of batch-effect correction methods for single-cell <span>RNA</span> sequencing data</a>. <em>Genome Biology</em> <strong>21</strong>, 12 (2020).</div>
+<div class="csl-left-margin">1. </div><div class="csl-right-inline">Tran, H. T. N. <em>et al.</em> <a href="https://doi.org/10.1186/s13059-019-1850-9">A benchmark of batch-effect correction methods for single-cell <span>RNA</span> sequencing data</a>. <em>Genome Biology</em> <strong>21</strong>, 12 (2020).</div>
 </div>
 <div id="ref-luecken2022benchmarking" class="csl-entry" role="listitem">
-<div class="csl-left-margin">6. </div><div class="csl-right-inline">Luecken, M. D. <em>et al.</em> <a href="https://doi.org/10.1038/s41592-021-01336-8">Benchmarking atlas-level data integration in single-cell genomics</a>. <em>Nature Methods</em> <strong>19</strong>, 41–50 (2022).</div>
+<div class="csl-left-margin">2. </div><div class="csl-right-inline">Luecken, M. D. <em>et al.</em> <a href="https://doi.org/10.1038/s41592-021-01336-8">Benchmarking atlas-level data integration in single-cell genomics</a>. <em>Nature Methods</em> <strong>19</strong>, 41–50 (2022).</div>
+</div>
+<div id="ref-haghverdi2018mnn" class="csl-entry" role="listitem">
+<div class="csl-left-margin">3. </div><div class="csl-right-inline">Haghverdi, L., Lun, A. T. L., Morgan, M. D. &amp; Marioni, J. C. <a href="https://doi.org/10.1038/nbt.4091">Batch effects in single-cell <span>RNA</span>-sequencing data are corrected by matching mutual nearest neighbors</a>. <em>Nature Biotechnology</em> <strong>36</strong>, 421–427 (2018).</div>
+</div>
+<div id="ref-stuart2019integration" class="csl-entry" role="listitem">
+<div class="csl-left-margin">4. </div><div class="csl-right-inline">Stuart, T. <em>et al.</em> <a href="https://doi.org/10.1016/j.cell.2019.05.031">Comprehensive integration of single-cell data</a>. <em>Cell</em> <strong>177</strong>, 1888–1902 (2019).</div>
 </div>
 <div id="ref-korsunsky2019harmony" class="csl-entry" role="listitem">
-<div class="csl-left-margin">7. </div><div class="csl-right-inline">Korsunsky, I. <em>et al.</em> <a href="https://doi.org/10.1038/s41592-019-0619-0">Fast, sensitive and accurate integration of single-cell data with <span>Harmony</span></a>. <em>Nature Methods</em> <strong>16</strong>, 1289–1296 (2019).</div>
+<div class="csl-left-margin">5. </div><div class="csl-right-inline">Korsunsky, I. <em>et al.</em> <a href="https://doi.org/10.1038/s41592-019-0619-0">Fast, sensitive and accurate integration of single-cell data with <span>Harmony</span></a>. <em>Nature Methods</em> <strong>16</strong>, 1289–1296 (2019).</div>
+</div>
+<div id="ref-lopez2018scvi" class="csl-entry" role="listitem">
+<div class="csl-left-margin">6. </div><div class="csl-right-inline">Lopez, R., Regier, J., Cole, M. B., Jordan, M. I. &amp; Yosef, N. <a href="https://doi.org/10.1038/s41592-018-0229-2">Deep generative modeling for single-cell transcriptomics</a>. <em>Nature Methods</em> <strong>15</strong>, 1053–1058 (2018).</div>
+</div>
+<div id="ref-xu2021scanvi" class="csl-entry" role="listitem">
+<div class="csl-left-margin">7. </div><div class="csl-right-inline">Xu, C. <em>et al.</em> <a href="https://doi.org/10.15252/msb.20209620">Probabilistic harmonization and annotation of single-cell transcriptomics data with deep generative models</a>. <em>Molecular Systems Biology</em> <strong>17</strong>, e9620 (2021).</div>
 </div>
 <div id="ref-hao2021integrated" class="csl-entry" role="listitem">
 <div class="csl-left-margin">8. </div><div class="csl-right-inline"><span class="nocase">Hao, Y. <em>et al.</em></span> <a href="https://doi.org/10.1016/j.cell.2021.04.048">Integrated analysis of multimodal single-cell data</a>. <em>Cell</em> <strong>184</strong>, 3573–3587 (2021).</div>

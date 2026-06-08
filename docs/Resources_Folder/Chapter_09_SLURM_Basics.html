@@ -4064,6 +4064,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4362,6 +4393,19 @@ Note
 <p>So far in this workshop you have run everything on your own laptop. That works for the <code>ifnb</code> dataset because it is small, but it stops working the moment your data grows: a full 10x run with tens of thousands of cells, an integration across many samples, or a pseudobulk model with bootstrapped confidence intervals can exhaust a laptop’s memory or run for many hours. The solution is to move the work to a <strong>high-performance computing (HPC) cluster</strong> — at the University of Oregon, that cluster is <strong>Talapas</strong>.</p>
 <p>A cluster is not one big computer. It is a collection of many separate machines (<strong>nodes</strong>), each with its own CPUs, memory, and sometimes GPUs, wired together by a fast network and a shared filesystem. Talapas has thousands of CPU cores, hundreds of GPUs, and many terabytes of RAM spread across those nodes. Crucially, it is <strong>shared</strong>: dozens of researchers from across the university are competing for those resources at any given moment.</p>
 <p>Sharing a finite pool of hardware among many users who all want it at once is fundamentally a scheduling problem. If everyone simply logged in and launched whatever they wanted, two things would go wrong. First, popular nodes would be oversubscribed — twenty jobs fighting for the cores and memory of one machine, each running far slower than it should, some crashing when memory ran out. Second, there would be no fairness: whoever happened to start their job first, or who ran the most jobs, would crowd everyone else out. A <strong>scheduler</strong> exists to prevent exactly this.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what a scheduler is and why you declare resources">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what a scheduler is and why you declare resources
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A scheduler is the software layer that translates your resource request (CPUs, memory, time, GPU) into an exclusive reservation on a specific compute node, ensuring no two jobs share hardware they did not agree to share. You do not <em>take</em> resources on a cluster — you <em>ask</em> for them by declaring what your job needs. The declaration is a contract: SLURM promises you that much exclusive capacity, and your job promises not to exceed it. Every SLURM skill in this chapter is really about understanding both sides of that contract.</p>
+</div>
+</div>
 </section>
 <section id="what-slurm-does" class="level2">
 <h2 class="anchored" data-anchor-id="what-slurm-does">9.2 What SLURM does</h2>
@@ -4374,6 +4418,19 @@ Note
 </ol>
 </div>
 <p>The key idea, and the one most worth internalizing, is that you do not <em>take</em> resources on a cluster — you <em>ask</em> for them. The declaration is a contract: you promise SLURM how much you will use, and SLURM promises you exclusive access to that much. The rest of this chapter is really about understanding both halves of that contract.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what a scheduler allocates and why the declaration is a contract">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what a scheduler allocates and why the declaration is a contract
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>When you submit a job, SLURM does not merely suggest a machine — it makes an exclusive reservation. No other job is permitted to use the CPUs, memory, or GPUs you declared for the duration your job runs. This is fundamentally different from a shared laptop where every process contends for the same RAM. The consequence is bidirectional: SLURM keeps its side (exclusive access), and your job must keep its side (not exceed the requested resources). Exceeding your declared memory (<code>--mem</code>) causes SLURM to terminate the job immediately with <code>OUT_OF_MEMORY</code>; exceeding your declared wall-clock time causes termination with <code>TIMEOUT</code>. Both are hard limits, not warnings. Understanding this is why the chapter repeatedly emphasizes sizing requests honestly — under-requesting kills jobs, over-requesting wastes shared capacity and delays your own start.</p>
+</div>
+</div>
 <p>Every job at UO must also name an <strong>account</strong> — your PIRG (Principal Investigator Research Group). This is how usage is tracked and how fair-share accounting (below) knows whose turn it is. If you do not know your PIRG, run <code>groups</code> after logging in; your research group will be listed alongside system groups you cannot charge to. You can set it once in your shell profile so you never have to type <code>--account=</code> again:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export SLURM_ACCOUNT=&lt;myPIRG&gt;&#39;</span>  <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="st">&#39;export SBATCH_ACCOUNT=&lt;myPIRG&gt;&#39;</span> <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
@@ -4383,6 +4440,19 @@ Note
 <h2 class="anchored" data-anchor-id="login-nodes-vs-compute-nodes">9.3 Login nodes vs compute nodes</h2>
 <p>When you <code>ssh</code> into Talapas you land on a <strong>login node</strong> (<code>login.talapas.uoregon.edu</code>). It is tempting to think of this as “the cluster,” but it is not where your analysis should run. A login node is the front desk: a small, shared machine meant for editing files, browsing your directories, running short commands, and — most importantly — <strong>submitting jobs</strong>. There are only a handful of login nodes, and every user on the cluster shares them simultaneously.</p>
 <p>The actual computation happens on <strong>compute nodes</strong>, which you never touch directly. Instead, you ask SLURM for one, and SLURM hands you a slice of a compute node that matches your request. A useful metaphor: login nodes are the front desk of a workshop, and compute nodes are the workbenches in the back. You check in at the desk and you fill out a request slip, but you do your sawing and welding at a bench.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — login node vs compute node">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — login node vs compute node
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A login node is a small, shared gateway machine: every user on Talapas lands there when they SSH in, so it handles dozens of simultaneous sessions. Its purpose is navigation, editing, and job submission — not computation. A compute node is a large, dedicated machine that SLURM reserves exclusively for your job. Running a Seurat pipeline or any memory-hungry analysis on the login node does not just slow your own work; it degrades the experience for every other user trying to log in at that moment. Always route real computation through <code>srun</code>, <code>salloc</code>, or <code>sbatch</code>.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -4402,11 +4472,30 @@ Important
 <h2 class="anchored" data-anchor-id="fair-share-how-slurm-decides-whose-turn-it-is">9.4 Fair-share: how SLURM decides whose turn it is</h2>
 <p>A naive scheduler might run jobs first-come, first-served. SLURM does something more sophisticated and more equitable: <strong>fair-share</strong> scheduling. Rather than ordering strictly by submission time, SLURM assigns each job a priority that depends in part on how much your group has used the cluster <em>recently</em>. Groups that have consumed a lot of compute in the recent past are gently nudged down the queue; groups that have used little are nudged up. Over time this balances access so that no single heavy user can monopolize the machine.</p>
 <p>Fair-share has a practical, almost counterintuitive implication for how you should size your jobs. Because SLURM also tries to fill small gaps in the schedule (a technique called <em>backfill</em>), a <strong>small, well-sized job often starts sooner than a large one</strong>, even if the large one was submitted first. If you ask for 4 cores and 16 GB for one hour, SLURM can slot you into a gap between bigger jobs. If you ask for a whole node for two days, it has to wait until a node-sized gap opens. The lesson is not to game the queue — you genuinely cannot — but to <strong>size your jobs honestly to what they need</strong>, which both gets you running sooner and leaves resources for everyone else.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — fair-share scheduling and backfill">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — fair-share scheduling and backfill
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Fair-share is not first-come-first-served. SLURM tracks how much CPU time each PIRG has consumed in a recent window and uses that history to adjust job priorities: groups that have used a lot recently are deprioritized relative to those that have used little. This rebalances the cluster toward equal long-run access rather than rewarding whoever submits first. The backfill mechanism compounds this advantage for small jobs: SLURM actively looks for gaps in the forward schedule where a small, short request can fit without displacing any higher-priority job. A scRNA-seq QC step requesting 4 cores for 1 hour may start in minutes; a request for an entire node for 3 days waits for a node-sized window. Honest sizing is therefore not just ethical — it is pragmatically faster.</p>
+</div>
+</div>
 <p><strong>QOS</strong> (quality of service) limits ride alongside fair-share. A QOS caps how much one user can hold at once — for example, a maximum number of simultaneously running jobs, or a ceiling on total cores. These limits are why you will sometimes see a job sit in the queue with a reason like <code>QOSMaxJobsPerUserLimit</code>: you have not done anything wrong, you have simply hit a per-user cap, and earlier jobs must finish before the next one starts.</p>
 </section>
 <section id="partitions-matching-jobs-to-the-right-hardware" class="level2">
 <h2 class="anchored" data-anchor-id="partitions-matching-jobs-to-the-right-hardware">9.5 Partitions: matching jobs to the right hardware</h2>
-<p>Talapas’s nodes are not identical. Some are ordinary CPU nodes, some carry GPUs, some have enormous amounts of RAM. SLURM groups nodes into <strong>partitions</strong> — queues that each map to a class of hardware and a maximum allowed wall-clock time. Every job must target a partition, and choosing the right one is how you ask for the right <em>kind</em> of machine.</p>
+<p>Talapas’s nodes are not identical. Some are ordinary CPU nodes, some carry GPUs, some have enormous amounts of RAM. SLURM groups nodes into <strong>partitions</strong> — queues that each map to a class of hardware and a maximum allowed wall-clock time. Every job must target a partition, and choosing the right one is how you ask for the right <em>kind</em> of machine. The available partitions are summarized in <a href="#tbl-ch09-partitions" class="quarto-xref">Table 1</a>.</p>
+<div id="tbl-ch09-partitions" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch09-partitions-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Talapas SLURM partitions. Choose <code>compute</code> for most scRNA-seq steps; use <code>memory</code> only when a step genuinely exceeds a standard node’s RAM; use <code>interactive</code> or <code>interactivegpu</code> for short exploratory sessions. Run <code>sinfo</code> to see the live state of each partition.
+</figcaption>
+<div aria-describedby="tbl-ch09-partitions-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 29%">
@@ -4453,7 +4542,12 @@ Important
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
+<p>Reading <a href="#tbl-ch09-partitions" class="quarto-xref">Table 1</a>: the most important column is “Max time” — it sets the upper bound you can request with <code>--time</code>. If you request a time longer than the partition allows, SLURM rejects the job immediately. For the <code>ifnb</code> workshop pipeline, all eight core analysis steps finish within 4 hours on a standard compute node; <code>compute</code> is the right choice throughout. The <code>memory</code> partition is for edge cases — atlas-scale integration, very large pseudobulk DE — not a general precaution; its nodes are few and in high demand. The <code>preempt</code> partition gives you access to any node (including those in other partitions), but the owner of that partition can evict your job at any time; use it only for checkpointed workloads that can survive being killed.</p>
 <p>Most of the core scRNA-seq pipeline runs comfortably on <code>compute</code>. You reach for <code>memory</code> only when a step genuinely needs more RAM than a standard node provides, for <code>gpu</code> when you run GPU-accelerated tools, and for <code>interactive</code> when you want a quick session that starts fast. Running <code>sinfo</code> shows you each partition and the live state of its nodes (idle, allocated, down) so you can see where capacity is currently free.</p>
+<p>A common beginner mistake is to use <code>memory</code> or <code>memorylong</code> as a precaution — “just in case” — rather than because a step genuinely needs it. The high-memory nodes are few and heavily contended; using them unnecessarily prevents other users’ legitimate high-memory work from starting. Conversely, using <code>compute</code> for a step that truly needs 200 GB will result in an <code>OUT_OF_MEMORY</code> kill mid-run. The right calibration comes from empirical measurement: run the first instance of any new step with a modest over-estimate, then check <code>seff</code> afterward and right-size subsequent submissions (§9.8).</p>
 </section>
 <section id="interactive-vs-batch-two-ways-to-use-a-compute-node" class="level2">
 <h2 class="anchored" data-anchor-id="interactive-vs-batch-two-ways-to-use-a-compute-node">9.6 Interactive vs batch: two ways to use a compute node</h2>
@@ -4496,10 +4590,178 @@ Important
 </ul>
 </div>
 <p>A related pair of flags controls behavior near maintenance windows: <code>--time-min=&lt;HH:MM:SS&gt;</code> tells SLURM the minimum time your job actually needs, allowing it to start the job in a shorter gap even if it cannot guarantee the full <code>--time</code>. This is the recommended fix for jobs sitting in the queue with reason <code>ReqNodeNotAvail, Reserved for maintenance</code>.</p>
+<p>One additional point on environment setup: every batch script should include <code>set -euo pipefail</code> as the first non-comment command. This trio of shell options makes the script exit immediately if any command fails (<code>-e</code>), treats unset variables as errors (<code>-u</code>), and propagates errors through pipes (<code>-o pipefail</code>). Without it, a script can silently continue past a failed step — writing a corrupt output, loading the wrong module, or producing nothing at all — with no indication anything went wrong until a confusing downstream error surfaces. For example: if <code>module load R/4.3.2</code> silently fails because the module name changed, and <code>set -euo pipefail</code> is absent, the script proceeds to run <code>Rscript ...</code> with no R loaded, producing a mysterious “command not found” or, worse, using a system R that has none of your packages. With <code>set -euo pipefail</code>, the failed <code>module load</code> terminates the script immediately and the <code>.err</code> log shows exactly where it stopped.</p>
+<p><a href="#tbl-ch09-sbatch-directives" class="quarto-xref">Table 2</a> summarizes the most-used <code>#SBATCH</code> directives in a quick-reference form.</p>
+<div id="tbl-ch09-sbatch-directives" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch09-sbatch-directives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: <code>#SBATCH</code> directive quick reference. All directives must appear at the top of the script, before any commands. The <code>logs/</code> directory must exist before submission — SLURM does not create it.
+</figcaption>
+<div aria-describedby="tbl-ch09-sbatch-directives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Directive</th>
+<th>Purpose</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>--account=</code></td>
+<td>PIRG to charge (required)</td>
+<td><code>--account=cresko</code></td>
+</tr>
+<tr class="even">
+<td><code>--partition=</code></td>
+<td>Queue / hardware class</td>
+<td><code>--partition=compute</code></td>
+</tr>
+<tr class="odd">
+<td><code>--job-name=</code></td>
+<td>Human-readable label in <code>squeue</code></td>
+<td><code>--job-name=seurat_qc</code></td>
+</tr>
+<tr class="even">
+<td><code>--output=</code></td>
+<td>Stdout log path (<code>%j</code> → job ID)</td>
+<td><code>--output=logs/qc_%j.out</code></td>
+</tr>
+<tr class="odd">
+<td><code>--error=</code></td>
+<td>Stderr log path</td>
+<td><code>--error=logs/qc_%j.err</code></td>
+</tr>
+<tr class="even">
+<td><code>--time=</code></td>
+<td>Wall-clock limit (<code>HH:MM:SS</code>); exceed → <code>TIMEOUT</code> kill</td>
+<td><code>--time=04:00:00</code></td>
+</tr>
+<tr class="odd">
+<td><code>--mem=</code></td>
+<td>Total memory for the job</td>
+<td><code>--mem=64G</code></td>
+</tr>
+<tr class="even">
+<td><code>--mem-per-cpu=</code></td>
+<td>Memory per core (alternative to <code>--mem</code>)</td>
+<td><code>--mem-per-cpu=8G</code></td>
+</tr>
+<tr class="odd">
+<td><code>--cpus-per-task=</code></td>
+<td>Cores for a multi-threaded step</td>
+<td><code>--cpus-per-task=8</code></td>
+</tr>
+<tr class="even">
+<td><code>--gpus=</code></td>
+<td>Number of GPUs</td>
+<td><code>--gpus=1</code></td>
+</tr>
+<tr class="odd">
+<td><code>--constraint=</code></td>
+<td>GPU memory tier</td>
+<td><code>--constraint=gpu-40gb</code></td>
+</tr>
+<tr class="even">
+<td><code>--mail-type=</code></td>
+<td>Notification events</td>
+<td><code>--mail-type=END,FAIL</code></td>
+</tr>
+<tr class="odd">
+<td><code>--mail-user=</code></td>
+<td>Email for notifications</td>
+<td><code>--mail-user=you@uoregon.edu</code></td>
+</tr>
+<tr class="even">
+<td><code>--array=</code></td>
+<td>Submit N independent sub-jobs; index is <code>$SLURM_ARRAY_TASK_ID</code></td>
+<td><code>--array=1-8</code></td>
+</tr>
+<tr class="odd">
+<td><code>--time-min=</code></td>
+<td>Minimum acceptable wall-clock for backfill scheduling</td>
+<td><code>--time-min=01:00:00</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Reading <a href="#tbl-ch09-sbatch-directives" class="quarto-xref">Table 2</a> as a decision checklist: every job must have <code>--account</code>, <code>--partition</code>, and <code>--time</code>; the first two are required, and the third has a partition-dependent default that is often too long for small jobs and too short for large ones. The <code>--output</code> and <code>--error</code> directives keep stdout and stderr in separate log files, which is essential for debugging — R’s error messages go to stderr (the <code>.err</code> file), while any progress-printing the script does goes to stdout (the <code>.out</code> file). Using <code>%j</code> in the filename embeds the job ID, so logs from repeated runs of the same script do not overwrite each other. The <code>--array</code> directive (last row) is the secret weapon for multi-sample work and is described in depth in the key-parameter callout below.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--mem`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--mem</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default on Talapas: ~3.7 GB per core</strong> (derived from the node’s total memory divided by its cores). If you need more than one core’s worth of RAM and do not specify <code>--mem</code> or <code>--mem-per-cpu</code>, your job receives only this default and will be killed with <code>OUT_OF_MEMORY</code> the moment it needs more. For most scRNA-seq steps, specify <code>--mem</code> explicitly — for example <code>--mem=64G</code> for integration or <code>--mem=96G</code> for pseudobulk DE. Setting it too high delays queue placement; setting it too low kills the job mid-run. After each first run, read <code>seff &lt;jobid&gt;</code> and note <code>MaxRSS</code>; trim your next request to that value plus a 15–20% safety margin.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--cpus-per-task`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--cpus-per-task</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: 1.</strong> This is the number of CPU cores allocated to your job on a single node. For multi-threaded tools (Seurat’s <code>FindAllMarkers</code>, STAR inside Cell Ranger, Harmony) you raise this — for example <code>--cpus-per-task=8</code>. The important distinction is between <code>--cpus-per-task</code> (threads within one process) and <code>--ntasks</code> (separate MPI processes). Most bioinformatics tools are multi-threaded, not MPI programs, so you almost always want <code>--cpus-per-task</code>, not <code>--ntasks</code>. Check what <code>seff</code> reports as <code>CPU Efficiency</code> after a run: if you asked for 8 cores but efficiency is 12%, the tool is not parallelizing and you should drop back to 1–2 cores.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--time`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--time</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: 24 hours on <code>compute</code>, 14 days on <code>computelong</code>.</strong> When your job exceeds this wall-clock limit, SLURM kills it with <code>TIMEOUT</code>. The job is terminated at exactly that boundary — there is no grace period. For a new pipeline, run once with a generous time limit and note <code>Elapsed</code> from <code>seff</code>; set subsequent submissions to <code>Elapsed × 1.2</code>. Use the <code>--array</code> directive (§9.6) rather than requesting unrealistically long time for jobs that process many samples — arrays let each sub-job have its own fair time limit and restart independently if one fails.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--partition`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--partition</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: none — required.</strong> You must specify a partition for every job; SLURM will not accept a submission without one. For standard scRNA-seq steps that finish within a day, <code>--partition=compute</code> is the correct choice. Reach for <code>--partition=computelong</code> only when a step genuinely requires more than 24 hours (rare for the <code>ifnb</code> workflow). Use <code>--partition=memory</code> or <code>--partition=memorylong</code> only when a step truly exceeds a standard node’s RAM — not as a precaution, because those nodes are scarce. The <code>--partition=interactive</code> is for short (≤12 hour) exploratory sessions that need to start quickly, not for production analysis.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--array`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--array</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Syntax: <code>--array=1-N</code> (or <code>1-N%M</code> to limit M simultaneously running sub-jobs).</strong> A job array submits N independent sub-jobs from a single script, with each receiving a unique <code>$SLURM_ARRAY_TASK_ID</code> (1 through N). Inside the script you use that ID to select the sample to process — for example <code>SAMPLE=$(sed -n &quot;${SLURM_ARRAY_TASK_ID}p&quot; samples.txt)</code>. This is the standard pattern for running Cell Ranger or any per-sample step on many samples without writing N separate scripts. The <code>%M</code> throttle is important when N is large: <code>--array=1-50%4</code> allows at most 4 sub-jobs to run simultaneously, so you don’t monopolize the queue for everyone else.</p>
+</div>
+</div>
 </section>
 <section id="submitting-monitoring-and-reading-the-result" class="level2">
 <h2 class="anchored" data-anchor-id="submitting-monitoring-and-reading-the-result">9.7 Submitting, monitoring, and reading the result</h2>
-<p>The lifecycle of a batch job is short to describe. You submit it, SLURM queues it, it runs, and it finishes — and a small set of commands lets you follow it the whole way.</p>
+<p>The lifecycle of a batch job is short to describe. You submit it, SLURM queues it, it runs, and it finishes — and a small set of commands lets you follow it the whole way. Understanding the difference between these commands matters: <code>squeue</code> shows the <em>current</em> state of a job while it is in the system; once a job finishes and leaves the queue, you must use <code>seff</code> or <code>sacct</code> to retrieve information about it. Many beginners check <code>squeue</code>, see nothing, and conclude the job never ran — when in fact it completed successfully and left the queue before they checked. Always pair <code>squeue</code> (for live monitoring) with <code>seff</code> (for post-mortem accounting).</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">sbatch</span> hostname.sbatch        <span class="co"># -&gt; Submitted batch job 123456</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span>               <span class="co"># all of your jobs</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">squeue</span> <span class="at">-j</span> 123456              <span class="co"># one specific job</span></span>
@@ -4509,41 +4771,172 @@ Important
 <p>After a job completes, you can ask SLURM what it <em>actually</em> used — which is the foundation of right-sizing future runs:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">seff</span> 123456</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">sacct</span> <span class="at">-j</span> 123456 <span class="at">--format</span><span class="op">=</span>JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p><code>seff</code> prints a friendly summary: CPU efficiency, peak memory, and wall time, plus the final state. <code>sacct</code> gives the same facts in tabular detail. The two numbers to watch are <code>MaxRSS</code> (the peak memory the job actually touched) and <code>Elapsed</code> (how long it actually ran). If you requested 64 GB and <code>MaxRSS</code> says you used 12 GB, your next submission can safely ask for far less — and will start sooner for it.</p>
+<p><code>seff</code> prints a friendly summary: CPU efficiency, peak memory, and wall time, plus the final state. <code>sacct</code> gives the same facts in tabular detail. <a href="#tbl-ch09-monitoring" class="quarto-xref">Table 3</a> describes the key fields from both commands. The two numbers to watch are <code>MaxRSS</code> (the peak memory the job actually touched) and <code>Elapsed</code> (how long it actually ran). If you requested 64 GB and <code>MaxRSS</code> says you used 12 GB, your next submission can safely ask for far less — and will start sooner for it.</p>
+<div id="tbl-ch09-monitoring" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch09-monitoring-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Key fields from <code>seff</code>, <code>sacct</code>, and <code>squeue</code> and what each tells you about a job. Run <code>seff &lt;jobid&gt;</code> after every job as a habit; the Memory and CPU efficiency numbers are the foundation of right-sizing future submissions.
+</figcaption>
+<div aria-describedby="tbl-ch09-monitoring-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Field / output line</th>
+<th>Source</th>
+<th>What it means</th>
+<th>How to use it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>State</code></td>
+<td><code>seff</code>, <code>sacct</code></td>
+<td>Final job status: <code>COMPLETED</code>, <code>FAILED</code>, <code>OUT_OF_MEMORY</code>, <code>TIMEOUT</code>, <code>CANCELLED</code></td>
+<td>Anything other than <code>COMPLETED</code> means the job did not finish cleanly</td>
+</tr>
+<tr class="even">
+<td><code>CPU Efficiency</code></td>
+<td><code>seff</code></td>
+<td>Fraction of allocated CPU time that was actually used</td>
+<td>Low efficiency on a single-threaded job is normal; low efficiency on a requested-8-core job means the code is not parallelizing</td>
+</tr>
+<tr class="odd">
+<td><code>Memory Efficiency</code></td>
+<td><code>seff</code></td>
+<td>Peak memory used / memory requested</td>
+<td>If consistently &lt; 50%, shrink <code>--mem</code> on the next run to improve queue priority</td>
+</tr>
+<tr class="even">
+<td><code>Job Wall-clock time</code></td>
+<td><code>seff</code></td>
+<td>Actual elapsed time</td>
+<td>Use with a 10–20% safety margin to set <code>--time</code> on repeated runs</td>
+</tr>
+<tr class="odd">
+<td><code>MaxRSS</code></td>
+<td><code>sacct</code></td>
+<td>Peak resident set size (memory high-water mark)</td>
+<td>The definitive right-sizing number; convert MB to GB with ÷ 1024</td>
+</tr>
+<tr class="even">
+<td><code>Elapsed</code></td>
+<td><code>sacct</code></td>
+<td>Actual wall-clock time in <code>HH:MM:SS</code></td>
+<td>Same as <code>seff</code> wall-clock; more scriptable from <code>sacct</code> output</td>
+</tr>
+<tr class="odd">
+<td><code>ExitCode</code></td>
+<td><code>sacct</code></td>
+<td>Process exit code (format <code>code:signal</code>)</td>
+<td><code>0:0</code> = clean exit; any non-zero code indicates an error in the job itself</td>
+</tr>
+<tr class="even">
+<td><code>PD</code></td>
+<td><code>squeue</code> State</td>
+<td>Pending — queued but not yet running</td>
+<td>Normal; check the Reason column for why</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td><code>squeue</code> State</td>
+<td>Running</td>
+<td>Job is actively executing</td>
+</tr>
+<tr class="even">
+<td><code>CG</code></td>
+<td><code>squeue</code> State</td>
+<td>Completing — job finished, SLURM cleaning up</td>
+<td>Transient; will disappear shortly</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Reading <a href="#tbl-ch09-monitoring" class="quarto-xref">Table 3</a>: the most immediately useful line from <code>seff</code> is <code>Memory Efficiency</code>. If it reads “19% of 64 GB,” your next submission should ask for roughly 64 × 0.19 × 1.2 ≈ 15 GB — a substantial reduction that will move you up the queue. <code>CPU Efficiency</code> deserves a different interpretation depending on the job: low efficiency on a single-threaded step is expected, because <code>seff</code> computes efficiency relative to the <em>allocated</em> cores; low efficiency on a step you requested 8 cores for is a signal that the tool is not actually multithreading and you should reduce <code>--cpus-per-task</code>. The <code>ExitCode</code> field is the clearest binary: <code>0:0</code> is clean; anything else is a failure. A job with <code>State: COMPLETED</code> and <code>ExitCode: 1:0</code> means the job ran to the time limit but the R script inside it errored — you must look at the <code>.err</code> log to find the actual failure message.</p>
 </section>
 <section id="right-sizing-the-central-skill" class="level2">
 <h2 class="anchored" data-anchor-id="right-sizing-the-central-skill">9.8 Right-sizing: the central skill</h2>
 <p>Resource requests pull in two opposite directions, and learning to balance them is the single most valuable HPC skill.</p>
 <p>On one side, <strong>smaller requests run sooner</strong>. SLURM’s backfill scheduler slots small jobs into gaps that a large job could never fit, so over-asking for memory or time directly delays your own work. On the other side, <strong>you must request enough</strong>. If a job exceeds its <code>--mem</code>, SLURM kills it with <code>OUT_OF_MEMORY</code>; if it exceeds its <code>--time</code>, SLURM kills it with <code>TIMEOUT</code>. In both cases the job dies, often after hours of progress, and you start over.</p>
 <p>The practical resolution is empirical. The first time you run a new pipeline step, err <em>slightly</em> on the high side so it does not die. Then read <code>seff</code> to see what it really needed, and trim subsequent submissions toward that number with a modest safety margin. A couple of defaults are worth memorizing: the default memory per core is roughly <strong>3.7 GB</strong>, so if your step needs more you must say so explicitly; and the <code>compute</code> partition’s default wall time is 24 hours, while <code>computelong</code> defaults to two weeks. In the scRNA-seq pipeline, most steps are comfortable on a standard node, but pseudobulk DE and differential abundance are memory-hungry and benefit from an explicit <code>--mem=96G</code>.</p>
+<p>The right-sizing workflow in practice is a two-submission loop. <strong>First submission:</strong> set generous but not absurd limits — for an unknown Seurat step, <code>--mem=64G --time=04:00:00 --cpus-per-task=4</code> is a reasonable starting point. Run <code>seff &lt;jobid&gt;</code> immediately after completion. <strong>Second and later submissions:</strong> set <code>--mem</code> to <code>MaxRSS × 1.2</code> (20% safety margin), <code>--time</code> to <code>Elapsed × 1.2</code>, and <code>--cpus-per-task</code> to whatever the tool actually uses (check <code>CPU Efficiency</code> from <code>seff</code>). A step that requested 64 GB but used only 12 GB has a <code>MaxRSS</code>-based new request of roughly 15 GB — a fourfold reduction that significantly improves its queue priority. Over the course of running the full <code>01</code>–<code>08</code> pipeline twice, you will have accurate resource profiles for all eight steps, and subsequent runs start promptly because each step requests only what it genuinely needs.</p>
 </section>
 <section id="why-is-my-job-stuck-in-pd" class="level2">
 <h2 class="anchored" data-anchor-id="why-is-my-job-stuck-in-pd">9.9 Why is my job stuck in <code>PD</code>?</h2>
-<p>A job sitting in the pending state is normal far more often than it is broken. The reason SLURM gives (visible in <code>squeue</code>’s reason column or via <code>scontrol show job &lt;id&gt;</code>) tells you which it is:</p>
-<div class="incremental">
-<ul class="incremental">
-<li><p><strong><code>Priority</code> or <code>Resources</code></strong> — ordinary queueing. Either there are jobs ahead of you in the fair-share ordering, or the specific resources you asked for are not free yet. There is nothing to fix; you are simply waiting your turn.</p></li>
-<li><p><strong><code>QOSMaxJobsPerUserLimit</code></strong> — you have hit a per-user cap on simultaneous jobs. Let some of your earlier jobs finish and the next will start.</p></li>
-<li><p><strong><code>ReqNodeNotAvail, Reserved for maintenance</code></strong> — your requested <code>--time</code> would run past an upcoming quarterly maintenance window, so SLURM cannot guarantee the node will be free for the whole duration. Shorten <code>--time</code>, or add a <code>--time-min</code> so SLURM can start the job sooner with a reduced limit:</p>
+<p>A job sitting in the pending state is normal far more often than it is broken. The reason SLURM gives (visible in <code>squeue</code>’s reason column or via <code>scontrol show job &lt;id&gt;</code>) tells you which it is; the most common reasons are collected in <a href="#tbl-ch09-pending-reasons" class="quarto-xref">Table 4</a>.</p>
+<p><strong><code>Priority</code> or <code>Resources</code></strong> indicates ordinary queueing: either there are jobs ahead of you in the fair-share ordering, or the specific resources you asked for are not free yet. There is nothing to fix — you are simply waiting your turn. <strong><code>QOSMaxJobsPerUserLimit</code></strong> means you have hit a per-user cap on simultaneous jobs; let some earlier jobs finish and the next will start automatically. The most disruptive reason is <strong><code>ReqNodeNotAvail, Reserved for maintenance</code></strong>: your requested <code>--time</code> would run past an upcoming quarterly maintenance window, so SLURM cannot guarantee the node will be free for the whole duration. The fix is to shorten <code>--time</code>, or to add a <code>--time-min</code> so SLURM can start the job sooner in a shorter gap:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time=0-08:00:00</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time-min=0-01:00:00</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-</ul>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co">#SBATCH --time-min=0-01:00:00</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div id="tbl-ch09-pending-reasons" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch09-pending-reasons-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 4: Common <code>squeue</code> pending reasons, their meaning, and the recommended action. The Reason column appears in <code>squeue -u $USER</code>; for more detail run <code>scontrol show job &lt;id&gt;</code>.
+</figcaption>
+<div aria-describedby="tbl-ch09-pending-reasons-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pending reason</th>
+<th>What it means</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Priority</code></td>
+<td>Jobs with higher fair-share priority are ahead of you</td>
+<td>Wait; nothing to fix</td>
+</tr>
+<tr class="even">
+<td><code>Resources</code></td>
+<td>The resources you requested are not currently free</td>
+<td>Wait; consider reducing <code>--mem</code> or <code>--cpus-per-task</code></td>
+</tr>
+<tr class="odd">
+<td><code>QOSMaxJobsPerUserLimit</code></td>
+<td>You have hit the per-user simultaneous-job cap</td>
+<td>Wait for earlier jobs to finish</td>
+</tr>
+<tr class="even">
+<td><code>ReqNodeNotAvail, Reserved for maintenance</code></td>
+<td>Your <code>--time</code> extends past a maintenance window</td>
+<td>Add <code>--time-min</code> or shorten <code>--time</code></td>
+</tr>
+<tr class="odd">
+<td><code>AssocGrpCPUMinutesLimit</code></td>
+<td>Your PIRG account has exhausted its CPU-minute allocation</td>
+<td>Contact RACS</td>
+</tr>
+<tr class="even">
+<td><code>Dependency</code></td>
+<td>The job was submitted with <code>--dependency=</code> and the upstream job has not yet completed</td>
+<td>Normal in dependency chains; nothing to fix</td>
+</tr>
+</tbody>
+</table>
 </div>
+</figure>
+</div>
+<p>Reading <a href="#tbl-ch09-pending-reasons" class="quarto-xref">Table 4</a>: the most important lesson is that most pending states require no action — they resolve when resources free up. The only reasons that require active intervention are <code>ReqNodeNotAvail, Reserved for maintenance</code> (shorten <code>--time</code> or add <code>--time-min</code>) and <code>AssocGrpCPUMinutesLimit</code> (contact RACS, because your PIRG has exhausted its allocation). Attempting to “fix” a <code>Priority</code>-pending job by cancelling it and resubmitting with shorter resource requests is logical in theory but rarely helps in practice: you move to the back of a queue whose front is also held up by the same resource contention. The most efficient response to <code>Priority</code> or <code>Resources</code> is to wait — and to note from <code>seff</code> on past runs whether your requests are larger than necessary.</p>
 <p>The official Knowledge Base FAQ, <a href="https://uoracs.github.io/talapas2-knowledge-base/docs/faqs/why_is_my_job_not_running/"><em>Why is my SLURM job not running?</em></a>, catalogs the less common reasons.</p>
 </section>
 <section id="being-a-good-cluster-citizen" class="level2">
 <h2 class="anchored" data-anchor-id="being-a-good-cluster-citizen">9.10 Being a good cluster citizen</h2>
-<p>Because Talapas is shared across the whole university, the etiquette of using it is not just politeness — it is what keeps the machine usable for everyone, including you. A short code of conduct:</p>
-<div class="incremental">
-<ul class="incremental">
-<li><strong>Never</strong> run intensive work on login nodes. Always route it through <code>srun</code> or <code>sbatch</code>.</li>
-<li>Do not leave idle interactive sessions open. <code>exit</code> the moment you are done so the node returns to the pool.</li>
-<li>Do not request more CPUs, memory, or GPUs than you will actually use. Over-requesting wastes shared capacity and delays your own jobs.</li>
-<li>Put large output — caches and intermediate files — in <code>/scratch/&lt;PIRG&gt;/</code>, not in <code>/home/</code>. Note that <code>/scratch</code> purges files not accessed in 90 days, so it is for working data, not archives.</li>
-<li><strong>Back up anything you care about.</strong> RACS does not back up Talapas; a disk failure or an accidental delete is final unless you have your own copy.</li>
-<li>If you have a genuine deadline that needs special scheduling, email RACS rather than trying to outmaneuver the queue.</li>
-</ul>
-</div>
+<p>Because Talapas is shared across the whole university, the etiquette of using it is not just politeness — it is what keeps the machine usable for everyone, including you.</p>
+<p>Never run intensive work on login nodes; always route real computation through <code>srun</code> or <code>sbatch</code>. Do not leave idle interactive sessions open — type <code>exit</code> the moment you are done so the reserved node returns to the pool. Do not request more CPUs, memory, or GPUs than you will actually use: over-requesting wastes shared capacity and, counter-intuitively, delays your own jobs by making them harder for the backfill scheduler to place.</p>
+<p>Put large output — caches and intermediate files — in <code>/scratch/&lt;PIRG&gt;/</code>, not in <code>/home/</code>. The scratch filesystem has generous per-PIRG quotas that home directories lack, but note that <code>/scratch</code> purges files not accessed in 90 days, so it is for working data, not long-term archives. Back up anything you care about: RACS does not back up Talapas, and a disk failure or an accidental deletion is final without your own copy. If you have a genuine deadline that needs special scheduling, email RACS rather than trying to outmaneuver the queue.</p>
 </section>
 <section id="b-reading-the-output-what-a-finished-batch-job-leaves-behind" class="level2">
 <h2 class="anchored" data-anchor-id="b-reading-the-output-what-a-finished-batch-job-leaves-behind">9.10b Reading the output: what a finished batch job leaves behind</h2>

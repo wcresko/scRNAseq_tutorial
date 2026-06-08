@@ -4168,6 +4168,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4527,7 +4558,64 @@ Tip
 </section>
 <section id="quality-control-metrics-what-they-measure-and-why" class="level2">
 <h2 class="anchored" data-anchor-id="quality-control-metrics-what-they-measure-and-why">1.3 Quality-control metrics — what they measure and why</h2>
-<p>Three numbers per cell carry most of the QC information, and a fourth (<code>percent.rb</code>) is often worth adding. The original systematic treatment of which features actually separate low-quality cells from good ones found that these library-complexity and mitochondrial metrics dominate<span class="citation" data-cites="ilicic2016classification"><sup><a href="#ref-ilicic2016classification" role="doc-biblioref">9</a></sup></span>.</p>
+<p>Three numbers per cell carry most of the QC information, and a fourth (<code>percent.rb</code>) is often worth adding. The original systematic treatment of which features actually separate low-quality cells from good ones found that these library-complexity and mitochondrial metrics dominate<span class="citation" data-cites="ilicic2016classification"><sup><a href="#ref-ilicic2016classification" role="doc-biblioref">9</a></sup></span>. <a href="#tbl-qc-metrics" class="quarto-xref">Table 1</a> summarizes the four metrics and how to read their tails; the subsections that follow explain each in turn.</p>
+<div id="tbl-qc-metrics" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-qc-metrics-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Per-cell QC metrics, their typical healthy ranges for PBMCs, and how to read each distribution’s tails. Ranges are tissue- and chemistry-dependent — always set thresholds from your own per-sample distributions rather than from this table.
+</figcaption>
+<div aria-describedby="tbl-qc-metrics-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>What it measures</th>
+<th>Healthy range (PBMC)</th>
+<th>A high value means</th>
+<th>A low value means</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>nCount_RNA</code></td>
+<td>Total UMIs per cell (sequencing depth)</td>
+<td>~5,000–15,000</td>
+<td>Very active cell <strong>or</strong> a doublet</td>
+<td>Empty, lysed, or undersequenced droplet</td>
+</tr>
+<tr class="even">
+<td><code>nFeature_RNA</code></td>
+<td>Unique genes detected</td>
+<td>~1,500–4,000</td>
+<td>Doublet (two cells’ transcriptomes)</td>
+<td>Low-complexity or dying cell</td>
+</tr>
+<tr class="odd">
+<td><code>percent.mt</code></td>
+<td>Mitochondrial-UMI fraction</td>
+<td>~2–10%</td>
+<td>Dying/damaged cell (membrane leaked)</td>
+<td>Expected; near-zero is normal for snRNA-seq</td>
+</tr>
+<tr class="even">
+<td><code>percent.rb</code></td>
+<td>Ribosomal-protein fraction</td>
+<td>tissue-dependent</td>
+<td>High translational activity (state, not quality)</td>
+<td>Translationally quiet cell state</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 <section id="ncount_rna-total-umis-per-cell" class="level3">
 <h3 class="anchored" data-anchor-id="ncount_rna-total-umis-per-cell">1.3.1 <code>nCount_RNA</code> — total UMIs per cell</h3>
 <p>This is just the sum of the cell’s column in the counts matrix: how many distinct RNA molecules (UMIs, not reads — see <a href="Appendix_A_SC_Biology_Refresher.html">Appendix A §4</a>) were captured for this barcode. It serves as a rough proxy for “how deeply was this cell sequenced?”</p>
@@ -4628,6 +4716,19 @@ Tip
 <section id="normalization" class="level2">
 <h2 class="anchored" data-anchor-id="normalization">1.8 Normalization</h2>
 <p>After filtering, every cell still has a different <code>nCount_RNA</code> — its sequencing depth. Without correction, a deeper-sequenced cell has higher absolute counts for every gene, regardless of biology. <strong>Normalization</strong> removes this technical variance. This is the step where the count nature of the data — and its mean–variance relationship — matters most; the statistical background is in <a href="Appendix_B_Statistical_Foundations.html">Appendix B §§2–3</a>.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — why depth normalization comes first">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — why depth normalization comes first
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>A cell’s total UMI count reflects how deeply that droplet happened to be sequenced, not how much RNA the cell biologically contained. Until that technical depth is divided out, the “most variable” genes are simply those in the most deeply sequenced cells, and PC1 tracks library size instead of biology. Normalization is the hinge of the whole workflow: every later step — HVG selection, scaling, PCA, clustering, and differential expression — assumes it has already happened, which is also why you must never normalize the same object twice.</p>
+</div>
+</div>
 <section id="log-normalization-the-default" class="level3">
 <h3 class="anchored" data-anchor-id="log-normalization-the-default">1.8.1 Log-normalization (the default)</h3>
 <p>The standard transformation is <strong>log-normalize</strong>:</p>
@@ -4640,7 +4741,52 @@ Tip
 </section>
 <section id="scran-pooling-and-the-broader-benchmark" class="level3">
 <h3 class="anchored" data-anchor-id="scran-pooling-and-the-broader-benchmark">1.8.3 scran pooling and the broader benchmark</h3>
-<p>For very heterogeneous data with many zeros, Bioconductor’s <strong><code>scran</code></strong> computes size factors by <strong>pooling</strong> cells before deconvolving per-cell factors, which is more robust than a simple library-size factor when many genes are undetected<span class="citation" data-cites="lun2016pooling"><sup><a href="#ref-lun2016pooling" role="doc-biblioref">21</a></sup></span>. Which transformation is “best” has been benchmarked directly: a systematic comparison found that the simple log-normalization (sometimes called shifted-log or <code>log1p</code>) is a remarkably strong, hard-to-beat default, with the more elaborate methods offering modest, dataset-dependent gains<span class="citation" data-cites="ahlmanneltze2023comparison"><sup><a href="#ref-ahlmanneltze2023comparison" role="doc-biblioref">22</a></sup></span>. The practical takeaway: <strong>consistency matters more than the choice</strong> — pick one, apply it identically across all samples, and record it. Do not normalize the same object twice.</p>
+<p>For very heterogeneous data with many zeros, Bioconductor’s <strong><code>scran</code></strong> computes size factors by <strong>pooling</strong> cells before deconvolving per-cell factors, which is more robust than a simple library-size factor when many genes are undetected<span class="citation" data-cites="lun2016pooling"><sup><a href="#ref-lun2016pooling" role="doc-biblioref">21</a></sup></span>. Which transformation is “best” has been benchmarked directly: a systematic comparison found that the simple log-normalization (sometimes called shifted-log or <code>log1p</code>) is a remarkably strong, hard-to-beat default, with the more elaborate methods offering modest, dataset-dependent gains<span class="citation" data-cites="ahlmanneltze2023comparison"><sup><a href="#ref-ahlmanneltze2023comparison" role="doc-biblioref">22</a></sup></span>. The three approaches are compared in <a href="#tbl-norm-methods" class="quarto-xref">Table 2</a>. The practical takeaway: <strong>consistency matters more than the choice</strong> — pick one, apply it identically across all samples, and record it. Do not normalize the same object twice.</p>
+<div id="tbl-norm-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-norm-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Normalization approaches in the Seurat/Bioconductor ecosystem. Benchmarks find the simple log-normalization a strong, hard-to-beat default<span class="citation" data-cites="ahlmanneltze2023comparison"><sup><a href="#ref-ahlmanneltze2023comparison" role="doc-biblioref">22</a></sup></span>; the elaborate methods help most for low-count or highly heterogeneous data.
+</figcaption>
+<div aria-describedby="tbl-norm-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Underlying model</th>
+<th>Best suited to</th>
+<th>Replaces the 3-step chain?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Log-normalize (<code>NormalizeData</code>)</td>
+<td><span class="math inline">\(\log(\text{CP10k} + 1)\)</span> scaling</td>
+<td>General-purpose default; well-behaved 10x data</td>
+<td>No — follow with <code>FindVariableFeatures</code> + <code>ScaleData</code></td>
+</tr>
+<tr class="even">
+<td><code>SCTransform</code></td>
+<td>Regularized negative-binomial; Pearson residuals</td>
+<td>Low-depth data and spatial (Visium)</td>
+<td>Yes — single call replaces all three steps</td>
+</tr>
+<tr class="odd">
+<td><code>scran</code> pooling</td>
+<td>Pooled-then-deconvolved size factors</td>
+<td>Very heterogeneous data with many zeros</td>
+<td>No — produces size factors for normalization</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 </section>
 </section>
 <section id="highly-variable-genes-hvgs" class="level2">
@@ -4659,6 +4805,19 @@ Tip
 <li>Above ~5,000: the list becomes diluted with low-information genes; PCA performance plateaus or degrades</li>
 </ul>
 <p>Going lower (e.g. 500 HVGs) is sometimes justified for atlas-scale data where speed matters more than fine resolution; going higher (3,000–5,000) helps for highly heterogeneous tissue with many subtle subtypes.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — nfeatures (number of HVGs)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — nfeatures (number of HVGs)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindVariableFeatures(nfeatures = 2000)</code> sets how many genes enter PCA. <strong>Default: 2000.</strong> Too few (≲1,000) and rare cell types vanish because their distinguishing genes never make the list; too many (≳5,000) and low-information genes dilute the signal so PCA plateaus or degrades. Raise it (3,000–5,000) for highly heterogeneous tissue with many subtle subtypes; lower it (≈500) only for atlas-scale data where speed outweighs fine resolution. Whatever you choose, select HVGs <em>after</em> normalization and — for multi-sample work — in a batch-aware way with <code>SelectIntegrationFeatures()</code> (<a href="Chapter_05_Integration.html">Chapter 5</a>).</p>
+</div>
+</div>
 <p><strong>Design choices worth knowing:</strong></p>
 <ul>
 <li><strong>Exclude technical genes.</strong> Mitochondrial and ribosomal genes are highly variable for <em>technical</em> reasons; including them as HVGs lets technical variation drive your PCs. Many pipelines remove <code>^MT-</code>/<code>^RP[SL]</code> patterns from the variable list before PCA.</li>
@@ -4688,6 +4847,13 @@ Tip
 </section>
 <section id="common-errors-and-what-they-mean" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors-and-what-they-mean">1.12 Common errors and what they mean</h2>
+<p><a href="#tbl-preproc-errors" class="quarto-xref">Table 3</a> collects the errors you are most likely to hit at this stage, what each one means, and the fix.</p>
+<div id="tbl-preproc-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-preproc-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common preprocessing errors, their underlying cause, and the fix.
+</figcaption>
+<div aria-describedby="tbl-preproc-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4734,6 +4900,9 @@ Tip
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 <p>For a longer list of preprocessing pitfalls, see the <strong>Common errors</strong> callout at the top of <a href="../Exercise_Folder/Tutorial_01_QC_Preprocessing.html">Tutorial 01</a>.</p>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">

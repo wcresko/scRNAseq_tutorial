@@ -4203,6 +4203,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4441,14 +4472,17 @@ z-index: 1;
   <li><a href="#the-design-matrix-and-contrasts" id="toc-the-design-matrix-and-contrasts" class="nav-link" data-scroll-target="#the-design-matrix-and-contrasts">6.5 The design matrix and contrasts</a></li>
   <li><a href="#the-wald-test-and-p-values" id="toc-the-wald-test-and-p-values" class="nav-link" data-scroll-target="#the-wald-test-and-p-values">6.6 The Wald test and p-values</a></li>
   <li><a href="#lfc-shrinkage-never-skip" id="toc-lfc-shrinkage-never-skip" class="nav-link" data-scroll-target="#lfc-shrinkage-never-skip">6.7 LFC shrinkage — never skip</a></li>
+  <li><a href="#b-reading-the-ma-plot" id="toc-b-reading-the-ma-plot" class="nav-link" data-scroll-target="#b-reading-the-ma-plot">6.7b Reading the MA plot</a></li>
   <li><a href="#the-full-bulk-deseq2-workflow-in-one-block" id="toc-the-full-bulk-deseq2-workflow-in-one-block" class="nav-link" data-scroll-target="#the-full-bulk-deseq2-workflow-in-one-block">6.8 The full bulk DESeq2 workflow, in one block</a></li>
   <li><a href="#independent-filtering-what-padj-na-means" id="toc-independent-filtering-what-padj-na-means" class="nav-link" data-scroll-target="#independent-filtering-what-padj-na-means">6.9 Independent filtering — what <code>padj = NA</code> means</a></li>
   <li><a href="#common-errors-bulk" id="toc-common-errors-bulk" class="nav-link" data-scroll-target="#common-errors-bulk">6.10 Common errors (bulk)</a></li>
   </ul></li>
   <li><a href="#part-b-pseudobulk-de-on-single-cell-data" id="toc-part-b-pseudobulk-de-on-single-cell-data" class="nav-link" data-scroll-target="#part-b-pseudobulk-de-on-single-cell-data">Part B — Pseudobulk DE on single-cell data</a>
   <ul class="collapse">
+  <li><a href="#b-pseudobulk-de-at-a-glance" id="toc-b-pseudobulk-de-at-a-glance" class="nav-link" data-scroll-target="#b-pseudobulk-de-at-a-glance">6.10b Pseudobulk DE at a glance</a></li>
   <li><a href="#the-cardinal-sin" id="toc-the-cardinal-sin" class="nav-link" data-scroll-target="#the-cardinal-sin">6.11 The cardinal sin</a></li>
   <li><a href="#the-aggregation-step" id="toc-the-aggregation-step" class="nav-link" data-scroll-target="#the-aggregation-step">6.12 The aggregation step</a></li>
+  <li><a href="#b-reading-the-pseudobulk-aggregation-output" id="toc-b-reading-the-pseudobulk-aggregation-output" class="nav-link" data-scroll-target="#b-reading-the-pseudobulk-aggregation-output">6.12b Reading the pseudobulk aggregation output</a></li>
   <li><a href="#filter-low-cell-groups" id="toc-filter-low-cell-groups" class="nav-link" data-scroll-target="#filter-low-cell-groups">6.13 Filter low-cell groups</a></li>
   <li><a href="#the-per-cell-type-deseq2-loop" id="toc-the-per-cell-type-deseq2-loop" class="nav-link" data-scroll-target="#the-per-cell-type-deseq2-loop">6.14 The per-cell-type DESeq2 loop</a></li>
   <li><a href="#why-per-cell-type-not-a-single-joint-test" id="toc-why-per-cell-type-not-a-single-joint-test" class="nav-link" data-scroll-target="#why-per-cell-type-not-a-single-joint-test">6.15 Why per-cell-type, not a single joint test?</a></li>
@@ -4515,6 +4549,75 @@ Note
 <h2 class="anchored" data-anchor-id="why-we-learn-deseq2-on-bulk-first">6.1 Why we learn DESeq2 on bulk first</h2>
 <p>Pseudobulk differential expression for scRNA-seq (Part B of this chapter) is exactly bulk DESeq2 applied to per-cell-type aggregated counts. So we learn the bulk model in isolation here, on the canonical bulk dataset (<code>airway</code> from Bioconductor — 8 samples of dexamethasone-treated airway smooth muscle cells), and then in Part B we apply it almost mechanically to the single-cell aggregation.</p>
 <p>This is the most heavily used statistical model in functional genomics<span class="citation" data-cites="love2014deseq2"><sup><a href="#ref-love2014deseq2" role="doc-biblioref">1</a></sup></span>. Its closest relatives — edgeR<span class="citation" data-cites="robinson2010edger"><sup><a href="#ref-robinson2010edger" role="doc-biblioref">2</a></sup></span> and limma-voom<span class="citation" data-cites="law2014voom ritchie2015limma"><sup><a href="#ref-law2014voom" role="doc-biblioref">3</a>,<a href="#ref-ritchie2015limma" role="doc-biblioref">4</a></sup></span> — share the same negative-binomial-or-linear-model framing and routinely agree; benchmarks of bulk DE methods find that with adequate replication these established tools all perform well, and that <strong>adding biological replicates buys far more than adding sequencing depth</strong><span class="citation" data-cites="rapaport2013comprehensive"><sup><a href="#ref-rapaport2013comprehensive" role="doc-biblioref">5</a></sup></span>. Earning a working understanding of this model is worth several lectures.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what differential expression tests">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what differential expression tests
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Differential expression (DE) asks: for cells of the same type, which genes are expressed at systematically different levels between two conditions? The question is answered at the level of estimated means — is the expected count of gene <span class="math inline">\(i\)</span> higher in the treated group than the control group, by more than chance alone? The answer depends on having enough independent observations (biological replicates) to separate true between-condition signal from within-condition biological noise. Adding more cells or more sequencing depth does not substitute for adding more independent samples, because the limiting noise is biological variability across subjects, not counting noise within a single library.</p>
+</div>
+</div>
+<p><a href="#tbl-ch06-methods" class="quarto-xref">Table 1</a> compares the three standard tools so you can navigate the literature and justify your choice.</p>
+<div id="tbl-ch06-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch06-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Comparison of the three standard bulk DE frameworks. All three perform similarly on well-powered experiments<span class="citation" data-cites="rapaport2013comprehensive"><sup><a href="#ref-rapaport2013comprehensive" role="doc-biblioref">5</a></sup></span>; the choice matters most at low replication (<span class="math inline">\(n &lt; 4\)</span> per group), where DESeq2’s stronger dispersion shrinkage tends to be more conservative and better calibrated.
+</figcaption>
+<div aria-describedby="tbl-ch06-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Statistical model</th>
+<th>Dispersion handling</th>
+<th>LFC shrinkage</th>
+<th>Pseudobulk support</th>
+<th>Workshop use</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>DESeq2</strong><span class="citation" data-cites="love2014deseq2"><sup><a href="#ref-love2014deseq2" role="doc-biblioref">1</a></sup></span></td>
+<td>Negative-binomial GLM</td>
+<td>Per-gene shrinkage toward a parametric trend</td>
+<td><code>apeglm</code> / <code>ashr</code> / <code>normal</code> priors</td>
+<td>Yes — standard approach</td>
+<td>Primary tool (this chapter)</td>
+</tr>
+<tr class="even">
+<td><strong>edgeR</strong><span class="citation" data-cites="robinson2010edger"><sup><a href="#ref-robinson2010edger" role="doc-biblioref">2</a></sup></span></td>
+<td>Negative-binomial GLM (quasi-likelihood variant available)</td>
+<td>Empirical Bayes across genes (common, trended, or tagwise)</td>
+<td>Not built in; use <code>limma::treat</code> for threshold tests</td>
+<td>Yes</td>
+<td>Alternative; see §6.21</td>
+</tr>
+<tr class="odd">
+<td><strong>limma-voom</strong><span class="citation" data-cites="law2014voom ritchie2015limma"><sup><a href="#ref-law2014voom" role="doc-biblioref">3</a>,<a href="#ref-ritchie2015limma" role="doc-biblioref">4</a></sup></span></td>
+<td>Linear model on variance-stabilized counts</td>
+<td>Mean-variance weights via <code>voom</code>; eBayes shrinkage</td>
+<td>Moderated t-statistics; <code>treat</code> for threshold</td>
+<td>Yes</td>
+<td>Alternative for large cohorts</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 </section>
 <section id="the-negative-binomial-glm" class="level2">
 <h2 class="anchored" data-anchor-id="the-negative-binomial-glm">6.2 The negative-binomial GLM</h2>
@@ -4531,13 +4634,26 @@ Note
 <p><span class="math display">\[Y_{ij} \sim \mathrm{NB}(\mu_{ij}, \alpha_i)\]</span></p>
 <p>with per-gene <strong>dispersion</strong> <span class="math inline">\(\alpha_i\)</span> that controls how much variance exceeds the Poisson baseline. The variance is <span class="math inline">\(\mu_{ij}(1 + \alpha_i \mu_{ij})\)</span>.</p>
 <p>The choice of NB rather than Poisson is non-negotiable for RNA-seq counts. Poisson assumes variance = mean; real RNA-seq has variance &gt; mean (over-dispersion), and Poisson testing is <strong>anti-conservative</strong> — it produces falsely-significant p-values. The NB adds a per-gene parameter to absorb the extra variance; results are honest. See <a href="Appendix_B_Statistical_Foundations.html">Appendix B § 1–2</a> for the underlying distributions.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — FDR and the adjusted p-value">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — FDR and the adjusted p-value
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>When you test 20,000 genes simultaneously, the raw per-gene p-value is a misleading quantity: at <span class="math inline">\(\alpha = 0.05\)</span>, roughly 1,000 genes would appear significant by chance alone. The <strong>Benjamini–Hochberg false discovery rate (FDR)</strong> procedure<span class="citation" data-cites="benjamini1995controlling"><sup><a href="#ref-benjamini1995controlling" role="doc-biblioref">6</a></sup></span> ranks the raw p-values from smallest to largest, compares each to a scaled threshold <span class="math inline">\((\text{rank}/\text{number of tests}) \times q\)</span>, and adjusts the p-values so that the <em>expected proportion of false positives among all declared significant genes</em> equals <span class="math inline">\(q\)</span> (typically 5%). The column <code>padj</code> in DESeq2 output is this BH-adjusted p-value; filtering on <code>padj &lt; 0.05</code> means that you accept a 5% false-discovery rate across your entire significant list, not a 5% per-test error rate. Never filter on the raw <code>pvalue</code> column in a multi-gene test, and never report raw p-values in a publication when adjusted values are available.</p>
+</div>
+</div>
 </section>
 <section id="size-factors-depth-normalization" class="level2">
 <h2 class="anchored" data-anchor-id="size-factors-depth-normalization">6.3 Size factors — depth normalization</h2>
 <p>Different samples have different sequencing depth. Without correction, a sample with twice as many total reads has twice the count for every gene, regardless of biology. The DESeq2 size factor <span class="math inline">\(s_j\)</span> corrects this:</p>
 <p><span class="math display">\[s_j = \mathrm{median}_i\left( \frac{y_{ij}}{(\prod_k y_{ik})^{1/n}} \right)\]</span></p>
-<p>This is the <strong>median of ratios</strong> estimator. It computes a per-gene “geometric mean across samples” baseline, then for each sample takes the median of (sample <span class="math inline">\(j\)</span>’s count / baseline) across genes. The result is robust — a few highly-expressed genes can’t dominate.</p>
-<p><code>DESeqDataSetFromMatrix(...)</code> and the subsequent <code>DESeq(dds)</code> call do this automatically; you don’t typically interact with size factors directly. But knowing the formula clarifies why DESeq2 is robust to a few genes shifting wildly between samples.</p>
+<p>This is the <strong>median of ratios</strong> estimator. It computes a per-gene “geometric mean across samples” baseline, then for each sample takes the median of (sample <span class="math inline">\(j\)</span>’s count / baseline) across genes. The result is robust — a few highly-expressed genes can’t dominate — which is why it performs far better than simple library-size normalization when a small number of genes are strongly upregulated in one condition. If you simply divided by total library size, those few up-regulated genes would make everything else appear artificially down-regulated in the treated samples.</p>
+<p><code>DESeqDataSetFromMatrix(...)</code> and the subsequent <code>DESeq(dds)</code> call do this automatically; you don’t typically interact with size factors directly. But knowing the formula clarifies why DESeq2 is robust to a few genes shifting wildly between samples. To inspect the estimated size factors, use <code>sizeFactors(dds)</code> after fitting; values far from 1.0 (e.g. &gt; 3 or &lt; 0.3) are a sign that samples have very different depths or that the library composition is extreme. In well-controlled RNA-seq experiments, size factors typically range from 0.5 to 2.0.</p>
 </section>
 <section id="dispersion-estimation-and-shrinkage" class="level2">
 <h2 class="anchored" data-anchor-id="dispersion-estimation-and-shrinkage">6.4 Dispersion estimation and shrinkage</h2>
@@ -4550,6 +4666,20 @@ Note
 </ol>
 <p>The result: high-confidence genes (high counts, many samples) keep their MLE estimates; low-confidence genes (low counts) are pulled to the trend. The <code>dispersions(dds)</code> slot holds the final shrunk values; <code>plotDispEsts(dds)</code> visualizes the trend.</p>
 <p>This is a <strong>Bayesian-flavored procedure</strong> — the trend is the prior, the per-gene MLE is the likelihood, the shrunk value is the posterior. See <a href="Appendix_B_Statistical_Foundations.html">Appendix B § 7</a> for the connection.</p>
+<p><strong>Reading the dispersion plot.</strong> <code>plotDispEsts(dds)</code> shows three things: the raw per-gene MLE estimates (black dots), the fitted trend (red line), and the final shrunken values (blue dots with circles). A healthy plot has: (a) a smooth trend that decreases monotonically as mean expression rises — high-count genes are less variable in relative terms; (b) black dots scattered around the red line without systematic structure (systematic departures suggest batch effects or outlier samples); (c) blue dots that fall <em>on</em> the trend for low-expressed genes but diverge toward the MLE for high-expressed genes where the data are informative. If the trend is flat or U-shaped, something is wrong with the dataset — usually an outlier sample, a confound in the design, or far too few samples for dispersion estimation to work. That is the time to go back and inspect the VST PCA plot (<code>vst(dds)</code> → <code>plotPCA()</code>), which often reveals the outlier or batch structure causing the problem.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — design formula">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — design formula
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>DESeqDataSetFromMatrix(design = ~ condition)</code> specifies which sample-level covariates enter the model. <strong>Default:</strong> no default — this argument is required. The simplest design <code>~ condition</code> models only the treatment effect. Adding a blocking variable — <code>~ donor + condition</code> for paired donors, or <code>~ batch + condition</code> for multi-batch experiments — accounts for that covariate in the model so the condition coefficient reflects the treatment effect <em>within each level of the covariate</em>, substantially increasing power in paired or blocked designs. The design must match the columns of <code>colData</code> exactly; a mismatch produces an error at <code>DESeq()</code> time. Always call <code>relevel()</code> on all factor columns before <code>DESeq()</code> so the sign of every log-fold-change is intentional.</p>
+</div>
+</div>
 </section>
 <section id="the-design-matrix-and-contrasts" class="level2">
 <h2 class="anchored" data-anchor-id="the-design-matrix-and-contrasts">6.5 The design matrix and contrasts</h2>
@@ -4565,6 +4695,34 @@ Note
 <p>Always run <code>relevel()</code> to set your reference level explicitly:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>dds<span class="sc">$</span>condition <span class="ot">&lt;-</span> <span class="fu">relevel</span>(dds<span class="sc">$</span>condition, <span class="at">ref =</span> <span class="st">&quot;untreated&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>If you skip this, R’s alphabetical default may pick the wrong reference, flipping the sign of every fold-change in your output. Hard to debug after the fact.</p>
+<p>For paired designs, adding <code>donor</code> as a fixed effect means that each subject’s measurements are modeled jointly and the condition effect is estimated <em>within each donor</em>, analogous to a paired t-test. The design formula <code>~ donor + condition</code> does not literally mean “donor causes expression” — it means “account for donor-level mean differences when estimating the condition coefficient.” For real multi-donor single-cell data (such as the <code>ifnb</code> dataset’s eight lupus donors), this is almost always the correct choice over <code>~ condition</code> alone, because inter-donor variability in baseline expression typically dwarfs the stimulus effect and its omission inflates within-group variance. In a balanced study where every donor appears in every condition, the paired design can reduce the number of significant genes to a fraction compared to an unpaired design — not because the biology changed, but because the unpaired analysis was confusing donor-specific expression differences with condition effects.</p>
+<p>For interaction designs — asking whether the condition effect differs across groups — the formula becomes <code>~ group + condition + group:condition</code>. The <code>group:condition</code> term captures the difference-in-differences: does the treatment response depend on which group a sample belongs to? Interactions are powerful but require substantially more replication because the interaction has fewer degrees of freedom than the main effects.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — design formula (blocking variable)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — design formula (blocking variable)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>DESeqDataSetFromMatrix(design = ~ donor + condition)</code> adds a blocking variable to the model. <strong>Default:</strong> required argument with no default. The simplest valid design <code>~ condition</code> tests the condition effect ignoring all other structure. Adding <code>~ donor + condition</code> for paired donors (each donor measured under each condition) or <code>~ batch + condition</code> for multi-batch experiments is the standard upgrade: the blocking variable soaks up the covariate’s variance contribution so the condition coefficient estimates the treatment effect <em>within each level</em> of the covariate. This is directly analogous to a paired t-test. For the <code>ifnb</code> eight-donor dataset, upgrading from <code>~ condition</code> to <code>~ donor + condition</code> substantially increases power and produces far more reproducible gene lists. The blocking variable must be a factor column in <code>colData</code> and must not be collinear with condition (e.g. if every donor appears in only one condition, <code>~ donor + condition</code> is unidentifiable).</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — AggregateExpression / pseudobulk minimum cells per group">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — AggregateExpression / pseudobulk minimum cells per group
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>AggregateExpression(seu, group.by = c(&quot;donor&quot;,&quot;stim&quot;,&quot;celltype&quot;))</code> followed by a manual count filter sets the minimum number of cells required for a pseudobulk column to be included. <strong>De-facto default: 10 cells.</strong> Below that threshold the pseudobulk profile is dominated by stochastic dropout rather than cell-type biology: one or two cells happen to express or not express any given gene by chance, and the resulting count column looks nothing like the true cell-type profile. Increasing the threshold to 20–50 is appropriate when libraries are shallow or the cell type is rare in some donors. There is no way to compensate for a too-small pseudobulk column with better statistics — the signal simply is not there. The consequence of including under-threshold columns is inflated dispersion estimates and reduced power for every other cell type in the same DESeq2 run.</p>
+</div>
+</div>
 </section>
 <section id="the-wald-test-and-p-values" class="level2">
 <h2 class="anchored" data-anchor-id="the-wald-test-and-p-values">6.6 The Wald test and p-values</h2>
@@ -4574,45 +4732,62 @@ Note
 <p>For testing whether <em>any</em> level of a multi-level factor matters, use the <strong>likelihood ratio test (LRT)</strong>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds, <span class="at">test =</span> <span class="st">&quot;LRT&quot;</span>, <span class="at">reduced =</span> <span class="sc">~</span> donor)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>This compares the full model (<code>~ donor + condition</code>) to the reduced model (<code>~ donor</code>); the LRT statistic is <span class="math inline">\(-2 \log(L_{reduced}/L_{full})\)</span> and is <span class="math inline">\(\chi^2\)</span>-distributed. Useful when <code>condition</code> has 3+ levels.</p>
-<p>For both tests, the output table from <code>results(dds)</code> has columns:</p>
+<p>For both tests, the output table from <code>results(dds)</code> has columns described in <a href="#tbl-ch06-results" class="quarto-xref">Table 2</a>.</p>
+<div id="tbl-ch06-results" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch06-results-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Columns in the <code>results(dds)</code> output table, their meaning, and how to interpret each. <code>padj = NA</code> indicates the gene was excluded by independent filtering or had a Cook’s-distance outlier — this is normal behavior, not a bug (§6.9).
+</figcaption>
+<div aria-describedby="tbl-ch06-results-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
-<col style="width: 50%">
-<col style="width: 50%">
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>Column</th>
 <th>Meaning</th>
+<th>How to use it</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><code>baseMean</code></td>
-<td>mean of normalized counts</td>
+<td>Mean of normalized counts across all samples</td>
+<td>Low values (&lt; 5) flag unreliable LFC estimates — apply LFC shrinkage</td>
 </tr>
 <tr class="even">
 <td><code>log2FoldChange</code></td>
-<td>effect size, base-2 log scale</td>
+<td>Effect size on base-2 log scale (unshrunk unless <code>lfcShrink</code> is called)</td>
+<td>Ranking and visualization: always shrink first with <code>lfcShrink</code></td>
 </tr>
 <tr class="odd">
 <td><code>lfcSE</code></td>
-<td>standard error of LFC</td>
+<td>Standard error of the log2 fold-change estimate</td>
+<td>Use to assess confidence; wide SE → noisy estimate</td>
 </tr>
 <tr class="even">
 <td><code>stat</code></td>
-<td>Wald statistic (or LRT statistic)</td>
+<td>Wald z-statistic (or LRT <span class="math inline">\(\chi^2\)</span>)</td>
+<td>Directly from the GLM; positive = up in numerator condition</td>
 </tr>
 <tr class="odd">
 <td><code>pvalue</code></td>
-<td>raw test p-value</td>
+<td>Raw per-gene test p-value</td>
+<td>Never filter on this alone — apply BH correction first</td>
 </tr>
 <tr class="even">
 <td><code>padj</code></td>
-<td>Benjamini–Hochberg-adjusted<span class="citation" data-cites="benjamini1995controlling"><sup><a href="#ref-benjamini1995controlling" role="doc-biblioref">6</a></sup></span> (the FDR you should filter on)</td>
+<td>Benjamini–Hochberg FDR<span class="citation" data-cites="benjamini1995controlling"><sup><a href="#ref-benjamini1995controlling" role="doc-biblioref">6</a></sup></span></td>
+<td>The primary filter: <code>padj &lt; 0.05</code> is the standard threshold</td>
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="lfc-shrinkage-never-skip" class="level2">
 <h2 class="anchored" data-anchor-id="lfc-shrinkage-never-skip">6.7 LFC shrinkage — never skip</h2>
@@ -4630,6 +4805,31 @@ Note
 </ul>
 <p>The unshrunk LFC is fine for hypothesis testing (the p-value cares about the SE-scaled LFC, not the LFC itself), but for <em>ranking</em> and <em>visualization</em>, shrunk values are far more honest.</p>
 <p>The shrinkage is a Bayesian procedure with <code>apeglm</code>’s prior — see <a href="Appendix_B_Statistical_Foundations.html">Appendix B § 7</a> for the connection to the dispersion shrinkage in §6.4. It’s the same idea: borrow strength from all genes to stabilize each gene’s estimate.</p>
+<p>An important nuance: since approximately 2016, DESeq2 computes <code>pvalue</code> and <code>padj</code> from the <strong>unshrunken</strong> MLE log-fold-changes — shrinkage does not enter the Wald test. This keeps the FDR well-calibrated. The shrunken LFCs and their SEs are exclusively for <em>ranking, volcano/MA plots, and effect-size reporting</em> after testing. Older tutorials occasionally show shrinkage before the <code>results()</code> call — this was the workflow in early DESeq2 versions and is now incorrect.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — lfcShrink type">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — lfcShrink type
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>lfcShrink(dds, coef = ..., type = &quot;apeglm&quot;)</code> controls the shrinkage estimator. <strong>Default: <code>type = &quot;normal&quot;</code></strong> (a normal prior applied during <code>DESeq()</code>) — but the current recommendation is to call <code>lfcShrink</code> explicitly after <code>DESeq()</code> with <code>type = &quot;apeglm&quot;</code><span class="citation" data-cites="zhu2019apeglm"><sup><a href="#ref-zhu2019apeglm" role="doc-biblioref">7</a></sup></span>. <code>&quot;apeglm&quot;</code> uses an adaptive Cauchy (heavy-tailed) prior that shrinks toward zero very aggressively for noisy low-count genes but barely touches high-confidence genes. <code>&quot;ashr&quot;</code> (adaptive shrinkage) is an alternative that produces similar results and also gives posterior probabilities; use it if you need compatibility with a contrast vector rather than a coefficient name. Avoid <code>&quot;normal&quot;</code> for standalone shrinkage calls — it was the legacy default and is strictly dominated by the other two for ranking purposes. The <code>coef</code> argument must match exactly one string in <code>resultsNames(dds)</code>.</p>
+</div>
+</div>
+</section>
+<section id="b-reading-the-ma-plot" class="level2">
+<h2 class="anchored" data-anchor-id="b-reading-the-ma-plot">6.7b Reading the MA plot</h2>
+<p>Before moving to the workflow, it is worth knowing how to read the MA plot that <code>plotMA(res_shrunk)</code> produces, because it is the primary post-fit sanity check. The <strong>M</strong> axis (y) is the log-fold-change; the <strong>A</strong> axis (x) is the mean normalized count (<code>baseMean</code>). Every gene is a dot; red dots are statistically significant at the chosen alpha.</p>
+<p>What a healthy MA plot shows:</p>
+<ul>
+<li><strong>A horizontal cloud centered near zero.</strong> Most genes do not change between conditions; the cloud of grey dots should be narrow and symmetric around the x-axis. A cloud that drifts above or below zero for all genes is a sign of failed normalization.</li>
+<li><strong>Narrowing toward the left (low counts).</strong> Without shrinkage, the cloud fans out dramatically at the left — the high variance of low-count estimates. With <code>lfcShrink(type = &quot;apeglm&quot;)</code>, these estimates are pulled toward zero and the cloud is tight even at low baseMean.</li>
+<li><strong>Significant genes (red) scattered left-to-right.</strong> The most strongly up- and down-regulated genes should span the range of baseMean values. If all red dots sit in the far-right (high-count) corner, the signal may be driven by a handful of highly expressed housekeeping genes shifting due to normalization failure.</li>
+<li><strong>No banana-shaped distortion.</strong> If the cloud curves upward at one end of the baseMean axis, there is a systematic bias — often from improper sample pairing or a covariate not accounted for in the design.</li>
+</ul>
 </section>
 <section id="the-full-bulk-deseq2-workflow-in-one-block" class="level2">
 <h2 class="anchored" data-anchor-id="the-full-bulk-deseq2-workflow-in-one-block">6.8 The full bulk DESeq2 workflow, in one block</h2>
@@ -4667,9 +4867,30 @@ Note
 <p>You’ll see some genes have <code>padj = NA</code> even when their <code>pvalue</code> is small. This is <strong>independent filtering</strong>: DESeq2 automatically excludes very-low-count genes from BH adjustment, on the grounds that they have insufficient power to ever be significant and including them dilutes the FDR for the rest.</p>
 <p>The filter is selected adaptively to maximize the number of detected genes at the chosen alpha. It is <em>not</em> a bug; it is making FDR more powerful. If you need to re-include filtered genes for a custom analysis, set <code>independentFiltering = FALSE</code> in <code>results()</code>.</p>
 <p>Cook’s-distance filtering also produces NAs: extreme outlier samples in a small experiment can break the dispersion estimate for one gene, and DESeq2 NAs it. Inspect with <code>assays(dds)[[&quot;cooks&quot;]]</code>.</p>
+<p><strong>Why <code>padj = NA</code> is actually helping you.</strong> When you test 15,000 genes, even just 2,000 of them having essentially zero power to be detected dilutes the BH budget for the 13,000 that do. Independent filtering removes those zero-power genes from the denominator of the BH correction, so the remaining genes get a less stringent adjusted threshold. The practical effect: you detect more true-positive genes at the same FDR level than you would if you included the un-testable ones. The genes excluded by independent filtering are low-count genes with <code>baseMean</code> below an adaptively chosen cutoff — not biologically important genes. You can see the cutoff with <code>attr(res, &quot;filterThreshold&quot;)</code> and see what was removed with <code>metadata(res)$filterThreshold</code>. The summary message from <code>summary(res)</code> tells you how many genes fall into each category.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — independent filtering (`independentFiltering`)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — independent filtering (<code>independentFiltering</code>)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>results(dds, independentFiltering = TRUE)</code> is the default. It adaptively removes very-low-count genes from multiple testing correction to maximize discoveries at the chosen alpha. <strong>Default: <code>TRUE</code>.</strong> Setting <code>independentFiltering = FALSE</code> includes all genes in the BH denominator, which reduces power slightly but is sometimes needed when you must have a <code>padj</code> value for every tested gene (e.g. for downstream tools that require a complete result table). The filter threshold is chosen automatically and stored in <code>attr(res, &quot;filterThreshold&quot;)</code>; inspect it to see how many genes were excluded and at what mean-expression level.</p>
+</div>
+</div>
 </section>
 <section id="common-errors-bulk" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors-bulk">6.10 Common errors (bulk)</h2>
+<p><a href="#tbl-ch06-errors-bulk" class="quarto-xref">Table 3</a> collects the errors most frequently encountered when running the bulk DESeq2 workflow.</p>
+<div id="tbl-ch06-errors-bulk" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch06-errors-bulk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common errors in the bulk DESeq2 workflow, their causes, and fixes. The pseudobulk-specific error table is <a href="#tbl-ch06-errors-pb" class="quarto-xref">Table 6</a>.
+</figcaption>
+<div aria-describedby="tbl-ch06-errors-bulk-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4711,10 +4932,93 @@ Note
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 </section>
 <section id="part-b-pseudobulk-de-on-single-cell-data" class="level1">
 <h1>Part B — Pseudobulk DE on single-cell data</h1>
+<section id="b-pseudobulk-de-at-a-glance" class="level2">
+<h2 class="anchored" data-anchor-id="b-pseudobulk-de-at-a-glance">6.10b Pseudobulk DE at a glance</h2>
+<p>Before diving into the implementation details, <a href="#tbl-ch06-pb-steps" class="quarto-xref">Table 4</a> summarizes the complete pseudobulk workflow in order. Each step is explained in the sections that follow.</p>
+<div id="tbl-ch06-pb-steps" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch06-pb-steps-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 4: Six-step pseudobulk DE workflow. Steps 1–2 convert single-cell counts to sample-level aggregates; steps 3–5 are standard bulk DESeq2 applied per cell type; step 6 consolidates results for functional analysis (Chapter 7).
+</figcaption>
+<div aria-describedby="tbl-ch06-pb-steps-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>Action</th>
+<th>Key function</th>
+<th>Pitfall to watch</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1. Aggregate</td>
+<td>Sum UMI counts per (donor × condition × cell type)</td>
+<td><code>AggregateExpression()</code></td>
+<td>Run after <code>JoinLayers()</code>; build <code>colData</code> from metadata, not parsed column names</td>
+</tr>
+<tr class="even">
+<td>2. Filter</td>
+<td>Drop pseudobulk columns with fewer than 10 cells</td>
+<td>Manual count filter</td>
+<td>A cell type absent from any donor is not a bug — handle NA levels downstream</td>
+</tr>
+<tr class="odd">
+<td>3. Build DDS</td>
+<td>One <code>DESeqDataSetFromMatrix</code> per cell type</td>
+<td><code>DESeqDataSetFromMatrix()</code></td>
+<td>Include donor as blocking variable: <code>design = ~ donor + condition</code></td>
+</tr>
+<tr class="even">
+<td>4. Fit</td>
+<td>Run the NB GLM, shrink dispersions, compute Wald test</td>
+<td><code>DESeq()</code></td>
+<td>Check <code>plotDispEsts(dds)</code> per cell type</td>
+</tr>
+<tr class="odd">
+<td>5. Extract</td>
+<td>Pull results for the condition contrast; shrink LFC</td>
+<td><code>results()</code> → <code>lfcShrink()</code></td>
+<td>Use <code>resultsNames(dds)</code> to get the exact coefficient name for <code>apeglm</code></td>
+</tr>
+<tr class="even">
+<td>6. Combine</td>
+<td>Bind all cell-type results into one table</td>
+<td><code>map_dfr(cell_types, run_de)</code></td>
+<td>Drop <code>padj = NA</code> rows before downstream filtering</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — pseudobulk aggregation and why it fixes pseudoreplication">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — pseudobulk aggregation and why it fixes pseudoreplication
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>In a multi-donor single-cell experiment, thousands of cells come from each donor, but the donor — not the cell — is the true unit of biological replication. When cells from the same donor are treated as independent observations in a statistical test, the effective sample size becomes artificially inflated by 100–10,000-fold, variances collapse to near zero, and the resulting p-values are anti-conservative: you detect thousands of “significant” genes that are really donor-specific idiosyncrasies, not condition effects<span class="citation" data-cites="squair2021confronting"><sup><a href="#ref-squair2021confronting" role="doc-biblioref">8</a></sup></span>. <strong>Pseudobulk aggregation</strong> fixes this by summing (or averaging) raw UMI counts across all cells of a given type within each donor to produce one observation per (donor × condition × cell type). The resulting matrix has columns equal in number to the number of donor–condition pairs (typically tens, not thousands) and is analyzed with a standard bulk DE method that treats each column as one biological replicate. The unit of test is now the donor, not the cell, and inferences are statistically honest.</p>
+</div>
+</div>
+</section>
 <section id="the-cardinal-sin" class="level2">
 <h2 class="anchored" data-anchor-id="the-cardinal-sin">6.11 The cardinal sin</h2>
 <p>The single most-violated rule in scRNA-seq:</p>
@@ -4734,6 +5038,8 @@ Important
 <p>Per-cell differential expression (<code>Seurat::FindMarkers</code> between conditions) treats every cell as an independent observation. With 5,000 cells per condition, the effective N becomes huge, and the variance estimates collapse to almost zero. The result is <strong>anti-conservative</strong> p-values — thousands of “significant” genes that wouldn’t replicate in a new cohort.</p>
 <p>This is documented empirically: Squair et al. showed that per-cell DE methods report many more “significant” genes than honest pseudobulk methods on the same data, with no corresponding increase in real signal — most of the extra hits are artifacts of treating cells as replicates<span class="citation" data-cites="squair2021confronting"><sup><a href="#ref-squair2021confronting" role="doc-biblioref">8</a></sup></span>. The statistical root cause — <strong>pseudoreplication</strong> — and the donor-level aggregation that fixes it have been laid out independently as well<span class="citation" data-cites="zimmerman2021practical"><sup><a href="#ref-zimmerman2021practical" role="doc-biblioref">9</a></sup></span>, and the original single-cell DE benchmark already flagged that bulk-style methods on aggregated data behave better than naive per-cell tests<span class="citation" data-cites="soneson2018bias"><sup><a href="#ref-soneson2018bias" role="doc-biblioref">10</a></sup></span>.</p>
 <p><strong>Pseudobulk DE</strong> fixes this. The fix is conceptually simple: aggregate per-cell counts to one observation per <em>(donor, condition, cell type)</em>, then run a standard bulk DESeq2 model (Part A) on the aggregated matrix. The unit of test is now the donor, not the cell, and inferences are honest.</p>
+<p><strong>When is <code>FindMarkers</code> appropriate?</strong> <code>Seurat::FindMarkers</code> is not wrong <em>in general</em> — it is the right tool for identifying genes that distinguish clusters within a single sample or condition, where the question is “what genes mark this cell type?” rather than “what genes change between conditions?” It is also useful as a rapid exploratory tool when you have a single sample per condition and no pseudobulk is possible. The mistake is specifically using per-cell tests for <strong>condition-level contrasts in multi-donor experiments</strong>, where the cell-as-replicate fallacy inflates significance. Within a single subject, cells are not independent but the inflation is bounded; across subjects claiming cells as independent is the dangerous case.</p>
+<p><strong>Mixed-effects alternatives.</strong> A second family of cell-level methods addresses pseudoreplication by modeling each cell while explicitly accounting for donor-level non-independence through a <strong>random effect</strong>. Methods in this family — <code>nebula</code>, <code>glmmTMB</code>, and MAST with a random effect on sample — add a per-donor random intercept to a cell-level count model, so the effective unit of replication is correctly the donor even though the model fits at the cell level. The literature is genuinely divided: some benchmarks favor pseudobulk for simplicity and robustness<span class="citation" data-cites="squair2021confronting"><sup><a href="#ref-squair2021confronting" role="doc-biblioref">8</a></sup></span>, while others find well-specified mixed models competitive<span class="citation" data-cites="zimmerman2021practical"><sup><a href="#ref-zimmerman2021practical" role="doc-biblioref">9</a></sup></span>. The practical stance for this workshop: <strong>default to pseudobulk</strong>, which is simple, hard to fool, and interpretable. Reach for a mixed-effects cell-level model when you have many cells per donor and need the extra power the cell-level information can provide, and only after verifying the random-effect specification matches your data’s structure.</p>
 </section>
 <section id="the-aggregation-step" class="level2">
 <h2 class="anchored" data-anchor-id="the-aggregation-step">6.12 The aggregation step</h2>
@@ -4757,6 +5063,11 @@ Important
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">celltype =</span> <span class="fu">sub</span>(<span class="st">&quot;.*_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>(Or build it from the original <code>seu@meta.data</code> with <code>distinct()</code> — more robust than parsing column names if your sample/cell-type names contain underscores.)</p>
+</section>
+<section id="b-reading-the-pseudobulk-aggregation-output" class="level2">
+<h2 class="anchored" data-anchor-id="b-reading-the-pseudobulk-aggregation-output">6.12b Reading the pseudobulk aggregation output</h2>
+<p>The <code>AggregateExpression</code> call returns a matrix where columns correspond to <em>(donor × condition × cell type)</em> combinations. Before running any statistics, inspect the resulting dimensions and the <code>table(meta_pb$celltype, meta_pb$condition)</code> printout to understand your data structure. For <code>ifnb</code> with eight donors, two conditions (CTRL and STIM), and eight major cell types, a fully balanced dataset would produce 128 columns (8 × 2 × 8). In practice you will typically have fewer because some cell types are absent or too sparse in specific donors — this is biologically normal. The fraction of missing cells-per-group combinations is itself an important annotation: a cell type appearing in only one of eight donors under one condition is genuinely rare or condition-specific, not a data quality failure.</p>
+<p>The column naming convention used by <code>AggregateExpression</code> follows the order of <code>group.by</code> and joins values with underscores. When any level of <code>group.by</code> contains underscores (common in cell-type annotations like <code>&quot;CD14+ Monocytes&quot;</code>) or starts with a digit (the <code>ifnb</code> donor IDs), the resulting column names can be ambiguous or malformed. The tutorial pre-empts this by renaming donor IDs to include a letter prefix (<code>d101</code>, <code>d107</code>, …) and using spaces or hyphens only within a single grouping level. A robust defensive strategy is to build the metadata data frame directly from the original Seurat <code>@meta.data</code> using <code>distinct()</code> rather than parsing column names.</p>
 </section>
 <section id="filter-low-cell-groups" class="level2">
 <h2 class="anchored" data-anchor-id="filter-low-cell-groups">6.13 Filter low-cell groups</h2>
@@ -4803,15 +5114,9 @@ Important
 <section id="why-per-cell-type-not-a-single-joint-test" class="level2">
 <h2 class="anchored" data-anchor-id="why-per-cell-type-not-a-single-joint-test">6.15 Why per-cell-type, not a single joint test?</h2>
 <p>You could imagine running a <em>single</em> pseudobulk DESeq2 with <code>design = ~ donor + celltype + stim + celltype:stim</code> and reading off the <code>celltype:stim</code> interaction term. Why don’t we?</p>
-<p>Three reasons:</p>
-<div class="incremental">
-<ol class="incremental" type="1">
-<li><strong>Different cell types have different dispersion structures.</strong> Mean-variance trends differ between, say, CD4 T cells and CD14 monocytes. A single dispersion fit pools across them and over-shrinks some, under-shrinks others.</li>
-<li><strong>Different cell types have different tested gene sets.</strong> A gene expressed only in monocytes shouldn’t be tested at all in T cells; the per-cell-type approach lets you filter the universe correctly.</li>
-<li><strong>Interpretation.</strong> Per-cell-type DE answers “in CD14 monocytes, which genes change?”. The interaction-test answer is “which genes change <em>more</em> in CD14 monocytes than in the average cell type?”. Both are valid questions but the per-cell-type framing is what biologists usually want.</li>
-</ol>
-</div>
+<p>Three reasons argue against the joint model. First, different cell types have different dispersion structures: mean-variance trends differ between, say, CD4 T cells and CD14 monocytes, and a single pooled dispersion fit will over-shrink some cell types and under-shrink others. Second, different cell types have different tested gene sets — a gene expressed only in monocytes should not be tested at all in T cells, and the per-cell-type loop applies the right gene filter to each model automatically. Third, the questions are different: per-cell-type DE answers “in CD14 monocytes, which genes change?” while the joint interaction term answers “which genes change <em>more</em> in CD14 monocytes than in the average cell type?” — a valid but less common question.</p>
 <p>The cost of per-cell-type DE is multiple tests per gene (one per cell type). FDR correction <em>within</em> each cell type is appropriate; cross-cell-type meta-correction is rarely worth it.</p>
+<p><strong>What to do when a cell type has no significant genes.</strong> Before concluding that a cell type shows no DE, check three things: (1) the dispersion plot for that cell type using <code>plotDispEsts(dds)</code> — if dispersion is poorly estimated (all dots far from the trend, or an unusual shape), the model fit may be unreliable; (2) the number of cells per pseudobulk column, especially whether any donors have very few cells for this cell type; (3) the raw LFC distribution — are the gene-level LFCs biologically implausible (near zero for everything) or do they suggest a real but underpowered effect? A cell type with a genuine null result shows an LFC distribution centered at zero with narrow spread; an underpowered result shows the expected biology in the LFC direction but no significance. These two patterns call for very different interpretations and follow-up actions.</p>
 </section>
 <section id="what-the-output-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-the-output-looks-like">6.16 What the output looks like</h2>
@@ -4827,33 +5132,57 @@ Important
 </section>
 <section id="replication-requirements" class="level2">
 <h2 class="anchored" data-anchor-id="replication-requirements">6.17 Replication requirements</h2>
-<p>Pseudobulk’s honesty depends on having enough donors. Power scales with the number of independent biological replicates, not cells:</p>
+<p>Pseudobulk’s honesty depends on having enough donors. Power scales with the number of independent biological replicates, not cells. <a href="#tbl-ch06-power" class="quarto-xref">Table 5</a> shows approximate power at a moderate effect size as a function of replicate count; the estimates assume a standard NB model with typical overdispersion values from bulk RNA-seq.</p>
+<div id="tbl-ch06-power" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch06-power-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 5: Approximate pseudobulk DE power as a function of donor count per group, for a moderate effect (LFC = 1) at typical RNA-seq overdispersion levels. Cell count per donor does not contribute additional statistical power once aggregation has been performed; adding more cells improves the accuracy of each pseudobulk profile but does not substitute for biological replication.
+</figcaption>
+<div aria-describedby="tbl-ch06-power-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
 <thead>
 <tr class="header">
-<th>Design</th>
-<th>Power for moderate effect (LFC=1)</th>
+<th>Design (donors per group)</th>
+<th>Approx. power at LFC = 1</th>
+<th>What to expect</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td>1 vs 1 donor</td>
+<td>1 vs 1</td>
 <td>0% (no degrees of freedom)</td>
+<td>No valid p-values — report fold-changes only</td>
 </tr>
 <tr class="even">
 <td>2 vs 2</td>
 <td>~20%</td>
+<td>Detect only the largest effects; expect few significant genes</td>
 </tr>
 <tr class="odd">
 <td>4 vs 4</td>
 <td>~55%</td>
+<td>Reasonable for pilot experiments; report sample size prominently</td>
 </tr>
 <tr class="even">
 <td>8 vs 8</td>
 <td>~85%</td>
+<td>Adequate for well-powered studies</td>
+</tr>
+<tr class="odd">
+<td>12 vs 12</td>
+<td>~95%</td>
+<td>Suitable for clinical cohort analyses</td>
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 <p>If you have only 2 vs 2, you can still run pseudobulk — it’ll be honest — but you should expect few significant hits and report sample size openly. If you have only 1 vs 1, no DE method can give you valid p-values; report descriptive fold-changes only.</p>
 </section>
 <section id="donor-ids-in-the-workshop-ifnb-dataset" class="level2">
@@ -4864,6 +5193,13 @@ Important
 </section>
 <section id="common-errors-pseudobulk" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors-pseudobulk">6.19 Common errors (pseudobulk)</h2>
+<p><a href="#tbl-ch06-errors-pb" class="quarto-xref">Table 6</a> collects the errors most frequently encountered when running the pseudobulk workflow.</p>
+<div id="tbl-ch06-errors-pb" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch06-errors-pb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 6: Common errors in the pseudobulk DESeq2 workflow, their causes, and fixes. The bulk-specific error table is <a href="#tbl-ch06-errors-bulk" class="quarto-xref">Table 3</a>.
+</figcaption>
+<div aria-describedby="tbl-ch06-errors-pb-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4903,8 +5239,16 @@ Important
 <td>Real biology + filter</td>
 <td>Tabulate <code>n_cells</code> before fitting; document explicitly</td>
 </tr>
+<tr class="even">
+<td><code>JoinLayers</code> required error in v5</td>
+<td>Seurat v5 assay still has split layers</td>
+<td>Run <code>JoinLayers(seu)</code> before <code>AggregateExpression</code></td>
+</tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">6.20 Where this material is also discussed</h2>

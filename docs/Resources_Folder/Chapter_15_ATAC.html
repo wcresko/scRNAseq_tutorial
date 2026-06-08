@@ -4029,6 +4029,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4331,6 +4362,20 @@ Note
 <li><strong>ATAC tells you what the cell is currently <em>able</em> to produce</strong> — its regulatory potential</li>
 </ul>
 <p>ATAC also reveals <strong>transcription factor binding sites</strong> indirectly: at sub-nucleosomal resolution, an open chromatin region’s exact width tells you whether a TF is bound there (footprinting). This is a layer of biology entirely invisible to RNA-seq.</p>
+<p>The Tn5 transposase used in ATAC-seq binds DNA as a homodimer and inserts sequencing adapters at both cut sites simultaneously. Because Tn5 is large (~55 kDa per monomer), it physically cannot insert into regions wrapped around nucleosomes — only nucleosome-free regions (NFRs) are accessible. The fragment length distribution therefore carries structural information: fragments shorter than ~150 bp come from NFRs (the “sub-nucleosomal” or “nucleosome-free” peak), fragments of ~200 bp come from mononucleosomal DNA, and longer fragments come from di- and tri-nucleosomal regions. A healthy ATAC library shows a characteristic <strong>ladder pattern</strong> in the fragment size distribution with peaks at multiples of ~200 bp. This ladder is used as a quality control metric (the nucleosome signal in §15.3): a flat distribution or absent ladder indicates poor Tn5 activity or a degraded sample.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — gene activity as a proxy for expression in scATAC-seq">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — gene activity as a proxy for expression in scATAC-seq
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Unlike scRNA-seq, scATAC-seq does not directly measure gene expression. It measures which genomic regions are accessible, and those regions include promoters, enhancers, and other regulatory elements. Signac’s <code>GeneActivity()</code> converts this chromatin accessibility signal into a gene-level proxy: it sums the fragment counts in a window around each gene’s transcription start site (by default the 2 kb upstream of the TSS plus the gene body). The result looks like a gene × cell expression matrix but is derived entirely from accessibility data. This “gene activity score” is an approximation — accessibility at a promoter is correlated with, but not identical to, transcription. The score is sufficient for cluster annotation and label transfer from RNA, but it should not be interpreted as quantitative expression. A cell with high gene activity for CD14 is likely a monocyte; quantitative comparisons of CD14 activity levels between clusters are less reliable than the same comparison made with RNA.</p>
+</div>
+</div>
 </section>
 <section id="the-10x-scatac-seq-chemistry" class="level2">
 <h2 class="anchored" data-anchor-id="the-10x-scatac-seq-chemistry">15.2 The 10x scATAC-seq chemistry</h2>
@@ -4345,11 +4390,83 @@ Note
 </section>
 <section id="per-cell-qc-metrics-in-scatac-seq" class="level2">
 <h2 class="anchored" data-anchor-id="per-cell-qc-metrics-in-scatac-seq">15.3 Per-cell QC metrics in scATAC-seq</h2>
-<p>The four standard metrics:</p>
-<p><strong><code>nCount_peaks</code></strong> — total fragments per cell. Like <code>nCount_RNA</code>, just at peak resolution. 5,000 fragments per cell is a healthy minimum.</p>
-<p><strong><code>nFeature_peaks</code></strong> — number of distinct peaks with at least one fragment. Like <code>nFeature_RNA</code>.</p>
-<p><strong>TSS enrichment score</strong> — fraction of fragments at transcription start sites (within ±2 kb). Healthy cells have TSS enrichment &gt; 4 (high signal, low background). Low TSS = high background, suggesting poor cell quality or extensive ambient chromatin.</p>
-<p><strong>Nucleosome signal / fragment size distribution</strong> — the characteristic ATAC profile shows peaks at &lt;100 bp (nucleosome-free), ~200 bp (mononucleosome), ~400 bp (dinucleosome). A flat distribution suggests poor digestion or contamination.</p>
+<p>Six metrics characterize scATAC cell quality; none has a universal threshold, but all have clear directional interpretations. <a href="#tbl-ch15-qc" class="quarto-xref">Table 1</a> summarizes all six and their expected ranges for healthy PBMC data.</p>
+<div id="tbl-ch15-qc" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch15-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Per-cell QC metrics for scATAC-seq, their typical healthy ranges for PBMC data, and how to interpret each tail. Ranges are chemistry- and tissue-dependent; always inspect per-sample distributions.
+</figcaption>
+<div aria-describedby="tbl-ch15-qc-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Metric</th>
+<th>What it measures</th>
+<th>Healthy range (PBMC)</th>
+<th>High value means</th>
+<th>Low value means</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>nCount_peaks</code></td>
+<td>Total fragments per cell</td>
+<td>≥ 5,000</td>
+<td>Very active chromatin or doublet</td>
+<td>Empty or lysed nucleus</td>
+</tr>
+<tr class="even">
+<td><code>nFeature_peaks</code></td>
+<td>Distinct peaks with ≥ 1 fragment</td>
+<td>≥ 1,000</td>
+<td>Doublet (two cells’ accessibility)</td>
+<td>Low-complexity or dead cell</td>
+</tr>
+<tr class="odd">
+<td>TSS enrichment score</td>
+<td>Enrichment of fragments at ±2 kb of TSS</td>
+<td>&gt; 4</td>
+<td>Strong signal, high-quality cell</td>
+<td>Poor cell quality; ambient chromatin dominates</td>
+</tr>
+<tr class="even">
+<td>Nucleosome signal</td>
+<td>Ratio of mono-nucleosomal to sub-nucleosomal fragments</td>
+<td>0–4 (mono-nuc peak present)</td>
+<td>Over-digestion or poor library quality</td>
+<td>Normal; near-zero is expected for NFR-dominant libraries</td>
+</tr>
+<tr class="odd">
+<td>Blacklist ratio</td>
+<td>Fragments overlapping ENCODE blacklist regions</td>
+<td>&lt; 0.05</td>
+<td>Artifactual signal from repetitive elements</td>
+<td>Expected; very low is good</td>
+</tr>
+<tr class="even">
+<td>FRiP (Reads in Peaks)</td>
+<td>Fraction of fragments inside called peaks</td>
+<td>&gt; 0.4</td>
+<td>High signal-to-background</td>
+<td>Background noise dominates; poor enrichment</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>The four standard metrics are:</p>
+<p><strong><code>nCount_peaks</code></strong> — total fragments per cell. Like <code>nCount_RNA</code>, just at peak resolution. 5,000 fragments per cell is a healthy minimum for PBMC data; tissues with smaller or more fragile nuclei may require adjusting this threshold. Very high fragment counts (&gt; 100,000) can indicate doublets or multiplets, analogous to the <code>nCount_RNA</code> upper filter in scRNA-seq QC.</p>
+<p><strong><code>nFeature_peaks</code></strong> — number of distinct peaks with at least one fragment. Like <code>nFeature_RNA</code>. A cell with many fragments but few distinct peaks has low complexity — it is repeatedly sequencing the same small set of regions, which suggests a degraded or contaminated nucleus.</p>
+<p><strong>TSS enrichment score</strong> — fraction of fragments at transcription start sites (within ±2 kb). Active TSSs are reliably open in essentially all cell types, so a healthy cell should show a sharp accessibility peak at TSSs. Healthy cells have TSS enrichment &gt; 4 (high signal, low background). Low TSS = high background, suggesting poor cell quality or extensive ambient chromatin. This metric is conceptually similar to <code>nCount_RNA</code> being correlated with library quality in scRNA-seq — it is a signal-to-noise ratio, not a biological measurement.</p>
+<p><strong>Nucleosome signal / fragment size distribution</strong> — the characteristic ATAC profile shows peaks at &lt;100 bp (nucleosome-free), ~200 bp (mononucleosome), ~400 bp (dinucleosome). A flat distribution suggests poor digestion or contamination. Signac’s <code>NucleosomeSignal()</code> computes the ratio of mononucleosomal to sub-nucleosomal fragments, which should be low in a healthy library (most fragments come from open, nucleosome-free regions). A high nucleosome signal in a cell means most of its detected fragments are from closed (nucleosomal) DNA — the Tn5 is cutting into nucleosome-wrapped regions, which typically means the nucleus was not properly permeabilized or was of poor quality.</p>
 <p>Two more advanced metrics:</p>
 <ul>
 <li><strong>Blacklist ratio</strong> — fragments overlapping ENCODE blacklist regions (repetitive sequences that produce mapping artifacts). High blacklist ratio = artifactual signal, suggesting the cell is dominated by repeats, not biology.</li>
@@ -4371,6 +4488,46 @@ Note
 <li><strong>Cluster</strong> with Seurat’s standard graph-based methods</li>
 </ol>
 <p>The conceptual shapes match RNA: get a QC’d, normalized, low-dim representation, cluster, visualize. The math is different (binary peaks not counts, TF-IDF not log-normalize, LSI not PCA) but the workflow scaffolding is the same.</p>
+<p><strong>Why TF-IDF, not log-normalization?</strong> ATAC data is binary or near-binary: each peak in each cell is either accessible (1 or a small count) or not (0). The data is extremely sparse — in a 100,000-peak × 10,000-cell matrix, more than 95% of entries are zero. Log-normalization, which divides by total counts and takes a log, is designed for count data with a roughly Poisson-to-negative-binomial distribution. For binary accessibility data, TF-IDF is more appropriate: it upweights rare peaks (high IDF — these are informative markers of specific cell types) and downweights ubiquitously-accessible peaks (low IDF — these are promoters active in all cells and carry little cell-type information). After TF-IDF, SVD (singular value decomposition) produces LSI components, which play the same role as PCs in RNA-seq.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — Signac / FindTopFeatures(min.cutoff)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — Signac / FindTopFeatures(min.cutoff)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindTopFeatures(pbmc, min.cutoff = &quot;q0&quot;)</code> selects peaks above a minimum accessibility cutoff before running TF-IDF and SVD. <strong>Default with <code>min.cutoff = &quot;q0&quot;</code>: keep all peaks</strong> (the 0th percentile, meaning no filtering). Setting <code>min.cutoff = &quot;q75&quot;</code> retains only the top 25% most accessible peaks, reducing noise from very rarely accessible peaks. For most analyses <code>&quot;q0&quot;</code> (all peaks) or <code>&quot;q5&quot;</code> (discard bottom 5%) is appropriate; raising the cutoff aggressively can discard peaks specific to rare cell types. The value <code>&quot;q0&quot;</code> is explicitly used in the tutorial to match the Signac vignette and is appropriate for the PBMC 10k dataset; for noisier data or datasets with many cell types consider <code>&quot;q5&quot;</code> or <code>&quot;q10&quot;</code>.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — RunSVD / dims to use (drop LSI component 1)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — RunSVD / dims to use (drop LSI component 1)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>After <code>RunSVD(pbmc)</code>, downstream functions use <code>dims = 2:30</code> rather than <code>dims = 1:30</code>. <strong>Default if unspecified: <code>dims = 1:30</code></strong>, which includes the depth-confounded first LSI component. LSI component 1 almost universally tracks sequencing depth (total fragment count) rather than biology: <code>DepthCor(pbmc)</code> shows the Pearson correlation between each LSI component and <code>nCount_ATAC</code>, and component 1 typically has |r| &gt; 0.9. Including it drives UMAP layout and cluster assignments by library size rather than chromatin state. Always run <code>DepthCor</code> and exclude any early components with |depth correlation| &gt; 0.75.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — CreateChromatinAssay / min.cells">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — CreateChromatinAssay / min.cells
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>CreateChromatinAssay(counts = counts, min.cells = 10, min.features = 200)</code> filters peaks and cells at object creation. <strong><code>min.cells = 10</code> default</strong>: a peak must be accessible in at least 10 cells to be retained. Lowering this (e.g. to 5) retains more peaks and may recover rare-cell-type–specific elements, but increases the matrix size and noise. Raising it (e.g. to 20–50) removes rare peaks aggressively — appropriate for atlas-scale data where rare peaks dominate the sparse background. The <code>min.features = 200</code> filter removes cells with fewer than 200 accessible peaks — analogous to <code>nFeature_RNA &gt; 200</code> in scRNA-seq QC.</p>
+</div>
+</div>
 </section>
 <section id="gene-activity-scores-translating-atac-to-rna-like" class="level2">
 <h2 class="anchored" data-anchor-id="gene-activity-scores-translating-atac-to-rna-like">15.5 Gene-activity scores — translating ATAC to RNA-like</h2>
@@ -4381,6 +4538,20 @@ Note
 <li>It enables <strong>label transfer</strong> from scRNA-seq (with cell types) to scATAC (without). The <code>FindTransferAnchors</code> workflow projects an scATAC dataset against a labeled scRNA reference and copies the labels over.</li>
 </ul>
 <p>Gene-activity scores are not as good as actual RNA expression — they’re an approximation — but they’re sufficient for cluster annotation and many downstream questions.</p>
+<p>The window used by <code>GeneActivity()</code> matters: the default ±2 kb from the TSS captures the proximal promoter and a bit of the gene body. For genes regulated primarily by distal enhancers (common in immune genes), accessibility at the TSS may be low even when the gene is actively transcribed. Widening the window to ±5 kb or including a separate enhancer set can improve gene activity scores for such genes, though at the cost of noisier scores from overlap between adjacent gene windows. Always check that known markers for your expected cell types show appropriately elevated gene activity scores after computing them.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — TF-IDF and LSI replace log-normalization and PCA for ATAC data">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — TF-IDF and LSI replace log-normalization and PCA for ATAC data
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The dimensionality-reduction pipeline for scATAC-seq uses TF-IDF normalization followed by latent semantic indexing (LSI, implemented as SVD) rather than the log-normalization + PCA pipeline used for RNA. The reason is the nature of the data: ATAC peak counts are near-binary (each peak is either accessible or not in a given cell), severely sparse (&gt;95% zeros), and lack the continuous count distribution that makes Poisson-based methods appropriate. TF-IDF (term frequency × inverse document frequency) is a normalization from information retrieval that weighs features (peaks) by their rarity across cells: a peak accessible in only 2% of cells (high IDF) is upweighted relative to a ubiquitously open promoter (low IDF). LSI / SVD then finds the major axes of variance in this TF-IDF–normalized binary matrix, analogous to how PCA operates on a scaled RNA matrix. The resulting “LSI components” play the same conceptual role as PCs and are used for UMAP, clustering, and label transfer. The practical warning is that LSI component 1 almost always captures sequencing depth rather than biology — it must be discarded before downstream analysis.</p>
+</div>
+</div>
 </section>
 <section id="peak-calling-vs-pre-called-peaks" class="level2">
 <h2 class="anchored" data-anchor-id="peak-calling-vs-pre-called-peaks">15.6 Peak calling vs pre-called peaks</h2>
@@ -4422,6 +4593,13 @@ Note
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">15.9 Common errors</h2>
+<p><a href="#tbl-ch15-errors" class="quarto-xref">Table 2</a> collects the errors most commonly encountered in a Signac scATAC workflow, their causes, and the fix.</p>
+<div id="tbl-ch15-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch15-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Common scATAC-seq errors in the Signac workflow, their underlying causes, and fixes.
+</figcaption>
+<div aria-describedby="tbl-ch15-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4463,6 +4641,9 @@ Note
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">15.10 Where this material is also discussed</h2>

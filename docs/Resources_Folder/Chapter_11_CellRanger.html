@@ -4064,6 +4064,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4369,6 +4400,19 @@ Note
 <li><strong>Assembly into reads</strong> — collecting the per-cycle base calls for each cluster into a contiguous sequence with per-base quality, written as a FASTQ record.</li>
 </ul>
 <p>Both are handled by <code>cellranger mkfastq</code>, which wraps Illumina’s <code>bcl2fastq</code> / BCL Convert under the hood. The output is a set of FASTQ files in a strict 10x naming pattern.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what Cell Ranger count actually does to your reads">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what Cell Ranger count actually does to your reads
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>cellranger count</code> is not a single algorithm — it is a sequential pipeline of five distinct steps that each transform the data in a specific way. <strong>Barcode correction</strong> maps observed barcodes against the known 10x whitelist, fixing single-base sequencing errors so that cells are not split across multiple barcode identities. <strong>Alignment</strong> runs STAR to map each cDNA read to the reference transcriptome, classifying reads as exonic (counted), intronic (counted with <code>--include-introns</code> or in newer versions by default), or unmapped (discarded). <strong>UMI deduplication</strong> collapses PCR amplification: multiple reads sharing the same cell barcode, gene, and UMI sequence represent one original molecule and are merged into a single count. <strong>Cell calling</strong> separates barcodes that represent real cells from barcodes that represent empty droplets (§11.6). <strong>Counting</strong> produces the final integer sparse matrix. Each stage has a characteristic failure mode, and the <code>web_summary.html</code> metrics map directly onto the health of each stage — low mapping rate diagnoses stage 2; low cells called diagnoses stage 4.</p>
+</div>
+</div>
 </section>
 <section id="mkfastq-versus-count" class="level2">
 <h2 class="anchored" data-anchor-id="mkfastq-versus-count">11.3 mkfastq versus count</h2>
@@ -4401,11 +4445,30 @@ Note
 <p>A droplet-based experiment generates far more barcodes than cells. Most droplets are empty — they captured no cell but still contain a little ambient RNA floating in the suspension, which gets barcoded and sequenced. The defining problem of the <code>count</code> step is drawing the line between barcodes that represent real cells and barcodes that represent empty droplets.</p>
 <p>The classic tool for seeing this is the <strong>barcode-rank plot</strong> (the “knee” plot). Barcodes are ranked from most to fewest UMIs and plotted on log-log axes. A clean experiment shows a sharp <strong>knee</strong>: a plateau of high-UMI barcodes (real cells) that drops steeply to a long tail of low-UMI barcodes (empties). The location of the knee is, roughly, the cell count.</p>
 <p>Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a knee-based threshold identifies obvious high-count cells, and then an <strong>EmptyDrops</strong>-style test<span class="citation" data-cites="lun2019emptydrops"><sup><a href="#ref-lun2019emptydrops" role="doc-biblioref">4</a></sup></span> recovers real cells that happen to have lower counts by asking whether each remaining barcode’s <em>expression profile</em> differs significantly from the ambient profile. A small dying cell with few UMIs but a distinctive transcriptome can thus be rescued, where a naive knee cut would have thrown it away. The consequence for you: the “filtered” matrix is the product of a statistical decision, not a simple threshold, and a soft or ambiguous knee in the plot is a sign to scrutinize that decision.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — the cell-calling knee and what a pathological plot signals">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — the cell-calling knee and what a pathological plot signals
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The barcode-rank (knee) plot is the most informative single diagnostic for a 10x run. It conveys three things at a glance: how many cells were loaded (the left plateau), how clean the separation between cells and empty droplets was (the steepness of the drop through the knee), and whether something unusual happened (the shape of the curve). A <strong>sharp, clean knee</strong> means cell calling was unambiguous. A <strong>gradual slope</strong> — a slow transition rather than a sharp drop — means there is a population of barcodes with intermediate UMI counts that may be real cells with low RNA content, damaged cells, or over-loaded droplets; <code>--expect-cells</code> (§11.9) can help force a tighter call. <strong>Two distinct plateaus</strong> typically indicate two populations of cells with different RNA content (e.g., large macrophages and small lymphocytes in the same suspension). A <strong>very short upper plateau</strong> followed by a long flat tail suggests over-loading: so many cells were loaded that many droplets captured two cells (doublets), inflating the upper plateau and depleting the lower one. The <code>web_summary.html</code> “Estimated number of cells” number is the numerical summary of this plot; always look at the plot itself when that number diverges from your expected target.</p>
+</div>
+</div>
 </section>
 <section id="reading-web_summary.html" class="level2">
 <h2 class="anchored" data-anchor-id="reading-web_summary.html">11.7 Reading <code>web_summary.html</code></h2>
 <p>Every <code>count</code> run writes a <code>web_summary.html</code>. It is the single most informative QC document in the entire pipeline, and it should be the <em>first</em> thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in <code>metrics_summary.csv</code> for programmatic use. Save the <code>web_summary.html</code> alongside your raw data, because reviewers and collaborators will ask for it. To inspect it on Talapas without downloading, use VS Code’s “Remote - SSH” extension and simply double-click the <code>.html</code> file in the explorer panel, or <code>scp</code> the file to your laptop.</p>
-<p>A short list of the numbers that most often reveal a problem:</p>
+<p>A short list of the numbers that most often reveal a problem is given in <a href="#tbl-ch11-websummary" class="quarto-xref">Table 1</a>.</p>
+<div id="tbl-ch11-websummary" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch11-websummary-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Key metrics from <code>web_summary.html</code> (also available as <code>metrics_summary.csv</code>). None of these is a hard pass/fail — they are prompts to investigate. A low “median genes per cell” in a sample of small resting lymphocytes may be biology rather than failure; read the numbers together and against your expectations for the tissue.
+</figcaption>
+<div aria-describedby="tbl-ch11-websummary-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4452,11 +4515,70 @@ Note
 </tr>
 </tbody>
 </table>
-<p>None of these is a hard pass/fail; they are prompts. A low “median genes per cell” in a sample of small resting lymphocytes may be biology, not failure. The skill is reading the numbers together and against your expectations for the tissue.</p>
+</div>
+</figure>
+</div>
+<p>Reading <a href="#tbl-ch11-websummary" class="quarto-xref">Table 1</a> requires context. The “Reads mapped confidently to transcriptome” metric is the most decisive: a value below 60% is almost always a reference or sample problem — either the wrong reference genome version, a contaminating organism (e.g., bacterial or mouse cell contamination in a human sample), or a chemistry mismatch where 5’ reads were processed with a 3’ reference (or vice versa). The “Q30 bases in barcode” metric reflects sequencing quality on the short barcode read (R1); below 90% means that many barcodes will be uncorrectable, reducing the effective cell count. “Mean reads per cell” and “Median genes per cell” should be evaluated in the context of the tissue: a PBMC sample with 15,000 reads per cell is undersequenced, but a tumor infiltrating lymphocyte sample from a cell-sparse tumor section might genuinely have fewer reads per cell due to lower loading. The skill is developing a baseline expectation for your own tissue type and flagging deviations from that baseline, not comparing against generic thresholds.</p>
 </section>
 <section id="the-hand-off-to-the-core-pipeline" class="level2">
 <h2 class="anchored" data-anchor-id="the-hand-off-to-the-core-pipeline">11.8 The hand-off to the core pipeline</h2>
-<p>When <code>count</code> finishes, the directory that matters for everything downstream is one subfolder of <code>outs/</code>:</p>
+<p>When <code>count</code> finishes, the output lives under the <code>outs/</code> subdirectory of the run folder. <a href="#tbl-ch11-outputs" class="quarto-xref">Table 2</a> describes the files most relevant to downstream analysis.</p>
+<div id="tbl-ch11-outputs" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch11-outputs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Key output files from <code>cellranger count</code>. Only <code>filtered_feature_bc_matrix/</code> and <code>web_summary.html</code> are needed for a standard scRNA-seq analysis; the BAM is optional and large (10–30 GB per sample). Keep <code>raw_feature_bc_matrix/</code> if you plan to run SoupX or re-call cells with EmptyDrops.
+</figcaption>
+<div aria-describedby="tbl-ch11-outputs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>File / folder</th>
+<th>Contents</th>
+<th>When you need it</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>filtered_feature_bc_matrix/</code></td>
+<td>Sparse counts matrix (3 files: <code>barcodes.tsv.gz</code>, <code>features.tsv.gz</code>, <code>matrix.mtx.gz</code>)</td>
+<td>Always — the primary input to the core pipeline</td>
+</tr>
+<tr class="even">
+<td><code>raw_feature_bc_matrix/</code></td>
+<td>Same format but all barcodes including empty droplets</td>
+<td>SoupX ambient-RNA correction; DropletUtils re-calling</td>
+</tr>
+<tr class="odd">
+<td><code>web_summary.html</code></td>
+<td>Interactive QC report — mapping, cell calling, barcode-rank plot</td>
+<td>Open first, before any R</td>
+</tr>
+<tr class="even">
+<td><code>metrics_summary.csv</code></td>
+<td>Same numbers as <code>web_summary.html</code> in machine-readable form</td>
+<td>Automated QC pipelines; batch reporting</td>
+</tr>
+<tr class="odd">
+<td><code>molecule_info.h5</code></td>
+<td>Per-molecule barcode/UMI/gene record</td>
+<td>Aggregation (<code>cellranger aggr</code>); advanced QC</td>
+</tr>
+<tr class="even">
+<td><code>possorted_genome_bam.bam</code> + <code>.bai</code></td>
+<td>Position-sorted aligned BAM</td>
+<td>Re-alignment, splice-junction analysis, allele-specific methods; only written with <code>--create-bam=true</code></td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>The directory that matters for everything downstream is one subfolder of <code>outs/</code>:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">outs/filtered_feature_bc_matrix/</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> barcodes.tsv.gz    <span class="co"># the called cell barcodes</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="ex">├──</span> features.tsv.gz    <span class="co"># the genes</span></span>
@@ -4475,17 +4597,190 @@ Note
 <p>The <code>--create-bam=true</code> flag writes the aligned BAM file to <code>outs/possorted_genome_bam.bam</code>. This is optional (BAMs are large — 10–30 GB per sample) but required for re-alignment, splice-junction analysis, or any downstream tool that works on aligned reads rather than counts. For a fresh analysis where you only need the counts matrix, omit it to save disk. Once a run finishes, monitor its progress in real time with <code>tail -f logs/cellranger_&lt;jobid&gt;.out</code>; Cell Ranger prints stage names as it advances so you can tell how far along it is without cancelling the job.</p>
 <p>For many samples, do not write many scripts. A scheduler <strong>array job</strong> runs one sub-job per sample from a single script, reading the sample name from a list file indexed by <code>$SLURM_ARRAY_TASK_ID</code> — the same script scaling from one sample to dozens. The tutorial walks through the SLURM specifics.</p>
 <p><strong>Design consideration: <code>cellranger aggr</code> vs Seurat merge + integration.</strong> After generating multiple <code>count</code> outputs you have two paths to a combined matrix. <code>cellranger aggr</code> performs a count-normalized merge at the Cell Ranger level, producing one combined <code>filtered_feature_bc_matrix/</code> — fast and consistent, but it applies only a simple depth normalization and has no batch correction. The workshop path (Seurat <code>merge()</code> + Harmony/anchor integration in Module 05) keeps samples separate until the R analysis, where you can apply the full integration pipeline and retain per-sample metadata. Use <code>aggr</code> only for technical replicates of the same library that need combining before any analysis; for multiple biological samples from different conditions or donors, let Seurat handle the integration.</p>
-<p>A few recurring pitfalls are worth internalizing:</p>
-<ul>
-<li><strong>FASTQ filename mismatch.</strong> Keep the exact <code>_S_L_R_001</code> pattern; symlink rather than rename.</li>
-<li><strong>Mixed chemistries in one input folder.</strong> Cell Ranger refuses to mix 3’ v2 and v3 reads; separate them.</li>
-<li><strong>Reference / chemistry mismatch.</strong> Running 5’ reads against a 3’ reference will “succeed” but produce statistics that are quietly wrong — always the hardest kind of error to catch.</li>
-<li><strong>Aggregation confusion.</strong> <code>cellranger aggr</code> performs a depth-normalized count-level merge of technical replicates of one library; it is <em>not</em> the same as the Seurat <code>merge()</code> + integration you do downstream, and for most analyses you want the latter for its finer control.</li>
-</ul>
+<p>A few recurring pitfalls are worth internalizing; <a href="#tbl-ch11-pitfalls" class="quarto-xref">Table 3</a> collects the most common ones.</p>
+<div id="tbl-ch11-pitfalls" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch11-pitfalls-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common <code>cellranger count</code> pitfalls and fixes. The wrong-reference and filename-mismatch errors are the two most frequent causes of a failed or misleading run; check these first when a run looks wrong.
+</figcaption>
+<div aria-describedby="tbl-ch11-pitfalls-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Pitfall</th>
+<th>Symptom</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>FASTQ filename mismatch</td>
+<td><code>count</code> errors “no input FASTQs” or wrong sample grouping</td>
+<td>Keep the exact <code>_S&lt;n&gt;_L&lt;lane&gt;_&lt;R1|R2&gt;_001</code> pattern; symlink rather than rename</td>
+</tr>
+<tr class="even">
+<td>Mixed chemistries in one input folder</td>
+<td><code>count</code> refuses to run</td>
+<td>Separate 3’ v2 and v3 (or any mismatched chemistry) reads into distinct input folders</td>
+</tr>
+<tr class="odd">
+<td>Wrong reference for the chemistry</td>
+<td>Run “succeeds” but mapping rate &lt; 60%; wrong gene coordinates</td>
+<td>Match chemistry to reference: 3’ GEX → <code>refdata-gex-...</code>; 5’ GEX → same GEX ref with <code>--chemistry fiveprime</code></td>
+</tr>
+<tr class="even">
+<td><code>--localmem</code> too close to <code>--mem</code></td>
+<td>Job is killed silently with “Killed” and no error</td>
+<td>Set <code>--localmem</code> ~10% below the SLURM <code>--mem</code> ceiling to absorb brief I/O spikes</td>
+</tr>
+<tr class="odd">
+<td>OOM kill mid-write produces a corrupt <code>.rds</code></td>
+<td>Downstream <code>readRDS()</code> fails with a confusing error</td>
+<td>Check <code>seff</code> for <code>OUT_OF_MEMORY</code>; increase <code>--mem</code> and re-run from scratch</td>
+</tr>
+<tr class="even">
+<td><code>cellranger aggr</code> used for multi-sample DE</td>
+<td>Integration artifacts; per-sample metadata lost</td>
+<td>Use <code>cellranger aggr</code> only for technical replicates; use Seurat <code>merge()</code> + Harmony for biological replicates</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--transcriptome`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--transcriptome</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>No default — required.</strong> This is the path to the pre-built reference directory (not the tarball), e.g. <code>--transcriptome=/projects/&lt;PIRG&gt;/&lt;user&gt;/refs/refdata-gex-GRCh38-2024-A</code>. The reference must match the organism of your sample (human vs mouse vs other) and must be the <strong>GEX reference</strong> (<code>refdata-gex-...</code>), not the ATAC reference. Using the wrong reference produces a low mapping rate (&lt; 60%) that Cell Ranger will not flag as an error — it will complete, write a matrix, and report the low mapping rate in <code>web_summary.html</code>. The reference version also matters for reproducibility: a run against GRCh38-2020-A and a run against GRCh38-2024-A will produce slightly different gene counts due to updated annotations. Record the exact reference name and path in your analysis notes.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--expect-cells`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--expect-cells</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: 3,000.</strong> This parameter tells Cell Ranger approximately how many cells to expect, which influences the knee-based component of cell calling. It is not a hard cutoff — Cell Ranger adjusts its algorithm around this expectation rather than truncating exactly at it. Providing an accurate value (or a reasonable estimate) is most important when the knee is soft or ambiguous. If you loaded 5,000 cells, set <code>--expect-cells=5000</code>; if you loaded 10,000, set it to 10,000. Using the default 3,000 for a high-loading experiment that actually produced 12,000 cells can cause over-conservative cell calling, where Cell Ranger under-calls cells because it did not expect so many. The “Estimated number of cells” in <code>web_summary.html</code> is the diagnostic: if it is far below your expected target, re-run with a more accurate <code>--expect-cells</code>.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--localcores` and `--localmem`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--localcores</code> and <code>--localmem</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Defaults: 1 core, 6 GB (Cell Ranger’s own conservative defaults).</strong> These parameters set Cell Ranger’s internal resource budget, distinct from the SLURM allocation. <code>--localcores</code> should match <code>--cpus-per-task</code> from your SLURM script so Cell Ranger uses all the cores SLURM reserved for it. <code>--localmem</code> should be set slightly <em>below</em> the SLURM <code>--mem</code> value — typically 8–10% lower — to absorb I/O buffers, pre-loaded STAR index, and brief memory spikes without exceeding the SLURM hard ceiling. A SLURM <code>--mem=128G</code> job should set <code>--localmem=120</code>. Omitting these flags is technically valid but forces Cell Ranger to use its conservative defaults (1 core, 6 GB), turning a 16-core, 128 GB job into a single-threaded, memory-starved process that will either run extremely slowly or fail outright on large datasets.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--chemistry`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--chemistry</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: <code>auto</code> (automatic detection).</strong> Cell Ranger infers the 10x chemistry version (3’ v2, 3’ v3, 5’, Fixed RNA Profiling, etc.) from the read structure. Auto-detection works correctly for the standard chemistries in the vast majority of cases. Set this flag explicitly when auto-detection fails (Cell Ranger will print a warning), when running a non-standard or custom chemistry, or when processing 5’ libraries that need <code>--chemistry=fiveprime</code>. An incorrect chemistry setting causes very low mapping rates and incorrect UMI assignment — symptoms indistinguishable from a wrong reference, so always check both if mapping rate is unexpectedly low.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--create-bam`">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--create-bam</code>
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: <code>true</code> in Cell Ranger ≤ 7; <code>false</code> in Cell Ranger ≥ 8 (must be specified explicitly).</strong> The aligned BAM file (<code>possorted_genome_bam.bam</code>) is large — 10–30 GB per sample — and is not needed for a standard scRNA-seq analysis that only uses the counts matrix. It is required for splice-junction analysis, allele-specific methods, re-alignment against a different reference, and certain advanced QC tools. Omitting it (or explicitly setting <code>--create-bam=false</code> in newer versions) saves substantial disk space. Set <code>--create-bam=true</code> explicitly when you have a downstream use for the aligned reads; otherwise the disk savings from omitting the BAM are significant for multi-sample projects.</p>
+</div>
+</div>
 </section>
 <section id="alternatives-to-cell-ranger" class="level2">
 <h2 class="anchored" data-anchor-id="alternatives-to-cell-ranger">11.10 Alternatives to Cell Ranger</h2>
-<p>Cell Ranger is the official 10x pipeline, but it is not the only way to turn FASTQs into a counts matrix, and the open-source alternatives are often faster and more flexible. <strong>STARsolo</strong><span class="citation" data-cites="kaminow2021starsolo"><sup><a href="#ref-kaminow2021starsolo" role="doc-biblioref">5</a></sup></span> reproduces Cell Ranger’s logic inside the STAR aligner<span class="citation" data-cites="dobin2013star"><sup><a href="#ref-dobin2013star" role="doc-biblioref">1</a></sup></span> and is largely concordant with it; <strong>alevin-fry / salmon</strong><span class="citation" data-cites="srivastava2019alevin"><sup><a href="#ref-srivastava2019alevin" role="doc-biblioref">6</a></sup></span> and <strong>kallisto | bustools (kb-python)</strong><span class="citation" data-cites="melsted2021kallistobustools"><sup><a href="#ref-melsted2021kallistobustools" role="doc-biblioref">7</a></sup></span> use lightweight (pseudo)alignment for constant-memory, very fast quantification. All three accept custom references easily, which matters for non-model organisms where no 10x reference exists. They differ mainly in how they handle multimapping reads, intronic counts, and EmptyDrops-style cell calling, so a sample quantified two ways will agree on most genes but not every count — worth knowing when you compare results across pipelines.</p>
+<p>Cell Ranger is the official 10x pipeline, but it is not the only way to turn FASTQs into a counts matrix, and the open-source alternatives are often faster and more flexible. <a href="#tbl-ch11-alternatives" class="quarto-xref">Table 4</a> compares the three main options.</p>
+<p>Reading <a href="#tbl-ch11-alternatives" class="quarto-xref">Table 4</a>: the choice between tools depends on what you are optimizing for. If <strong>official 10x support</strong> and the widest chemistry compatibility matter (e.g., you are processing Flex, Feature Barcoding, or CRISPR screening data), Cell Ranger is the only supported option. If you want a <strong>drop-in open-source replacement</strong> for standard GEX data that produces Cell Ranger-compatible output, STARsolo is the closest match — it uses the same STAR aligner and implements the same UMI-deduplication and cell-calling logic, making its outputs concordant with Cell Ranger on the vast majority of genes. If <strong>speed</strong> is the priority — processing dozens of samples in a pipeline where wall-clock time matters — alevin-fry’s pseudoalignment is 3–5× faster and uses significantly less memory. The kallisto|bustools ecosystem (kb-python) is similarly fast and has an active Python integration. A sample quantified by two different tools will produce concordant counts on highly expressed, unambiguously mapping genes but will differ on genes with complex multimapping patterns or on intronic counts — never switch tools mid-project without validating concordance on a representative sample.</p>
+<div id="tbl-ch11-alternatives" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch11-alternatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 4: Open-source alternatives to Cell Ranger for FASTQs-to-counts. All three are concordant with Cell Ranger on well-mapped genes but differ in multimapping handling, intronic count logic, and cell calling. A sample quantified by two tools will agree on most genes but not every count — verify with a spot-check if you switch tools mid-project.
+</figcaption>
+<div aria-describedby="tbl-ch11-alternatives-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tool</th>
+<th>Approach</th>
+<th>Speed vs Cell Ranger</th>
+<th>Custom reference</th>
+<th>Key use cases</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Cell Ranger</td>
+<td>STAR alignment + UMI deduplication + EmptyDrops cell calling</td>
+<td>Baseline</td>
+<td><code>cellranger mkref</code> from FASTA + GTF</td>
+<td>Official 10x support; full-featured web summary; required for many 10x-specific chemistries</td>
+</tr>
+<tr class="even">
+<td>STARsolo<span class="citation" data-cites="kaminow2021starsolo"><sup><a href="#ref-kaminow2021starsolo" role="doc-biblioref">5</a></sup></span></td>
+<td>Same STAR aligner, Cell Ranger–compatible logic</td>
+<td>Similar</td>
+<td>Standard STAR genome index</td>
+<td>Drop-in replacement for Cell Ranger counts; open-source; easier cluster deployment</td>
+</tr>
+<tr class="odd">
+<td>alevin-fry / salmon<span class="citation" data-cites="srivastava2019alevin"><sup><a href="#ref-srivastava2019alevin" role="doc-biblioref">6</a></sup></span></td>
+<td>Selective alignment (quasimapping)</td>
+<td>~3–5× faster</td>
+<td>Decoy-aware salmon index</td>
+<td>Very fast; low memory; well-suited for high-throughput runs</td>
+</tr>
+<tr class="even">
+<td>kallisto | bustools (kb-python)<span class="citation" data-cites="melsted2021kallistobustools"><sup><a href="#ref-melsted2021kallistobustools" role="doc-biblioref">7</a></sup></span></td>
+<td>Pseudoalignment</td>
+<td>~5–10× faster</td>
+<td><code>kb ref</code> from genome/GTF</td>
+<td>Rapid exploration; constant memory footprint; active Python ecosystem</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>All three accept custom references easily, which matters for non-model organisms where no 10x reference exists.</p>
 </section>
 <section id="see-also" class="level2">
 <h2 class="anchored" data-anchor-id="see-also">11.11 See also</h2>

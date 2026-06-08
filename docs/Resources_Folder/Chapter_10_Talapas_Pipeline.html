@@ -4064,6 +4064,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4302,6 +4333,7 @@ z-index: 1;
   <li><a href="#c-reading-the-output-confirming-each-step-succeeded" id="toc-c-reading-the-output-confirming-each-step-succeeded" class="nav-link" data-scroll-target="#c-reading-the-output-confirming-each-step-succeeded">10.5c Reading the output: confirming each step succeeded</a></li>
   <li><a href="#running-the-pipeline-the-two-wrappers" id="toc-running-the-pipeline-the-two-wrappers" class="nav-link" data-scroll-target="#running-the-pipeline-the-two-wrappers">10.6 Running the pipeline: the two wrappers</a></li>
   <li><a href="#the-bonus-scripts-1317" id="toc-the-bonus-scripts-1317" class="nav-link" data-scroll-target="#the-bonus-scripts-1317">10.7 The bonus scripts (13–17)</a></li>
+  <li><a href="#b-per-step-resource-guide" id="toc-b-per-step-resource-guide" class="nav-link" data-scroll-target="#b-per-step-resource-guide">10.7b Per-step resource guide</a></li>
   <li><a href="#adapting-the-pipeline-to-your-own-data" id="toc-adapting-the-pipeline-to-your-own-data" class="nav-link" data-scroll-target="#adapting-the-pipeline-to-your-own-data">10.8 Adapting the pipeline to your own data</a></li>
   <li><a href="#where-this-leads" id="toc-where-this-leads" class="nav-link" data-scroll-target="#where-this-leads">10.9 Where this leads</a></li>
   <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">Going further</a></li>
@@ -4360,22 +4392,24 @@ Note
 <p>Every module in this workshop is taught through four parallel artifacts — a <strong>lecture</strong>, a <strong>reading</strong>, a <strong>laptop tutorial</strong>, and a <strong>Talapas script</strong> — all covering the same workflow at different altitudes. The laptop tutorials (notebooks 01–08) are <em>learning</em> documents: rich prose, “Think about it” prompts, inline plots, and explanation woven through every step. They are written to be read and understood at a desk, one cell at a time.</p>
 <p>The Talapas scripts are the fourth leg. They run the <em>same</em> analysis, on the <em>same</em> dataset, but stripped down to runnable R with only minimal comments that mark which notebook each step parallels. This division of labor is deliberate. A teaching notebook and a production script have opposite goals: the notebook maximizes explanation, the script maximizes reproducibility and unattended execution. Rather than compromise either, the workshop keeps them separate — <strong>the explanation lives in the notebook, the execution lives in the script</strong> — and the comment markers in the script point you back to the notebook whenever you need the “why.”</p>
 <p>The payoff is that moving to the cluster introduces <em>no new analysis to learn</em>. You already understand QC, clustering, annotation, integration, pseudobulk DE, functional enrichment, and differential abundance from the laptop series. Chapter 10 is purely about how that same understanding is packaged so it can run as a chain of SLURM jobs on Talapas.</p>
+<p>The practical difference between a notebook and a script shows up in two concrete ways. First, a notebook runs cell by cell in RStudio; you see each plot and table as it is produced, and you can pause, inspect, and change course. A script runs from start to finish as a single process: either it completes successfully and writes its output, or it fails. There is no mid-run intervention. This is why the scripts print explicit progress messages (“==== RUNNING 01_qc_preprocessing.R ====”) and end with <code>cat(&quot;Wrote ...&quot;)</code> — those messages are your only window into what happened, and reading the <code>.out</code> log is how you confirm success. Second, a script on a shared cluster must be self-contained: it cannot depend on variables in your current R session, on packages installed in an interactive session that wasn’t loaded by <code>module load</code>, or on data that happen to be in your current working directory. Everything it needs — the package list, the data path, the parameters — must be explicit and inside the script itself.</p>
 </section>
 <section id="the-dataset-why-ifnb-is-not-a-toy" class="level2">
 <h2 class="anchored" data-anchor-id="the-dataset-why-ifnb-is-not-a-toy">10.2 The dataset: why <code>ifnb</code> is not a toy</h2>
 <p>The scripts run the <strong><code>ifnb</code> dataset</strong><span class="citation" data-cites="kang2017multiplexed"><sup><a href="#ref-kang2017multiplexed" role="doc-biblioref">1</a></sup></span>, the same one used throughout the laptop tutorials. It is worth dwelling on <em>why</em> this dataset was chosen, because the choice is what makes the cluster run a real analysis rather than a demonstration.</p>
 <p><code>ifnb</code> carries two kinds of structure that most single-cell demo datasets lack:</p>
-<div class="incremental">
-<ul class="incremental">
-<li>A <strong>real biological condition</strong> — <code>stim</code>, with two levels: <code>CTRL</code> (control) and <code>STIM</code> (cells stimulated with interferon-β). This is a genuine perturbation with a known biological consequence.</li>
-<li><strong>Real biological replicates</strong> — <code>ind</code>, identifying 8 lupus patient donors, each measured in <em>both</em> conditions. These are true replicates at the level that matters for statistics: the donor.</li>
-</ul>
-</div>
+<p>A <strong>real biological condition</strong> — <code>stim</code>, with two levels: <code>CTRL</code> (control) and <code>STIM</code> (cells stimulated with interferon-β) — this is a genuine perturbation with a known biological consequence. And <strong>real biological replicates</strong> — <code>ind</code>, identifying 8 lupus patient donors, each measured in <em>both</em> conditions, providing true replicates at the level that matters for statistics: the donor.</p>
 <p>Contrast this with a single dissociated-tumor run, which gives you one sample, no condition, and no replicates. With such data you can cluster and annotate cells, but you cannot ask whether anything <em>changes</em> between conditions, because there is no condition and nothing to compare. <code>ifnb</code> has both axes by design, so the downstream steps — integration (05), pseudobulk differential expression (06), and differential abundance (08) — operate on genuine sample and donor structure. Integration corrects the CTRL/STIM batch axis; the DE and DA tests recover a real <strong>interferon-stimulated gene (ISG)</strong> response rather than returning a null result. The cluster run reproduces the workshop’s actual biological findings, at scale, on the real machine.</p>
 </section>
 <section id="pipeline-architecture-a-chain-of-object-hand-offs" class="level2">
 <h2 class="anchored" data-anchor-id="pipeline-architecture-a-chain-of-object-hand-offs">10.3 Pipeline architecture: a chain of object hand-offs</h2>
-<p>The eight core scripts are not eight independent programs. They form a <strong>pipeline</strong> — a chain in which each step’s output is the next step’s input. The connective tissue is the filesystem: each script reads an object from disk, does its work, and writes a new object that the following script will read.</p>
+<p>The eight core scripts are not eight independent programs. They form a <strong>pipeline</strong> — a chain in which each step’s output is the next step’s input. The connective tissue is the filesystem: each script reads an object from disk, does its work, and writes a new object that the following script will read. This pattern has a formal name in software engineering — it is a <em>dataflow pipeline</em>, where each stage is connected to the next by a named artifact rather than by a direct function call. The advantage is that stages can be developed, debugged, and re-run independently; the disadvantage is that you bear responsibility for verifying each artifact before passing it forward.</p>
+<div id="tbl-ch10-pipeline" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch10-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Core pipeline scripts — input and output of each step. The chain reads left to right: each script reads the <code>.rds</code> written by the preceding step and writes a new one. Steps 06 and 08 both consume <code>ifnb_integrated.rds</code> independently, so they can run in parallel once step 05 completes.
+</figcaption>
+<div aria-describedby="tbl-ch10-pipeline-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 18%">
@@ -4442,21 +4476,57 @@ Note
 </tr>
 </tbody>
 </table>
-<p>Reading the table top to bottom traces the entire workflow: raw <code>ifnb</code> enters at step 01, becomes a QC’d object, then a clustered object, then an annotated object, then an integrated object — and from the integrated object the pipeline branches to pseudobulk DE (06, which 07 then interprets functionally) and to differential abundance (08). The only external input to the whole chain is <code>ifnb</code> itself, fetched once by script 01. Everything else is an internal hand-off.</p>
-<p>Because the steps are linked by their inputs and outputs, they must run <strong>in order</strong>. Step 02 cannot run until step 01 has written <code>ifnb_preprocessed.rds</code>; step 06 cannot run until step 05 has written <code>ifnb_integrated.rds</code>. A missing or corrupt hand-off breaks the chain at that point.</p>
+</div>
+</figure>
+</div>
+<p>Reading <a href="#tbl-ch10-pipeline" class="quarto-xref">Table 1</a> top to bottom traces the entire workflow: raw <code>ifnb</code> enters at step 01, becomes a QC’d object, then a clustered object, then an annotated object, then an integrated object — and from the integrated object the pipeline branches to pseudobulk DE (06, which 07 then interprets functionally) and to differential abundance (08). The only external input to the whole chain is <code>ifnb</code> itself, fetched once by script 01. Everything else is an internal hand-off.</p>
+<p>Because the steps are linked by their inputs and outputs, they must run <strong>in order</strong>. Step 02 cannot run until step 01 has written <code>ifnb_preprocessed.rds</code>; step 06 cannot run until step 05 has written <code>ifnb_integrated.rds</code>. A missing or corrupt hand-off breaks the chain at that point. Notice also that steps 06 and 08 both read from <code>ifnb_integrated.rds</code> — they have no dependency on each other, so once step 05 finishes they can run simultaneously if you are using the per-step wrapper (<code>run_rscript.sbatch</code>). The <code>run_core_pipeline.sbatch</code> wrapper runs all eight sequentially, so it cannot exploit this parallelism; the gain from submitting 06 and 08 in parallel is modest for a single-dataset run but becomes meaningful when processing many datasets.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — why .rds checkpoints make a pipeline robust">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — why .rds checkpoints make a pipeline robust
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each <code>.rds</code> file is not just a saved object — it is a <em>checkpoint</em>: a self-contained, on-disk snapshot of the analysis state at a specific stage. This pattern decouples the stages from each other. If step 06 (pseudobulk DE) fails because of a memory spike, you do not lose steps 01–05. You fix the memory request, resubmit step 06, and it reads the already-existing <code>ifnb_integrated.rds</code> as if nothing happened. Without checkpoints, a pipeline failure anywhere forces a complete re-run from scratch. The cost of checkpointing is disk space (each Seurat object is 100–500 MB) and the discipline of verifying each checkpoint before passing it forward — a truncated, corrupt <code>.rds</code> from an OOM-killed job looks like a file but is unreadable. The verification habit (check <code>seff</code> for <code>State: COMPLETED</code>, then look for the <code>Wrote ...</code> line in the <code>.out</code> log) is what keeps the chain clean.</p>
+</div>
+</div>
 </section>
 <section id="why-.rds-checkpoints" class="level2">
 <h2 class="anchored" data-anchor-id="why-.rds-checkpoints">10.4 Why <code>.rds</code> checkpoints?</h2>
 <p>The hand-off format is R’s native serialization, <code>.rds</code> (with <code>.csv</code> for the tabular results of steps 06–08). Saving a fully-formed Seurat object to a <code>.rds</code> file after each step is more than a convenience; it is a deliberate design pattern with several payoffs.</p>
-<div class="incremental">
-<ul class="incremental">
-<li><strong>Each <code>.rds</code> is a checkpoint.</strong> A step’s output is a complete, self-contained object on disk. If step 06 fails, you do not re-run steps 01 through 05 — you fix step 06 and point it at the already-saved <code>ifnb_integrated.rds</code>.</li>
-<li><strong>Steps can be right-sized independently.</strong> Because each is its own SLURM job reading from disk, you can give step 06 (pseudobulk DE) and step 08 (differential abundance) the extra memory they need without inflating the cheaper steps. Right-sizing per step (the skill from Chapter 9) only works because the pipeline is decomposed this way.</li>
-<li><strong>The contract between steps is inspectable.</strong> The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.</li>
-</ul>
-</div>
+<p><strong>Each <code>.rds</code> is a checkpoint.</strong> A step’s output is a complete, self-contained object on disk. If step 06 fails, you do not re-run steps 01 through 05 — you fix step 06 and point it at the already-saved <code>ifnb_integrated.rds</code>. <strong>Steps can be right-sized independently.</strong> Because each is its own SLURM job reading from disk, you can give step 06 (pseudobulk DE) and step 08 (differential abundance) the extra memory they need without inflating the cheaper steps. Right-sizing per step (the skill from Chapter 9) only works because the pipeline is decomposed this way. <strong>The contract between steps is inspectable.</strong> The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.</p>
 <p>The cost of this pattern is the discipline it demands: <strong>you must confirm each step truly succeeded before launching the next.</strong> A job that runs out of memory or time mid-write leaves behind a <em>truncated, corrupt</em> <code>.rds</code> — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.5c) before chaining onward.</p>
 <p>This explicit-checkpoint pattern is a hand-rolled version of what dedicated workflow managers automate: <strong>Snakemake</strong><span class="citation" data-cites="molder2021snakemake"><sup><a href="#ref-molder2021snakemake" role="doc-biblioref">2</a></sup></span> and <strong>Nextflow</strong><span class="citation" data-cites="ditommaso2017nextflow"><sup><a href="#ref-ditommaso2017nextflow" role="doc-biblioref">3</a></sup></span> track the file-level dependency graph for you, re-running only the steps whose inputs changed and parallelizing independent branches. For an eight-step teaching pipeline, shell wrappers are clear and sufficient; once a pipeline grows or must run on many datasets, moving to one of these managers — combined with per-tool environments from <strong>Bioconda</strong><span class="citation" data-cites="gruning2018bioconda"><sup><a href="#ref-gruning2018bioconda" role="doc-biblioref">4</a></sup></span> and containers such as <strong>Singularity/Apptainer</strong><span class="citation" data-cites="kurtzer2017singularity"><sup><a href="#ref-kurtzer2017singularity" role="doc-biblioref">5</a></sup></span> for full reproducibility — is the natural next step.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — the distinction between a wrapper script and a workflow manager">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — the distinction between a wrapper script and a workflow manager
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>run_rscript.sbatch</code> wrapper and <code>run_core_pipeline.sbatch</code> scripts in the workshop are shell-level orchestration: they submit or loop over the R scripts, but they do not track dependencies, detect partial failures, or skip already-completed steps. If step 03 fails and you resubmit <code>run_core_pipeline.sbatch</code>, it re-runs steps 01 and 02 unnecessarily. A dedicated workflow manager like Snakemake or Nextflow represents the pipeline as an explicit dependency graph — it knows that step 03 reads from step 02’s output file, and it re-runs step 03 only when that file is newer than step 03’s output or missing. For a small teaching pipeline this difference is a convenience, not a necessity. For a production pipeline processing dozens of samples, the ability to automatically skip completed steps and restart only from the point of failure saves hours of compute time and is worth the learning investment.</p>
+</div>
+</div>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — experimental design requirements for differential analysis">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — experimental design requirements for differential analysis
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The pseudobulk DE (step 06) and differential abundance (step 08) steps require two design features that not all datasets have: a <strong>condition</strong> (something that differs between groups of samples) and <strong>biological replicates</strong> (multiple independent samples per condition). The <code>ifnb</code> dataset provides both — <code>stim</code> is the condition (CTRL vs IFN-β) and <code>ind</code> identifies 8 independent lupus donors each measured in both conditions. Without replicates, pseudobulk DE collapses to a single-replicate comparison, and no valid statistical test exists for that design. Without a condition, there is nothing to compare. When you adapt the pipeline to your own data (§10.8), check these two requirements first: if either is absent, steps 06 and 08 will run without error but will return meaningless or null results, not a statistical failure message. The design check belongs in your experimental planning, not in your computational analysis.</p>
+</div>
+</div>
 </section>
 <section id="reproducibility-pre-caching-and-data_dir" class="level2">
 <h2 class="anchored" data-anchor-id="reproducibility-pre-caching-and-data_dir">10.5 Reproducibility: pre-caching and <code>DATA_DIR</code></h2>
@@ -4505,7 +4575,13 @@ Note
 </section>
 <section id="the-bonus-scripts-1317" class="level2">
 <h2 class="anchored" data-anchor-id="the-bonus-scripts-1317">10.7 The bonus scripts (13–17)</h2>
-<p>Beyond the core chain, five <strong>bonus scripts</strong> parallel the downstream bonus laptop tutorials. Unlike the core, these are largely <strong>standalone</strong> — they run <em>after</em> the core pipeline rather than in a fixed sequence with each other, and several bring their own datasets.</p>
+<p>Beyond the core chain, five <strong>bonus scripts</strong> parallel the downstream bonus laptop tutorials. Unlike the core, these are largely <strong>standalone</strong> — they run <em>after</em> the core pipeline rather than in a fixed sequence with each other, and several bring their own datasets. <a href="#tbl-ch10-bonus" class="quarto-xref">Table 2</a> lists each script with its inputs and outputs.</p>
+<div id="tbl-ch10-bonus" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch10-bonus-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Bonus pipeline scripts (13–17). Unlike the core chain, these are largely standalone — each can run independently once its input data exist. The <code>run_bonus_pipeline.sbatch</code> wrapper runs all five in sequence but continues past failures so a missing dataset for one step does not abort the others.
+</figcaption>
+<div aria-describedby="tbl-ch10-bonus-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 18%">
@@ -4554,20 +4630,133 @@ Note
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 <p>Scripts 13 (WGCNA) and 15 (scATAC) use their own datasets, downloaded into <code>../data/</code>; 14 and 17 run on the annotated <code>ifnb</code> object the core pipeline produces; 16 uses the <code>stxBrain</code> spatial dataset. Because they do not chain on each other, you can run whichever bonus analyses interest you in any order, once the relevant input exists.</p>
 <p>Just as the core eight have <code>run_core_pipeline.sbatch</code>, the bonus five have a parallel wrapper, <strong><code>run_bonus_pipeline.sbatch</code></strong>, that runs <code>13</code>–<code>17</code> in one allocation. Because they’re standalone (each needs its own dataset), that wrapper does <strong>not</strong> abort if one step fails — it logs the failure and continues to the next — so a missing dataset for, say, WGCNA won’t stop the spatial run. Submit it with <code>sbatch run_bonus_pipeline.sbatch</code> after <code>mkdir -p logs</code>.</p>
 <p>One caveat, consistent with the notebooks: steps that are inherently <em>interactive</em> or <em>Python-based</em> — Monocle3 root selection, scVelo, CellChat plotting, the <code>cellxgene-schema</code> validator — cannot be fully automated in a batch script and are kept as <strong>commented sketches</strong> inside the scripts, exactly as they appear in the notebooks. The bonus scripts mirror the <em>runnable core</em> of each notebook, not its interactive parts. The one exception is <strong>RNA velocity</strong> (Module 14), which is packaged as a runnable Python script, <code>14_rna_velocity_scvelo.py</code>, submitted via <code>sbatch run_python.sbatch 14_rna_velocity_scvelo.py</code>.</p>
 </section>
+<section id="b-per-step-resource-guide" class="level2">
+<h2 class="anchored" data-anchor-id="b-per-step-resource-guide">10.7b Per-step resource guide</h2>
+<p>Each core script has different CPU, memory, and wall-clock needs. <a href="#tbl-ch10-resources" class="quarto-xref">Table 3</a> gives the practical defaults for the <code>ifnb</code> dataset and notes where to scale up for larger inputs. Use <code>seff</code> after each first run to verify your actual usage and trim accordingly.</p>
+<p>Understanding <em>why</em> different steps have different needs makes the table more useful than memorizing it. Steps 01–04 are data-loading, normalization, clustering, and annotation — these are primarily memory-proportional-to-cell-count operations, and for <code>ifnb</code> (~24,000 cells) 32 GB is more than adequate. Step 05 (integration) is the first step that benefits from more cores: Harmony and anchor-based integration both parallelize, and the object being manipulated is the fully-annotated Seurat object across all conditions, making the memory footprint larger. Steps 06 and 08 are the memory peaks: pseudobulk DE builds one count matrix per cell type per donor (DESeq2’s model matrix can be large), and Milo’s neighborhood graph for differential abundance stores adjacency information across all cells. Both benefit from <code>--mem=96G</code> rather than the generic 32 GB default. Step 07 (functional analysis with fgsea) is computationally cheap by comparison — it reads a CSV, not a Seurat object — and 32 GB is generous.</p>
+<div id="tbl-ch10-resources" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch10-resources-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Per-step SLURM resource defaults for the <code>ifnb</code> dataset (~24,000 cells, 8 donors). Scale <code>--mem</code> proportionally for larger datasets; the pseudobulk DE (06) and differential abundance (08) steps spike highest. Always run <code>seff &lt;jobid&gt;</code> after first execution to right-size repeated runs.
+</figcaption>
+<div aria-describedby="tbl-ch10-resources-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Script</th>
+<th><code>--mem</code></th>
+<th><code>--cpus-per-task</code></th>
+<th><code>--time</code></th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>01_qc_preprocessing.R</code></td>
+<td>32G</td>
+<td>4</td>
+<td>1:00:00</td>
+<td>Fetches <code>ifnb</code> on first run; pre-cache on login node</td>
+</tr>
+<tr class="even">
+<td><code>02_dimreduction_clustering.R</code></td>
+<td>32G</td>
+<td>4</td>
+<td>1:00:00</td>
+<td>PCA is the slow step; parallelizes with <code>future</code></td>
+</tr>
+<tr class="odd">
+<td><code>03_markers_annotation.R</code></td>
+<td>32G</td>
+<td>4</td>
+<td>2:00:00</td>
+<td><code>FindAllMarkers</code> is CPU-bound; more cores help</td>
+</tr>
+<tr class="even">
+<td><code>04_reference_annotation.R</code></td>
+<td>32G</td>
+<td>4</td>
+<td>1:00:00</td>
+<td>SingleR reference download needs internet (pre-cache)</td>
+</tr>
+<tr class="odd">
+<td><code>05_integration.R</code></td>
+<td>64G</td>
+<td>8</td>
+<td>4:00:00</td>
+<td>Harmony/anchor integration is memory-intensive</td>
+</tr>
+<tr class="even">
+<td><code>06_pseudobulk_de.R</code></td>
+<td>96G</td>
+<td>4</td>
+<td>2:00:00</td>
+<td>DESeq2 in-memory model matrix drives memory spike</td>
+</tr>
+<tr class="odd">
+<td><code>07_functional_analysis.R</code></td>
+<td>32G</td>
+<td>4</td>
+<td>1:00:00</td>
+<td>fgsea is fast; MSigDB download needs pre-caching</td>
+</tr>
+<tr class="even">
+<td><code>08_differential_abundance.R</code></td>
+<td>96G</td>
+<td>8</td>
+<td>3:00:00</td>
+<td>Milo neighborhood graph is both CPU and memory hungry</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+</section>
 <section id="adapting-the-pipeline-to-your-own-data" class="level2">
 <h2 class="anchored" data-anchor-id="adapting-the-pipeline-to-your-own-data">10.8 Adapting the pipeline to your own data</h2>
 <p>The whole point of learning this pipeline on <code>ifnb</code> is to run it on <em>your</em> data afterward, and the chained architecture makes that swap clean. The only place the pipeline touches the external world is <strong>script 01</strong>, which loads <code>ifnb</code> from Bioconductor. To run the analysis on your own counts:</p>
-<div class="incremental">
-<ul class="incremental">
-<li><strong>Replace the loader in script 01.</strong> Swap the <code>muscData::Kang18_8vs8()</code> call for code that builds a Seurat object from your own counts matrix — for example, reading a Cell Ranger output directory or a 10x <code>.h5</code> file — and carry your condition and donor information into the object’s metadata.</li>
-<li><strong>Keep the rest of the chain.</strong> Steps 02–08 read from the previous step’s <code>.rds</code>, so once script 01 writes a Seurat object in the expected shape, the downstream steps run unchanged.</li>
-<li><strong>Mind the design.</strong> The DE and DA steps (05/06/08) depend on having a real condition and real replicates in the metadata. If your data lacks a condition or has no biological replication, those steps will not return meaningful results — the limitation is your experimental design, not the scripts. This is the same lesson §10.2 drew from why <code>ifnb</code> was chosen.</li>
-<li><strong>Right-size for your scale.</strong> A dataset much larger than <code>ifnb</code> will need more memory and time; use <code>seff</code> from Chapter 9 to tune each step.</li>
-</ul>
+<p><strong>Replace the loader in script 01.</strong> Swap the <code>muscData::Kang18_8vs8()</code> call for code that builds a Seurat object from your own counts matrix — for example, reading a Cell Ranger output directory or a 10x <code>.h5</code> file — and carry your condition and donor information into the object’s metadata.</p>
+<p><strong>Keep the rest of the chain.</strong> Steps 02–08 read from the previous step’s <code>.rds</code>, so once script 01 writes a Seurat object in the expected shape, the downstream steps run unchanged. <strong>Mind the design:</strong> the DE and DA steps (05/06/08) depend on having a real condition and real replicates in the metadata. If your data lacks a condition or has no biological replication, those steps will not return meaningful results — the limitation is your experimental design, not the scripts. This is the same lesson §10.2 drew from why <code>ifnb</code> was chosen. <strong>Right-size for your scale:</strong> a dataset much larger than <code>ifnb</code> will need more memory and time; <a href="#tbl-ch10-resources" class="quarto-xref">Table 3</a> gives the <code>ifnb</code> defaults as a starting point, and <code>seff</code> from Chapter 9 is how you tune each step once you have a first-run baseline.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `DATA_DIR` (pipeline output directory)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>DATA_DIR</code> (pipeline output directory)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default: <code>../data/</code> (relative to the scripts directory).</strong> All eight pipeline scripts write their <code>.rds</code> and <code>.csv</code> hand-off files to the path in the <code>DATA_DIR</code> environment variable. If <code>DATA_DIR</code> is unset, it defaults to <code>../data/</code>. For cluster runs, set it to a scratch location before submission: <code>export DATA_DIR=/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/ifnb/data</code>. This keeps large intermediate Seurat objects (100–500 MB each) out of your home directory and on the high-throughput scratch filesystem. Because it is a shell variable, the same eight scripts run unchanged whether the data go to your project directory, scratch, or an external storage path — no edits to the scripts themselves are required.</p>
+</div>
+</div>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--mem` per step (pipeline-specific defaults)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — <code>--mem</code> per step (pipeline-specific defaults)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Default in <code>run_rscript.sbatch</code>: 32 GB.</strong> Most pipeline steps (01–04, 07) run comfortably at <code>--mem=32G</code> on the <code>ifnb</code> dataset. Steps 05 (integration) should be raised to <code>--mem=64G</code>; steps 06 and 08 (pseudobulk DE and differential abundance) should be raised to <code>--mem=96G</code>. These overrides are passed inline: <code>sbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R</code>. If you are adapting the pipeline to a dataset larger than <code>ifnb</code> (~24,000 cells), scale <code>--mem</code> proportionally — roughly linearly with cell count for steps 01–05, and more aggressively for 06 and 08 because DESeq2 and Milo both build in-memory data structures that scale with the number of cell types × donors × cells.</p>
+</div>
 </div>
 </section>
 <section id="where-this-leads" class="level2">

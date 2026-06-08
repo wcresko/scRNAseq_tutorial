@@ -4168,6 +4168,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4472,6 +4503,13 @@ Note
 </section>
 <section id="the-technology-landscape" class="level2">
 <h2 class="anchored" data-anchor-id="the-technology-landscape">16.2 The technology landscape</h2>
+<p>Two axes define the spatial transcriptomics landscape: <strong>resolution</strong> (spot vs. single-cell vs. sub-cellular) and <strong>coverage</strong> (whole-transcriptome vs. targeted gene panel). Visium is high-coverage / low-resolution; Xenium and MERFISH are targeted / high-resolution. Match the platform to your hypothesis. <a href="#tbl-ch16-platforms" class="quarto-xref">Table 1</a> summarizes the major current options.</p>
+<div id="tbl-ch16-platforms" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch16-platforms-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: Major spatial transcriptomics platforms by resolution and transcriptome coverage. Visium is the established whole-transcriptome entry point; imaging-based platforms (Xenium, MERFISH, CosMx) provide single-cell resolution at the cost of a targeted gene panel.
+</figcaption>
+<div aria-describedby="tbl-ch16-platforms-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 20%">
@@ -4534,7 +4572,9 @@ Note
 </tr>
 </tbody>
 </table>
-<p>Two axes matter: <strong>resolution</strong> (spot vs cell vs sub-cellular) and <strong>coverage</strong> (whole-transcriptome vs targeted). Visium is high-coverage / low-resolution; Xenium is targeted / high-resolution. Match to your hypothesis.</p>
+</div>
+</figure>
+</div>
 </section>
 <section id="what-a-visium-spot-is-and-isnt" class="level2">
 <h2 class="anchored" data-anchor-id="what-a-visium-spot-is-and-isnt">16.3 What a Visium spot is — and isn’t</h2>
@@ -4551,6 +4591,20 @@ Note
 <li>“Deconvolution” is its own analytical step that decomposes each spot into cell-type fractions</li>
 </ul>
 <p>For true single-cell resolution, use Xenium / MERFISH / Visium HD. For tissue-overview-level analysis, Visium is fine and cheaper.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — a Visium spot is a tissue neighborhood, not a single cell">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — a Visium spot is a tissue neighborhood, not a single cell
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The 55 µm diameter of a Visium spot is larger than most mammalian cells (5–20 µm). This means every spot captures a mixture of cell types from the tissue neighborhood directly beneath it. The transcriptome of a spot is a <em>weighted average</em> of the transcriptomes of its constituent cells, weighted by how much mRNA each cell contributed. This has two important consequences. First, marker genes for a single cell type will be “diluted” by the expression of co-localized cells — a spot that is 80% neurons and 20% astrocytes will express both neuronal and astrocytic markers, making it impossible to assign it cleanly to one cell type without deconvolution. Second, clustering of spots recovers anatomical regions (layers, tissue compartments) rather than individual cell types, because spots in the same anatomical region contain similar mixtures of the same cell types. These properties make Visium well-suited for tissue-architecture questions and poorly suited for questions that require single-cell resolution.</p>
+</div>
+</div>
+<p>The Seurat object produced by <code>Load10X_Spatial()</code> stores the Visium data differently from a standard scRNA-seq object. The <code>@images</code> slot holds a <code>VisiumV1</code> object containing four things: the <strong>H&amp;E histology image</strong> (a downsampled JPEG from the Space Ranger output), the <strong>per-spot tissue coordinates</strong> (the pixel position of each spot’s center in the image), the <strong>scale factors</strong> (ratios between the full-resolution, low-resolution, and high-resolution coordinate systems that Space Ranger uses), and a flag for which barcodes are “in tissue” (spots that landed on tissue vs. the background). <code>SpatialFeaturePlot()</code> uses all four components simultaneously: it places colored circles at the correct pixel coordinates, scales them to the spot size using the scale factors, and overlays them on the H&amp;E image. If any component is missing or misaligned, the plot will either error or produce circles that float in the wrong positions relative to the tissue.</p>
 </section>
 <section id="the-visium-workflow" class="level2">
 <h2 class="anchored" data-anchor-id="the-visium-workflow">16.4 The Visium workflow</h2>
@@ -4567,6 +4621,21 @@ Note
 <li><strong>Load</strong> the <code>spaceranger</code> output into Seurat. The resulting object’s <code>@images</code> slot holds a <code>VisiumV1</code> object containing four things: the <strong>histology image</strong> (low-resolution JPEG), the <strong>per-spot tissue coordinates</strong> (which pixel each spot maps to in the image), the <strong>scale factors</strong> (ratios between the full-res, low-res, and hi-res coordinate systems), and a flag for which barcodes are “in tissue”. <code>SpatialFeaturePlot</code> uses all four to draw expression over the H&amp;E.</li>
 <li><strong>QC</strong> per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus <strong>always plot them on the tissue</strong>, because spatial outliers are tissue artifacts (folds, bubbles), not random noise.</li>
 <li><strong>Normalize</strong> with <code>SCTransform</code> — preferred over <code>LogNormalize</code> for spatial because each spot captures the transcriptome of 1–15 cells rather than one. This wider dynamic range means count distributions are further from the Poisson assumption that <code>LogNormalize</code> implicitly relies on; <code>SCTransform</code>’s regularized negative binomial model adjusts per-spot dispersion and handles outlier spots more robustly.</li>
+</ol>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — SCTransform for spatial (spatial-specific considerations)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — SCTransform for spatial (spatial-specific considerations)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>SCTransform(brain, assay = &quot;Spatial&quot;, verbose = FALSE)</code> runs the regularized negative-binomial regression on Visium counts. <strong>Default behavior</strong>: estimates per-gene overdispersion parameters (θ) by pooling information across genes, then extracts Pearson residuals as the normalized values. For Visium, the key difference from scRNA-seq is that the <code>assay</code> argument must be <code>&quot;Spatial&quot;</code> (not <code>&quot;RNA&quot;</code>). Visium spots have systematically wider count distributions than single cells because each spot aggregates multiple cells — <code>SCTransform</code> handles this by fitting per-spot size factors. A common warning, “iteration limit reached,” is usually safe to ignore for Visium: it occurs when an outlier spot causes the NB regression to converge slowly, but the result is still usable. Unlike scRNA-seq, <code>SCTransform</code> for Visium also accounts for the spatial variation in sequencing depth that arises from tissue-section-edge effects, making it more robust than <code>LogNormalize</code> for spatial data.</p>
+</div>
+</div>
+<ol start="4" type="1">
 <li><strong>Run PCA + clustering</strong> as in scRNA — but expect clusters to recover <strong>anatomical regions</strong>, not single-cell-type populations.</li>
 <li><strong>Spatially variable features</strong> with <strong>Moran’s I</strong> — see §16.6.</li>
 <li><strong>Integrate</strong> sections if you have multiple — same Harmony / anchor methods as scRNA, using the SCT integration path.</li>
@@ -4596,11 +4665,56 @@ Note
 <p>where <span class="math inline">\(w_{ij}\)</span> is a spatial weight (large for spatially close spots, zero for far). High Moran’s I = adjacent spots have similar expression = spatially structured gene.</p>
 <p>Seurat’s <code>FindSpatiallyVariableFeatures</code> runs the test. The output is the gene list ranked by Moran’s I; the top hits are genes whose spatial pattern is most non-random (spatial markers, anatomical-region-specific genes).</p>
 <p>Compare to <code>FindVariableFeatures</code> (which finds variable-but-not-necessarily-spatially-structured genes): the spatially variable list is a strict subset of the variable list. The difference is informative — variable but spatially random genes are usually technical (depth, ambient bleed) rather than biological.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — FindSpatiallyVariableFeatures / selection.method (Moran&#39;s I)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — FindSpatiallyVariableFeatures / selection.method (Moran’s I)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindSpatiallyVariableFeatures(brain, assay = &quot;SCT&quot;, features = VariableFeatures(brain)[1:1000], selection.method = &quot;moransi&quot;)</code> identifies spatially autocorrelated genes. <strong>Default <code>selection.method</code>: <code>&quot;markvariogram&quot;</code></strong> (a variogram-based approach) but the tutorial uses <code>&quot;moransi&quot;</code> because it is faster and more interpretable. <code>&quot;moransi&quot;</code> computes Moran’s I for each gene and ranks by the statistic; <code>&quot;markvariogram&quot;</code> fits a spatial variogram model and uses the fitted range parameter. For a first analysis, <code>&quot;moransi&quot;</code> is preferred because Moran’s I has a well-defined statistical interpretation and is faster. The <code>features</code> argument limits computation to the top HVGs — running on all 32,000 genes in the brain dataset is feasible but slower; restricting to <code>VariableFeatures(brain)[1:1000]</code> covers the biologically relevant range. For a thorough publication analysis, run on all <code>VariableFeatures</code> or the full gene set.</p>
+</div>
+</div>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — spatially variable features vs. highly variable features">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — spatially variable features vs. highly variable features
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FindVariableFeatures()</code> (used in scRNA-seq) finds genes that vary substantially across spots/cells, but variation can be driven by technical noise, depth heterogeneity, or genuine biological heterogeneity unrelated to spatial position. <code>FindSpatiallyVariableFeatures()</code> adds a spatial criterion: the variation must be <em>autocorrelated in space</em>, meaning nearby spots tend to share similar values. A gene with high Moran’s I has a spatial pattern — it is high in one region of the tissue and low in another. A gene with low Moran’s I but high total variance is spatially random, which often indicates a technical artifact or a rare cell type distributed uniformly. The spatially variable gene list is the biologically richer starting point for anatomical marker discovery and spatial domain analysis.</p>
+</div>
+</div>
 </section>
 <section id="cell-type-deconvolution" class="level2">
 <h2 class="anchored" data-anchor-id="cell-type-deconvolution">16.7 Cell-type deconvolution</h2>
 <p>Each Visium spot is a mixture. Deconvolution decomposes each spot’s transcriptome into estimated cell-type fractions, using a single-cell <strong>reference</strong> of the same tissue.</p>
-<p>Tools:</p>
+<p>Tools differ in their statistical model and whether they incorporate spatial smoothing; <a href="#tbl-ch16-deconv" class="quarto-xref">Table 2</a> summarizes the main options. The reference choice is critical regardless of tool: deconvolving a brain Visium with a PBMC reference returns garbage (PBMCs don’t include neurons). Match the reference to the tissue you sampled.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — RCTD / doublet_mode and reference cell count (deconvolution)">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — RCTD / doublet_mode and reference cell count (deconvolution)
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>run.RCTD(rctd, doublet_mode = &quot;doublet&quot;)</code> runs the RCTD deconvolution in doublet mode, which allows each spot to contain at most two cell types. <strong>Default <code>doublet_mode = &quot;doublet&quot;</code></strong> is appropriate for Visium, where many spots genuinely contain exactly two dominant cell types. Alternative modes: <code>&quot;full&quot;</code> (allows any number of cell types per spot, more flexible but noisier), <code>&quot;multi&quot;</code> (explicitly models multi-type spots, computationally expensive). For the reference, RCTD requires at minimum ~25 cells per cell type — cell types represented by fewer cells in the reference will have unreliable deconvolution estimates. The reference cell type set should include all cell types plausibly present in the tissue; missing reference cell types will cause their cells to be mis-assigned to the nearest available cell type.</p>
+</div>
+</div>
+<div id="tbl-ch16-deconv" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch16-deconv-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Spatial deconvolution tools and their statistical approaches. RCTD is the workshop default; cell2location is preferred for atlas-scale references. All require a tissue-matched single-cell reference.
+</figcaption>
+<div aria-describedby="tbl-ch16-deconv-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4642,7 +4756,9 @@ Note
 </tr>
 </tbody>
 </table>
-<p>The reference choice is critical. Deconvolving a brain Visium with a PBMC reference returns garbage (PBMCs don’t include neurons). Match the reference to the tissue you sampled.</p>
+</div>
+</figure>
+</div>
 <p>The output: per-spot, a probability vector over cell types. Plot each cell-type fraction as a <code>SpatialFeaturePlot</code>; you see the spatial distribution of each cell type as it’s distributed across the tissue.</p>
 </section>
 <section id="spatial-aware-clustering-beyond-standard-snnleiden" class="level2">
@@ -4659,6 +4775,13 @@ Note
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">16.9 Common errors</h2>
+<p><a href="#tbl-ch16-errors" class="quarto-xref">Table 3</a> collects the errors most commonly encountered in a Seurat/Signac Visium workflow, their causes, and the fix.</p>
+<div id="tbl-ch16-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch16-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common Visium / spatial transcriptomics errors, their underlying causes, and fixes.
+</figcaption>
+<div aria-describedby="tbl-ch16-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4700,6 +4823,9 @@ Note
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">16.10 Where this material is also discussed</h2>

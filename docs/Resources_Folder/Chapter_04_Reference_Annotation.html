@@ -4064,6 +4064,37 @@ z-index: 1055;
 position: relative;
 z-index: 1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+div.callout.key-concept {
+border-left-color: #6f42c1 !important;
+}
+div.callout.key-concept > .callout-header {
+background-color: rgba(111, 66, 193, 0.12) !important;
+}
+div.callout.key-concept > .callout-header .callout-icon-container {
+display: none; 
+}
+
+div.callout.key-parameter {
+border-left-color: #0aa2b8 !important;
+}
+div.callout.key-parameter > .callout-header {
+background-color: rgba(10, 162, 184, 0.12) !important;
+}
+div.callout.key-parameter > .callout-header .callout-icon-container {
+display: none; 
+}
 </style>
 </head>
 
@@ -4358,11 +4389,81 @@ Note
 <p><strong>Manual annotation (Chapter 3)</strong> — inspect canonical markers per cluster, assign names by hand. Interpretable, biased by the annotator’s experience, requires a literature.</p>
 <p><strong>Reference-based annotation (this chapter)</strong> — map your cells against a <em>labeled reference dataset</em> using a statistical method. Reproducible, biased by the reference’s coverage, requires a reference of the same tissue.</p>
 <p>Best practice is to run <strong>both</strong> and <strong>reconcile disagreements</strong> — they catch different kinds of errors. Manual annotation catches references missing your cell type; reference-based annotation catches missed subdivisions and reduces annotator bias. Automated annotation is now a crowded field — large comparisons evaluate 20–30+ classifiers and find that the best correlation- and classifier-based methods are accurate when the reference matches the query, but degrade sharply on cell types absent from the reference<span class="citation" data-cites="abdelaal2019comparison pasquini2021automated"><sup><a href="#ref-abdelaal2019comparison" role="doc-biblioref">1</a>,<a href="#ref-pasquini2021automated" role="doc-biblioref">2</a></sup></span>.</p>
-<p>The workshop tutorial uses <strong>Azimuth</strong> as its reference-based method: it ships curated, atlas-quality references (including a PBMC reference that is a perfect fit for <code>ifnb</code>), downloads them on demand, and needs no separate Bioconductor reference-data packages. §4.4 sketches the two other paradigms — correlation (SingleR) and classifier (CellTypist) — you’ll meet in the literature.</p>
+<div class="key-concept callout callout-style-default callout-note callout-titled" title="🔑 Key concept — what reference-based annotation actually does">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>🔑 Key concept — what reference-based annotation actually does
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every reference-based method — Azimuth, SingleR, or CellTypist — frames annotation as a <em>nearest-neighbor problem in a shared gene-expression space</em>: given a query cell and a set of reference cells with known labels, the query is assigned the label of the reference cells it most resembles, weighted by some confidence metric. What differs between methods is <em>how</em> resemblance is measured (correlation, Euclidean distance in PCA space, or learned logistic-regression weights) and <em>how</em> the reference was prepared (bulk RNA-seq averages, single-cell atlas, or a trained model). Crucially, all methods share the same blind spot: they can only assign labels that exist in the reference. A cell type absent from the reference will be assigned the closest available label, possibly with low confidence — it will never spontaneously return “novel.” This is why reading the confidence metric and reconciling against manual markers is not optional.</p>
+</div>
+</div>
+<p>The workshop tutorial uses <strong>Azimuth</strong> as its reference-based method: it ships curated, atlas-quality references (including a PBMC reference that is a perfect fit for <code>ifnb</code>), downloads them on demand, and needs no separate Bioconductor reference-data packages. <a href="#tbl-ch04-methods" class="quarto-xref">Table 1</a> summarizes the three paradigms side by side; §4.4 walks SingleR and CellTypist further.</p>
+<div id="tbl-ch04-methods" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch04-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 1: The three main reference-based annotation paradigms. All three degrade when the reference does not cover the query tissue — inspect the confidence metric and filter low-confidence cells rather than trusting every label<span class="citation" data-cites="abdelaal2019comparison pasquini2021automated"><sup><a href="#ref-abdelaal2019comparison" role="doc-biblioref">1</a>,<a href="#ref-pasquini2021automated" role="doc-biblioref">2</a></sup></span>.
+</figcaption>
+<div aria-describedby="tbl-ch04-methods-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Approach</th>
+<th>Reference needed</th>
+<th>Confidence metric</th>
+<th>Best for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Azimuth</strong></td>
+<td>Anchor-based mapping (CCA + MNN) into a precomputed reference manifold</td>
+<td>Pre-built atlas references (single-cell)</td>
+<td><code>mapping.score</code> per cell</td>
+<td>PBMC, brain, lung, fetal: tissues with curated Seurat refs</td>
+</tr>
+<tr class="even">
+<td><strong>SingleR</strong></td>
+<td>Per-cell Spearman correlation against per-label reference profiles</td>
+<td>Bulk or single-cell; <code>celldex</code> library</td>
+<td><code>delta</code> (top score − median); prune with <code>pruneScores()</code></td>
+<td>When only a bulk reference exists; Bioconductor-native workflows</td>
+</tr>
+<tr class="odd">
+<td><strong>CellTypist</strong></td>
+<td>Logistic-regression classifier trained on atlas data</td>
+<td>Pre-trained models (Python package)</td>
+<td>Per-label probability (multi-label aware)</td>
+<td>Python / Scanpy workflows; multi-label / ambiguous cells</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>§4.4 sketches SingleR and CellTypist further.</p>
 </section>
 <section id="azimuth-anchor-based-reference-mapping" class="level2">
 <h2 class="anchored" data-anchor-id="azimuth-anchor-based-reference-mapping">4.2 Azimuth — anchor-based reference mapping</h2>
-<p>Azimuth wraps Seurat’s anchor-based mapping<span class="citation" data-cites="hao2021integrated"><sup><a href="#ref-hao2021integrated" role="doc-biblioref">3</a></sup></span> (the same method as Seurat integration, applied with a query → reference orientation). Pre-built atlas-quality references are available:</p>
+<p>Azimuth wraps Seurat’s anchor-based mapping<span class="citation" data-cites="hao2021integrated"><sup><a href="#ref-hao2021integrated" role="doc-biblioref">3</a></sup></span> (the same method as Seurat integration, applied with a query → reference orientation). The key design advantage is that the reference UMAP and cell labels are precomputed once from a large atlas dataset; at query time, your cells are projected <em>into</em> that manifold rather than re-computing everything jointly. This is fundamentally different from methods that require both the query and reference to be processed together: because Azimuth’s reference is frozen at publication time and its UMAP is precomputed, mapping a new query to it is fast (minutes on a laptop), consistent across queries, and does not require re-running the reference-side integration every time. The shared feature space between query and reference is determined by finding mutual nearest neighbors across the two datasets after projecting both into a common CCA subspace — the same anchor-finding machinery used for multi-sample integration in Chapter 5. Pre-built atlas-quality references are available:</p>
+<div id="tbl-ch04-aziref" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch04-aziref-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 2: Available Azimuth pre-built references as of 2025. Matching tissue type is mandatory — a PBMC reference applied to tumor or gut data will label every cell but with low <code>mapping.score</code> and high error rates.
+</figcaption>
+<div aria-describedby="tbl-ch04-aziref-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -4399,6 +4500,9 @@ Note
 </tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 <p>For each query cell, Azimuth:</p>
 <ol type="1">
 <li>Projects it into the reference’s PC space using shared HVGs</li>
@@ -4423,7 +4527,47 @@ Note
 </section>
 <section id="reading-azimuths-mapping-score" class="level2">
 <h2 class="anchored" data-anchor-id="reading-azimuths-mapping-score">4.3 Reading Azimuth’s mapping score</h2>
-<p><code>mapping.score</code> reflects how well the cell’s local neighborhood projects into the reference’s manifold. Bimodal distributions are common: one peak is in-reference cells (mapping score 0.7–1.0), the other is out-of-reference cells (0.0–0.4).</p>
+<p><code>mapping.score</code> is the primary quality filter for Azimuth output; it reflects how well the cell’s local neighborhood projects into the reference’s manifold. <a href="#tbl-ch04-mapscore" class="quarto-xref">Table 3</a> gives practical interpretation ranges. Bimodal distributions are common: one peak represents in-reference cells (mapping score 0.7–1.0), the other out-of-reference cells (0.0–0.4). A good first diagnostic after running Azimuth is to plot <code>FeaturePlot(seu, features = &quot;mapping.score&quot;)</code> on the UMAP — a clean matched-reference run produces a uniformly high-scoring cloud with occasional low-scoring outliers; a bimodal distribution with a substantial low-scoring population tells you the reference doesn’t cover a large fraction of your data and the labels on those cells should not be trusted. Plotting <code>tapply(seu$mapping.score, seu$stim, mean)</code> for a multi-condition dataset quantifies any systematic asymmetry between conditions.</p>
+<div id="tbl-ch04-mapscore" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch04-mapscore-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Practical interpretation of Azimuth <code>mapping.score</code>. On a well-matched reference (e.g. <code>pbmcref</code> applied to a healthy-donor PBMC dataset), the vast majority of cells should score above 0.7; a large low-scoring fraction indicates a reference mismatch.
+</figcaption>
+<div aria-describedby="tbl-ch04-mapscore-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Score range</th>
+<th>Interpretation</th>
+<th>Recommended action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0.7 – 1.0</td>
+<td>Cell maps confidently into the reference manifold</td>
+<td>Trust the label</td>
+</tr>
+<tr class="even">
+<td>0.4 – 0.7</td>
+<td>Borderline — cell is near but not firmly inside the reference</td>
+<td>Inspect manually; cross-check against manual marker annotation</td>
+</tr>
+<tr class="odd">
+<td>0.0 – 0.4</td>
+<td>Cell does not project into the reference</td>
+<td>Label is unreliable; likely a cell type absent from the reference</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
 <p>For cells with low mapping score:</p>
 <ul>
 <li>The label assignment is unreliable — don’t trust it</li>
@@ -4432,13 +4576,39 @@ Note
 <p>In an <code>ifnb</code> PBMC analysis with the <code>pbmcref</code> reference, mapping scores should be uniformly high (&gt;0.7) because the data is the reference’s intended target. In a tumor analysis using <code>pbmcref</code>, the immune cells score high and the tumor/stromal cells score low — and you should <em>not</em> trust the labels on the low-scoring cells.</p>
 <p><strong>The <code>ifnb</code> STIM/CTRL asymmetry.</strong> Even on a matched reference, you may notice that STIM cells receive <strong>systematically lower mapping scores</strong> than CTRL cells of the same type. This is expected: the <code>pbmcref</code> reference was built from resting PBMCs, and IFN-β stimulation shifts the STIM cells away from the resting manifold even though their cell-type identity is unchanged. The right interpretation is that the label is still correct (the cells are genuinely CD14 Monocytes or CD4 T cells) but the confidence is lower because the activated state is under-represented in the reference. Use <code>tapply(seu$mapping.score, seu$stim, mean)</code> to quantify the asymmetry; if it is large and systematic, consider comparing Azimuth labels against your manual annotations more carefully for the STIM condition.</p>
 <p>Always report the share of low-mapping-score cells in your methods, the same way you would report a prune fraction. Healthy on a matched reference: very few. A large low-scoring fraction means the reference doesn’t cover your data — pick a different one.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — Azimuth mapping.score threshold">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — Azimuth mapping.score threshold
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Azimuth reports <code>mapping.score</code> per cell in the range [0, 1]. <strong>Recommended threshold: &gt; 0.7 to trust a label.</strong> There is no single hard cutoff baked into the method — the Azimuth documentation uses 0.7 as a practical rule of thumb, and the workshop adopts it. Cells below 0.7 are “borderline” (0.4–0.7) or clearly off-manifold (&lt; 0.4) and should be compared against manual marker annotation before their label is accepted. In practice, on a well-matched reference (e.g. <code>pbmcref</code> applied to healthy-donor PBMCs) virtually all cells score &gt; 0.7; on a mismatched reference (e.g. <code>pbmcref</code> applied to tumor tissue) a large fraction will score &lt; 0.4. Always report the proportion of cells below threshold in your methods section.</p>
+</div>
+</div>
 </section>
 <section id="other-reference-based-methods-youll-meet" class="level2">
 <h2 class="anchored" data-anchor-id="other-reference-based-methods-youll-meet">4.4 Other reference-based methods you’ll meet</h2>
-<p>The workshop runs Azimuth, but two other paradigms are common in the literature — worth recognizing even though we don’t install them here.</p>
-<p><strong>SingleR — correlation against a reference</strong><span class="citation" data-cites="aran2019singler"><sup><a href="#ref-aran2019singler" role="doc-biblioref">4</a></sup></span>. SingleR compares each query cell’s expression vector against per-label reference profiles by Spearman correlation, then assigns the best-matching label, optionally with a fine-tuning step. Its classic pairing is with the <code>celldex</code> package, which provides curated bulk references (e.g. <code>HumanPrimaryCellAtlasData()</code>, covering 37 main human cell types). Each call returns a <code>delta</code> diagnostic (top-label score minus median) and <code>pruneScores()</code> NAs the labels where <code>delta</code> is too small. SingleR shines when you only have a <em>bulk</em> reference; its weakness, like all reference methods, is that without a confidence threshold every cell gets a label — including cells whose biology isn’t in the reference.</p>
-<p><strong>CellTypist — pre-trained logistic regression</strong><span class="citation" data-cites="dominguezconde2022crosstissue"><sup><a href="#ref-dominguezconde2022crosstissue" role="doc-biblioref">5</a></sup></span>. CellTypist trains logistic-regression models per cell type from atlas-scale references, then runs the trained model on your query. It is fast, returns per-cell probabilities for every label (multi-label aware), and has the largest pre-trained model library. The Python implementation is the mature one; for Python-native (<code>scanpy</code>) workflows it is often the first choice.</p>
-<p>All three degrade the same way when the reference doesn’t cover the query — the benchmarks in §4.1 make that point repeatedly. The practical lesson is identical regardless of method: read the confidence diagnostic, and reconcile against manual markers.</p>
+<p>The workshop runs Azimuth, but two other paradigms are common in the literature. Understanding them lets you read methods sections critically and choose the right tool when Azimuth’s pre-built references don’t match your tissue.</p>
+<p><strong>SingleR — correlation against a reference</strong><span class="citation" data-cites="aran2019singler"><sup><a href="#ref-aran2019singler" role="doc-biblioref">4</a></sup></span>. SingleR compares each query cell’s expression vector against per-label reference profiles by Spearman correlation, then assigns the best-matching label, optionally with a fine-tuning step that iteratively removes low-scoring labels until only one remains. Its classic pairing is with the <code>celldex</code> package, which provides curated bulk RNA-seq references (e.g. <code>HumanPrimaryCellAtlasData()</code>, covering 37 main human cell types, and <code>ImmGenData()</code> for mouse immune). The key diagnostic is the <code>delta</code> statistic — the top-label score minus the median score over all labels — which <code>pruneScores()</code> uses to NA the label when the margin is too small to trust. SingleR shines when you only have a <em>bulk</em> reference (no matching single-cell atlas exists for your tissue) and in Bioconductor-native workflows. Its main weakness is that, like all reference methods, it always returns a label — including for cells whose type is genuinely absent from the reference. The <code>pruneScores()</code> step is not optional; it is what separates reliable from unreliable calls.</p>
+<p><strong>CellTypist — pre-trained logistic regression</strong><span class="citation" data-cites="dominguezconde2022crosstissue"><sup><a href="#ref-dominguezconde2022crosstissue" role="doc-biblioref">5</a></sup></span>. CellTypist trains a sparse logistic-regression classifier per cell type from atlas-scale references (primarily the Human Cell Atlas and large CELLxGENE census datasets), then applies the trained model to your query cells. It is fast, returns per-label probability scores (making it multi-label aware — a cell can score high for both “CD4 T activated” and “CD4 T naive”), and ships over 40 pre-trained models covering many human and mouse tissues. The Python implementation is the mature one; for Scanpy workflows it is the most natural choice. Like all classifiers, its accuracy depends on whether its training labels match the granularity and tissue context of your query.</p>
+<p>All three methods share the same fundamental failure mode: when the reference doesn’t cover a cell type present in the query, the method still assigns the closest available label. The benchmarks in §4.1 make this point repeatedly<span class="citation" data-cites="abdelaal2019comparison pasquini2021automated"><sup><a href="#ref-abdelaal2019comparison" role="doc-biblioref">1</a>,<a href="#ref-pasquini2021automated" role="doc-biblioref">2</a></sup></span>. The practical lesson is identical regardless of method: always read the confidence diagnostic (<code>mapping.score</code> for Azimuth, <code>delta</code> for SingleR, probability for CellTypist), filter low-confidence cells, and reconcile against manual markers before publishing any annotation.</p>
+<div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — SingleR delta (pruneScores) and CellTypist majority_voting">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>⚙️ Key parameter — SingleR delta (pruneScores) and CellTypist majority_voting
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>SingleR:</strong> <code>pruneScores(results, min.diff.med = 0.05)</code> removes labels where the top-label Spearman score minus the median score over all labels (<code>delta</code>) is too small to be trustworthy. The default <code>min.diff.med = 0.05</code> is a conservative threshold; reducing it accepts more marginal calls. Cells pruned to <code>NA</code> by <code>pruneScores</code> are the SingleR equivalent of low Azimuth mapping scores — they should not be used without further investigation. <strong>CellTypist:</strong> <code>CellTypist.annotate(majority_voting = True)</code> consolidates per-cell probability scores into a cluster-level majority vote before assigning a final label — reducing noise on a per-cell basis at the cost of assigning the same label to all cells in a cluster even when a few clearly belong elsewhere. <code>majority_voting = False</code> (the default) assigns each cell independently based on its highest per-label probability, which can be inconsistent across cells in the same cluster but exposes genuine heterogeneity.</p>
+</div>
+</div>
 </section>
 <section id="the-reconciliation-step" class="level2">
 <h2 class="anchored" data-anchor-id="the-reconciliation-step">4.5 The reconciliation step</h2>
@@ -4493,6 +4663,13 @@ Warning
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">4.7 Common errors</h2>
+<p><a href="#tbl-ch04-errors" class="quarto-xref">Table 4</a> collects the most frequent problems encountered with reference-based annotation tools, their root causes, and the fixes.</p>
+<div id="tbl-ch04-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch04-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 4: Common errors in reference-based annotation and their fixes. The most important habit is checking <code>mapping.score</code> before using any labels — automated methods always produce a label, regardless of whether the cell type is represented in the reference.
+</figcaption>
+<div aria-describedby="tbl-ch04-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4515,7 +4692,7 @@ Warning
 <tr class="even">
 <td>Mapping scores are uniformly low</td>
 <td>Wrong reference for your tissue</td>
-<td>Match tissue; consider an atlas like Tabula Sapiens</td>
+<td>Match tissue; consider an atlas like Tabula Sapiens<span class="citation" data-cites="tabulasapiens2022"><sup><a href="#ref-tabulasapiens2022" role="doc-biblioref">8</a></sup></span></td>
 </tr>
 <tr class="odd">
 <td>All cells get a coarse label</td>
@@ -4527,8 +4704,16 @@ Warning
 <td>Normal — T-cell subdivision is genuinely hard</td>
 <td>Inspect markers; document; sometimes both are partly right</td>
 </tr>
+<tr class="odd">
+<td>Every cell is labeled even with low mapping score</td>
+<td>No confidence filter applied</td>
+<td>Filter with <code>mapping.score &gt; 0.7</code> before accepting labels</td>
+</tr>
 </tbody>
 </table>
+</div>
+</figure>
+</div>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
 <h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">4.8 Where this material is also discussed</h2>
