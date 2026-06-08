@@ -51,8 +51,9 @@ cat("Wrote Slingshot pseudotime for", ncol(sce), "cells (root =", root, ")\n")
 cat("Wrote Mod14 figures/tables to", OUT_DIR, "\n")
 
 # Part B — RNA velocity (scVelo) is a Python analysis. Run the companion script
-# 14_rna_velocity_scvelo.py (it needs spliced/unspliced layers from velocyto/kb,
-# NOT the Cell Ranger filtered matrix).
+# 14_rna_velocity_scvelo.py (on Talapas: sbatch run_python.sbatch
+# 14_rna_velocity_scvelo.py). It needs spliced/unspliced layers from velocyto/kb,
+# NOT the Cell Ranger filtered matrix.
 
 # Part C — Cell-cell communication with CellChat (uncomment once CellChat is installed):
 # library(CellChat)

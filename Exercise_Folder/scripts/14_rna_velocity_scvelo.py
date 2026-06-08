@@ -13,8 +13,13 @@ than the .R script. It needs a SPLICED/UNSPLICED count matrix — a .loom from
 run from it (the most common reason a velocity run "fails" or returns flat
 arrows).
 
-Run (e.g. on Talapas, inside a Python env that has scvelo installed):
+Run locally (inside a Python env that has scvelo installed):
     OUT_DIR=../output/Mod14 LOOM=../data/ifnb_velocyto.loom python 14_rna_velocity_scvelo.py
+
+Run on Talapas via SLURM (the Python sibling of run_rscript.sbatch):
+    mkdir -p logs
+    LOOM=../data/ifnb_velocyto.loom sbatch --job-name=velocity \
+        run_python.sbatch 14_rna_velocity_scvelo.py
 
 Install once (choose one):
     pip install scvelo scanpy

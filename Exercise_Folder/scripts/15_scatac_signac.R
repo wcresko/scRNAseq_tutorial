@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Talapas analysis pipeline 09 — parallels laptop Tutorial 09 (scATAC-seq with Signac).
+# Talapas analysis pipeline 15 — parallels laptop Tutorial 15 (scATAC-seq with Signac).
 # Standalone bonus track. Dataset: PBMC 10k scATAC-seq v1 (hg19) in ../data/.
 # Learning notebook: Exercise_Folder/Tutorial_15_scATACseq_Signac.qmd
 # Run:  sbatch --job-name=atac --mem=64G run_rscript.sbatch 15_scatac_signac.R

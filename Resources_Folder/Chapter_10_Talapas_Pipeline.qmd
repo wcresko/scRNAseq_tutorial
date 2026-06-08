@@ -114,7 +114,7 @@ sbatch --job-name=da     --mem=96G run_rscript.sbatch 08_differential_abundance.
 
 Because the steps are chained, you launch them one at a time and **confirm each before starting the next**. Concretely: look in the `.out` log for the `Wrote ...` line that the script prints when it has finished writing its object, and run `seff <jobid>` to confirm `State: COMPLETED` — not `OUT_OF_MEMORY` or `TIMEOUT`, either of which would have left a corrupt hand-off (§10.4).
 
-**`run_pipeline.sbatch` — the whole series in one allocation.** When you simply want to reproduce the entire core analysis end-to-end, this wrapper runs all eight scripts in order inside a single SLURM allocation (roughly 12 hours, 96 GB):
+**`run_core_pipeline.sbatch` — the whole series in one allocation.** When you simply want to reproduce the entire core analysis end-to-end, this wrapper runs all eight scripts in order inside a single SLURM allocation (roughly 12 hours, 96 GB):
 
 ``` bash
 STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
@@ -124,7 +124,7 @@ for step in "${STEPS[@]}"; do
 done
 ```
 
-You submit it once with `sbatch run_pipeline.sbatch` (after `mkdir -p logs` and pre-caching `ifnb`), then confirm `State: COMPLETED` with `seff`. This is the simplest path to "run the whole thing." The trade-off versus the one-at-a-time approach is granularity: a single fat allocation cannot right-size memory per step, so use the per-step wrapper when you need that control and the pipeline wrapper when you just want the full run.
+You submit it once with `sbatch run_core_pipeline.sbatch` (after `mkdir -p logs` and pre-caching `ifnb`), then confirm `State: COMPLETED` with `seff`. This is the simplest path to "run the whole thing." The trade-off versus the one-at-a-time approach is granularity: a single fat allocation cannot right-size memory per step, so use the per-step wrapper when you need that control and the pipeline wrapper when you just want the full run.
 
 ## 10.7 The bonus scripts (13–17)
 
@@ -140,7 +140,9 @@ Beyond the core chain, five **bonus scripts** parallel the downstream bonus lapt
 
 Scripts 13 (WGCNA) and 15 (scATAC) use their own datasets, downloaded into `../data/`; 14 and 17 run on the annotated `ifnb` object the core pipeline produces; 16 uses the `stxBrain` spatial dataset. Because they do not chain on each other, you can run whichever bonus analyses interest you in any order, once the relevant input exists.
 
-One caveat, consistent with the notebooks: steps that are inherently *interactive* or *Python-based* — Monocle3 root selection, scVelo, CellChat plotting, the `cellxgene-schema` validator — cannot be fully automated in a batch script and are kept as **commented sketches** inside the scripts, exactly as they appear in the notebooks. The bonus scripts mirror the *runnable core* of each notebook, not its interactive parts.
+Just as the core eight have `run_core_pipeline.sbatch`, the bonus five have a parallel wrapper, **`run_bonus_pipeline.sbatch`**, that runs `13`–`17` in one allocation. Because they're standalone (each needs its own dataset), that wrapper does **not** abort if one step fails — it logs the failure and continues to the next — so a missing dataset for, say, WGCNA won't stop the spatial run. Submit it with `sbatch run_bonus_pipeline.sbatch` after `mkdir -p logs`.
+
+One caveat, consistent with the notebooks: steps that are inherently *interactive* or *Python-based* — Monocle3 root selection, scVelo, CellChat plotting, the `cellxgene-schema` validator — cannot be fully automated in a batch script and are kept as **commented sketches** inside the scripts, exactly as they appear in the notebooks. The bonus scripts mirror the *runnable core* of each notebook, not its interactive parts. The one exception is **RNA velocity** (Module 14), which is packaged as a runnable Python script, `14_rna_velocity_scvelo.py`, submitted via `sbatch run_python.sbatch 14_rna_velocity_scvelo.py`.
 
 ## 10.8 Adapting the pipeline to your own data
 
