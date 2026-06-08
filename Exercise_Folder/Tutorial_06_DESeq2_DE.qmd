@@ -281,24 +281,43 @@ save_base_fig(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"), width = 7, heigh
 
 ```{r}
 #| label: top-hit-airway
-#| fig-cap: "Per-sample normalized counts for the top-ranked airway hit, split by treatment."
+#| fig-cap: "Per-sample normalized counts for the top 5 airway hits (by padj), each panel labelled with its gene, split by treatment."
 top_genes <- as.data.frame(res_shrunk) |>
   rownames_to_column("gene") |>
   arrange(padj) |>
   head(5)
 top_genes
 
-plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
-           main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
+# Gather per-sample normalized counts for the top 5 genes (plotCounts can return
+# the data instead of drawing), so we can plot them together with gene labels.
+counts_top <- purrr::map_dfr(top_genes$gene, function(g) {
+  d <- plotCounts(dds, gene = g, intgroup = "dex", returnData = TRUE)
+  d$gene <- g
+  d
+})
+# Keep the panels ordered by significance (padj rank), not alphabetically.
+counts_top$gene <- factor(counts_top$gene, levels = top_genes$gene)
+
+p_top <- ggplot(counts_top, aes(x = dex, y = count, colour = dex)) +
+  geom_jitter(width = 0.12, height = 0, size = 2, alpha = 0.85) +
+  facet_wrap(~ gene, nrow = 1, scales = "free_y") +   # facet strip = the gene label
+  scale_y_log10() +
+  labs(
+    title    = "Top 5 airway hits (by padj) — per-sample normalized counts",
+    subtitle = "Each panel is a gene; points are samples, split by treatment",
+    x        = "Treatment (dex)",
+    y        = "Normalized count (log scale)",
+    colour   = "Treatment"
+  ) +
+  theme(legend.position = "none")
+p_top
 
 # --- Table out: top 5 hits by padj -----------------------------------------
 readr::write_csv(top_genes, file.path(out_dir, "Mod6_C10_airway_top_hits.csv"))
 
-# --- Figure out: base-graphics per-sample counts for the top hit -----------
-save_base_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), width = 6, height = 5, draw = function() {
-  plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
-             main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
-})
+# --- Figure out: per-sample counts for the top 5 hits (png + svg) -----------
+save_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), p_top,
+         width = 11, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
