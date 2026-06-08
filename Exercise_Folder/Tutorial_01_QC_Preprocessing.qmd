@@ -105,7 +105,11 @@ By the end of this tutorial you will be able to:
 
 **`scDblFinder` returns a different result than the workshop** — `scDblFinder` is stochastic. The workshop uses `set.seed(2026)` *immediately before* calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.
 
-**SoupX errors with "no raw matrix found"** — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The Step 5 callout flags this — the SoupX block is illustrative on `ifnb`. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
+**SoupX errors with "no raw matrix found"** (or `subscript out of bounds` from `load10X`) — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The Step 5 block is an **illustrative template** for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
+
+**Warnings (not errors) during doublet detection** — when Step 6 runs you'll see `Layer 'data'/'scale.data' is empty` and `'normalizeCounts'/'librarySizeFactors' is deprecated`. Both are harmless: doublet detection runs on **raw counts before normalization** (so those layers are legitimately empty), and the deprecation notes come from `scran`/`scuttle` *inside* `scDblFinder`, not your code. As long as you see `Creating … artificial doublets`, it's working.
+
+**Feature/gene-name message `replacing '_' with '-'`** — a few gene symbols in `ifnb` contain underscores, which Seurat disallows in feature names, so they're renamed to dashes (valid names like `HLA-A`). The loader does this explicitly and reports which genes; no marker used downstream has an underscore, so nothing breaks.
 :::
 
 
@@ -459,10 +463,17 @@ library(scDblFinder)
 
 set.seed(2026)
 
-# Run scDblFinder per sample, then merge the results back into the Seurat object
+# Run scDblFinder per sample, then merge the results back into the Seurat object.
+# NOTE on the messages you'll see here (all harmless, NOT errors):
+#   - "Layer 'data'/'scale.data' is empty" — doublet detection runs BEFORE
+#     normalization (Step 8), so those layers aren't populated yet; scDblFinder
+#     works on raw counts and normalizes internally. We wrap the conversion in
+#     suppressWarnings() to quiet those expected notes.
+#   - "'normalizeCounts'/'librarySizeFactors' is deprecated" — these come from
+#     scran/scuttle *inside* scDblFinder, not from this code; safe to ignore.
 ifnb_list <- SplitObject(ifnb, split.by = "stim")
 ifnb_list <- lapply(ifnb_list, function(x) {
-  sce <- as.SingleCellExperiment(x)
+  sce <- suppressWarnings(as.SingleCellExperiment(x))
   sce <- scDblFinder(sce, returnType = "sce")
   x$scDblFinder.score <- colData(sce)$scDblFinder.score
   x$scDblFinder.class <- colData(sce)$scDblFinder.class    # "singlet" or "doublet"
