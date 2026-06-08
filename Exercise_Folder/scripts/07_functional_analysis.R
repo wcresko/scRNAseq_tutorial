@@ -18,6 +18,15 @@ dir.create(FUN_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# Prefer dplyr's verbs over identically-named functions from the Bioconductor
+# packages loaded above: S4Vectors/IRanges/AnnotationDbi/matrixStats (pulled in by
+# org.Hs.eg.db, DESeq2, miloR, SingleCellExperiment, ...) mask select, filter,
+# count, desc, slice, rename, first. Re-bind the ones used below so the dplyr
+# pipelines work regardless of package load order.
+select <- dplyr::select; filter <- dplyr::filter; count <- dplyr::count
+desc   <- dplyr::desc;   slice  <- dplyr::slice
+rename <- dplyr::rename; first  <- dplyr::first
+
 # --- Figure saving --------------------------------------------------------
 # save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
 # editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
