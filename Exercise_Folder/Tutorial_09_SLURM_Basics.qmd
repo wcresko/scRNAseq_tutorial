@@ -72,6 +72,7 @@ Before you start:
 Optionally, set your account once in `~/.bash_profile` so you don't type `--account=` every time:
 
 ```{bash}
+#| label: M9-echo_export_slurm_account
 #| eval: false
 echo 'export SLURM_ACCOUNT=<myPIRG>'  >> ~/.bash_profile
 echo 'export SBATCH_ACCOUNT=<myPIRG>' >> ~/.bash_profile
@@ -137,6 +138,7 @@ Use an **interactive** session (`srun` / `salloc`) when you'll **sit and watch**
 From a Talapas login node, run:
 
 ```{bash}
+#| label: M9-srun_account_mypirg
 #| eval: false
 srun --account=<myPIRG> \
      --partition=compute \
@@ -160,6 +162,7 @@ When the resources are available, your prompt will change to show the hostname o
 **`salloc` — the close cousin of `srun --pty bash`.** Run `salloc` from a **login node** to request an interactive allocation; when it's granted, your shell **prompt changes from the login node to the compute node** (e.g. `n0135`) and you work there directly:
 
 ```{bash}
+#| label: M9-allocation_granted_prompt_changes
 #| eval: false
 salloc --account=<myPIRG> --partition=compute --time=1:00:00 --mem=4G --cpus-per-task=2
 # allocation granted → prompt changes, e.g.  [duckid@n0135 ~]$
@@ -172,6 +175,7 @@ salloc --account=<myPIRG> --partition=compute --time=1:00:00 --mem=4G --cpus-per
 For short, quick sessions the `interactive` partition is usually faster to start:
 
 ```{bash}
+#| label: M9-srun_account_mypirg_partition
 #| eval: false
 srun --account=<myPIRG> --partition=interactive --time=2:00:00 --mem=8G --pty bash
 ```
@@ -179,6 +183,7 @@ srun --account=<myPIRG> --partition=interactive --time=2:00:00 --mem=8G --pty ba
 ### 5.3 Interactive GPU session
 
 ```{bash}
+#| label: M9-srun_account_mypirg_2
 #| eval: false
 srun --account=<myPIRG> \
      --partition=interactivegpu \
@@ -220,6 +225,7 @@ The Talapas scripts folder ships a tiny demo, [`hello_world.R`](scripts/hello_wo
 From an interactive session (above), load R and run it:
 
 ```{bash}
+#| label: M9-module_load_r
 #| eval: false
 module load R
 Rscript hello_world.R
@@ -250,6 +256,7 @@ For longer-running analyses (which is most real workshop work), write a **batch 
 The shipped scripts (`slurm_demo.sbatch`, `run_rscript.sbatch`, and the analysis-step examples below) write their `.out`/`.err` logs to a `logs/` subdirectory via `#SBATCH --output=logs/%x_%j.out`. **SLURM does not create this directory for you** — if it is missing, the job is rejected (or dies instantly with no log to explain why). From the `scripts/` folder you submit jobs from, run this once:
 
 ```{bash}
+#| label: M9-mkdir_p_logs
 #| eval: false
 mkdir -p logs
 ```
@@ -262,6 +269,7 @@ mkdir -p logs
 Save the following as `hostname.sbatch`:
 
 ```{bash}
+#| label: M9-bin_bash
 #| eval: false
 #!/bin/bash
 #SBATCH --account=<myPIRG>        ### PIRG / account for charging
@@ -281,6 +289,7 @@ echo "Hello from $(hostname) at $(date)"
 Submit it:
 
 ```{bash}
+#| label: M9-sbatch_hostname_sbatch
 #| eval: false
 sbatch hostname.sbatch
 ```
@@ -294,6 +303,7 @@ Submitted batch job 123456
 Check its status:
 
 ```{bash}
+#| label: M9-or
 #| eval: false
 squeue -j 123456
 # or
@@ -311,6 +321,7 @@ You don't have to type it out: the Talapas scripts folder includes [`slurm_demo.
 All `#SBATCH` lines must be at the **top** of the script, before any other commands. A few additional flags worth knowing:
 
 ```{bash}
+#| label: M9-sbatch_mem_per_cpu
 #| eval: false
 #SBATCH --mem-per-cpu=4G          ### per-core memory (alternative to --mem)
 #SBATCH --mail-type=END,FAIL      ### email on end/failure
@@ -323,6 +334,7 @@ All `#SBATCH` lines must be at the **top** of the script, before any other comma
 A batch script that loads R and runs a Seurat QC pipeline looks like this:
 
 ```{bash}
+#| label: M9-bin_bash_2
 #| eval: false
 #!/bin/bash
 #SBATCH --account=<myPIRG>
@@ -352,6 +364,7 @@ Note how `module purge` and `module load` happen *inside* the script --- modules
 ### 6.4 GPU batch job
 
 ```{bash}
+#| label: M9-bin_bash_3
 #| eval: false
 #!/bin/bash
 #SBATCH --account=<myPIRG>
@@ -381,6 +394,7 @@ python scripts/train_scvi.py
 You don't need a separate `.sbatch` file for every R script. The folder ships a generic wrapper, [`run_rscript.sbatch`](scripts/run_rscript.sbatch), whose last line is simply:
 
 ```{bash}
+#| label: M9-rscript_script
 #| eval: false
 Rscript "${SCRIPT}"
 ```
@@ -388,6 +402,7 @@ Rscript "${SCRIPT}"
 Pass the R script as an argument and override the job name per run:
 
 ```{bash}
+#| label: M9-or_real_analysis_step
 #| eval: false
 sbatch --job-name=hello run_rscript.sbatch hello_world.R
 # or a real analysis step:
@@ -397,6 +412,7 @@ sbatch --job-name=qc    run_rscript.sbatch 01_qc_preprocessing.R
 Then watch the queue and, when it finishes, read the logs (or open them in VS Code):
 
 ```{bash}
+#| label: M9-squeue_u_user
 #| eval: false
 squeue -u $USER
 cat logs/hello_*.out      # stdout
@@ -410,6 +426,7 @@ This is exactly how the rest of the Talapas track is run — every analysis step
 When you want to reproduce the **entire core analysis** (Modules 01–08) end-to-end rather than one step at a time, the folder also ships [`run_core_pipeline.sbatch`](scripts/run_core_pipeline.sbatch). It runs the eight numbered scripts **in order** inside a single allocation — each step's `.rds`/`.csv` output is the next step's input:
 
 ```{bash}
+#| label: M9-sbatch_one_allocation_12
 #| eval: false
 #SBATCH ... (one allocation, ~12 h, 96 GB)
 STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
@@ -422,6 +439,7 @@ done
 Submit it once (after `mkdir -p logs` and pre-caching `ifnb` on a login node):
 
 ```{bash}
+#| label: M9-sbatch_core_pipeline_sbatch
 #| eval: false
 sbatch run_core_pipeline.sbatch
 squeue -u $USER
@@ -445,6 +463,7 @@ control — running one step at a time, or right-sizing memory per step — use
 After a job finishes, check what it actually used:
 
 ```{bash}
+#| label: M9-seff_123456
 #| eval: false
 seff 123456
 ```
@@ -452,6 +471,7 @@ seff 123456
 or:
 
 ```{bash}
+#| label: M9-sacct_j_123456_format
 #| eval: false
 sacct -j 123456 --format=JobID,JobName,ReqMem,MaxRSS,Elapsed,State,ExitCode
 ```
@@ -463,6 +483,7 @@ Use `MaxRSS` (peak memory) and `Elapsed` (wall time) to right-size future submis
 ## 8. Monitoring, cancelling, and troubleshooting
 
 ```{bash}
+#| label: M9-see_jobs
 #| eval: false
 # See your jobs
 squeue -u $USER

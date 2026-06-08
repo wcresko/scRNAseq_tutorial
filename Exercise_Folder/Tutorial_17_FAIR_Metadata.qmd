@@ -88,7 +88,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ## Setup
 
 ```{r}
-#| label: setup
+#| label: M17-setup
 library(Seurat)
 library(tidyverse)
 
@@ -117,7 +117,7 @@ ifnb
 ## Step 1 — Audit what's actually in the object
 
 ```{r}
-#| label: audit
+#| label: M17-audit
 
 # Per-cell metadata columns
 colnames(ifnb@meta.data)
@@ -154,7 +154,7 @@ A 2030-era reanalyzer would not be able to determine species (the paper says hum
 Load the example sheet and adapt it for the `ifnb` study. In a real study, you'd build this **at experimental design time** and version-control it alongside your code.
 
 ```{r}
-#| label: canonical-sheet
+#| label: M17-canonical_sheet
 
 canonical <- read_csv("../Resources_Folder/metadata_templates/canonical_sample_sheet.csv")
 canonical
@@ -190,7 +190,7 @@ CELLxGENE Discover requires a small set of per-cell columns to be present, with 
 Build a per-cell metadata frame from the canonical sheet + author cell types:
 
 ```{r}
-#| label: per-cell-metadata
+#| label: M17-per_cell_metadata
 
 # Map seurat_annotations -> Cell Ontology IDs.
 cl_map <- tribble(
@@ -257,7 +257,7 @@ CELLxGENE distinguishes between **disease state** (a clinical condition) and **e
 ## Step 4 — Attach the new metadata back to the Seurat object
 
 ```{r}
-#| label: attach
+#| label: M17-attach
 
 # Make sure cell ordering matches
 stopifnot(identical(per_cell$cell_barcode, colnames(ifnb)))
@@ -281,7 +281,7 @@ tibble::enframe(table(ifnb$cell_type_ontology_term_id),
 ## Step 5 — Convert Seurat → AnnData (`.h5ad`)
 
 ```{r}
-#| label: to-h5ad
+#| label: M17-to_h5ad
 
 # SeuratDisk's two-step Seurat -> H5Seurat -> H5AD bridge
 # (Seurat 5 has built-in conversion via writeH5AD too if SeuratDisk is unavailable)
@@ -296,6 +296,7 @@ file.info("../data/ifnb_for_submission.h5ad")$size / 1e6   # MB
 CELLxGENE provides a **Python** validator (`cellxgene-schema`) that you can run from the command line on the resulting `.h5ad`. From a shell:
 
 ```{bash}
+#| label: M17-pip_install_cellxgene_schema
 #| eval: false
 # pip install cellxgene-schema
 cellxgene-schema validate data/ifnb_for_submission.h5ad
@@ -314,7 +315,7 @@ Real submissions to NCBI use the portal's online forms or batch-upload TSV templ
 ### 7a. BioSample TSV (one row per sample)
 
 ```{r}
-#| label: biosample-tsv
+#| label: M17-biosample_tsv
 
 biosample <- canonical |>
   transmute(
@@ -343,7 +344,7 @@ readr::write_csv(biosample, file.path(out_dir, "Mod17_C7_biosample_template.csv"
 ### 7b. SRA metadata TSV (one row per sequencing run)
 
 ```{r}
-#| label: sra-tsv
+#| label: M17-sra_tsv
 
 sra <- canonical |>
   transmute(
@@ -374,7 +375,7 @@ readr::write_csv(sra, file.path(out_dir, "Mod17_C8_sra_template.csv"))
 GEO's `seq_template_v2.1.xlsx` has a sample-section row per biological sample plus a processed-data row per output file. We'll generate the sample-section rows:
 
 ```{r}
-#| label: geo-tsv
+#| label: M17-geo_tsv
 
 geo_samples <- canonical |>
   transmute(
@@ -422,7 +423,7 @@ readr::write_csv(geo_samples, file.path(out_dir, "Mod17_C9_geo_samples_template.
 Generate a draft from the metadata so it's ready to drop into the methods:
 
 ```{r}
-#| label: data-availability
+#| label: M17-data_availability
 
 cat(glue::glue(
 "## Data Availability
