@@ -2,17 +2,17 @@
 # Talapas analysis pipeline 02 — parallels laptop Tutorial 02 (DimReduction & Clustering).
 # Learning notebook: Exercise_Folder/Tutorial_02_DimReduction_Clustering.qmd
 # Run:  sbatch --job-name=cluster run_rscript.sbatch 02_dimreduction_clustering.R
-# In:   ../objects/ifnb_preprocessed.rds   Out: ../objects/ifnb_clustered.rds
+# In:   ../data/ifnb_preprocessed.rds   Out: ../data/ifnb_clustered.rds
 # Figures/tables (match the Mod2 notebook filenames): ../output/Mod2/Mod2_C*_*
 
 suppressPackageStartupMessages({ library(Seurat); library(tidyverse); library(patchwork) })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod2") # figures/tables, named to match Tutorial_02.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
-seu <- readRDS(file.path(OBJ_DIR, "ifnb_preprocessed.rds"))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+seu <- readRDS(file.path(DATA_DIR, "ifnb_preprocessed.rds"))
 
 # Step 1 — PCA
 seu <- RunPCA(seu, npcs = 50, verbose = FALSE)
@@ -96,7 +96,7 @@ as.data.frame(
   table(cluster = seu$RNA_snn_res.0.5, celltype = seu$seurat_annotations)) |>
   write_csv(file.path(OUT_DIR, "Mod2_C10_cluster_by_celltype.csv"))
 
-saveRDS(seu, file.path(OBJ_DIR, "ifnb_clustered.rds"))
-cat("Wrote", file.path(OBJ_DIR, "ifnb_clustered.rds"), "with",
+saveRDS(seu, file.path(DATA_DIR, "ifnb_clustered.rds"))
+cat("Wrote", file.path(DATA_DIR, "ifnb_clustered.rds"), "with",
     length(levels(Idents(seu))), "clusters\n")
 cat("Wrote Mod2 figures/tables to", OUT_DIR, "\n")

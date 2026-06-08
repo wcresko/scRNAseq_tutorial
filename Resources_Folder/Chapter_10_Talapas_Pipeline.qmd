@@ -75,7 +75,7 @@ The cost of this pattern is the discipline it demands: **you must confirm each s
 
 This explicit-checkpoint pattern is a hand-rolled version of what dedicated workflow managers automate: **Snakemake** [@molder2021snakemake] and **Nextflow** [@ditommaso2017nextflow] track the file-level dependency graph for you, re-running only the steps whose inputs changed and parallelizing independent branches. For an eight-step teaching pipeline, shell wrappers are clear and sufficient; once a pipeline grows or must run on many datasets, moving to one of these managers — combined with per-tool environments from **Bioconda** [@gruning2018bioconda] and containers such as **Singularity/Apptainer** [@kurtzer2017singularity] for full reproducibility — is the natural next step.
 
-## 10.5 Reproducibility: pre-caching and `OBJ_DIR`
+## 10.5 Reproducibility: pre-caching and `DATA_DIR`
 
 Two practical knobs make the pipeline reproducible and portable on a cluster.
 
@@ -87,10 +87,10 @@ Rscript -e 'invisible(muscData::Kang18_8vs8())'
 
 After this, the data sit in your local `ExperimentHub` cache, and script 01 finds them there with no network access required.
 
-**`OBJ_DIR` — controlling where objects land.** By default the scripts write their `.rds`/`.csv` hand-offs into `../objects/`. The `OBJ_DIR` environment variable overrides that destination, which matters for two reasons. First, the intermediate Seurat objects can be large, and Chapter 9's etiquette says large working data belongs in `/scratch/<PIRG>/`, not in `/home/`. Second, making the output location a variable rather than a hard-coded path is itself a reproducibility practice — the same scripts run unchanged whether the objects go to your project directory, scratch, or somewhere else entirely:
+**`DATA_DIR` — controlling where the hand-off files land.** By default the scripts write their `.rds`/`.csv` hand-offs into `../data/`. The `DATA_DIR` environment variable overrides that destination, which matters for two reasons. First, the intermediate Seurat objects can be large, and Chapter 9's etiquette says large working data belongs in `/scratch/<PIRG>/`, not in `/home/`. Second, making the output location a variable rather than a hard-coded path is itself a reproducibility practice — the same scripts run unchanged whether the data go to your project directory, scratch, or somewhere else entirely:
 
 ``` bash
-export OBJ_DIR=/scratch/<PIRG>/<duckid>/ifnb/objects
+export DATA_DIR=/scratch/<PIRG>/<duckid>/ifnb/data
 ```
 
 ## 10.6 Running the pipeline: the two wrappers
@@ -157,7 +157,7 @@ The whole point of learning this pipeline on `ifnb` is to run it on *your* data 
 
 ## 10.9 Where this leads
 
-You now have the full picture: the cluster mechanics from Chapter 9, and in this chapter the architecture of the analysis that runs on it — a chain of `.rds` checkpoints, two wrappers to submit it, the pre-caching and `OBJ_DIR` knobs that make it reproducible, and the `ifnb` design that gives the whole run real interferon biology to recover.
+You now have the full picture: the cluster mechanics from Chapter 9, and in this chapter the architecture of the analysis that runs on it — a chain of `.rds` checkpoints, two wrappers to submit it, the pre-caching and `DATA_DIR` knobs that make it reproducible, and the `ifnb` design that gives the whole run real interferon biology to recover.
 
 If you want to go *upstream* of script 01 — to start from raw FASTQs and generate the counts matrix yourself with Cell Ranger — see the bonus Cell Ranger modules and the [Full Talapas RNA-seq run from raw FASTQs](Talapas_FullRun_FromFASTQs.html) roadmap. Otherwise, you are ready to reproduce the entire single-cell workflow on Talapas and then point it at your own experiment.
 

@@ -2,7 +2,7 @@
 # Talapas analysis pipeline 08 — parallels laptop Tutorial 08 (Differential Abundance, miloR).
 # Learning notebook: Exercise_Folder/Tutorial_08_DifferentialAbundance.qmd
 # Run:  sbatch --job-name=da --time=04:00:00 --mem=96G run_rscript.sbatch 08_differential_abundance.R
-# In:   ../objects/ifnb_integrated.rds   Out: ../objects/ifnb_milo_da.csv, ../output/Mod8/
+# In:   ../data/ifnb_integrated.rds   Out: ../data/ifnb_milo_da.csv, ../output/Mod8/
 # Figures/tables (match the Mod8 notebook filenames): ../output/Mod8/Mod8_C*_*
 #
 # ifnb has a real condition (IFN-beta STIM vs CTRL) and 8 real donors (`ind`),
@@ -13,13 +13,13 @@ suppressPackageStartupMessages({
   library(scater); library(tidyverse); library(patchwork)
 })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod8") # figures/tables, named to match Tutorial_08.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
-seu <- readRDS(file.path(OBJ_DIR, "ifnb_integrated.rds"))
+seu <- readRDS(file.path(DATA_DIR, "ifnb_integrated.rds"))
 
 # Real condition + replicate. miloR needs one sample ID per replicate: donor x stim.
 if (!"donor" %in% colnames(seu@meta.data)) seu$donor <- seu$ind
@@ -105,11 +105,11 @@ p_beeswarm <- plotDAbeeswarm(res, group.by = "seurat_annotations") +
 ggsave(file.path(OUT_DIR, "Mod8_C9_da_beeswarm.png"), p_beeswarm,
        width = 8, height = 6, dpi = 300)
 
-# Pipeline hand-off: keep the OBJ_DIR copy so downstream steps pick it up unchanged.
-write_csv(as_tibble(res), file.path(OBJ_DIR, "ifnb_milo_da.csv"))
+# Pipeline hand-off: keep the DATA_DIR copy so downstream steps pick it up unchanged.
+write_csv(as_tibble(res), file.path(DATA_DIR, "ifnb_milo_da.csv"))
 
 # Table out: full DA result table for this module's outputs (Mod8_C10)
 write_csv(as_tibble(res), file.path(OUT_DIR, "Mod8_C10_milo_da_results.csv"))
 
-cat("Wrote", file.path(OBJ_DIR, "ifnb_milo_da.csv"), "\n")
+cat("Wrote", file.path(DATA_DIR, "ifnb_milo_da.csv"), "\n")
 cat("Wrote Mod8 figures/tables to", OUT_DIR, "\n")

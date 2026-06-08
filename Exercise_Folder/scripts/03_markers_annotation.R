@@ -2,23 +2,23 @@
 # Talapas analysis pipeline 03 — parallels laptop Tutorial 03 (Markers & Annotation).
 # Learning notebook: Exercise_Folder/Tutorial_03_Markers_Annotation.qmd
 # Run:  sbatch --job-name=markers run_rscript.sbatch 03_markers_annotation.R
-# In:   ../objects/ifnb_clustered.rds   Out: ../objects/ifnb_annotated.rds
+# In:   ../data/ifnb_clustered.rds   Out: ../data/ifnb_annotated.rds
 # Figures/tables (match the Mod3 notebook filenames): ../output/Mod3/Mod3_C*_*
 
 suppressPackageStartupMessages({ library(Seurat); library(tidyverse); library(patchwork) })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod3") # figures/tables, named to match Tutorial_03.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
-seu <- readRDS(file.path(OBJ_DIR, "ifnb_clustered.rds"))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+seu <- readRDS(file.path(DATA_DIR, "ifnb_clustered.rds"))
 
 # Step 2 — Markers for every cluster (top 5 per cluster written for inspection)
 markers <- FindAllMarkers(seu, only.pos = TRUE, min.pct = 0.25,
                           logfc.threshold = 0.25, verbose = FALSE)
 top5 <- markers |> group_by(cluster) |> slice_max(order_by = avg_log2FC, n = 5) |> ungroup()
-top5 |> write_csv(file.path(OBJ_DIR, "ifnb_top5_markers.csv"))   # pipeline copy (read downstream)
+top5 |> write_csv(file.path(DATA_DIR, "ifnb_top5_markers.csv"))   # pipeline copy (read downstream)
 
 # Tables out: all positive markers + the per-cluster top 5 (Mod3_C4)
 markers |> write_csv(file.path(OUT_DIR, "Mod3_C4_all_markers.csv"))
@@ -99,7 +99,7 @@ as.data.frame(table(manual = seu$celltype_manual, truth = seu$seurat_annotations
   write_csv(file.path(OUT_DIR, "Mod3_C10_manual_vs_truth.csv"))
 
 # Step 6 — Save
-saveRDS(seu, file.path(OBJ_DIR, "ifnb_annotated.rds"))
-cat("Wrote", file.path(OBJ_DIR, "ifnb_annotated.rds"), "with",
+saveRDS(seu, file.path(DATA_DIR, "ifnb_annotated.rds"))
+cat("Wrote", file.path(DATA_DIR, "ifnb_annotated.rds"), "with",
     length(unique(seu$celltype_manual)), "cell-type labels\n")
 cat("Wrote Mod3 figures/tables to", OUT_DIR, "\n")

@@ -3,7 +3,7 @@
 # Dataset: ifnb (Kang et al. 2017) — the SAME dataset as the laptop tutorials.
 # Learning notebook: Exercise_Folder/Tutorial_01_QC_Preprocessing.qmd  (Module 1)
 # Run:  sbatch --job-name=qc run_rscript.sbatch 01_qc_preprocessing.R
-# In:   muscData::Kang18_8vs8() (ExperimentHub cache)   Out: ../objects/ifnb_preprocessed.rds
+# In:   muscData::Kang18_8vs8() (ExperimentHub cache)   Out: ../data/ifnb_preprocessed.rds
 # Figures/tables (match the Mod1 notebook filenames): ../output/Mod1/Mod1_C*_*
 
 suppressPackageStartupMessages({
@@ -12,11 +12,11 @@ suppressPackageStartupMessages({
 })
 set.seed(2026)
 
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")   # every step reads/writes pipeline objects here
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")   # every step reads/writes pipeline objects here
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod1") # figures/tables, named to match Tutorial_01.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Load ifnb from Bioconductor's ExperimentHub (cached after the first
 # download). Keep singlets that have an author-assigned cell-type label, and mirror
@@ -94,6 +94,6 @@ tibble(rank = seq_along(top10), gene = top10) |>
 # Step 10 — Scale
 seu <- ScaleData(seu, vars.to.regress = c("nCount_RNA", "percent.mt"))
 
-saveRDS(seu, file.path(OBJ_DIR, "ifnb_preprocessed.rds"))
-cat("Wrote", file.path(OBJ_DIR, "ifnb_preprocessed.rds"), "with", ncol(seu), "cells\n")
+saveRDS(seu, file.path(DATA_DIR, "ifnb_preprocessed.rds"))
+cat("Wrote", file.path(DATA_DIR, "ifnb_preprocessed.rds"), "with", ncol(seu), "cells\n")
 cat("Wrote Mod1 figures/tables to", OUT_DIR, "\n")

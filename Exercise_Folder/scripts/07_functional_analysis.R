@@ -2,23 +2,23 @@
 # Talapas analysis pipeline 07 — parallels laptop Tutorial 07 (Functional Analysis).
 # Learning notebook: Exercise_Folder/Tutorial_07_FunctionalAnalysis.qmd
 # Run:  sbatch --job-name=fa --time=02:00:00 --mem=32G run_rscript.sbatch 07_functional_analysis.R
-# In:   ../objects/ifnb_pseudobulk_de.csv
-# Out:  ../objects/functional/*.csv  +  ../output/Mod7 figures/tables (match Tutorial_07.qmd)
+# In:   ../data/ifnb_pseudobulk_de.csv
+# Out:  ../data/functional/*.csv  +  ../output/Mod7 figures/tables (match Tutorial_07.qmd)
 
 suppressPackageStartupMessages({
   library(tidyverse); library(clusterProfiler); library(org.Hs.eg.db)
   library(enrichplot); library(ReactomePA); library(patchwork)
 })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
-FUN_DIR <- file.path(OBJ_DIR, "functional")          # pipeline per-cell-type result CSVs
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
+FUN_DIR <- file.path(DATA_DIR, "functional")          # pipeline per-cell-type result CSVs
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod7")    # figures/tables, named to match Tutorial_07.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(FUN_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
-de <- read_csv(file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"), show_col_types = FALSE)
+de <- read_csv(file.path(DATA_DIR, "ifnb_pseudobulk_de.csv"), show_col_types = FALSE)
 
 # Step 1 — map gene SYMBOL -> ENTREZID (cheap bitr call; enrichment tools key on
 # ENTREZ). A 5-10% unmapped rate (deprecated symbols, lncRNAs, pseudogenes) is normal.
@@ -132,7 +132,7 @@ reactome_top5 <- map_dfr(names(reactome_list),
 write_csv(reactome_top5, file.path(OUT_DIR, "Mod7_C7_reactome_top5.csv"))
 
 # Step 6 — Save the full per-cell-type enrichment tables (Mod7_C8). Also keep the
-# pipeline's per-cell-type CSV copies in OBJ_DIR/functional for downstream use.
+# pipeline's per-cell-type CSV copies in DATA_DIR/functional for downstream use.
 ego_long <- map_dfr(names(ego_list), \(ct) ego_list[[ct]]@result |> mutate(celltype = ct))
 write_csv(ego_long, file.path(OUT_DIR, "Mod7_C8_enrichgo_bp.csv"))
 
@@ -143,7 +143,7 @@ write_csv(reactome_long, file.path(OUT_DIR, "Mod7_C8_reactome.csv"))
 gse_long <- map_dfr(names(gse_list), \(ct) gse_list[[ct]]@result |> mutate(celltype = ct))
 write_csv(gse_long, file.path(OUT_DIR, "Mod7_C8_gsego_bp.csv"))
 
-# Pipeline per-cell-type result CSVs (kept in OBJ_DIR/functional)
+# Pipeline per-cell-type result CSVs (kept in DATA_DIR/functional)
 for (ct in names(ego_list)) {
   safe_ct <- gsub("[^A-Za-z0-9]+", "_", ct)
   write_csv(ego_list[[ct]]@result, file.path(FUN_DIR, paste0("GO_BP_", safe_ct, ".csv")))
