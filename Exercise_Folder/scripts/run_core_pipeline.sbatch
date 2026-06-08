@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=<myPIRG>
 #SBATCH --partition=compute
-#SBATCH --job-name=ifnb_pipeline
+#SBATCH --job-name=ifnb_core_pipeline
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --time=12:00:00
@@ -19,7 +19,8 @@
 # This is the script referenced by Module 09 (SLURM Basics) as the example
 # of "how to run the series of .R scripts". For finer control — running one
 # step at a time, or right-sizing memory per step — use run_rscript.sbatch
-# instead (see Module 10, the Analysis Pipeline page).
+# instead (see Module 10, the Analysis Pipeline page). For the downstream BONUS
+# analyses (Modules 13-17) there is a parallel wrapper, run_bonus_pipeline.sbatch.
 #
 # PREREQUISITES (one time, from this scripts/ folder):
 #   mkdir -p logs
@@ -27,12 +28,12 @@
 #   Rscript -e 'invisible(muscData::Kang18_8vs8())'
 #
 # Submit:
-#   sbatch run_pipeline.sbatch
+#   sbatch run_core_pipeline.sbatch
 #
 # Watch / verify:
 #   squeue -u $USER
 #   seff <jobid>          # confirm State: COMPLETED (not OUT_OF_MEMORY/TIMEOUT)
-#   tail -f logs/ifnb_pipeline_*.out
+#   tail -f logs/ifnb_core_pipeline_*.out
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -58,4 +59,4 @@ for step in "${STEPS[@]}"; do
   echo "==== $(date '+%F %T')  FINISHED ${step} ===="
 done
 
-echo "==== Pipeline complete: all 8 steps finished on $(hostname) ===="
+echo "==== Core pipeline complete: all 8 steps finished on $(hostname) ===="
