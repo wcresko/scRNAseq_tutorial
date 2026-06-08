@@ -93,11 +93,21 @@ bioc_pkgs <- c(
   "fgsea", "clusterProfiler", "ReactomePA", "enrichplot",  # functional analysis (Module 07)
   "org.Hs.eg.db", "org.Mm.eg.db",                          # gene-ID maps (Module 07)
   "miloR",             # differential abundance (Module 08)
-  "SingleR", "celldex",# reference-based annotation (Module 04)
+  "SingleR",           # reference-based annotation method (Module 04)
   "muscData"           # ifnb (Kang18_8vs8) loader (Modules 01–08)
 )
 BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
                      update = FALSE, ask = FALSE)
+
+# celldex provides the SingleR REFERENCE DATA (Module 04). It is built on
+# Bioconductor's alabaster/gypsum framework, so install it on its own with
+# dependency updates ALLOWED. Leaving it in the block above with update = FALSE
+# is the usual cause of:
+#   installation of package 'alabaster.base' had non-zero exit status
+#   installation of package 'celldex'        had non-zero exit status
+# because a stale dependency left from an older install can't satisfy the newer
+# alabaster build. update = TRUE keeps the whole chain on one Bioconductor release.
+BiocManager::install("celldex", update = TRUE, ask = FALSE)
 
 # GitHub / R-universe
 remotes::install_github("satijalab/seurat-data", quiet = TRUE, upgrade = "never")  # SeuratData
@@ -109,6 +119,22 @@ invisible(muscData::Kang18_8vs8())
 
 ::: callout-note
 The first install will take 20–60 minutes depending on your machine and whether your platform is building from source. **Run it before the workshop, not the morning of.**
+:::
+
+::: {.callout-warning title="If `celldex` / `alabaster.base` fails to install"}
+`celldex` (the SingleR reference loader, Module 04) is built on Bioconductor's **alabaster/gypsum** framework, so it pulls in `alabaster.base` and friends. If you see `installation of package 'alabaster.base' had non-zero exit status` (which then fails `celldex`):
+
+1. **Confirm your compiler toolchain** — `alabaster.base` builds C++ from source ([Software Setup §3](../Software_Setup.html)): Xcode CLT (macOS), Rtools (Windows), `build-essential` (Linux).
+2. **Re-run it with updates allowed** — the usual cause is a stale dependency from an older install:
+
+   ``` r
+   BiocManager::install("celldex", update = TRUE, ask = FALSE)
+   ```
+
+   Re-running resumes where it left off, so transient download failures clear on a second try.
+3. **Check for version mismatches** with `BiocManager::valid()` — it lists out-of-sync packages and the exact command to repair them.
+
+`celldex` is only used in **Module 04**, so you can keep going and circle back to this one package.
 :::
 
 ### Bonus packages — only for the self-paced bonus modules (11–17)
