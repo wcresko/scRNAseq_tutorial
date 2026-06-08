@@ -111,13 +111,15 @@ BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
                      update = FALSE, ask = FALSE)
 
 # celldex provides the SingleR REFERENCE DATA (Module 04). It is built on
-# Bioconductor's alabaster/gypsum framework, so install it on its own with
-# dependency updates ALLOWED. Leaving it in the block above with update = FALSE
-# is the usual cause of:
+# Bioconductor's alabaster/gypsum framework (alabaster.base & friends), so it is
+# installed on its OWN line with update = TRUE to keep the whole chain on one
+# Bioconductor release. If it fails with
 #   installation of package 'alabaster.base' had non-zero exit status
-#   installation of package 'celldex'        had non-zero exit status
-# because a stale dependency left from an older install can't satisfy the newer
-# alabaster build. update = TRUE keeps the whole chain on one Bioconductor release.
+#   dependency 'alabaster.base' is not available for package 'celldex'
+# see the troubleshooting callout below — the usual cause on a brand-new R is that
+# Bioconductor has no prebuilt binaries yet, so it builds from source and the
+# link step can't find OpenSSL. celldex is only used in Module 04 (SingleR path),
+# so a failure here does NOT block the rest of the install.
 BiocManager::install("celldex", update = TRUE, ask = FALSE)
 
 # GitHub / R-universe
@@ -133,20 +135,49 @@ The first install will take 20–60 minutes depending on your machine and whethe
 :::
 
 ::: {.callout-warning title="If `celldex` / `alabaster.base` fails to install"}
-`celldex` (the SingleR reference loader, Module 04) is built on Bioconductor's **alabaster/gypsum** framework, so it pulls in `alabaster.base` and friends. If you see `installation of package 'alabaster.base' had non-zero exit status` (which then fails `celldex`):
+`celldex` (the SingleR reference loader, Module 04) is built on Bioconductor's **alabaster/gypsum** framework, so it pulls in `alabaster.base` and friends. The usual failure looks like:
 
-1. **Confirm your compiler toolchain** — `alabaster.base` builds C++ from source ([Software Setup §3](../Software_Setup.html)): Xcode CLT (macOS), Rtools (Windows), `build-essential` (Linux).
-2. **Re-run it with updates allowed** — the usual cause is a stale dependency from an older install:
+```
+installation of package 'alabaster.base' had non-zero exit status
+dependency 'alabaster.base' is not available for package 'celldex'
+```
 
-   ```{r}
-   #| eval: false
-   BiocManager::install("celldex", update = TRUE, ask = FALSE)
-   ```
+**First, find out *why* `alabaster.base` failed** — there are two common causes, and the fix is different for each. Scroll up in the install log.
 
-   Re-running resumes where it left off, so transient download failures clear on a second try.
-3. **Check for version mismatches** with `BiocManager::valid()` — it lists out-of-sync packages and the exact command to repair them.
+**Cause A — no prebuilt binary, so R is compiling from source (most common on a brand-new R).**
+If you see repeated `404 Not Found` lines like
 
-`celldex` is only used in **Module 04**, so you can keep going and circle back to this one package.
+```
+cannot open URL '.../bin/macosx/sonoma-arm64/contrib/4.6/PACKAGES': HTTP status was '404 Not Found'
+```
+
+then Bioconductor does **not yet ship Mac/arm64 binaries for your R version**, so every Bioconductor package is being built from source. Bleeding-edge R (e.g. R 4.6 / Bioconductor 3.23 right after release) typically has **no** prebuilt arm64 binaries for weeks. The fix is to run a **released** R that already has binaries:
+
+- Install the current **release** of R (e.g. **R 4.5.x → Bioconductor 3.21**) from [CRAN](https://cran.r-project.org), point RStudio at it (*Tools ▸ Global Options ▸ General ▸ R version*), and re-run the install. With binaries available, `celldex` installs in minutes with **no compiler needed**.
+- Check what you're on with `R.version.string` and `BiocManager::version()`. Forcing `type = "binary"` will **not** help here — there is no binary to fetch, so it errors with *"not available"*.
+
+**Cause B — the source build itself fails at the link step (`ld: library 'ssl' not found`).**
+If you're building from source and the compile ends with
+
+```
+ld: library 'ssl' not found
+clang++: error: linker command failed with exit code 1
+```
+
+then the OpenSSL library isn't on the linker's search path. Make it discoverable (macOS, Homebrew):
+
+```{.bash filename="Terminal"}
+brew install openssl@3
+mkdir -p ~/.R
+cat >> ~/.R/Makevars <<'EOF'
+LDFLAGS += -L/opt/homebrew/opt/openssl@3/lib
+CPPFLAGS += -I/opt/homebrew/opt/openssl@3/include
+EOF
+```
+
+Then restart R and re-run `BiocManager::install("celldex", update = TRUE, ask = FALSE)`. (On Intel Macs Homebrew lives under `/usr/local/opt/openssl@3` instead of `/opt/homebrew`.) Switching to a released R (Cause A) avoids this entirely, since binaries skip the compile.
+
+**Either way — you are not blocked.** `celldex` is used **only** in **Module 04**, and only by the **SingleR** annotation path. Module 04 also teaches an **Azimuth** path that needs only the `Azimuth` package (already installed above) and no `celldex`, so you can finish the whole workshop without it and circle back later. As a last check, `BiocManager::valid()` lists any out-of-sync packages and the exact command to repair them.
 :::
 
 ### Bonus packages — only for the self-paced bonus modules (11–17)
