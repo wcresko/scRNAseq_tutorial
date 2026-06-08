@@ -277,8 +277,11 @@ After `IntegrateData()` the **default assay** becomes `"integrated"`. That assay
 
 ## Step 2 — Compare unintegrated, Harmony, and Seurat-anchor UMAPs
 
+The six-panel comparison (@lst-M5-compare) shows each integration method colored by sample (top row) and by cell type (bottom row).
+
 ```{r}
-#| label: M5-compare
+#| label: lst-M5-compare
+#| lst-cap: "Six-panel UMAP comparison: unintegrated, Harmony, and Seurat-anchor embeddings coloured by sample and by cell type."
 #| fig-cap: "Unintegrated vs Harmony vs Seurat-anchor UMAPs, coloured by sample (mixing check) and by cell type (structure check)."
 
 # Unintegrated UMAP from Tut 02 (still inside the `ifnb` object)
@@ -326,6 +329,10 @@ save_fig(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
        width = 15, height = 5, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Two three-panel figures appear side-by-side. The **by-sample** row (x = UMAP 1, y = UMAP 2, colour = CTRL/STIM) is your **mixing diagnostic**: in the unintegrated panel the two colours form parallel islands per cell type; after successful integration they should interleave within each cluster. The **by-cell-type** row uses labelled cluster colours — in the unintegrated panel each cell type is split into two sample-specific blobs; after integration each type should collapse into one. Comparing Harmony and Seurat-anchor columns lets you see whether the two methods differ in how aggressively they mix samples or how cleanly they separate rare populations.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  In the **by-sample** row, after integration the two colors should be **interleaved** within each cluster. Are they? Are CTRL and STIM mixed at the same ratio in every cluster, or do some clusters still skew?
 2.  In the **by-cell-type** row, each label should occupy a **single** region. After integration, has the doubling-up from Tutorial 02 collapsed?
@@ -346,10 +353,11 @@ save_fig(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
 
 ## Step 3 — Diagnose over-correction
 
-The risk of integration is **erasing real biology**. The ISG response is real — STIM cells *should* differ from CTRL cells in every cell type — and integration should **mix the cells in space** without zeroing out their expression.
+The risk of integration is **erasing real biology**. The ISG response is real — STIM cells *should* differ from CTRL cells in every cell type — and integration should **mix the cells in space** without zeroing out their expression. The code in @lst-M5-isg_score scores each cell on a nine-gene IFN-β module and checks that the STIM–CTRL gap survives integration.
 
 ```{r}
-#| label: M5-isg_score
+#| label: lst-M5-isg_score
+#| lst-cap: "Score each cell on the IFN-β gene module (RNA assay), plot on integrated UMAPs, and tabulate mean ISG score per cell type by condition."
 #| fig-cap: "Per-cell interferon-stimulated-gene (ISG) module score on the Harmony and Seurat-anchor UMAPs — integration should mix cells in space without flattening the ISG response."
 
 isg_set <- c("ISG15","IFI6","IFIT1","IFIT3","ISG20","MX1","OAS1","RSAD2","IFIT2")
@@ -397,6 +405,10 @@ readr::write_csv(isg_by_celltype,
                  file.path(out_dir, "Mod5_C7_isg_mean_by_celltype.csv"))
 ```
 
+::: {.callout-tip title="Reading the output"}
+Two **FeaturePlots** appear side-by-side (Harmony left, Seurat-anchors right); each cell is coloured by its ISG module score (low = dark/cool, high = bright/warm). A successful integration shows cells of the same type co-localised on UMAP regardless of score, but STIM cells still carrying higher scores than their CTRL neighbours. The **`isg_by_celltype` table** below prints the mean ISG score per cell-type × condition pair, sorted by STIM–CTRL gap; monocytes typically show the largest gap (> 0.5 in module-score units) while T cells show a smaller but still positive gap. A gap of zero in any row is the key over-correction warning sign.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  In the FeaturePlot, do high-ISG cells cluster with low-ISG cells of the same type? They should — that's exactly what integration is supposed to do (put them in the same cluster but at different positions in *gene-expression space*, not erase the difference).
 2.  Look at the per-cell-type CTRL-vs-STIM mean ISG score table. The STIM column should be **noticeably higher** than CTRL for every cell type. If a row's STIM-CTRL gap is near zero, integration has flattened that cell type's IFN response — over-correction.
@@ -415,8 +427,11 @@ readr::write_csv(isg_by_celltype,
 
 ## Step 4 — Re-find markers on integrated clusters
 
+The top markers per integrated cluster (@lst-M5-integrated_markers) let you check whether cell-type signals are now cleaner than in the unintegrated Tutorial 03 results.
+
 ```{r}
-#| label: M5-integrated_markers
+#| label: lst-M5-integrated_markers
+#| lst-cap: "FindAllMarkers on Harmony-integrated clusters (RNA assay), then slice top 5 per cluster by average log2 FC."
 
 # Switch back to the RNA assay for marker testing
 DefaultAssay(ifnb_h) <- "RNA"
@@ -448,6 +463,10 @@ readr::write_csv(ifnb_h_markers,
 readr::write_csv(ifnb_h_top_markers,
                  file.path(out_dir, "Mod5_C8_integrated_top5_markers.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+`ifnb_h_top_markers` prints as a tibble with columns `cluster`, `gene`, `avg_log2FC`, `pct.1`, `pct.2`, and `p_val_adj` — five rows per integrated cluster, sorted by highest average log2 fold change. A clean integration result shows canonical PBMC markers (`LYZ`/`CD14` for monocytes, `MS4A1` for B cells, `GNLY`/`NKG7` for NK, `CD8A` for cytotoxic T) at the top of their respective clusters, with ISGs (`ISG15`, `IFIT1`, …) absent or much lower ranked than they were in the unintegrated Tutorial 03 markers.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  Compare the top markers per cluster here to the top markers from Tutorial 03 (the unintegrated version). Did ISGs disappear from the top of the lists?

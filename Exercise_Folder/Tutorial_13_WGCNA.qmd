@@ -224,7 +224,8 @@ data <- data[gsg$goodGenes == TRUE, ]
 ```
 
 ```{r}
-#| label: M13-hclust
+#| label: lst-M13-hclust
+#| lst-cap: "Average-linkage hierarchical clustering of samples (Euclidean distance) for outlier detection."
 #| fig-cap: "Average-linkage hierarchical clustering of samples (Euclidean distance) for outlier detection."
 htree <- hclust(dist(t(data)), method = "average")
 plot(htree,
@@ -241,8 +242,13 @@ save_base_fig(file.path(out_dir, "Mod13_C6_sample_dendrogram.png"), width = 10, 
 })
 ```
 
+::: {.callout-tip title="Reading the output"}
+The x-axis lists every sample (GEO accession), and the y-axis is the Euclidean distance at which two branches merge. Samples that fuse at a very long branch length on the right side of the tree are outliers — they are far from every other sample in raw-count space. Anything that merges last, at a height visibly above the main cluster of samples, is a candidate to drop. If all samples fuse at roughly similar heights, the dataset is clean; a single isolated branch at 2–3× the height of the rest is a reliable warning sign.
+:::
+
 ```{r}
-#| label: M13-pca_outlier
+#| label: lst-M13-pca_outlier
+#| lst-cap: "Sample-level PCA (PC1 vs PC2) with each sample labelled, used to spot outlying samples."
 #| fig-cap: "Sample-level PCA (PC1 vs PC2) with each sample labelled, used to spot outlying samples."
 pca       <- prcomp(t(data))
 pca.dat   <- pca$x
@@ -265,8 +271,12 @@ save_fig(file.path(out_dir, "Mod13_C7_sample_pca.png"), p_pca,
        width = 7, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each point is one sample, labelled by its GEO accession. The axes show PC1 and PC2 with their percent-variance contributions; together they capture the largest two dimensions of sample-to-sample variation. Samples that sit far from the main cloud — visibly isolated along either axis — are outliers. Because PCA captures *magnitude* of distance (not just merge order), a sample can look borderline in the dendrogram yet be clearly outlying here; the PCA is generally more informative on a small N. Most points should form a loose ellipse; anything beyond ~3 standard deviations in either PC is a removal candidate.
+:::
+
 ::: {.callout-important title="Think about it"}
-The hierarchical-clustering tree and the PCA both expose outliers. Which would you trust more on a small dataset?
+The hierarchical-clustering tree (@lst-M13-hclust) and the PCA (@lst-M13-pca_outlier) both expose outliers. Which would you trust more on a small dataset?
 
 <details>
 <summary>Show answers</summary>
@@ -316,7 +326,8 @@ norm.counts <- assay(dds_norm) |> t()      # WGCNA wants samples × genes
 ## Step 4 — Pick the soft-thresholding power
 
 ```{r}
-#| label: M13-pick_power
+#| label: lst-M13-pick_power
+#| lst-cap: "Soft-threshold scan: scale-free topology fit (signed R²) and mean connectivity versus candidate powers."
 #| fig-cap: "Soft-threshold scan: scale-free topology fit (signed R²) and mean connectivity versus candidate powers."
 power <- c(1:10, seq(12, 30, by = 2))
 sft <- pickSoftThreshold(norm.counts,
@@ -349,6 +360,10 @@ save_fig(file.path(out_dir, "Mod13_C10_soft_threshold.png"), p_sft,
        width = 7, height = 8, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The two-panel plot (@lst-M13-pick_power) shows candidate powers on the x-axis for both panels. **Top panel:** the scale-free topology fit R² — the red horizontal line at 0.8 is your target; choose the **smallest power that crosses it**, because higher powers reduce sensitivity. **Bottom panel:** mean network connectivity — it should decrease steadily as power increases; if connectivity is already very low (near zero) at your chosen power, the network is too sparse. Pick the power where the top panel just clears 0.8 *and* the bottom panel still shows meaningful connectivity. If R² never reaches 0.8, suspect batch effects or too few samples rather than trying higher powers.
+:::
+
 ::: callout-warning
 **Pick the smallest power that crosses R² ≈ 0.8** *and* gives a reasonable mean connectivity. Patel's example lands at **β = 18** for this dataset; yours will vary.
 :::
@@ -378,7 +393,8 @@ cor <- temp_cor                          # restore base::cor
 :::
 
 ```{r}
-#| label: M13-dendro
+#| label: lst-M13-dendro
+#| lst-cap: "Gene dendrogram with unmerged and merged module-colour assignments from blockwiseModules."
 #| fig-cap: "Gene dendrogram with unmerged and merged module-colour assignments from blockwiseModules."
 plotDendroAndColors(bwnet$dendrograms[[1]],
                     cbind(bwnet$unmergedColors, bwnet$colors),
@@ -401,6 +417,10 @@ save_base_fig(file.path(out_dir, "Mod13_C12_module_dendrogram.png"), width = 10,
                       main         = "Gene clustering dendrogram & module colours")
 })
 ```
+
+::: {.callout-tip title="Reading the output"}
+The dendrogram (@lst-M13-dendro) clusters all genes by their topological overlap; genes that are highly co-expressed sit on adjacent leaves. Below the tree, two colour bars show the module assignments: the top bar is **unmerged** (many fine-grained modules) and the bottom bar is **merged** (modules with similar eigengenes fused by `mergeCutHeight = 0.25`). Each distinct colour is one module; grey genes were not assigned to any module. A good result shows a modest number of discrete-coloured branches — typically 5–20 modules. Very many tiny modules (especially if unmerged and merged look similar) suggest `mergeCutHeight` could be raised; a single giant turquoise module may indicate the power was set too low.
+:::
 
 ## Step 6 — Module eigengenes & module–trait correlations
 
@@ -438,7 +458,8 @@ traits <- cbind(traits, severity.out)
 ```
 
 ```{r}
-#| label: M13-cor_trait
+#| label: lst-M13-cor_trait
+#| lst-cap: "Module–trait relationships: correlation of each module eigengene with the severity traits."
 #| fig-cap: "Module–trait relationships: correlation of each module eigengene with the severity traits."
 nSamples <- nrow(norm.counts)
 nGenes   <- ncol(norm.counts)
@@ -474,6 +495,10 @@ as.data.frame(module.trait.corr.p) |>
   readr::write_csv(file.path(out_dir, "Mod13_C15_module_trait_pvalues.csv"))
 ```
 
+::: {.callout-tip title="Reading the output"}
+The heatmap (@lst-M13-cor_trait) is a modules × traits matrix. Each cell shows the Pearson r between a module eigengene and a severity trait, with the colour scale running from blue (strong negative correlation) through white (no correlation) to red (strong positive correlation). Each cell also displays the correlation value and asterisks for significance (* p < 0.05, ** p < 0.01). Modules coloured strongly red or blue against the "severe" or "ICU" columns are your candidates for follow-up — their member genes co-vary with disease severity. A module that is red for "severe" and blue for "healthy" is behaving as expected for an immunity/inflammation module; any module showing conflicting associations (red for both ends of severity) may reflect a technical or confounding signal.
+:::
+
 ::: {.callout-important title="Think about it"}
 Modules with strong *|r|* and small p against the severity column are candidates for follow-up. What's the next thing you'd do with such a module?
 
@@ -490,7 +515,8 @@ Two things in parallel:
 ## Step 7 — Hub genes within a module
 
 ```{r}
-#| label: M13-kme
+#| label: lst-M13-kme
+#| lst-cap: "List genes in a module of interest and rank them by kME (module membership correlation)."
 module.gene.mapping <- as.data.frame(bwnet$colors)
 module.gene.mapping |>
   rownames_to_column("gene") |>
@@ -515,6 +541,11 @@ mm |>
   head(15) |>
   readr::write_csv(file.path(out_dir, "Mod13_C16_turquoise_hub_genes.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+The first table (from `@lst-M13-kme`) lists every gene assigned to the module you chose (here turquoise); the second table ranks all module members by their kME value — the Pearson correlation between each gene's expression profile and the module eigengene. A kME close to 1.0 means the gene tracks the module's average activity almost perfectly, making it a strong hub candidate. The top 5–15 hub genes are typically the most biologically interpretable members of the module and the best starting points for literature validation or follow-up wet-lab work. `clusterProfiler::enrichGO()` on the full gene list gives the module a pathway label.
+:::
+
 
 ## Stretch goals
 

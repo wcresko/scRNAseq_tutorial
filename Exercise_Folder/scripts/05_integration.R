@@ -14,10 +14,7 @@ dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # --- Figure saving --------------------------------------------------------
-# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
-# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
-# .svg is written alongside with the same basename. (.svg uses the 'svglite'
-# package, installed in Tutorial 00.)
+# save_fig(): write each figure as .png + .svg (vector). See Tutorial_05_Integration.qmd.
 save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
   ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
   svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
@@ -51,12 +48,8 @@ saveRDS(seu, file.path(DATA_DIR, "ifnb_integrated.rds"))
 cat("Wrote", file.path(DATA_DIR, "ifnb_integrated.rds"), "\n")
 
 # ===========================================================================
-# Mod5 figures/tables — reuse the Tutorial_05.qmd filenames.
-# NOTE on drift: the qmd's C6 figures compare THREE embeddings
-# (unintegrated / Harmony / Seurat-anchor). This condensed pipeline computes
-# Harmony only, so the saved C6 figures show the Harmony result (the by-sample
-# mixing check and the by-cell-type structure check) rather than the 3-panel
-# comparison. Same filenames, Harmony-only content.
+# Mod5 figures/tables — reuse Tutorial_05.qmd filenames.
+# NOTE: the qmd C6 figures show three embeddings; this pipeline saves Harmony-only content.
 # ===========================================================================
 
 # --- Figure: sample mixing on the Harmony UMAP (Mod5_C6) -------------------
@@ -108,9 +101,7 @@ isg_by_celltype <- seu@meta.data |>
 write_csv(isg_by_celltype, file.path(OUT_DIR, "Mod5_C7_isg_mean_by_celltype.csv"))
 
 # --- Step 4 — Re-find markers on the integrated (Harmony) clusters (Mod5_C8) -
-# Marker tests run on the RNA assay, not the integrated/corrected values.
-# Defensive: FindAllMarkers needs a single joined RNA layer (Seurat v5 merge/split
-# can leave per-sample layers); join if needed so no test is silently skipped.
+# Marker tests run on RNA assay; join layers first if Seurat v5 left per-sample splits.
 if (length(Layers(seu, search = "data")) > 1) seu <- JoinLayers(seu)
 Idents(seu) <- "seurat_clusters"
 integrated_markers <- FindAllMarkers(seu, only.pos = TRUE,

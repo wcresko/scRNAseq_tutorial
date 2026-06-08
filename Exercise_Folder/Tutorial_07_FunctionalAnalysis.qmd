@@ -175,7 +175,8 @@ Why do some symbols fail to map? What kinds of genes typically don't have ENTREZ
 For each cell type, take the genes that are **significantly DE** (we'll require `padj < 0.05` and `|log2FC| > 0.5`) and ask: against the *universe* of tested genes for that cell type, which GO Biological Process terms are over-represented?
 
 ```{r}
-#| label: M7-enrichGO
+#| label: lst-M7-enrichGO
+#| lst-cap: "GO Biological Process over-representation per cell type, using tested genes as the universe."
 
 run_enrichGO <- function(ct, df) {
   sub <- df |> filter(celltype == ct)
@@ -214,6 +215,10 @@ ego_top5
 readr::write_csv(ego_top5, file.path(out_dir, "Mod7_C3_enrichgo_top5.csv"))
 ```
 
+::: {.callout-tip title="Reading the output"}
+The `ego_top5` table (@lst-M7-enrichGO) shows the top 5 GO Biological Process terms per cell type, columns `Description` (the term name), `Count` (how many of your significant genes hit this term), and `p.adjust` (BH-corrected p-value). For `ifnb` STIM vs CTRL, expect `type I interferon signaling pathway`, `response to virus`, and related immune-defense terms to dominate — that is the biology of the contrast. The interesting signal is in the *cell-type-specific* rows that appear for one cell type only, such as T-cell-receptor signaling in T cells or complement activation in monocytes. A `Count` of 2–3 with a very small `p.adjust` often indicates a small but tightly defined term — useful, but verify the gene list. `enrichplot::dotplot(ego_list[[ct]])` renders this as a ranked dot plot for any single cell type.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  Why pass `universe = uni` rather than letting `enrichGO` use the whole genome?
 2.  Some GO terms (`response to virus`, `defense response`, `type I interferon signaling pathway`) will dominate every cell type. Why?
@@ -233,8 +238,8 @@ readr::write_csv(ego_top5, file.path(out_dir, "Mod7_C3_enrichgo_top5.csv"))
 A single dot plot showing which BP terms are enriched in which cell type:
 
 ```{r}
-#| label: M7-compareCluster
-#| fig-cap: "GO BP over-representation per cell type (STIM vs CTRL) as a compareCluster dot plot."
+#| label: lst-M7-compareCluster
+#| lst-cap: "GO BP over-representation per cell type (STIM vs CTRL) as a compareCluster dot plot."
 
 # Build the input list: named list of significant ENTREZIDs per cell type
 sig_by_ct <- de_mapped |>
@@ -272,6 +277,10 @@ save_fig(file.path(out_dir, "Mod7_C4_comparecluster_dotplot.png"), p_cc,
        width = 10, height = 8, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The x-axis is cell type and the y-axis is GO Biological Process term. Each dot marks one enriched term in one cell type: **dot size** encodes the gene ratio (fraction of significant genes in that term), and **dot colour** encodes the BH-adjusted p-value (darker = more significant). Terms shared across many cell types appear as a horizontal row of dots — in this dataset, `type I interferon signaling pathway` will run across almost every column because IFN-β stimulation is the contrast. Cell-type-specific terms (a dot in only one column) are the biologically interesting findings. If every column shows exactly the same terms with equal significance, raise the `|log2FC|` threshold in `sig_by_ct` to filter to only the strongest responders — that often surfaces the cell-type-specific signal beneath the shared core response.
+:::
+
 ::: {.callout-important title="Think about it"}
 What do you do when *all* cell types show the same top terms?
 
@@ -289,7 +298,8 @@ Step out of GO BP and into a more focused ontology — try `ont = "MF"` (Molecul
 Where ORA throws away the ranking, GSEA uses it. Build a **named, decreasing-sorted vector** of `log2FoldChange`s for each cell type and run `gseGO`:
 
 ```{r}
-#| label: M7-gseGO
+#| label: lst-M7-gseGO
+#| lst-cap: "GSEA on GO Biological Process terms per cell type, ranked by log2FoldChange."
 
 run_gseGO <- function(ct, df) {
   sub <- df |>
@@ -331,10 +341,15 @@ gse_top5
 readr::write_csv(gse_top5, file.path(out_dir, "Mod7_C5_gsego_top5.csv"))
 ```
 
+::: {.callout-tip title="Reading the output"}
+The `gse_top5` table (@lst-M7-gseGO) shows the top 5 GSEA GO BP hits per cell type ordered by **NES** (Normalized Enrichment Score). A positive NES means the gene set is enriched at the top of the ranked list (genes most up in STIM), while a negative NES means enrichment at the bottom (genes most up in CTRL). Unlike ORA, GSEA uses the whole ranked list, so modest but coordinated shifts across many ISGs produce a strongly positive NES even if few individual genes pass an FDR threshold. For `ifnb`, expect interferon-signaling terms with NES > 2 in monocytes; a term with NES close to 1 or –1 and a borderline `p.adjust` is likely noise. Use `enrichplot::gseaplot2()` to draw the running enrichment curve for any term and visually confirm the hit.
+:::
+
 A classic GSEA "running enrichment" plot for a single term in a single cell type:
 
 ```{r}
-#| label: M7-gsea_plot
+#| label: lst-M7-gsea_plot
+#| lst-cap: "GSEA running-enrichment plot for the top 3 GO BP terms in the monocyte cell type."
 #| fig-cap: "GSEA running-enrichment plot for the top 3 GO BP terms in CD14 monocytes."
 
 # Pick a cell type to highlight — data-driven so it matches your labels: prefer a
@@ -354,12 +369,17 @@ if (!is.na(ct_pick) && nrow(gse_list[[ct_pick]]@result) > 0) {
 }
 ```
 
+::: {.callout-tip title="Reading the output"}
+The GSEA running-enrichment plot (@lst-M7-gsea_plot) has three panels per gene set. The top panel shows the **running enrichment score** (y-axis) as you walk from the most up-regulated genes (left) to the most down-regulated (right) in your ranked list — the score climbs steeply for a positively enriched set, reaches a peak, then falls. The middle tick-mark panel marks where each gene from the set falls in the ranked list. The bottom bar shows the ranked list metric (`log2FoldChange`) as a gradient from positive (red) to negative (blue). A healthy enrichment shows an early, steep rise in the top panel; a flat, noisy curve with an ambiguous peak suggests the gene set is not coherently regulated. The **NES** and `p.adjust` values from the `gse_top5` table tell you whether the peak is statistically reliable.
+:::
+
 ## Step 5 — Reactome pathways (cleaner than GO for signaling biology)
 
 Reactome's curated pathways are typically more interpretable than GO BP for immune signaling. Same input, different database:
 
 ```{r}
-#| label: M7-reactome
+#| label: lst-M7-reactome
+#| lst-cap: "Reactome pathway over-representation per cell type (significant DE genes as input)."
 
 reactome_list <- map(unique(de_mapped$celltype), function(ct) {
   sub <- de_mapped |> filter(celltype == ct)
@@ -382,6 +402,10 @@ reactome_top5
 # --- Table out: top-5 Reactome pathways per cell type ----------------------
 readr::write_csv(reactome_top5, file.path(out_dir, "Mod7_C7_reactome_top5.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+The `reactome_top5` table (@lst-M7-reactome) lists the top 5 Reactome pathways per cell type, with `Description` (the pathway name) and `p.adjust` (BH-corrected). Reactome pathways are more specific and less redundant than GO BP: you'll see named signaling cascades (`Interferon alpha/beta signaling`, `Cytokine Signaling in Immune system`, `MHC class II antigen presentation`) rather than the vague meta-terms GO often produces. Compare these results to your GO BP hits — concordance between the two databases is strong evidence for a real biological signal. Reactome divergence (a term appearing in Reactome but not GO, or vice versa) often reflects how each database drew its boundaries around overlapping biology, not a discrepancy in your data.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  GO BP, GO MF, Reactome, KEGG, MSigDB Hallmark, WikiPathways — there are a lot of databases. How do you pick?

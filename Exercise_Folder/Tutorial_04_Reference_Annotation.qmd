@@ -125,12 +125,17 @@ save_fig(file.path(out_dir, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap
        width = 7, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each point is a cell, positioned by the unintegrated UMAP from Tutorial 02–03, and coloured/labelled by the author-curated `seurat_annotations`. You should see well-separated clusters for the major PBMC types — monocytes, T cells, B cells, NK cells, dendritic cells — each occupying its own region of the embedding. This is the baseline you'll compare Azimuth's automatic labels against in the next steps.
+:::
+
 ## Azimuth — Seurat reference mapping
 
 Azimuth wraps Seurat's anchor-based reference mapping with curated atlases, and returns hierarchical labels (`predicted.celltype.l1` / `l2` / `l3`) plus a per-cell **mapping score**. The PBMC reference (`pbmcref`) is the most widely tested and is a perfect fit for `ifnb`.
 
 ```{r}
-#| label: M4-azimuth
+#| label: lst-M4-azimuth
+#| lst-cap: "Run Azimuth (pbmcref) to predict hierarchical cell-type labels, then plot level-2 calls on the UMAP."
 #| fig-cap: "Azimuth (pbmcref) level-2 predicted cell types projected onto the unintegrated UMAP."
 library(Azimuth)
 
@@ -160,10 +165,15 @@ save_fig(file.path(out_dir, "Mod4_C2_azimuth_labels_umap.png"), p_azimuth_umap,
        width = 7, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The `head()` table shows each cell's Azimuth predictions at three granularity levels (`predicted.celltype.l1/l2/l3`) and the per-cell `mapping.score` (0–1): higher means the cell's neighborhood projects cleanly into the reference manifold. In the UMAP, each point is coloured by its `predicted.celltype.l2` label; for a clean PBMC dataset like `ifnb` you should see the major types (`CD14 Mono`, `CD4 T`, `CD8 T`, `B naive`, `NK`, `DC`) mapping onto the same clusters you labelled manually in Tutorial 03. Large discrepancies between the UMAP positions of Azimuth labels and your manual labels indicate either an off-manifold cell type or a granularity mismatch between `l1`/`l2`/`l3`.
+:::
+
 ### Reading the mapping score — a built-in confidence check
 
 ```{r}
-#| label: M4-azimuth_confidence
+#| label: lst-M4-azimuth_confidence
+#| lst-cap: "FeaturePlot of per-cell Azimuth mapping scores — cells that project poorly into the reference appear in dark/cool colours."
 #| fig-cap: "Azimuth mapping scores on the UMAP. Low-scoring cells project poorly into the reference manifold — treat their labels with caution."
 
 p_mapping <- FeaturePlot(ifnb, features = "mapping.score", reduction = "umap") +
@@ -178,6 +188,10 @@ p_mapping
 save_fig(file.path(out_dir, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
        width = 7, height = 6, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+The colour scale runs from low (dark/cool) to high (bright/warm) mapping score, overlaid on the same UMAP positions as before. Most cells in a clean PBMC dataset should score ≥ 0.7; cells that fall below ~0.5 project poorly into the `pbmcref` manifold and their type labels deserve extra scrutiny. In `ifnb`, watch for IFN-β-stimulated STIM cells showing systematically lower scores than their CTRL counterparts — this is expected because the resting-PBMC reference doesn't model the activated state, even though the cell-type identity is unchanged.
+:::
 
 ::: {.callout-important title="Think about it"}
 Azimuth's PBMC reference is built for **resting** PBMCs. The `ifnb` STIM cells are **interferon-β stimulated**. Will Azimuth confidently place STIM cells, or might it struggle? How would you spot a problem?
@@ -196,7 +210,8 @@ In practice the PBMC reference is robust enough that this effect is mild — but
 ## Compare Azimuth against the manual / ground-truth labels
 
 ```{r}
-#| label: M4-compare
+#| label: lst-M4-compare
+#| lst-cap: "Raw cross-tabulation of author ground-truth labels vs Azimuth level-2 predictions."
 
 ann <- ifnb@meta.data |>
   select(seurat_annotations,                  # ground truth (Kang authors)
@@ -213,10 +228,15 @@ as.data.frame(
   readr::write_csv(file.path(out_dir, "Mod4_C4_truth_vs_azimuth.csv"))
 ```
 
-A cleaner cross-tabulation as a heatmap:
+::: {.callout-tip title="Reading the output"}
+The `table()` printout (@lst-M4-compare) is a contingency matrix with ground-truth cell types on rows and Azimuth `predicted.celltype.l2` labels on columns; each cell value is the number of cells with that combination. For a clean PBMC dataset like `ifnb`, most cells should land in one off-diagonal cell per row — you want large numbers concentrated near the "correct" column. Zero rows or columns indicate a label present in one system but not the other. The heatmap below (@lst-M4-compare_heatmap) makes patterns easier to read at a glance.
+:::
+
+A cleaner cross-tabulation as a heatmap (@lst-M4-compare_heatmap):
 
 ```{r}
-#| label: M4-compare_heatmap
+#| label: lst-M4-compare_heatmap
+#| lst-cap: "Confusion heatmap of author ground-truth labels vs Azimuth level-2 predictions."
 #| fig-cap: "Confusion heatmap of author ground-truth labels (rows) against Azimuth level-2 predictions (columns)."
 
 p_compare_heatmap <- ann |>
@@ -236,16 +256,21 @@ save_fig(file.path(out_dir, "Mod4_C5_truth_vs_azimuth_heatmap.png"), p_compare_h
        width = 8, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The rows are the author ground-truth labels (`seurat_annotations`) and the columns are Azimuth's `predicted.celltype.l2` calls; tile colour encodes the number of cells with that combination. A well-behaved mapping shows **bright tiles on or near the diagonal**, meaning Azimuth agrees with the ground truth for most cells. Off-diagonal bright tiles mark genuine disagreements — common cases are coarse-vs-fine granularity mismatches (e.g. `B cells` vs `B naive`/`B memory`) rather than biological misclassification. Cells in rows with no single bright tile dominating are the ones most worth reviewing.
+:::
+
 ## Reconcile disagreements
 
-A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review.
+A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review (@lst-M4-reconcile).
 
 ::: callout-important
 **You can't compare the labels as raw strings.** The author ground truth (`seurat_annotations`, from `muscData`) and Azimuth use **different vocabularies and granularities** — e.g. `CD14+ Monocytes` (truth) vs `CD14 Mono` (Azimuth l2) vs `Mono` (Azimuth l1); `B cells` vs `B naive`/`B memory`. A direct `==` would flag *everything* as a disagreement even when the calls actually agree. So we **harmonize both to a common coarse vocabulary** and reconcile at Azimuth **level 1** (`predicted.celltype.l1`), the granularity that matches the coarse ground truth.
 :::
 
 ```{r}
-#| label: M4-reconcile
+#| label: lst-M4-reconcile
+#| lst-cap: "Harmonize ground-truth and Azimuth labels to a coarse vocabulary, flag disagreements, and tabulate the final calls."
 
 # Map the author ground-truth labels onto Azimuth's coarse level-1 vocabulary
 # (B, CD4 T, CD8 T, NK, DC, Mono). Anything without a clean level-1 counterpart
@@ -284,6 +309,10 @@ tibble::enframe(table(ifnb$celltype_final),
   dplyr::arrange(dplyr::desc(n_cells)) |>
   readr::write_csv(file.path(out_dir, "Mod4_C6_celltype_final_counts.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+The first printed value is the **agreement fraction** — the proportion of cells where the coarsened ground-truth label matches Azimuth's level-1 call. For a clean PBMC dataset against the PBMC reference you should see ≥ 0.90; values below \~0.80 suggest vocabulary mismatches or genuine off-reference populations. The `table(ifnb$celltype_final)` below it shows how many cells kept their ground-truth label vs how many were prefixed with `REVIEW:` — the `REVIEW:` entries are your work queue for the next annotation check.
+:::
 
 ::: {.callout-important title="Think about it"}
 A reviewer asks you to "use Azimuth labels instead of your manual ones because they're more reproducible". How do you respond?
