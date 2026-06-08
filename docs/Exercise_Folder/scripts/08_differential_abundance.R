@@ -17,6 +17,7 @@ OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod8") # figures/tables, named to match Tutorial_08.qmd
 dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 seu <- readRDS(file.path(OBJ_DIR, "ifnb_integrated.rds"))
 

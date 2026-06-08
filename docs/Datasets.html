@@ -4324,17 +4324,19 @@ z-index: 1;
 <p>Where a tutorial mirrors Khushbu Patel’s <a href="https://github.com/kpatel427/YouTubeTutorials">YouTube Tutorials</a>, we use the same dataset so her video walkthroughs serve as supplementary material.</p>
 <section id="expected-directory-layout" class="level2">
 <h2 class="anchored" data-anchor-id="expected-directory-layout">Expected directory layout</h2>
-<p>By convention every tutorial reads from <code>../data/</code> — a <code>data/</code> folder at the repository root. R-package datasets (ifnb, airway, stxBrain) are cached by their packages and never land in <code>data/</code>; only the manually-downloaded bonus datasets do:</p>
-<pre><code>scrnaseq_workshop/
-├── Exercise_Folder/
-│   └── Tutorial_01 … Tutorial_17 (.qmd) + scripts/
-└── data/
-    ├── (ifnb → muscData cache; airway → R package; stxBrain → SeuratData — no files here)
-    ├── GSE152418_p20047_Study1_RawCounts.txt              # Module 13 (WGCNA)
-    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5        # Module 15 (scATAC)
-    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)         # Module 15 (scATAC)
-    └── atac_v1_pbmc_10k_singlecell.csv                    # Module 15 (scATAC)</code></pre>
-<p>Tutorials 01–08 need nothing in <code>data/</code> to start — <code>ifnb</code> is cached by Bioconductor’s <code>muscData</code> package on first use. They only <em>write</em> to <code>data/</code> (the chained <code>.rds</code> objects passed from one tutorial to the next).</p>
+<p>Each tutorial creates two folders <strong>in the directory you run it from</strong> (the folder the <code>.qmd</code> is in): a <strong><code>data/</code></strong> folder for the chained <code>.rds</code> objects passed from one tutorial to the next, and an <strong><code>output/ModN/</code></strong> folder for that module’s figures and tables. So <strong>keep all the tutorial <code>.qmd</code> files in one folder</strong> and they will share a single <code>data/</code>. R-package datasets (ifnb, airway, stxBrain) are cached by their packages and never land in <code>data/</code>; only the manually-downloaded bonus datasets do:</p>
+<pre><code>your_tutorial_folder/            # wherever you put the .qmd files
+├── Tutorial_01 … Tutorial_17 (.qmd)
+├── data/                        # created on first run, next to the .qmd
+│   ├── (ifnb → muscData cache; airway → R package; stxBrain → SeuratData — no files here)
+│   ├── ifnb_preprocessed.rds … ifnb_annotated_final.rds  # the chained hand-off objects (Tut 01→08)
+│   ├── GSE152418_p20047_Study1_RawCounts.txt              # Module 13 (WGCNA)
+│   ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5        # Module 15 (scATAC)
+│   ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)         # Module 15 (scATAC)
+│   └── atac_v1_pbmc_10k_singlecell.csv                    # Module 15 (scATAC)
+└── output/
+    └── Mod1/ … Mod17/           # each module&#39;s figures (.png) and tables (.csv)</code></pre>
+<p>Tutorials 01–08 need nothing in <code>data/</code> to start — <code>ifnb</code> is cached by Bioconductor’s <code>muscData</code> package on first use. They only <em>write</em> to <code>data/</code> (the chained <code>.rds</code> objects). When you run a setup chunk it prints the absolute path it’s writing to, so you can always find your files. (On the Talapas HPC track the layout differs — the numbered scripts run from <code>Exercise_Folder/scripts/</code> and read/write <code>../objects/</code> and <code>../data/</code>.)</p>
 </section>
 <section id="core-module-datasets" class="level1">
 <h1>Core-module datasets</h1>
@@ -4484,9 +4486,10 @@ z-index: 1;
 <h2 class="anchored" data-anchor-id="module-13-gse152418-covid-19-pbmc-bulk-rna-seq-wgcna">Module 13 — GSE152418 (COVID-19 PBMC bulk RNA-seq, WGCNA)</h2>
 <p><strong>What it is.</strong> PBMC <strong>bulk</strong> RNA-seq from a cross-sectional COVID-19 study (Arunachalam <em>et al.</em> 2020, <em>Science</em>), ~34 samples spanning a severity gradient from healthy controls through convalescent, moderate, severe, and ICU patients. The severity axis is the sample-level trait WGCNA correlates its co-expression modules against. Same dataset as Patel’s <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/WGCNA.R"><code>WGCNA.R</code></a>.</p>
 <p><strong>Download it.</strong> One supplementary file from GEO, unzipped in place:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> ../data</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">gunzip</span> GSE152418_p20047_Study1_RawCounts.txt.gz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run this from the folder your Tutorial 13 .qmd is in (creates data/ next to it)</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> data</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="fu">gunzip</span> GSE152418_p20047_Study1_RawCounts.txt.gz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The per-sample metadata is fetched inside R with <code>GEOquery::getGEO()</code> during the tutorial — no separate download.</p>
 <ul>
 <li>GEO: <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418" class="uri">https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE152418</a> · Reference: Arunachalam <em>et al.</em> (2020) <em>Science</em> <strong>369</strong>: 1210–1220, <a href="https://doi.org/10.1126/science.abc6261">doi:10.1126/science.abc6261</a></li>
@@ -4496,11 +4499,12 @@ z-index: 1;
 <h2 class="anchored" data-anchor-id="module-15-pbmc-10k-scatac-seq-v1-10x-hg19">Module 15 — PBMC 10k scATAC-seq v1 (10x, hg19)</h2>
 <p><strong>What it is.</strong> Single-cell ATAC-seq of ~10,000 PBMCs from a healthy donor — the <strong>v1 / hg19</strong> release. Each cell is summarized as fragment counts over accessible peaks; the fragments file is the canonical scATAC representation. Same dataset as Patel’s <a href="https://github.com/kpatel427/YouTubeTutorials/blob/main/scATACSeq_standard_workflow.R"><code>scATACSeq_standard_workflow.R</code></a> and the <a href="https://stuartlab.org/signac/articles/pbmc_vignette">Signac PBMC vignette</a>.</p>
 <p><strong>Download it.</strong> Four files load directly into Signac (there is no R-package source for them):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ../data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> ../data</span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Run this from the folder your Tutorial 15 .qmd is in (creates data/ next to it)</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> data <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> data</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz.tbi</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">

@@ -39,7 +39,7 @@ A parallel to the scRNA-seq tutorial series — but for **chromatin accessibilit
 The rendered HTML shows the code but does **not** execute it. To run it:
 
 1.  Download the `.qmd` source: <a href="Tutorial_15_scATACseq_Signac.qmd.txt" download="Tutorial_15_scATACseq_Signac.qmd">Tutorial_15_scATACseq_Signac.qmd</a>. If your browser saves the file as `Tutorial_15_scATACseq_Signac.qmd.txt`, **drop the trailing `.txt`** so the filename ends in `.qmd`, then open it in RStudio.
-2.  Download the data files (block below) into `../data/`.
+2.  Download the data files (block below) into `data/`.
 3.  Work through the chunks, flipping `eval: true` as you go.
 :::
 
@@ -69,11 +69,11 @@ Only the **v1** release is pinned to hg19. The *Next GEM v1.1* re-release of the
 
 ### Download the data
 
-The four v1 (hg19) files load directly into Signac — there is no R-package download for them, so fetch them once from the 10x CDN into `../data/` (relative to the tutorial):
+The four v1 (hg19) files load directly into Signac — there is no R-package download for them, so fetch them once from the 10x CDN into `data/` (relative to the tutorial):
 
 ```{bash}
 #| eval: false
-mkdir -p ../data && cd ../data
+mkdir -p data && cd data
 
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv
@@ -151,16 +151,18 @@ set.seed(2026)
 # ---------------------------------------------------------------------------
 # Output directory for this module's figures and tables.
 # Every figure/table chunk below writes a file named  Mod15_C<chunk>_<name>
-# into ../output/Mod15/ so it can be cross-referenced from the rest of the site.
+# into output/Mod15/ so it can be cross-referenced from the rest of the site.
 #   Mod15 = Module 15 (this tutorial);  C<n> = the nth code chunk.
 # ---------------------------------------------------------------------------
-out_dir <- "../output/Mod15"
+out_dir <- "output/Mod15"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create("data",  showWarnings = FALSE)   # shared .rds hand-off folder (created next to this .qmd)
+message("This module writes its figures & tables to: ", normalizePath(out_dir))
 ```
 
 ## Data files and data dictionary
 
-You will need three files from the 10x PBMC 10k scATAC-seq release, placed under `../data/`. All three are available under "Output and supplemental files" on the [10x landing page](https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-next-gem-v-1-1-1-1-standard-2-0-0).
+You will need three files from the 10x PBMC 10k scATAC-seq release, placed under `data/`. All three are available under "Output and supplemental files" on the [10x landing page](https://www.10xgenomics.com/datasets/10-k-peripheral-blood-mononuclear-cells-pbm-cs-from-a-healthy-donor-next-gem-v-1-1-1-1-standard-2-0-0).
 
 | File | Size | Purpose |
 |---|---|---|
@@ -214,7 +216,7 @@ These columns feed directly into the ATAC QC metrics computed in Step 4.
 #| label: peek-fragments
 
 frag.file <- read.delim(
-  "../data/atac_v1_pbmc_10k_fragments.tsv.gz",
+  "data/atac_v1_pbmc_10k_fragments.tsv.gz",
   header = FALSE,
   nrows  = 10
 )
@@ -247,19 +249,19 @@ readr::write_csv(tibble::as_tibble(frag_preview),
 ```{r}
 #| label: load-matrix
 
-counts <- Read10X_h5("../data/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5")
+counts <- Read10X_h5("data/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5")
 counts[1:5, 1:5]
 
 chrom_assay <- CreateChromatinAssay(
   counts       = counts,
   sep          = c(":", "-"),
-  fragments    = "../data/atac_v1_pbmc_10k_fragments.tsv.gz",
+  fragments    = "data/atac_v1_pbmc_10k_fragments.tsv.gz",
   min.cells    = 10,
   min.features = 200
 )
 
 metadata <- read.csv(
-  file      = "../data/atac_v1_pbmc_10k_singlecell.csv",
+  file      = "data/atac_v1_pbmc_10k_singlecell.csv",
   header    = TRUE,
   row.names = 1
 )
@@ -519,7 +521,7 @@ ggsave(file.path(out_dir, "Mod15_C9_umap_clusters.png"), p_umap,
 ```{r}
 #| label: save
 
-saveRDS(pbmc, file = "../data/pbmc_atac_clustered.rds")
+saveRDS(pbmc, file = "data/pbmc_atac_clustered.rds")
 ```
 
 ## Stretch goals

@@ -15,7 +15,9 @@ suppressPackageStartupMessages({
 set.seed(2026)
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod14") # figures/tables for this module
+dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 seu <- readRDS(file.path(OBJ_DIR, "ifnb_annotated.rds"))
 DefaultAssay(seu) <- "RNA"
 

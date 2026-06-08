@@ -14,6 +14,7 @@ OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod16") # figures/tables, named to match Tutorial_16.qmd
 dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Load both sections (run SeuratData::InstallData("stxBrain") once first)
 ant  <- LoadData("stxBrain", type = "anterior1")

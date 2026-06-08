@@ -4341,9 +4341,16 @@ z-index: 1;
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">list.files</span>(<span class="st">&quot;data/filtered_feature_bc_matrix&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>You should see exactly those three filenames.</p>
 </section>
-<section id="tutorial-says-..data...-but-my-data-is-in-data" class="level3">
-<h3 class="anchored" data-anchor-id="tutorial-says-..data...-but-my-data-is-in-data">Tutorial says <code>../data/...</code> but my data is in <code>data/</code></h3>
-<p>The tutorials assume each <code>.qmd</code> lives one level deep (e.g. <code>tutorials/Tutorial_01.qmd</code>) so <code>../data/</code> resolves to a sibling <code>data/</code>. If you’re running from the repo root, change the paths to <code>data/...</code> — or move the tutorial into a subfolder.</p>
+<section id="i-ran-the-tutorial-but-no-figures-tables-.rds-files-appeared" class="level3">
+<h3 class="anchored" data-anchor-id="i-ran-the-tutorial-but-no-figures-tables-.rds-files-appeared">I ran the tutorial but no figures / tables / <code>.rds</code> files appeared</h3>
+<p>They were almost certainly created — just not where you were looking. Each tutorial writes to a <strong><code>data/</code></strong> folder (the <code>.rds</code> hand-off objects) and an <strong><code>output/ModN/</code></strong> folder (figures and tables), both created <strong>in the directory you run the <code>.qmd</code> from</strong>. When you run the setup chunk it prints the exact location:</p>
+<pre><code>This module writes its figures &amp; tables to: /Users/you/.../output/Mod1</code></pre>
+<p>If you can’t find your files:</p>
+<ol type="1">
+<li><strong>Check <code>getwd()</code></strong> in the R console — that’s the folder <code>data/</code> and <code>output/</code> are created in. In RStudio, “Run Current Chunk” uses the folder the <code>.qmd</code> is in; a stray <code>setwd()</code> or the <em>Tools ▸ Global Options ▸ R Markdown ▸ “Evaluate chunks in directory”</em> setting can change it.</li>
+<li><strong>Keep all the tutorial <code>.qmd</code> files in one folder.</strong> Tutorial 01 writes <code>data/ifnb_preprocessed.rds</code> and Tutorial 02 reads it from the same <code>data/</code>; if each <code>.qmd</code> is in a different folder the hand-off breaks with <code>cannot open the connection</code>.</li>
+<li><strong>Nothing runs on Render with <code>eval: false</code></strong> — the chunks are tagged <code>#| eval: false</code>, so <em>rendering</em> the document shows the code without executing it. To actually produce files, run the chunks interactively (▶ / Ctrl-Cmd-Enter) or flip <code>eval: true</code>.</li>
+</ol>
 </section>
 </section>
 <section id="running-the-analysis" class="level2">
@@ -4351,9 +4358,9 @@ z-index: 1;
 <section id="my-umap-doesnt-match-the-slide-handout-exactly" class="level3">
 <h3 class="anchored" data-anchor-id="my-umap-doesnt-match-the-slide-handout-exactly">My UMAP doesn’t match the slide / handout exactly</h3>
 <p>Expected. UMAP and clustering both depend on a random seed. The cluster identities and overall topology should match; rotation/reflection of the embedding will not. To reproduce exactly, set:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(seu, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, <span class="at">seed.use =</span> <span class="dv">2026</span>)</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(seu, <span class="at">random.seed =</span> <span class="dv">2026</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(seu, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>, <span class="at">seed.use =</span> <span class="dv">2026</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(seu, <span class="at">random.seed =</span> <span class="dv">2026</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="findmarkers-is-slow" class="level3">
 <h3 class="anchored" data-anchor-id="findmarkers-is-slow"><code>FindMarkers</code> is slow</h3>
@@ -4362,8 +4369,8 @@ z-index: 1;
 <section id="i-get-warnings-about-future-parallelization" class="level3">
 <h3 class="anchored" data-anchor-id="i-get-warnings-about-future-parallelization">I get warnings about future / parallelization</h3>
 <p>Most are safe to ignore. To silence and pick a sensible default, add at the top of your script:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">future.globals.maxSize =</span> <span class="dv">8</span> <span class="sc">*</span> <span class="dv">1024</span><span class="sc">^</span><span class="dv">3</span>)   <span class="co"># 8 GB</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>future<span class="sc">::</span><span class="fu">plan</span>(<span class="st">&quot;multicore&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)         <span class="co"># or &quot;multisession&quot; on Windows</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">future.globals.maxSize =</span> <span class="dv">8</span> <span class="sc">*</span> <span class="dv">1024</span><span class="sc">^</span><span class="dv">3</span>)   <span class="co"># 8 GB</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>future<span class="sc">::</span><span class="fu">plan</span>(<span class="st">&quot;multicore&quot;</span>, <span class="at">workers =</span> <span class="dv">4</span>)         <span class="co"># or &quot;multisession&quot; on Windows</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="cannot-allocate-vector-of-size-xx-gb" class="level3">
 <h3 class="anchored" data-anchor-id="cannot-allocate-vector-of-size-xx-gb">“Cannot allocate vector of size XX Gb”</h3>
