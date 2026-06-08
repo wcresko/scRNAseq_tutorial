@@ -40,6 +40,10 @@ Two transformations stand between this raw instrument output and anything analyz
 
 Both are handled by `cellranger mkfastq`, which wraps Illumina's `bcl2fastq` / BCL Convert under the hood. The output is a set of FASTQ files in a strict 10x naming pattern.
 
+::: {.callout-note .key-concept title="🔑 Key concept — what Cell Ranger count actually does to your reads"}
+`cellranger count` is not a single algorithm — it is a sequential pipeline of five distinct steps that each transform the data in a specific way. **Barcode correction** maps observed barcodes against the known 10x whitelist, fixing single-base sequencing errors so that cells are not split across multiple barcode identities. **Alignment** runs STAR to map each cDNA read to the reference transcriptome, classifying reads as exonic (counted), intronic (counted with `--include-introns` or in newer versions by default), or unmapped (discarded). **UMI deduplication** collapses PCR amplification: multiple reads sharing the same cell barcode, gene, and UMI sequence represent one original molecule and are merged into a single count. **Cell calling** separates barcodes that represent real cells from barcodes that represent empty droplets (§11.6). **Counting** produces the final integer sparse matrix. Each stage has a characteristic failure mode, and the `web_summary.html` metrics map directly onto the health of each stage — low mapping rate diagnoses stage 2; low cells called diagnoses stage 4.
+:::
+
 ## 11.3 mkfastq versus count
 
 Cell Ranger's two main subcommands map directly onto the two transformations above plus the biology.
@@ -86,6 +90,10 @@ The classic tool for seeing this is the **barcode-rank plot** (the "knee" plot).
 
 Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a knee-based threshold identifies obvious high-count cells, and then an **EmptyDrops**-style test [@lun2019emptydrops] recovers real cells that happen to have lower counts by asking whether each remaining barcode's *expression profile* differs significantly from the ambient profile. A small dying cell with few UMIs but a distinctive transcriptome can thus be rescued, where a naive knee cut would have thrown it away. The consequence for you: the "filtered" matrix is the product of a statistical decision, not a simple threshold, and a soft or ambiguous knee in the plot is a sign to scrutinize that decision.
 
+::: {.callout-note .key-concept title="🔑 Key concept — the cell-calling knee and what a pathological plot signals"}
+The barcode-rank (knee) plot is the most informative single diagnostic for a 10x run. It conveys three things at a glance: how many cells were loaded (the left plateau), how clean the separation between cells and empty droplets was (the steepness of the drop through the knee), and whether something unusual happened (the shape of the curve). A **sharp, clean knee** means cell calling was unambiguous. A **gradual slope** — a slow transition rather than a sharp drop — means there is a population of barcodes with intermediate UMI counts that may be real cells with low RNA content, damaged cells, or over-loaded droplets; `--expect-cells` (§11.9) can help force a tighter call. **Two distinct plateaus** typically indicate two populations of cells with different RNA content (e.g., large macrophages and small lymphocytes in the same suspension). A **very short upper plateau** followed by a long flat tail suggests over-loading: so many cells were loaded that many droplets captured two cells (doublets), inflating the upper plateau and depleting the lower one. The `web_summary.html` "Estimated number of cells" number is the numerical summary of this plot; always look at the plot itself when that number diverges from your expected target.
+:::
+
 ## 11.7 Reading `web_summary.html`
 
 Every `count` run writes a `web_summary.html`. It is the single most informative QC document in the entire pipeline, and it should be the *first* thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in `metrics_summary.csv` for programmatic use. Save the `web_summary.html` alongside your raw data, because reviewers and collaborators will ask for it. To inspect it on Talapas without downloading, use VS Code's "Remote - SSH" extension and simply double-click the `.html` file in the explorer panel, or `scp` the file to your laptop.
@@ -103,7 +111,7 @@ A short list of the numbers that most often reveal a problem is given in @tbl-ch
 
 : Key metrics from `web_summary.html` (also available as `metrics_summary.csv`). None of these is a hard pass/fail — they are prompts to investigate. A low "median genes per cell" in a sample of small resting lymphocytes may be biology rather than failure; read the numbers together and against your expectations for the tissue. {#tbl-ch11-websummary}
 
-None of these is a hard pass/fail; they are prompts. A low "median genes per cell" in a sample of small resting lymphocytes may be biology, not failure. The skill is reading the numbers together and against your expectations for the tissue.
+Reading @tbl-ch11-websummary requires context. The "Reads mapped confidently to transcriptome" metric is the most decisive: a value below 60% is almost always a reference or sample problem — either the wrong reference genome version, a contaminating organism (e.g., bacterial or mouse cell contamination in a human sample), or a chemistry mismatch where 5' reads were processed with a 3' reference (or vice versa). The "Q30 bases in barcode" metric reflects sequencing quality on the short barcode read (R1); below 90% means that many barcodes will be uncorrectable, reducing the effective cell count. "Mean reads per cell" and "Median genes per cell" should be evaluated in the context of the tissue: a PBMC sample with 15,000 reads per cell is undersequenced, but a tumor infiltrating lymphocyte sample from a cell-sparse tumor section might genuinely have fewer reads per cell due to lower loading. The skill is developing a baseline expectation for your own tissue type and flagging deviations from that baseline, not comparing against generic thresholds.
 
 ## 11.8 The hand-off to the core pipeline
 
@@ -164,9 +172,31 @@ A few recurring pitfalls are worth internalizing; @tbl-ch11-pitfalls collects th
 
 : Common `cellranger count` pitfalls and fixes. The wrong-reference and filename-mismatch errors are the two most frequent causes of a failed or misleading run; check these first when a run looks wrong. {#tbl-ch11-pitfalls}
 
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--transcriptome`"}
+**No default — required.** This is the path to the pre-built reference directory (not the tarball), e.g. `--transcriptome=/projects/<PIRG>/<user>/refs/refdata-gex-GRCh38-2024-A`. The reference must match the organism of your sample (human vs mouse vs other) and must be the **GEX reference** (`refdata-gex-...`), not the ATAC reference. Using the wrong reference produces a low mapping rate (< 60%) that Cell Ranger will not flag as an error — it will complete, write a matrix, and report the low mapping rate in `web_summary.html`. The reference version also matters for reproducibility: a run against GRCh38-2020-A and a run against GRCh38-2024-A will produce slightly different gene counts due to updated annotations. Record the exact reference name and path in your analysis notes.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--expect-cells`"}
+**Default: 3,000.** This parameter tells Cell Ranger approximately how many cells to expect, which influences the knee-based component of cell calling. It is not a hard cutoff — Cell Ranger adjusts its algorithm around this expectation rather than truncating exactly at it. Providing an accurate value (or a reasonable estimate) is most important when the knee is soft or ambiguous. If you loaded 5,000 cells, set `--expect-cells=5000`; if you loaded 10,000, set it to 10,000. Using the default 3,000 for a high-loading experiment that actually produced 12,000 cells can cause over-conservative cell calling, where Cell Ranger under-calls cells because it did not expect so many. The "Estimated number of cells" in `web_summary.html` is the diagnostic: if it is far below your expected target, re-run with a more accurate `--expect-cells`.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--localcores` and `--localmem`"}
+**Defaults: 1 core, 6 GB (Cell Ranger's own conservative defaults).** These parameters set Cell Ranger's internal resource budget, distinct from the SLURM allocation. `--localcores` should match `--cpus-per-task` from your SLURM script so Cell Ranger uses all the cores SLURM reserved for it. `--localmem` should be set slightly *below* the SLURM `--mem` value — typically 8–10% lower — to absorb I/O buffers, pre-loaded STAR index, and brief memory spikes without exceeding the SLURM hard ceiling. A SLURM `--mem=128G` job should set `--localmem=120`. Omitting these flags is technically valid but forces Cell Ranger to use its conservative defaults (1 core, 6 GB), turning a 16-core, 128 GB job into a single-threaded, memory-starved process that will either run extremely slowly or fail outright on large datasets.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--chemistry`"}
+**Default: `auto` (automatic detection).** Cell Ranger infers the 10x chemistry version (3' v2, 3' v3, 5', Fixed RNA Profiling, etc.) from the read structure. Auto-detection works correctly for the standard chemistries in the vast majority of cases. Set this flag explicitly when auto-detection fails (Cell Ranger will print a warning), when running a non-standard or custom chemistry, or when processing 5' libraries that need `--chemistry=fiveprime`. An incorrect chemistry setting causes very low mapping rates and incorrect UMI assignment — symptoms indistinguishable from a wrong reference, so always check both if mapping rate is unexpectedly low.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--create-bam`"}
+**Default: `true` in Cell Ranger ≤ 7; `false` in Cell Ranger ≥ 8 (must be specified explicitly).** The aligned BAM file (`possorted_genome_bam.bam`) is large — 10–30 GB per sample — and is not needed for a standard scRNA-seq analysis that only uses the counts matrix. It is required for splice-junction analysis, allele-specific methods, re-alignment against a different reference, and certain advanced QC tools. Omitting it (or explicitly setting `--create-bam=false` in newer versions) saves substantial disk space. Set `--create-bam=true` explicitly when you have a downstream use for the aligned reads; otherwise the disk savings from omitting the BAM are significant for multi-sample projects.
+:::
+
 ## 11.10 Alternatives to Cell Ranger
 
 Cell Ranger is the official 10x pipeline, but it is not the only way to turn FASTQs into a counts matrix, and the open-source alternatives are often faster and more flexible. @tbl-ch11-alternatives compares the three main options.
+
+Reading @tbl-ch11-alternatives: the choice between tools depends on what you are optimizing for. If **official 10x support** and the widest chemistry compatibility matter (e.g., you are processing Flex, Feature Barcoding, or CRISPR screening data), Cell Ranger is the only supported option. If you want a **drop-in open-source replacement** for standard GEX data that produces Cell Ranger-compatible output, STARsolo is the closest match — it uses the same STAR aligner and implements the same UMI-deduplication and cell-calling logic, making its outputs concordant with Cell Ranger on the vast majority of genes. If **speed** is the priority — processing dozens of samples in a pipeline where wall-clock time matters — alevin-fry's pseudoalignment is 3–5× faster and uses significantly less memory. The kallisto|bustools ecosystem (kb-python) is similarly fast and has an active Python integration. A sample quantified by two different tools will produce concordant counts on highly expressed, unambiguously mapping genes but will differ on genes with complex multimapping patterns or on intronic counts — never switch tools mid-project without validating concordance on a representative sample.
 
 | Tool | Approach | Speed vs Cell Ranger | Custom reference | Key use cases |
 |---|---|---|---|---|

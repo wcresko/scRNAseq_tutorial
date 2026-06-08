@@ -55,6 +55,14 @@ Why PCA *first*? Three reasons work together. First, **compression**: 2,000 gene
 
 UMAP and clustering operate on PCs, not raw expression, exactly because of (3). Skip PCA and try to UMAP the scaled HVG matrix and you'll get visibly worse embeddings, slower runtime, and unstable cluster solutions. In practice the SVD is computed by a **randomized / truncated** solver (`irlba` in Seurat, `scanpy`'s `arpack`/randomized backends), which returns only the top ~50 components and scales to atlas-sized matrices where a full eigendecomposition would be intractable [@amezquita2020orchestrating]. The choice of PCA as the linear backbone of the single-cell workflow is shared across Seurat, Scanpy, and Bioconductor [@satija2015spatial; @wolf2018scanpy; @amezquita2020orchestrating].
 
+::: {.callout-note .key-concept title="🔑 Key concept — what a principal component captures"}
+Each PC is a linear combination of all HVGs — a weighted sum of gene expression values — chosen so that cell scores along that axis have maximum variance, subject to the constraint of being orthogonal to all previous PCs. In biological terms, PC1 captures the largest source of transcriptional variation in the dataset (often a cell-type axis, or a batch/condition axis on unintegrated data); PC2 captures the next largest source, uncorrelated with PC1; and so on. Because PCA finds axes of maximum variance in a *linear* sense, it is interpretable: the loadings tell you exactly which genes drive cells apart along each PC, making it the only major dimensionality reduction in the workflow where you can inspect a component and understand its biology. UMAP and t-SNE lack this interpretability entirely.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — RunPCA npcs"}
+`RunPCA(seu, npcs = 50)`. **Default: 50.** Sets the maximum number of principal components computed. More PCs cost more computation but ensure you don't miss a low-variance biological axis. For `ElbowPlot` to be informative you need at least as many PCs as you expect to use (typically 30–50); requesting 50 upfront is a safe standard. Note that `npcs` is the maximum computed — you then *choose* a subset (e.g. `dims = 1:20`) for `FindNeighbors` and `RunUMAP`. Increasing `npcs` beyond 50 rarely helps for standard 10x runs of < 200k cells.
+:::
+
 ## 2.3 Choosing how many PCs to keep
 
 The standard tool is the **scree plot** (sometimes called an elbow plot): for each PC, plot the variance it explains, in descending order. The shape is a steep initial drop, an **elbow**, and a long noise floor. @tbl-ch02-pc-selection summarizes the main PC-selection strategies, their cost, and when to reach for each.
@@ -90,13 +98,17 @@ The modern alternative is **graph-based clustering**, which has two stages:
 
 ### 2.4.1 Build the k-nearest-neighbor (kNN) graph
 
-For each cell, find its $k$ nearest neighbors in PC space (typically $k = 20$). Connect each cell to its neighbors with edges. The result is a graph where every cell has degree $k$.
+For each cell, find its $k$ nearest neighbors in PC space (typically $k = 20$). Connect each cell to its neighbors with edges. The result is a graph where every cell has degree $k$. The `k` here is the knob that controls how local or global the neighborhood concept is: small `k` (5–10) makes each cell's community very tight and local, while large `k` (30–50) creates broader, fuzzier communities that survive noise better but can blend nearby populations.
 
 ### 2.4.2 Promote to a shared-nearest-neighbor (SNN) graph
 
-For every edge $(i, j)$ in the kNN graph, weight it by how many of $i$'s neighbors are also $j$'s neighbors — the **Jaccard similarity** of their neighborhoods. Edges between cells in the same dense region get high weight; edges between cells on the boundary of a cluster get low weight. The SNN graph is what clustering actually runs on.
+For every edge $(i, j)$ in the kNN graph, weight it by how many of $i$'s neighbors are also $j$'s neighbors — the **Jaccard similarity** of their neighborhoods. Edges between cells in the same dense region get high weight; edges between cells on the boundary of a cluster get low weight. The SNN graph is what clustering actually runs on. The Jaccard re-weighting is important: it makes the graph robust to "hub" cells — cells with unusually high connectivity that would otherwise dominate naive kNN clustering — by requiring that shared-neighborhood structure, not just raw proximity, defines community membership.
 
 Seurat's `FindNeighbors(seu, dims = 1:30)` builds both. The SNN graph stored in `seu@graphs$RNA_snn` is then handed to `FindClusters`.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — FindNeighbors k.param"}
+`FindNeighbors(seu, dims = 1:30, k.param = 20)`. **Default: k.param = 20.** Sets the number of nearest neighbors per cell in PC space. Increasing `k.param` (e.g. to 30–50) makes clusters larger and more robust to noise but can merge genuinely distinct subtypes; decreasing it (e.g. to 10) emphasizes fine-grained local structure and tends to produce more, smaller clusters. For most 10x datasets in the 5k–100k cell range, the default of 20 is appropriate; rare populations benefit from a modest increase (25–30) to ensure they are not isolated as disconnected singleton nodes. `dims` should match the number of PCs you selected in §2.3.
+:::
 
 ## 2.5 Graph-based community detection (Louvain & Leiden)
 
@@ -117,6 +129,10 @@ The **resolution parameter** controls granularity:
 - High (1.0+) → many small clusters; subdivides cell states
 
 There is **no single "right" resolution.** The right one is the one that matches your biological question. Run several and inspect with [`clustree`](https://cran.r-project.org/package=clustree) to see how clusters split as resolution increases. Resolutions where the clustree topology is **stable** (clusters don't shuffle membership across nearby resolutions) are defensible. Modularity optimization has a known **resolution limit** — it can fail to detect communities smaller than a scale set by the total graph size — which is part of why a single global resolution rarely resolves both abundant and rare populations well, and why iterative subclustering of a coarse partition is often more effective than pushing one global resolution very high. Unsupervised clustering remains one of the harder, less-settled steps of the pipeline; systematic comparisons find that no method dominates across datasets and that the recovered cluster count is method- and parameter-dependent [@kiselev2019challenges; @duo2018systematic; @yu2022benchmarking].
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — FindClusters resolution"}
+`FindClusters(seu, resolution = 0.8)`. **Default: 0.8.** Controls the granularity of community detection: higher values yield more, smaller clusters; lower values yield fewer, larger clusters. There is no universally correct resolution — the right value depends on your biological question. A practical workflow is to run several resolutions (e.g. `c(0.1, 0.3, 0.5, 0.8, 1.0)`) simultaneously, visualize the hierarchy with `clustree`, and choose the resolution where each cluster can be given a defensible biological identity. For the workshop `ifnb` PBMC dataset, `resolution = 0.5` is the tutorial default; on unintegrated data this typically yields 15–20 clusters (more than the ~13 biologically distinct types, because condition-split duplicates appear). Post-integration, the same resolution usually collapses to ~13 clean clusters.
+:::
 
 ## 2.6 t-SNE and UMAP: visualization, not analysis
 
@@ -156,6 +172,14 @@ UMAP is the workshop default. Two parameters:
 - `min.dist` (default 0.3): smaller = tighter clusters with clear gaps; larger = spread-out, good for continua
 
 UMAP is **noticeably more stable** across `n.neighbors` than t-SNE is across perplexity. Usually one well-chosen UMAP is enough.
+
+::: {.callout-note .key-concept title="🔑 Key concept — what UMAP does and does not preserve"}
+UMAP optimizes a cross-entropy objective over a fuzzy weighted neighborhood graph: it penalizes both placing true neighbors too far apart (attraction) and placing unrelated cells too close together (repulsion). This symmetric penalty preserves more *global* topology than t-SNE, which only penalizes the first error. However, "more global" does not mean "faithful" — inter-cluster distances on a UMAP are not a reliable measure of biological dissimilarity, and apparent density differences are artifacts of the `min.dist` parameter, not cell-type frequencies. UMAP is correctly read as a visualization of the cluster solution (computed on the SNN graph in PC space), not as a geometric analysis in its own right. It is valid for: showing cluster assignments, overlaying gene expression as a continuous gradient (`FeaturePlot`), and spotting dramatic batch effects as parallel sample islands. It is not valid for: distance-based statistics, trajectory direction, or density quantification.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — RunUMAP n.neighbors and min.dist"}
+`RunUMAP(seu, dims = 1:30, n.neighbors = 30, min.dist = 0.3)`. **Defaults: n.neighbors = 30, min.dist = 0.3.** `n.neighbors` sets how many nearest neighbors each cell considers when building UMAP's local graph — smaller values (5–10) emphasize very local detail and produce more fragmented embeddings; larger values (50+) emphasize global topology and can blur subtypes together. `min.dist` sets the minimum separation between points in the 2-D embedding — smaller values (0.05–0.1) produce tight, compact clusters with clear gaps between them (best for discrete cell types); larger values (0.5–0.8) spread cells across continuous gradients (best for developmental trajectories or smooth state transitions). For the workshop `ifnb` PBMC dataset, the defaults produce a clean, interpretable embedding.
+:::
 
 ## 2.7 What UMAPs do *not* tell you
 

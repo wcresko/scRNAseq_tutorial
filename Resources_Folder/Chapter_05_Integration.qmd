@@ -31,6 +31,10 @@ If the samples form **parallel structures** — every cell type appearing twice,
 
 **Integration** is the family of methods that warp the embedding so the same cell type from different samples ends up in the same cluster, while preserving any *real* biological differences between samples (e.g. an activated state present in one sample but not another).
 
+::: {.callout-note .key-concept title="🔑 Key concept — what integration actually aligns"}
+Integration does not align raw expression values; it aligns the geometric positions of cells in PC space. A batch effect in scRNA-seq is not a simple additive shift (as in bulk RNA-seq) but a complex non-linear warp: the same cell type measured in two libraries can sit in two distinct PC-space clouds, with different variances, different inter-cluster distances, and often different numbers of recovered clusters. Integration methods identify which cells from different batches are most likely the same type — either by finding mutual nearest-neighbor pairs across batches (Seurat anchors, MNN) or by penalizing cluster centroids that are batch-unbalanced (Harmony) — and apply a correction that moves those cells toward each other. The correction is applied in PC space (Harmony) or in a corrected expression assay (Seurat anchors), but in both cases the downstream biological signal — stored in the original RNA assay — is untouched. This is why you always switch back to `DefaultAssay(seu) <- "RNA"` before any differential expression or module scoring.
+:::
+
 ## 5.2 The diagnostic: when do you need integration?
 
 Run the unintegrated PCA + UMAP from Chapter 2 and inspect three things:
@@ -68,7 +72,7 @@ Harmony [@korsunsky2019harmony] operates in PC space — *after* you've run `Run
 3. **Compute correction factors**: the difference between each per-batch centroid and the global centroid
 4. **Shift each cell** by a soft-cluster-weighted combination of those correction factors
 
-The output is a `harmony` reduction that is a drop-in replacement for `pca` in `FindNeighbors` and `RunUMAP`. The original PCs are preserved separately.
+The output is a `harmony` reduction that is a drop-in replacement for `pca` in `FindNeighbors` and `RunUMAP`. The original PCs are preserved separately. The soft-clustering approach is what distinguishes Harmony from hard-assignment methods: because each cell belongs to *multiple* clusters with fractional membership, the correction is smooth and continuous — a cell on the boundary between two populations is shifted by a weighted average of both populations' correction factors, rather than being abruptly assigned to one population's correction. This continuity makes Harmony robust to rare populations that straddle cluster boundaries in the pre-correction PC space.
 
 Harmony's strengths:
 
@@ -81,6 +85,14 @@ Harmony's strengths:
 Harmony's weaknesses:
 
 - Less effective on very heterogeneous batches (cell types absent in one but present in another); works best when most cell types are shared
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — RunHarmony theta"}
+`RunHarmony(seu, group.by.vars = "stim", theta = 2)`. **Default: theta = 2.** Controls how aggressively Harmony penalizes batch imbalance in its soft-clustering objective. Higher `theta` (e.g. 4–6) forces more aggressive mixing across batches — useful for strong, hard-to-correct batch effects but risks erasing real biological variation between conditions. Lower `theta` (e.g. 1) is less aggressive and is appropriate when batches are nearly comparable already or when biological differences between samples are strong and should not be over-corrected. For most multi-sample scRNA-seq studies the default of 2 is a sensible starting point; the ISG-score diagnostic in §5.6 is the practical test of whether you've pushed too hard.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — SelectIntegrationFeatures nfeatures"}
+`SelectIntegrationFeatures(object.list = ifnb.list, nfeatures = 2000)`. **Default: 2000.** Selects genes that are among the top HVGs in the most samples, producing a feature set that is robust across batches rather than dominated by any single sample. Increasing `nfeatures` (e.g. 3000–5000) includes more genes and can recover rarer cell-type markers, at the cost of including more batch-specific noise genes. For most two-sample designs (like `ifnb`), 2000 is sufficient; for highly heterogeneous multi-tissue or multi-protocol atlases, raising to 3000–4000 is common practice. These features are then used to scale the merged object and run PCA before Harmony or `IntegrateLayers`.
+:::
 
 ## 5.5 Seurat anchors in detail
 
@@ -129,6 +141,10 @@ Because the workshop implements both methods, it is worth pausing to contrast th
 | **Atlas scale (>500k cells)** | Yes | Not recommended |
 
 : Direct comparison of Harmony and Seurat anchors on the dimensions most relevant to choosing between them. For most PBMC-scale studies (10k–200k cells), both work well; Harmony is the practical default for speed; Seurat anchors can provide more conservative correction when cell-type compositions are very unequal across batches. {#tbl-ch05-harmony-vs-anchors}
+
+::: {.callout-note .key-concept title="🔑 Key concept — the over-correction vs. under-correction trade-off"}
+Integration methods operate on a fundamental tension: every algorithm that moves cells from different samples together risks also moving cells with *different biology* together. A Harmony run with `theta = 10` will produce a perfectly sample-mixed UMAP, but at the cost of flattening the IFN-β response, the tumor microenvironment gradient, or any other biology that correlates with the sample label. The core diagnostic is therefore not "is the UMAP sample-mixed?" but "are real biological signals preserved *within* the mixed clusters?" The ISG-score gap test (§5.6) is the canonical check for the `ifnb` dataset: if STIM cells still score higher on interferon-stimulated genes than CTRL cells of the same cluster type, the biology is intact. If the gap is zero, you've over-corrected. No integration metric should ever be interpreted in isolation from a biology-preservation check.
+:::
 
 ## 5.6 The over-correction problem
 

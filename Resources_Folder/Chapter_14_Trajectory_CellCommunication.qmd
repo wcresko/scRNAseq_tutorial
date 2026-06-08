@@ -36,6 +36,14 @@ A trajectory method (i) embeds cells in a reduced space, (ii) fits a graph, tree
 
 The foundational intuition is that if you sample enough cells during a continuous process — differentiation, the cell cycle, a time-course — then at any given moment you capture cells at all stages. Ordering them by transcriptome similarity therefore reconstructs the temporal sequence even though you never measured the same cell twice at different times. This idea was articulated in the original Monocle paper [@trapnell2014monocle] and is now the basis of dozens of methods. The benchmark of 45 trajectory methods [@saelens2019comparison] remains the single best guide for method selection and shows clearly that the method choice matters, that discrete data forced through trajectory tools produce confident nonsense, and that the user-supplied root is the most influential parameter of all.
 
+::: {.callout-note .key-concept title="🔑 Key concept — pseudotime has no inherent direction"}
+Pseudotime is a number assigned to each cell representing its position along an inferred path in transcriptome space. It is computed from the graph structure and the distances between cells — it carries no information about which end is "early" and which is "late." The biological direction must be supplied by the analyst: you choose the root cluster (the start), typically based on known progenitor markers, CytoTRACE scores (less-differentiated cells express more genes), or RNA velocity arrows. Getting the root wrong reverses the entire narrative. A trajectory that runs from a mature cell type to a progenitor looks exactly as numerically valid as the correct direction, because the algorithm has no way to distinguish them. Report how you chose your root, and cross-validate with at least one independent line of evidence.
+:::
+
+::: {.callout-note .key-concept title="🔑 Key concept — trajectory inference requires a biological prior, not just data"}
+The most common misuse of trajectory tools is applying them to data that does not contain a continuum. If your dataset is two unrelated cell populations that happen to overlap in UMAP, any trajectory method will fit a confident-looking pseudotime axis through them — but the axis is meaningless. Before running Slingshot or Monocle, ask: is there biological reason to expect a continuous process here? The PAGA connectivity graph (from Scanpy) is the best first-pass check: it quantifies how strongly clusters are transcriptionally connected, allowing you to ask "is there a continuum?" before committing to a full trajectory model. The Saelens benchmark [@saelens2019comparison] makes this failure mode explicit with controlled-data experiments.
+:::
+
 ### 14.2.1 Slingshot
 
 **Slingshot** [@street2018slingshot] is one of the two tools the workshop tutorial uses. Its approach is deliberately conservative: rather than learning a continuous graph from scratch, it fits **smooth principal curves** through the existing cluster structure that the user has already derived. This means Slingshot amplifies a good clustering and respects known biology, but it also means that a mis-annotated or over-merged clustering will produce a misleading trajectory.
@@ -44,6 +52,10 @@ The key inputs are the dimensionality-reduction embedding (Slingshot works well 
 
 Practical notes: the curve fit is done on the cluster centroids first (the *cluster-level* graph), then the cell-level pseudotimes are derived by projecting each cell onto its nearest curve segment. This two-stage approach is computationally efficient and numerically stable for the moderate-N scRNA-seq datasets typical of a single study. For atlas-scale data with hundreds of thousands of cells, the projection step can be slow and it is worth filtering to the relevant cell types first.
 
+::: {.callout-note .key-parameter title="⚙️ Key parameter — slingshot / start.clus (root cluster)"}
+`slingshot(sce, clusterLabels = ..., reducedDim = ..., start.clus = "ClusterName")` specifies the root cluster from which pseudotime is measured. **No default** — the argument is required and there is no meaningful fallback. If omitted, Slingshot attempts to infer a root automatically, but the result is unreliable without biological guidance. The root choice is the single most influential parameter in the analysis: swapping it to any other cluster reverses or restructures the entire trajectory. Justify the root with at least one of: known progenitor markers expressed in that cluster; CytoTRACE scores highest there; RNA velocity arrows pointing away from it. Optionally, `end.clus` can also be specified to constrain the terminal state. When multiple lineages are expected, omit `end.clus` and let Slingshot find branches from the common root.
+:::
+
 ### 14.2.2 Monocle 3
 
 **Monocle 3** [@trapnell2014monocle; @cao2019monocle3] takes a different architectural approach: rather than fitting curves through an existing cluster structure, it learns a **principal graph** directly from the cell embedding using a reversed-graph embedding algorithm. A principal graph can have branch points, allowing Monocle 3 to model more complex topologies than a simple tree.
@@ -51,6 +63,12 @@ Practical notes: the curve fit is done on the cluster centroids first (the *clus
 The core workflow is: `new_cell_data_set()` → `preprocess_cds()` (PCA) → `reduce_dimension()` (UMAP) → `cluster_cells()` → `learn_graph()` → `order_cells()`. The last step, `order_cells()`, is **interactive** — it opens a plot in which the user clicks the root node of the graph. This cannot be automated in a batch script, which is why the Module 14 tutorial keeps it as a commented sketch rather than a runnable block. For reproducibility, record the root node ID or the root cluster name in your methods.
 
 Monocle 3 can also perform differential expression along pseudotime using a likelihood-ratio test that models gene expression as a smooth function of pseudotime via a principal-graph-dependent spline. Genes that vary significantly along the inferred path are the trajectory's molecular drivers. This is a powerful feature absent from Slingshot's core; however, Slingshot's pseudotimes can be plugged into `tradeSeq` [@vandenberge2020tradeseq] for a similar generalized additive model (GAM) approach to pseudotime-dependent DE.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — Monocle3 / order_cells root node (interactive)"}
+`order_cells(cds)` opens an interactive plot in which the user **clicks** the root node of the principal graph to define the pseudotime origin. **No automated default** — the function blocks until a root is clicked. This makes it impossible to batch-script reproducibly without capturing the root node ID. For reproducibility: (1) record the cluster whose centroid is nearest to your chosen root node, or (2) use `order_cells(cds, root_pr_nodes = <node_id>)` with a pre-identified node ID, or (3) use `order_cells(cds, root_cells = <barcode_vector>)` to specify root cells programmatically. Always report the root selection strategy in your methods section.
+:::
+
+**`tradeSeq` for pseudotime-dependent DE.** Once pseudotimes are estimated by Slingshot (or any other method), `tradeSeq` [@vandenberge2020tradeseq] fits a generalized additive model (GAM) to each gene using a penalized spline of pseudotime as the predictor. The GAM captures non-linear expression dynamics — a gene that peaks mid-trajectory and then declines will be detected even though its mean at start and end is similar. Key tests include `associationTest()` (does the gene vary along pseudotime at all?) and `startVsEndTest()` (is the gene significantly different between the root and the terminal state?). `tradeSeq` integrates naturally with Slingshot because it can take the `SlingshotDataSet` object directly and model branching lineages simultaneously.
 
 ### 14.2.3 Choosing and validating a root
 
@@ -77,6 +95,10 @@ The deepest pitfall is more fundamental: **the algorithm will return a trajector
 Pseudotime supplies an ordering but not an arrow. **RNA velocity** recovers the direction of cellular movement by splitting reads into **unspliced** (intron-containing, newly transcribed) and **spliced** (mature, processed) counts per gene. A gene with a high unspliced-to-spliced ratio is being actively induced: the cell is producing more pre-mRNA than its current steady-state level predicts, meaning it is moving toward a higher-expression state for that gene. Conversely, a gene with a low unspliced-to-spliced ratio is being downregulated. The per-gene signals are combined into a per-cell velocity vector that can be projected onto the UMAP embedding as an arrow, giving each cell an estimated direction of travel.
 
 The original implementation is **velocyto** [@lamanno2018rnavelocity], which introduced the steady-state model: at steady state, the ratio of unspliced to spliced counts is constant per gene, so deviations from that ratio indicate induction or repression. The current default is the **scVelo** dynamical model [@bergen2020scvelo], which relaxes the steady-state assumption by estimating gene-specific kinetic parameters (transcription rate, splicing rate, degradation rate) directly from the data. The dynamical model is more accurate for genes undergoing rapid kinetic changes but is also more computationally demanding.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — scVelo / mode (velocity estimation model)"}
+`scv.tl.velocity(adata, mode = "dynamical")` selects the kinetic model used to estimate velocities. **Default: `"stochastic"`** in older scVelo versions; the recommended current default is `"dynamical"`. The `"stochastic"` mode uses the original steady-state model with an added noise term — faster but less accurate for genes with rapid kinetics. The `"dynamical"` mode estimates per-gene transcription, splicing, and degradation rates from the data — more accurate but requires `scv.tl.recover_dynamics(adata)` first and is computationally expensive. For standard trajectory validation use `"dynamical"`; for quick exploratory runs on large datasets use `"stochastic"`. The `"deterministic"` mode is the original velocyto steady-state model without a noise term — fastest but most assumption-bound.
+:::
 
 Velocity analysis requires a spliced/unspliced count matrix produced by `velocyto run` (command-line) or `kallisto | bustools` — *not* the standard filtered-feature-bc-matrix that most downstream analyses use. The spliced/unspliced counts are stored in a `loom` file or an AnnData object and must be aligned to the same barcode set as your RNA analysis.
 
@@ -128,6 +150,10 @@ Other widely used tools take different approaches. **CellPhoneDB** (Python) uses
 | **LIANA** [@dimitrov2022comparison] | R/Python | Multi-method consensus | Reduces sensitivity to any single method/DB | Aggregates CellPhoneDB, CellChat, others |
 
 : Cell–cell communication inference tools and their principal approaches. LIANA provides a method-agnostic consensus; CellChat is the most common single-tool choice in R-based workflows. {#tbl-ch14-lrctools}
+
+::: {.callout-note .key-concept title="🔑 Key concept — cell–cell communication inference predicts potential, not activity"}
+Every cell–cell communication tool asks the same question: "is the ligand expressed in cell type A AND is the receptor expressed in cell type B?" A positive answer means co-expression, not a verified interaction. The mRNA for a secreted ligand must be translated, processed, and secreted before it can bind a receptor — and the receptor must be on the cell surface, unoccupied, and coupled to a downstream effector. None of these post-transcriptional steps are visible to scRNA-seq. Furthermore, if the two cell types are never spatially adjacent in the tissue, co-expression is moot regardless of how high the ligand or receptor expression is. Treat the output of any communication inference tool as a list of **testable hypotheses**, not a signaling atlas.
+:::
 
 ### 14.5.3 Universal caveats
 

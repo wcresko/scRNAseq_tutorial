@@ -31,6 +31,10 @@ Cell-type labeling has two methodological camps:
 
 Best practice is to run **both** and **reconcile disagreements** — they catch different kinds of errors. Manual annotation catches references missing your cell type; reference-based annotation catches missed subdivisions and reduces annotator bias. Automated annotation is now a crowded field — large comparisons evaluate 20–30+ classifiers and find that the best correlation- and classifier-based methods are accurate when the reference matches the query, but degrade sharply on cell types absent from the reference [@abdelaal2019comparison; @pasquini2021automated].
 
+::: {.callout-note .key-concept title="🔑 Key concept — what reference-based annotation actually does"}
+Every reference-based method — Azimuth, SingleR, or CellTypist — frames annotation as a *nearest-neighbor problem in a shared gene-expression space*: given a query cell and a set of reference cells with known labels, the query is assigned the label of the reference cells it most resembles, weighted by some confidence metric. What differs between methods is *how* resemblance is measured (correlation, Euclidean distance in PCA space, or learned logistic-regression weights) and *how* the reference was prepared (bulk RNA-seq averages, single-cell atlas, or a trained model). Crucially, all methods share the same blind spot: they can only assign labels that exist in the reference. A cell type absent from the reference will be assigned the closest available label, possibly with low confidence — it will never spontaneously return "novel." This is why reading the confidence metric and reconciling against manual markers is not optional.
+:::
+
 The workshop tutorial uses **Azimuth** as its reference-based method: it ships curated, atlas-quality references (including a PBMC reference that is a perfect fit for `ifnb`), downloads them on demand, and needs no separate Bioconductor reference-data packages. @tbl-ch04-methods summarizes the three paradigms side by side; §4.4 walks SingleR and CellTypist further.
 
 | Method | Approach | Reference needed | Confidence metric | Best for |
@@ -45,7 +49,7 @@ The workshop tutorial uses **Azimuth** as its reference-based method: it ships c
 
 ## 4.2 Azimuth — anchor-based reference mapping
 
-Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same method as Seurat integration, applied with a query → reference orientation). The key design advantage is that the reference UMAP and cell labels are precomputed once from a large atlas dataset; at query time, your cells are projected *into* that manifold rather than re-computing everything jointly. Pre-built atlas-quality references are available:
+Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same method as Seurat integration, applied with a query → reference orientation). The key design advantage is that the reference UMAP and cell labels are precomputed once from a large atlas dataset; at query time, your cells are projected *into* that manifold rather than re-computing everything jointly. This is fundamentally different from methods that require both the query and reference to be processed together: because Azimuth's reference is frozen at publication time and its UMAP is precomputed, mapping a new query to it is fast (minutes on a laptop), consistent across queries, and does not require re-running the reference-side integration every time. The shared feature space between query and reference is determined by finding mutual nearest neighbors across the two datasets after projecting both into a common CCA subspace — the same anchor-finding machinery used for multi-sample integration in Chapter 5. Pre-built atlas-quality references are available:
 
 | Reference | Tissue | Source |
 |---|---|---|
@@ -83,7 +87,7 @@ Weaknesses:
 
 ## 4.3 Reading Azimuth's mapping score
 
-`mapping.score` is the primary quality filter for Azimuth output; it reflects how well the cell's local neighborhood projects into the reference's manifold. @tbl-ch04-mapscore gives practical interpretation ranges. Bimodal distributions are common: one peak represents in-reference cells (mapping score 0.7–1.0), the other out-of-reference cells (0.0–0.4).
+`mapping.score` is the primary quality filter for Azimuth output; it reflects how well the cell's local neighborhood projects into the reference's manifold. @tbl-ch04-mapscore gives practical interpretation ranges. Bimodal distributions are common: one peak represents in-reference cells (mapping score 0.7–1.0), the other out-of-reference cells (0.0–0.4). A good first diagnostic after running Azimuth is to plot `FeaturePlot(seu, features = "mapping.score")` on the UMAP — a clean matched-reference run produces a uniformly high-scoring cloud with occasional low-scoring outliers; a bimodal distribution with a substantial low-scoring population tells you the reference doesn't cover a large fraction of your data and the labels on those cells should not be trusted. Plotting `tapply(seu$mapping.score, seu$stim, mean)` for a multi-condition dataset quantifies any systematic asymmetry between conditions.
 
 | Score range | Interpretation | Recommended action |
 |---|---|---|
@@ -104,6 +108,10 @@ In an `ifnb` PBMC analysis with the `pbmcref` reference, mapping scores should b
 
 Always report the share of low-mapping-score cells in your methods, the same way you would report a prune fraction. Healthy on a matched reference: very few. A large low-scoring fraction means the reference doesn't cover your data — pick a different one.
 
+::: {.callout-note .key-parameter title="⚙️ Key parameter — Azimuth mapping.score threshold"}
+Azimuth reports `mapping.score` per cell in the range [0, 1]. **Recommended threshold: > 0.7 to trust a label.** There is no single hard cutoff baked into the method — the Azimuth documentation uses 0.7 as a practical rule of thumb, and the workshop adopts it. Cells below 0.7 are "borderline" (0.4–0.7) or clearly off-manifold (< 0.4) and should be compared against manual marker annotation before their label is accepted. In practice, on a well-matched reference (e.g. `pbmcref` applied to healthy-donor PBMCs) virtually all cells score > 0.7; on a mismatched reference (e.g. `pbmcref` applied to tumor tissue) a large fraction will score < 0.4. Always report the proportion of cells below threshold in your methods section.
+:::
+
 ## 4.4 Other reference-based methods you'll meet
 
 The workshop runs Azimuth, but two other paradigms are common in the literature. Understanding them lets you read methods sections critically and choose the right tool when Azimuth's pre-built references don't match your tissue.
@@ -113,6 +121,10 @@ The workshop runs Azimuth, but two other paradigms are common in the literature.
 **CellTypist — pre-trained logistic regression** [@dominguezconde2022crosstissue]. CellTypist trains a sparse logistic-regression classifier per cell type from atlas-scale references (primarily the Human Cell Atlas and large CELLxGENE census datasets), then applies the trained model to your query cells. It is fast, returns per-label probability scores (making it multi-label aware — a cell can score high for both "CD4 T activated" and "CD4 T naive"), and ships over 40 pre-trained models covering many human and mouse tissues. The Python implementation is the mature one; for Scanpy workflows it is the most natural choice. Like all classifiers, its accuracy depends on whether its training labels match the granularity and tissue context of your query.
 
 All three methods share the same fundamental failure mode: when the reference doesn't cover a cell type present in the query, the method still assigns the closest available label. The benchmarks in §4.1 make this point repeatedly [@abdelaal2019comparison; @pasquini2021automated]. The practical lesson is identical regardless of method: always read the confidence diagnostic (`mapping.score` for Azimuth, `delta` for SingleR, probability for CellTypist), filter low-confidence cells, and reconcile against manual markers before publishing any annotation.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — SingleR delta (pruneScores) and CellTypist majority_voting"}
+**SingleR:** `pruneScores(results, min.diff.med = 0.05)` removes labels where the top-label Spearman score minus the median score over all labels (`delta`) is too small to be trustworthy. The default `min.diff.med = 0.05` is a conservative threshold; reducing it accepts more marginal calls. Cells pruned to `NA` by `pruneScores` are the SingleR equivalent of low Azimuth mapping scores — they should not be used without further investigation. **CellTypist:** `CellTypist.annotate(majority_voting = True)` consolidates per-cell probability scores into a cluster-level majority vote before assigning a final label — reducing noise on a per-cell basis at the cost of assigning the same label to all cells in a cluster even when a few clearly belong elsewhere. `majority_voting = False` (the default) assigns each cell independently based on its highest per-label probability, which can be inconsistent across cells in the same cluster but exposes genuine heterogeneity.
+:::
 
 ## 4.5 The reconciliation step
 

@@ -29,6 +29,8 @@ Genes that consistently rise and fall together across samples are likely **funct
 
 This is a **systems-level** analytical lens, complementary to per-gene DE. A module of 200 genes co-expressed and correlated with disease severity is often more informative than a list of 200 individually-significant DE genes. A DE list of 800 genes is hard to interpret; a handful of co-regulated modules — each summarized by an eigengene and tied to a trait — is actionable. WGCNA reframes "which genes change?" as "which transcriptional programs change?"
 
+The key distinction between WGCNA and differential expression is that DE operates gene-by-gene — each gene is tested independently for a mean shift between conditions — whereas WGCNA operates across the **covariance structure** of all genes simultaneously. Two genes can each fail a DE test yet be informative together if their co-expression pattern changes with disease. Conversely, a DE gene that belongs to no co-expression module is an orphan whose mechanism is harder to infer. The two approaches are therefore genuinely complementary, not redundant: start with DE to find what changes; use WGCNA to find the programs within which those changes are embedded.
+
 ::: {.callout-note .key-concept title="🔑 Key concept — co-expression modules and the guilt-by-association principle"}
 A co-expression module is a group of genes whose expression levels rise and fall together across samples, measured by Pearson correlation. Genes in the same module are assumed to be functionally linked — co-regulated by the same transcription factor, acting in the same pathway, or responding to the same upstream signal — even without prior knowledge of their function. This "guilt by association" logic [@vandam2018gene] is what makes WGCNA biologically productive: once a module is linked to a phenotype, every gene in it becomes a candidate for that biology, including uncharacterized genes co-expressed with well-known ones.
 :::
@@ -37,7 +39,7 @@ A co-expression module is a group of genes whose expression levels rise and fall
 A module eigengene (ME) is the first principal component of the expression matrix formed by the module's member genes across all samples. It is a single number per sample per module — the dominant axis of co-variation — that captures the average "activity" of the module in each sample. Because it is a PC score, the ME can be positive or negative; the sign is arbitrary, but the relative values across samples are meaningful. Once computed, an ME can be correlated with any sample-level trait (disease severity, age, treatment, etc.), converting hundreds of gene-level measurements into one tractable correlation test. Modules with similar MEs are candidates for merging (controlled by `mergeCutHeight`); modules with divergent MEs represent distinct biological programs.
 :::
 
-The tutorial works through a **bulk** RNA-seq dataset (GSE152418, COVID-19 PBMC bulk RNA-seq from Arunachalam et al. 2020) as the foundational worked example, because classic WGCNA was designed for bulk data and the interpretive logic is most transparent there. For single-cell adaptations see §13.6.
+The tutorial works through a **bulk** RNA-seq dataset (GSE152418, COVID-19 PBMC bulk RNA-seq from Arunachalam et al. 2020 — GEO accession GSE152418, comprising ~34 samples across healthy controls, convalescent patients, and ICU-severity COVID-19 patients) as the foundational worked example, because classic WGCNA was designed for bulk data and the interpretive logic is most transparent there. This dataset is an ideal teaching case: the severity gradient provides a clear trait axis, the sample size (~31 post-outlier-exclusion) is near the practical minimum for reliable module–trait correlation tests, and the biology (inflammatory vs. interferon modules tracking COVID severity) is well-characterized in the primary paper. For single-cell adaptations see §13.6.
 
 ## 13.1b Pre-processing steps before network construction
 
@@ -53,7 +55,16 @@ Three pre-processing steps precede network building and each has a non-obvious c
 
 Note that WGCNA expects the expression matrix as **samples × genes** (rows = samples, columns = genes) — the transpose of the standard RNA-seq convention of genes × samples. This is the most common orientation error and the tutorial transposes explicitly before passing to `pickSoftThreshold`.
 
-Note also that WGCNA operates on a gene-by-gene correlation matrix, so statistical power depends on the number of *samples*, not cells. As a rule of thumb, the downstream module–trait correlation tests are meaningless below about N = 10 samples; the soft-threshold scan often fails to reach R² > 0.8 with fewer than ~15 samples; and reliable modules typically require N ≥ 20–30 [@langfelder2008wgcna]. If you have fewer samples than this, WGCNA will still run but its results should be treated as exploratory.
+Note also that WGCNA operates on a gene-by-gene correlation matrix, so statistical power depends on the number of *samples*, not cells. As a rule of thumb, the downstream module–trait correlation tests are meaningless below about N = 10 samples; the soft-threshold scan often fails to reach R² > 0.8 with fewer than ~15 samples; and reliable modules typically require N ≥ 20–30 [@langfelder2008wgcna]. If you have fewer samples than this, WGCNA will still run but its results should be treated as exploratory. This is one of the most common misapplications: a lab with 6 samples runs WGCNA, obtains colorful module-trait heatmaps with small p-values, and reports findings that do not replicate because N = 6 gives essentially no power for a Pearson correlation test.
+
+::: {.callout-note .key-concept title="🔑 Key concept — why WGCNA needs many samples, not many cells"}
+WGCNA builds a gene × gene correlation matrix where each entry is the Pearson correlation of two genes *across samples*. Statistical confidence in a Pearson r with N = 10 samples is very low — the 95% CI for r = 0.8 with N = 10 is approximately ±0.25. Adding more cells per sample does not help: those cells are aggregated into one expression vector per sample, so N still equals the number of biological samples. The module–trait correlation tests that follow have the same N = samples constraint. Plan for at least 15–20 samples before committing to a WGCNA analysis, and include an independent replication cohort wherever possible.
+:::
+
+::: {.callout-note .key-concept title="🔑 Key concept — the scale-free topology assumption and why it motivates the power transform"}
+Real biological networks — protein–protein interactions, metabolic networks, and gene co-regulatory networks — tend to be **scale-free**: a small number of "hub" genes have many connections, and most genes have few. A scale-free network's degree distribution follows a power law, so the log of degree vs. the log of frequency is approximately linear with a negative slope. WGCNA's soft-thresholding power transform is designed to push the observed co-expression network toward this scale-free property. The `pickSoftThreshold()` scan measures scale-free fit (R²) as a function of the chosen power β and returns the smallest β at which the network is approximately scale-free (R² ≥ 0.8). If no β achieves R² ≥ 0.8, the data does not fit the scale-free assumption — this is a signal that the dataset has unresolved batch structure, too few samples, or a biology that is not organized into hub-and-spoke modules.
+:::
+
 
 The three pre-processing steps and the four network-construction/downstream steps are summarized in @tbl-ch13-workflow.
 
@@ -71,6 +82,10 @@ The three pre-processing steps and the four network-construction/downstream step
 : The eight-step WGCNA workflow: pre-processing through hub-gene identification. Each step lists the primary R call, the key user choice, and the most common pitfall. {#tbl-ch13-workflow}
 
 Reading @tbl-ch13-workflow: work down the rows in order — each step's output feeds the next. The most consequential user choices are in the "Key choice" column: the intercept-only design formula (row 2) prevents double-dipping; the gene-count filter (row 3) directly controls memory for the TOM step; and the soft-threshold power (row 4) determines the network's sparsity. If you change any one of these, re-run all subsequent steps. The "Common pitfall" column maps to the error table in §13.9.
+
+**Why the intercept-only design prevents double-dipping.** If you encode the severity trait in the DESeq2 `design` formula before running VST normalization, the normalization step will learn and partially remove variation associated with severity. The resulting normalized counts will then show *reduced* correlation with severity in the module–trait step — not because the biology is weak, but because you subtracted it. Using `design = ~ 1` ensures the VST is agnostic to all traits and the module–trait correlations are genuine discoveries rather than artifacts of the normalization model.
+
+**The relationship between gene filtering and memory.** The TOM matrix is genes × genes: for 20,000 genes it is a 400 million entry matrix, which at 8 bytes per double is ~3.2 GB. By filtering to genes with ≥ 15 counts in ≥ 75% of samples you typically reduce to 7,000–12,000 genes, shrinking the TOM to 49–144 million entries (0.4–1.2 GB), which fits comfortably in 8–16 GB RAM. If memory is still a bottleneck, `blockwiseModules`'s `maxBlockSize` argument splits the gene set into sub-blocks and computes the TOM block-by-block, accepting a small loss in cross-block module detection accuracy.
 
 ## 13.2 The network construction
 
@@ -98,13 +113,17 @@ The right $\beta$ is data-dependent. WGCNA's `pickSoftThreshold` scans a range o
 `blockwiseModules(mergeCutHeight = 0.25)` controls how similar two module eigengenes must be before the modules are fused into one. **Default: 0.25** (merge modules whose eigengenes have a dissimilarity ≤ 0.25, i.e., a correlation ≥ 0.75). Lowering it (e.g. 0.15) creates more, smaller, more distinct modules; raising it (e.g. 0.35–0.40) merges more aggressively, producing fewer but broader modules. If your heatmap shows many modules with near-identical trait correlations, raise `mergeCutHeight`. If you lose a biologically interesting sub-module, lower it.
 :::
 
+::: {.callout-note .key-parameter title="⚙️ Key parameter — WGCNA::cor shadowing"}
+Loading `library(WGCNA)` replaces base R's `cor()` function with WGCNA's own multi-threaded version in the global namespace. **Default after loading: WGCNA's `cor()` is active.** This causes silent failures in downstream code that expects `base::cor()` — for example, Seurat's `FindTransferAnchors()` will use WGCNA's version and may return unexpected results. The tutorial pattern is to save and restore: `temp_cor <- cor; cor <- WGCNA::cor; <WGCNA calls>; cor <- temp_cor`. Always restore `base::cor` before any non-WGCNA code.
+:::
+
 ### 13.2.3 Topological overlap
 
 Convert the adjacency to **topological overlap matrix (TOM)**:
 
 $$\mathrm{TOM}_{ij} = \frac{\sum_k a_{ik} a_{kj} + a_{ij}}{\min(\sum_k a_{ik}, \sum_k a_{kj}) + 1 - a_{ij}}$$
 
-Two genes are TOM-similar if they have many shared connections, not just a high pairwise correlation. This makes the network more robust to spurious correlations.
+Two genes are TOM-similar if they have many shared connections, not just a high pairwise correlation. This makes the network more robust to spurious correlations. The intuition is that two genes i and j may have a modest pairwise correlation $a_{ij}$, but if they both connect strongly to the same set of genes k, their TOM-similarity will be high — and they likely participate in the same biological process. This shared-neighborhood logic is what makes TOM better than raw adjacency for module detection.
 
 The dissimilarity is $1 - \mathrm{TOM}$, which is what's clustered in the next step.
 
@@ -193,13 +212,17 @@ Two practical strategies:
 
 ## 13.7 Reading module-trait correlation heatmaps
 
-A typical figure: rows = modules (turquoise, blue, brown, ...), columns = traits (severity score, age, sex, time point, ...), each cell colored by Pearson correlation, with $-\log_{10}p$ as text annotation.
+A typical figure: rows = modules (turquoise, blue, brown, ...), columns = traits (severity score, age, sex, time point, ...), each cell colored by Pearson correlation, with $-\log_{10}p$ as text annotation. The color scale runs from blue (strong negative correlation) through white (no correlation) to red (strong positive correlation).
 
 Reading rules:
 
-- **A module with strong correlation to one trait + weak to others** → that module is "the X-response module"
-- **A module correlated with multiple traits** → either a confounded module or a true general-stress signature
-- **No modules correlated with anything** → either no signal in the dataset, or your module detection settings need tuning
+- **A module with strong correlation to one trait + weak to others** → that module is "the X-response module." In the GSE152418 COVID dataset, modules strongly correlated with the ICU trait but not with sex or age are candidate inflammation or immune-response modules.
+- **A module correlated with multiple traits** → either a confounded module (severity and age are correlated in many disease datasets, so a single module may reflect both) or a true general-stress signature. Partial correlation or regression adjustment can disentangle these.
+- **No modules correlated with anything** → either no signal in the dataset, or your module detection settings need tuning. Try lowering `minModuleSize`, increasing sample N, or inspecting whether a batch effect dominates the network.
+- **Multiple modules with very similar trait patterns** → `mergeCutHeight` may be too low; these modules are biologically redundant and can likely be merged.
+- **Modules with opposite correlations to the same trait** → a positive and a negative module for the same axis. These are typically reciprocal programs — one being induced as the other is repressed during the biological process. Both are informative.
+
+Numerical confidence: a Pearson r ≈ 0.5 with N = 30 has a p-value near 0.005 (FDR-significant); r ≈ 0.7 would have p ≈ 0.00003. With N = 10 the same r = 0.5 gives p ≈ 0.14 — not significant. Always print the sample size alongside the heatmap so readers can judge effect size vs. power.
 
 ## 13.8 Hub genes and module export
 
@@ -219,7 +242,9 @@ intramodConn <- intramodularConnectivity(adjacency, moduleColors)
 hubs <- intramodConn |> arrange(desc(kWithin)) |> head(10)
 ```
 
-Hub genes are biologically interesting candidates: a module's hub is often the TF or upstream regulator coordinating the rest. Cross-reference hub genes against TF databases for hypothesis generation.
+Hub genes are biologically interesting candidates: a module's hub is often the TF or upstream regulator coordinating the rest. Cross-reference hub genes against TF databases for hypothesis generation. The choice between kME and kWithin is a matter of question: kME is simpler to compute and directly interpretable ("how much does this gene track the module average?"), whereas kWithin reflects topological centrality in the TOM network. For most applications kME is the preferred starting point; kWithin is more informative when you want to understand network topology rather than eigengene tracking. For functional follow-up, export the ranked hub gene list to [Chapter 7's](Chapter_07_FunctionalAnalysis.html) `clusterProfiler::enrichGO()` pipeline — a module's top pathway enrichment gives it a biological label that is more interpretable than its color name.
+
+**Module color names are arbitrary identifiers.** WGCNA assigns colors (turquoise, blue, brown, ...) as arbitrary labels to distinguish modules — the same analysis run with a different random seed may assign a different color to what is biologically the same module. Never cross-reference module colors across datasets or publications without first verifying that the member genes are the same. Always identify modules by their member gene lists or eigengene correlation profiles, not by their color labels.
 
 ::: callout-warning
 **`cor` shadowing.** The WGCNA package replaces base R's `cor()` function in the global environment when it is loaded. Code run after `library(WGCNA)` will silently use WGCNA's `cor()` rather than `base::cor()`, which can produce surprising results in unrelated downstream code. The tutorial pattern saves base `cor` before calling `blockwiseModules` and restores it afterward: `temp_cor <- cor; cor <- WGCNA::cor; ...; cor <- temp_cor`.

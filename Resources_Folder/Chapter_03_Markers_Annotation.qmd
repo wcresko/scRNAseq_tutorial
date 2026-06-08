@@ -34,7 +34,7 @@ Best practice: **run both, reconcile disagreements, document choices.** Disagree
 
 ## 3.2 Finding markers — the statistical core
 
-`FindAllMarkers(seu)` runs, for each cluster $c$, a Wilcoxon rank-sum test comparing the gene's expression in cluster $c$ vs all other clusters combined. The output is a per-cluster ranked gene list. @tbl-ch03-findmarkers describes each output column and how to read it.
+`FindAllMarkers(seu)` runs, for each cluster $c$, a Wilcoxon rank-sum test comparing the gene's expression in cluster $c$ vs all other clusters combined. The output is a per-cluster ranked gene list. @tbl-ch03-findmarkers describes each output column and how to read it. The table captures five key quantities per gene per cluster; knowing how to read each column is the prerequisite for turning the output into a useful annotation. Most columns are self-explanatory in isolation but become informative only in combination: a high `avg_log2FC` with a low `pct.1` is a gene that is highly upregulated on average but barely expressed in any individual cell of the cluster — a mathematical artifact of the ratio, not a biologically useful marker. Similarly, a high `pct.1` with a high `pct.2` means the gene is broadly expressed across most cell types and provides no discriminatory power. The most useful markers simultaneously have high `pct.1`, low `pct.2`, and high `avg_log2FC`.
 
 | Column | Meaning |
 |---|---|
@@ -52,8 +52,16 @@ A "good" marker has high `pct.1`, low `pct.2`, and high `avg_log2FC`. The rankin
 
 **Why the Wilcoxon test?** Seurat defaults to the non-parametric Wilcoxon rank-sum test, and the large benchmark of single-cell DE methods found that simple tests like Wilcoxon are surprisingly robust and competitive for marker detection — the more elaborate model-based methods do not consistently beat it [@soneson2018bias]. (`presto` provides a fast Wilcoxon implementation Seurat uses automatically when installed.) A crucial distinction from Chapter 6: marker detection here is a *descriptive, within-dataset* ranking used to name clusters, **not** a cross-condition inference about which genes change with treatment — that question requires pseudobulk and is the subject of Chapter 6 [@squair2021confronting].
 
+::: {.callout-note .key-concept title="🔑 Key concept — marker detection vs. differential expression"}
+`FindAllMarkers` and the Chapter 6 pseudobulk DESeq2 workflow are often confused but answer entirely different questions. Marker detection asks: "which genes are enriched in cluster $c$ relative to all other cells in this same dataset?" It is a descriptive ranking within a single object, and its purpose is to name clusters by their characteristic genes. Differential expression across conditions asks: "does gene $X$ change between treatment and control groups?" It is an inferential test that requires biological replicates and appropriate statistical calibration. Using `FindAllMarkers` to detect condition effects produces anti-conservative p-values (cells treated as independent replicates), while using DESeq2 across donors to find cluster markers ignores the within-cluster information. Keep the two workflows separate.
+:::
+
 ::: callout-warning
 **`FindAllMarkers` finds genes *enriched* in a cluster, not necessarily canonical markers.** A gene can top the list of cluster $c$ either because it's a literature lineage marker (good) or because some technical / state effect happens to differentiate the cluster (e.g. ISGs in the unintegrated `ifnb` data). Cross-check the top hits against canonical panels before naming clusters from them.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — FindAllMarkers min.pct, logfc.threshold, only.pos"}
+`FindAllMarkers(seu, min.pct = 0.1, logfc.threshold = 0.25, only.pos = FALSE)`. **Defaults: min.pct = 0.1, logfc.threshold = 0.25, only.pos = FALSE.** `min.pct` filters out genes detected in fewer than the specified fraction of cells in *either* group — raising it to 0.25 (the workshop default) significantly reduces runtime and cuts low-detection noise genes; lowering it can recover rare markers in small clusters. `logfc.threshold` is a pre-filter on the log2 fold-change that prevents testing genes with trivial effect sizes; the default 0.25 is conservative for marker purposes. `only.pos = TRUE` restricts output to upregulated markers — almost always what you want when naming a cluster by what it *is* rather than what it lacks. For small clusters (<50 cells), loosen both thresholds (e.g. `min.pct = 0.1`, `logfc.threshold = 0.1`) to avoid returning an empty table.
 :::
 
 ## 3.3 Conserved markers — for case-control designs
@@ -74,7 +82,7 @@ Use `FindConservedMarkers` whenever you have a non-trivial perturbation in your 
 
 ## 3.4 The five marker visualizations
 
-[Tutorial 03 §3](../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers) walks five canonical plot types. Each answers a different diagnostic question; choosing the right one speeds interpretation and produces clearer figures. @tbl-ch03-viztools summarizes the five, then the subsections explain when each pays off.
+[Tutorial 03 §3](../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers) walks five canonical plot types. Each answers a different diagnostic question; choosing the right one speeds interpretation and produces clearer figures. @tbl-ch03-viztools summarizes the five, then the subsections explain when each pays off. A common mistake is to pick one plot type and use it for everything — the `DotPlot` is elegant for a publication panel but hides bimodal expression that `VlnPlot` reveals immediately; the `FeaturePlot` shows spatial context that the `DotPlot` compresses away. For a rigorous annotation, you should consult at least two plot types per cluster: one to confirm specificity (e.g. `DotPlot`) and one to confirm distributional properties (e.g. `VlnPlot`).
 
 | Function | Best question to ask | Strength | Caveat |
 |---|---|---|---|
@@ -125,6 +133,10 @@ The practical workflow:
 3. **Confirm visually** with a DotPlot of the canonical panel × clusters (does each cluster's expected marker actually concentrate there?)
 4. **Assign labels** with `RenameIdents`, store in `seu$celltype_manual`
 5. **Document** *why* you assigned each label — write a sentence per cluster in your lab notebook (a future reviewer or future-you will thank you)
+
+::: {.callout-note .key-concept title="🔑 Key concept — cluster identity is a biological claim, not a data property"}
+A cluster number is an arbitrary label assigned by community-detection software; it has no biological meaning until you interpret it. Assigning "CD14+ Monocyte" to cluster 3 is a hypothesis — you are asserting that the cells in this group share a lineage, a developmental origin, a set of functional capabilities, and a canonical literature context. That hypothesis is supported by (1) high specificity of monocyte markers in the DotPlot, (2) absence of markers for competing identities, and (3) concordance with reference annotation (Chapter 4). The label becomes less defensible when any of those supports is weak. In practice, the annotation step is also the first place where novel biology becomes visible: a cluster with no good match in the canonical panel is either a technical artifact (doublet, ambient contamination — inspect per §3.8) or a cell state worth investigating further.
+:::
 
 For the workshop's `ifnb` PBMCs, the canonical panel is small and highly stereotyped (see also §3.5 above for how the unintegrated embedding changes how many clusters you will label). @tbl-ch03-pbmc-markers lists the ten major PBMC populations and their most reliable lineage markers.
 

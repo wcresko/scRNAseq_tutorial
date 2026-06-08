@@ -25,6 +25,8 @@ editor: visual
 
 Single-cell RNA-seq measures **transcription**: it captures polyadenylated mRNA and counts molecules (UMIs) per gene. Single-cell ATAC-seq measures **chromatin accessibility**: a hyperactive Tn5 transposase cuts DNA preferentially where the chromatin is open, and the assay captures and sequences those cut fragments [@buenrostro2013atacseq]. The per-cell readout is not "how many copies of gene X" but "how many fragments fell in open region Y" — a direct readout of the regulatory, rather than the expressed, state of the cell [@klemm2019chromatin].
 
+The biological distinction is important. RNA-seq tells you what a cell is *doing* right now — which genes are being transcribed. ATAC-seq tells you what a cell is *capable of* doing — which regulatory regions are physically accessible to transcription factors. Two cells can have identical transcriptomes (same gene expression) but different accessibility landscapes (different potential futures). Conversely, cells that appear distinct by RNA can share broad chromatin accessibility patterns that reveal a common lineage. This is why multi-modal analysis combining RNA and ATAC from the same cells (10x Multiome) has become powerful: it links the regulatory landscape to the expression outcome.
+
 Because the underlying measurement differs, the raw-processing pipeline diverges from RNA at almost every output even though the surrounding machinery is the same. @tbl-ch12-comparison lines them up.
 
 | Step | scRNA-seq | scATAC-seq |
@@ -38,7 +40,13 @@ Because the underlying measurement differs, the raw-processing pipeline diverges
 
 : Side-by-side comparison of scRNA-seq and scATAC-seq raw-processing steps. The SLURM submission patterns, FASTQ-naming rules, and reference-storage discipline are identical; the outputs and QC metrics differ because the biological measurement is different. {#tbl-ch12-comparison}
 
+Reading @tbl-ch12-comparison column by column clarifies which aspects of the RNA workflow transfer directly and which require a mental model update. The "per-cell unit" row is the most important: everything downstream in the analysis — QC thresholds, normalization, dimensionality reduction, differential testing — is calibrated to fragments-in-peaks rather than UMI-per-gene, which is why a separate set of QC metrics and an entirely different analysis tool (Signac or ArchR) is needed. The "reference" row explains why a different reference bundle is used (§12.4): the whole genome must be indexed because fragments can fall anywhere, including intergenic regions and distal enhancers that are not annotated in a gene-centric transcriptome reference.
+
 The tool that does the work is `cellranger-atac` (distinct from `cellranger`), and its main subcommand is again `count`. The SLURM patterns, the strict FASTQ naming, and the "reference lives in shared storage, not home" discipline are all identical to Chapter 11 — so this chapter spends its time on what is genuinely new.
+
+::: {.callout-note .key-concept title="🔑 Key concept — ATAC fragments vs reads, and what the fragments file encodes"}
+In scRNA-seq, the fundamental unit of measurement is a UMI — a unique molecular identifier that collapses PCR duplicates of the same original mRNA molecule into a single count. In scATAC-seq, the fundamental unit is a **fragment** — a DNA segment flanked by two Tn5 insertion sites. Because Tn5 inserts in pairs at adjacent positions on the same DNA molecule, each fragment is defined by its two genomic endpoints (chromosome, start, end). The `fragments.tsv.gz` file stores these endpoint pairs, one per row, with the cell barcode and a duplicate count (how many times that exact fragment was sequenced, as a quality proxy). This is qualitatively different from a UMI: a fragment encodes *two* genomic positions and therefore a physical span of DNA. The fragment length itself carries biological information — fragments below ~150 bp are nucleosome-free (the Tn5 cut between two nucleosomes in open, accessible chromatin), while ~200 bp fragments span one nucleosome and ~400 bp fragments span two. The nucleosome-signal metric in the QC report is derived from the distribution of these lengths, making fragment length an intrinsic quality indicator that has no RNA analogue.
+:::
 
 ## 12.2 From open chromatin to fragments
 
@@ -56,6 +64,10 @@ This step is the main reason an ATAC run takes roughly two to three times as lon
 
 A consequence worth noting: because peaks are dataset-specific, two experiments processed separately will have different peak sets, which is why downstream integration of ATAC datasets requires re-counting against a common peak set — a complication that has no clean RNA analogue.
 
+::: {.callout-note .key-concept title="🔑 Key concept — de novo peak calling and why the feature set is not fixed"}
+In scRNA-seq, the feature space is defined by the reference annotation before the experiment begins — every sample processed against the same reference has exactly the same gene list. In scATAC-seq, the features (peaks) are derived *from the data itself*: `cellranger-atac` calls peaks by identifying genomic intervals where the aggregate fragment pileup across all cells exceeds background. This means that two scATAC experiments processed independently will have different numbers of peaks at different genomic coordinates, even if they profiled the same cell types. This has a concrete practical implication: when integrating multiple scATAC datasets for a joint analysis, you cannot simply merge the count matrices — the feature axes do not align. The correct approach is to pool the fragment files (or re-run peak calling on the pooled data), define a single merged peak set, and then re-count fragments-per-peak-per-barcode against that unified set for every sample. Signac's `CallPeaks()` and `FeatureMatrix()` functions automate this pattern (see §12.7b).
+:::
+
 ## 12.4 The ATAC reference: arc vs gex vs atac
 
 The reference for `cellranger-atac` is **not** the RNA reference, and confusing them is the most common failure mode. The RNA reference (`refdata-gex-...`) is built around the transcriptome; the ATAC reference indexes the whole genome and ships with motif annotations the RNA build lacks. They even share `fasta/` and `genes/` subdirectories, which makes the wrong one look superficially plausible — but the indexes and annotations differ, and a wrong-reference run usually fails to start with a cryptic error rather than a clear one.
@@ -69,6 +81,8 @@ The three reference names you will encounter are collected in @tbl-ch12-referenc
 | `refdata-cellranger-atac-GRCh37-1.2.0` | `cellranger-atac` (legacy) | hg19 | Only when downstream annotation is pinned to hg19 (e.g. Chapter 15's `EnsDb.Hsapiens.v75`) |
 
 : Cell Ranger reference bundles for human ATAC and multiome experiments. The arc bundle is the recommended choice for all new work; the GEX bundle cannot be used with `cellranger-atac` even though its subdirectory structure looks similar. {#tbl-ch12-references}
+
+Reading @tbl-ch12-references: the "arc" reference bundle deserves a short explanation. 10x introduced the `arc` name when they unified the reference format for both their Multiome kit (joint RNA + ATAC) and their standalone ATAC kit under one reference build that includes whole-genome sequence, a gene annotation, and a motif file. The older `atac`-specific reference (`refdata-cellranger-atac-GRCh37-1.2.0`) was built only for the standalone ATAC chemistry and predates the arc format. Using the newer `arc` reference for standalone ATAC runs is correct and recommended; the `arc` build includes all the information the `atac`-only reference has, plus the motif annotations needed for downstream transcription-factor footprinting analysis.
 
 ```bash
 cd /projects/<PIRG>/<user>/refs

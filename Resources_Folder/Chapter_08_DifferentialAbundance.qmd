@@ -34,6 +34,10 @@ These are independent questions. A perturbation can change cell-type composition
 
 Reviewers increasingly expect both analyses in a single-cell manuscript. Running only DE while ignoring composition, or only DA while ignoring per-cell transcriptional state, leaves half the biology unreported.
 
+::: {.callout-note .key-concept title="🔑 Key concept — differential abundance vs differential expression"}
+Differential expression (DE) and differential abundance (DA) address orthogonal aspects of a perturbation's effect on a single-cell dataset. DE asks: *for cells of the same annotated type, which genes are expressed at different levels between conditions?* — a question answered by pseudobulk DESeq2 on per-(donor × condition × cell-type) aggregated counts. DA asks: *do the relative proportions of cell types shift between conditions?* — a question answered by testing whether the fraction of cells belonging to each neighborhood or cluster changes. These analyses measure different biological signals: a drug might expand a regulatory T cell population (DA-positive) while simultaneously shutting down cytokine production in every T cell (DE-positive), or might transcriptionally activate monocytes (DE-positive) without changing how many monocytes there are (DA-negative). Both analyses are routinely expected in high-quality single-cell manuscripts, and their combined interpretation — which populations expanded and what changed within them — provides a far more complete picture of the biology than either alone.
+:::
+
 ## 8.2 Why cluster-level proportion tests fail
 
 The naive approach — count cells per (cluster, sample), compute each cluster's fraction of the total, and run a Fisher's exact or chi-squared test per cluster — is tempting because it requires no new tools. It is also systematically unreliable for four distinct reasons.
@@ -47,6 +51,8 @@ The naive approach — count cells per (cluster, sample), compute each cluster's
 **The compositional constraint.** Cell-type fractions within a sample must sum to 1. They are therefore **not** independent: when one population expands, the others must mathematically shrink, even if their absolute counts are unchanged. Naive proportion tests treat the fractions as independent observations, which produces spurious negative results for non-changing populations that appear to shrink purely as a consequence of another population's expansion. This is the **compositional problem**, well known from microbiome analysis and increasingly recognized in single-cell DA. Methods like scCODA [@buttner2021sccoda] and sccomp [@mangiola2023sccomp] model this explicitly using Bayesian compositional frameworks.
 
 A dedicated benchmark of six DA methods evaluated these failure modes across real and simulated datasets and is the reference for method selection [@yi2024benchmarking]. The benchmark's main finding is that neighborhood-based methods and compositional-aware methods outperform naive cluster proportion tests, especially when biological gradients are present.
+
+**When cluster-level proportion tests are acceptable.** The four failures above are most severe for continuous biology (gradients, trajectories) and small cohorts. For well-separated, discrete cell types in a large, well-powered cohort, cluster-level proportion tests using propeller's logit-transform approach produce results that agree well with neighborhood-based methods. If your clusters are biologically well-defined (e.g. separate B cells, T cells, and NK cells), cell numbers per donor are large, and you have > 8 donors per condition, a cluster-level screen with propeller as the first pass is defensible — with miloR for follow-up on any uncertain result. The benchmark [@yi2024benchmarking] confirms this: cluster-level methods perform acceptably when assumptions are met, but neighborhood methods are consistently more robust when any of the four assumptions is violated.
 
 ## 8.3 The compositional problem in depth
 
@@ -63,6 +69,8 @@ The practical response is to either (a) use absolute counts where possible, (b) 
 ## 8.4 Available methods and when to use each
 
 @tbl-ch08-methods summarizes the four main DA tools used in single-cell analysis, their statistical frameworks, and recommended use cases. No single method is best for all datasets; the benchmark [@yi2024benchmarking] provides guidance, but cross-validating two complementary approaches on your own data is the most defensible practice.
+
+Understanding how each method addresses the compositional constraint and the pseudoreplication problem is the key to choosing among them. miloR sidesteps both issues by working on absolute cell counts per neighborhood (not proportions) and requiring a per-sample design analogous to pseudobulk DESeq2. scCODA addresses the compositional constraint directly through its Dirichlet-multinomial prior but works at cluster level, requiring you to trust your cluster annotations. propeller makes a partial correction via logit transformation but is otherwise a classical linear model — simple and fast but with the weakest theoretical treatment of compositionality. sccomp goes further by jointly modeling composition and within-type expression, capturing dependencies between the two that the other methods ignore entirely.
 
 | Method | Statistical framework | Resolution | Handles composition? | Best suited to |
 |---|---|---|---|---|
@@ -103,6 +111,10 @@ Because the graph is built on the integrated reduction (Harmony, Seurat integrat
 
 The `makeNhoods` step samples a subset of cells as index cells (typically 10% of the total, controlled by `prop`). With `refined = TRUE`, the sampling uses a second-round refinement step that ensures better spatial coverage across the graph. For a 25,000-cell dataset with `prop = 0.1`, this produces roughly 2,500 neighborhoods — enough to cover the embedding densely without testing every cell individually.
 
+::: {.callout-note .key-parameter title="⚙️ Key parameter — makeNhoods(k, prop, d)"}
+`makeNhoods(milo, prop = 0.1, k = 30, d = 20, refined = TRUE)` controls the neighborhood sampling. **Default: `prop = 0.1`, `k = 30`, `d = 20`, `refined = TRUE`.** `prop` sets what fraction of cells are sampled as neighborhood index cells — 10% of 25,000 cells produces ~2,500 neighborhoods, which is sufficient for dense coverage while keeping computation tractable. `k` is the number of nearest neighbors in the kNN graph (same parameter as for clustering); increasing it produces larger neighborhoods and smoothes the DA signal, decreasing it produces smaller, more granular neighborhoods. `d` is the number of integrated PCs used for graph construction; this should match the `d` used in the `buildGraph` call. `refined = TRUE` runs a second-pass refinement that improves the spatial distribution of sampled neighborhoods — omitting it produces neighborhoods that are clustered in dense regions of the embedding and sparse elsewhere. Always inspect `plotNhoodSizeHist(milo)` after `makeNhoods` to verify that the median neighborhood size falls between 50 and 200 cells before proceeding to `testNhoods`.
+:::
+
 ### 8.5.2 The negative-binomial GLM
 
 For each neighborhood, miloR fits a generalized linear model analogous to the pseudobulk DESeq2 model of [Chapter 6](Chapter_06_DESeq2_DE.html):
@@ -119,6 +131,16 @@ Standard BH correction assumes independent tests. Neighborhoods overlap by const
 
 **SpatialFDR** [@dann2022milo] addresses this by weighting each neighborhood's p-value by the inverse of its graph connectivity: a neighborhood with many overlapping neighbors is downweighted because its result is not truly independent. The corrected p-values are stored as `SpatialFDR` in the results; the standard significance threshold is `SpatialFDR < 0.1` (10% FDR), slightly more lenient than the conventional 5% because the correction is conservative.
 
+To understand why 10% rather than 5%: the spatial weighting in SpatialFDR is inherently conservative — it assigns each neighborhood a weight proportional to the inverse of how many neighborhoods it overlaps with, which tends to *over-penalize* tests in dense regions of the graph. Simulation studies in the original miloR paper found that `SpatialFDR < 0.1` corresponds approximately to a true FDR of 5–7% in practice, while `SpatialFDR < 0.05` is too stringent and misses many genuine hits. In practice, use `SpatialFDR < 0.1` as the primary filter and treat neighborhoods between 0.05 and 0.1 as borderline results warranting visual inspection of the neighborhood graph.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — SpatialFDR threshold"}
+Filtering on `da_results[SpatialFDR < 0.1,]` controls which neighborhoods are called significant after correction for overlapping tests. **De-facto default threshold: 0.1 (10% FDR).** This is more lenient than the conventional 5% BH threshold because SpatialFDR's spatial weighting is inherently conservative and a threshold of 0.1 corresponds empirically to a true FDR of approximately 5–7% in benchmarked simulations. Tightening to `SpatialFDR < 0.05` is appropriate when you want the most conservative call set (e.g. for reporting in a clinical manuscript where false positives are costly). Loosening to `SpatialFDR < 0.2` is occasionally justified for exploratory analyses in small cohorts where power is limited, but should be clearly stated as exploratory.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — testNhoods design formula"}
+`testNhoods(milo, design = ~ stim, design.df = milo_design)` specifies the model to fit per neighborhood. **Default: required argument with no default.** The design formula follows exactly the same rules as in DESeq2 (see §6.5): `~ condition` for a simple two-group contrast, `~ donor + condition` for a paired design that blocks on donor-level variation (the recommended upgrade when donors are balanced across conditions), `~ batch + condition` to block on batch effects, and continuous covariates (e.g. `~ age + condition`) for quantitative phenotypes. The `design.df` must have one row per sample (donor × condition combination), not one row per cell. Adding `donor` to the design substantially increases power in paired experiments: donor-level differences in baseline cell-type composition are large (often 2–5-fold between donors), and failing to account for them makes the condition variance estimate too wide, reducing sensitivity. The `design.df` must contain all variables referenced in the `design` formula as columns.
+:::
+
 ## 8.6 Neighborhood size — the only parameter you'll tune
 
 The defaults (`k = 30`, `d = 20`, `prop = 0.1`) work well for most 10–50k-cell datasets. The diagnostic is `plotNhoodSizeHist(milo)`: the distribution of cells per neighborhood should be approximately unimodal with a median between 50 and 200 cells.
@@ -126,6 +148,8 @@ The defaults (`k = 30`, `d = 20`, `prop = 0.1`) work well for most 10–50k-cell
 Below ~30 cells per neighborhood the test is underpowered — a neighborhood that spans only a handful of cells is dominated by stochastic variation and the NB GLM cannot distinguish biological signal from noise. Above ~500, you are spatially smoothing so broadly that neighborhoods span multiple biologically distinct cell states, and DA detected at that scale reflects a blunt average rather than the fine-grained shift you want to capture.
 
 If the histogram peak is below 30, increase `k` (try 50 or 75) and rebuild the graph before re-running `makeNhoods`. If the peak is above 500, decrease `k` to 20 or 15. For very large datasets (> 100,000 cells), reducing `prop` to 0.05 or 0.02 prevents testing an unwieldy number of neighborhoods without sacrificing coverage.
+
+**Why neighborhood size matters for the GLM.** The NB GLM that `testNhoods` fits per neighborhood estimates a dispersion parameter for the cell counts across samples. With fewer than ~20–30 cells per sample in a neighborhood, that cell count is dominated by Poisson sampling noise from a handful of cells, and the dispersion estimate becomes unreliable. A neighborhood might show zero cells from one donor in CTRL simply by chance, which the GLM incorrectly interprets as a condition effect. With 50–100 cells per sample, the cell counts average out the stochastic variation of individual cells and reflect genuine compositional biology. This is the DA analogy of the pseudobulk minimum-cells-per-group threshold in Chapter 6: both exist to ensure that the input to the statistical model represents a real biological signal rather than sampling noise.
 
 ::: callout-tip
 **Always run `plotNhoodSizeHist` before `testNhoods`.** Checking the size distribution takes seconds and catches mis-parameterized runs that would otherwise produce unreliable or uninterpretable results.
@@ -158,6 +182,10 @@ For very discrete biology — B cells vs T cells, where the populations are sepa
 
 miloR builds neighborhoods on whichever low-dimensional reduction you provide. Using the **unintegrated PCA** is a common error. In a multi-sample experiment where batch effects are present, the unintegrated kNN graph will partly cluster by sample rather than by cell type: cells from sample A appear as neighbors of other cells from sample A even if those cells are not transcriptionally similar. Neighborhoods will be enriched for sample-of-origin rather than cell-state, and `testNhoods` will detect composition shifts that are entirely batch artifacts.
 
+::: {.callout-note .key-concept title="🔑 Key concept — why miloR must run on the integrated reduction"}
+The miloR neighborhood graph defines "similar cells" as those close together in the low-dimensional reduction you provide. If that reduction retains batch effects — as raw PCA often does in multi-sample experiments — then two cells from the same donor will appear as nearest neighbors even if they belong to different cell types, simply because they share a donor-specific transcriptional background. `testNhoods` would then detect abundance differences between conditions that are actually driven by donor-to-donor composition differences, not the condition effect you intended to test. Building the graph on the integrated reduction (Harmony, Seurat CCA, or scVI latent space from Chapter 5) ensures that nearest-neighbor relationships reflect cell-type biology rather than sample identity. This is not optional — it is the fundamental prerequisite for the neighborhood-level DA test to be interpretable.
+:::
+
 The fix is to build the graph on the **integrated reduction** — the Harmony embeddings, the Seurat-integration corrected PCA, or the scVI latent space from [Chapter 5](Chapter_05_Integration.html). In Seurat:
 
 ```r
@@ -181,6 +209,8 @@ Look for:
 - **Isolated bright dots** — single significant neighborhoods surrounded by non-significant ones. Treat with caution; these are more likely false positives after SpatialFDR correction.
 
 The neighborhood graph is the DA analog of a volcano plot: it maps statistical significance onto biological space rather than onto a gene-level axis.
+
+**Troubleshooting the neighborhood graph plot.** The `layout` argument must match one of the names in `reducedDimNames(milo)` — use `reducedDimNames(milo)` to check what is available before calling the plot function. If the Harmony-based UMAP is stored under `"UMAP_HARMONY"` in the Seurat object, it should transfer to the SCE under the same name; if it was stored under `"umap.harmony"` (lowercase), that is what to pass. A common error is the reduction being named `"UMAP"` (the default Seurat UMAP slot) without the Harmony suffix, which produces a plot on the uncorrected UMAP — the layout will look wrong because samples will cluster by condition rather than by cell type.
 
 ### 8.10.2 The DA beeswarm
 

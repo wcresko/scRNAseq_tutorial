@@ -32,6 +32,12 @@ This is fundamentally different from RNA-seq, which measures transcription outpu
 
 ATAC also reveals **transcription factor binding sites** indirectly: at sub-nucleosomal resolution, an open chromatin region's exact width tells you whether a TF is bound there (footprinting). This is a layer of biology entirely invisible to RNA-seq.
 
+The Tn5 transposase used in ATAC-seq binds DNA as a homodimer and inserts sequencing adapters at both cut sites simultaneously. Because Tn5 is large (~55 kDa per monomer), it physically cannot insert into regions wrapped around nucleosomes — only nucleosome-free regions (NFRs) are accessible. The fragment length distribution therefore carries structural information: fragments shorter than ~150 bp come from NFRs (the "sub-nucleosomal" or "nucleosome-free" peak), fragments of ~200 bp come from mononucleosomal DNA, and longer fragments come from di- and tri-nucleosomal regions. A healthy ATAC library shows a characteristic **ladder pattern** in the fragment size distribution with peaks at multiples of ~200 bp. This ladder is used as a quality control metric (the nucleosome signal in §15.3): a flat distribution or absent ladder indicates poor Tn5 activity or a degraded sample.
+
+::: {.callout-note .key-concept title="🔑 Key concept — gene activity as a proxy for expression in scATAC-seq"}
+Unlike scRNA-seq, scATAC-seq does not directly measure gene expression. It measures which genomic regions are accessible, and those regions include promoters, enhancers, and other regulatory elements. Signac's `GeneActivity()` converts this chromatin accessibility signal into a gene-level proxy: it sums the fragment counts in a window around each gene's transcription start site (by default the 2 kb upstream of the TSS plus the gene body). The result looks like a gene × cell expression matrix but is derived entirely from accessibility data. This "gene activity score" is an approximation — accessibility at a promoter is correlated with, but not identical to, transcription. The score is sufficient for cluster annotation and label transfer from RNA, but it should not be interpreted as quantitative expression. A cell with high gene activity for CD14 is likely a monocyte; quantitative comparisons of CD14 activity levels between clusters are less reliable than the same comparison made with RNA.
+:::
+
 ## 15.2 The 10x scATAC-seq chemistry
 
 Single-cell ATAC works similarly to scRNA but with one crucial difference: the unit of capture is a **fragment** (a pair of Tn5 cut sites at distance ~50–500 bp), not a polyA-tailed mRNA. The 10x scATAC bead carries primers that hybridize to Tn5-introduced ME (mosaic-end) sequences rather than polyT.
@@ -61,13 +67,13 @@ Six metrics characterize scATAC cell quality; none has a universal threshold, bu
 
 The four standard metrics are:
 
-**`nCount_peaks`** — total fragments per cell. Like `nCount_RNA`, just at peak resolution. 5,000 fragments per cell is a healthy minimum.
+**`nCount_peaks`** — total fragments per cell. Like `nCount_RNA`, just at peak resolution. 5,000 fragments per cell is a healthy minimum for PBMC data; tissues with smaller or more fragile nuclei may require adjusting this threshold. Very high fragment counts (> 100,000) can indicate doublets or multiplets, analogous to the `nCount_RNA` upper filter in scRNA-seq QC.
 
-**`nFeature_peaks`** — number of distinct peaks with at least one fragment. Like `nFeature_RNA`.
+**`nFeature_peaks`** — number of distinct peaks with at least one fragment. Like `nFeature_RNA`. A cell with many fragments but few distinct peaks has low complexity — it is repeatedly sequencing the same small set of regions, which suggests a degraded or contaminated nucleus.
 
-**TSS enrichment score** — fraction of fragments at transcription start sites (within ±2 kb). Healthy cells have TSS enrichment > 4 (high signal, low background). Low TSS = high background, suggesting poor cell quality or extensive ambient chromatin.
+**TSS enrichment score** — fraction of fragments at transcription start sites (within ±2 kb). Active TSSs are reliably open in essentially all cell types, so a healthy cell should show a sharp accessibility peak at TSSs. Healthy cells have TSS enrichment > 4 (high signal, low background). Low TSS = high background, suggesting poor cell quality or extensive ambient chromatin. This metric is conceptually similar to `nCount_RNA` being correlated with library quality in scRNA-seq — it is a signal-to-noise ratio, not a biological measurement.
 
-**Nucleosome signal / fragment size distribution** — the characteristic ATAC profile shows peaks at <100 bp (nucleosome-free), \~200 bp (mononucleosome), \~400 bp (dinucleosome). A flat distribution suggests poor digestion or contamination.
+**Nucleosome signal / fragment size distribution** — the characteristic ATAC profile shows peaks at <100 bp (nucleosome-free), \~200 bp (mononucleosome), \~400 bp (dinucleosome). A flat distribution suggests poor digestion or contamination. Signac's `NucleosomeSignal()` computes the ratio of mononucleosomal to sub-nucleosomal fragments, which should be low in a healthy library (most fragments come from open, nucleosome-free regions). A high nucleosome signal in a cell means most of its detected fragments are from closed (nucleosomal) DNA — the Tn5 is cutting into nucleosome-wrapped regions, which typically means the nucleus was not properly permeabilized or was of poor quality.
 
 Two more advanced metrics:
 
@@ -91,6 +97,20 @@ Signac [@stuart2021signac] is the Seurat-flavored R toolkit for scATAC; **ArchR*
 
 The conceptual shapes match RNA: get a QC'd, normalized, low-dim representation, cluster, visualize. The math is different (binary peaks not counts, TF-IDF not log-normalize, LSI not PCA) but the workflow scaffolding is the same.
 
+**Why TF-IDF, not log-normalization?** ATAC data is binary or near-binary: each peak in each cell is either accessible (1 or a small count) or not (0). The data is extremely sparse — in a 100,000-peak × 10,000-cell matrix, more than 95% of entries are zero. Log-normalization, which divides by total counts and takes a log, is designed for count data with a roughly Poisson-to-negative-binomial distribution. For binary accessibility data, TF-IDF is more appropriate: it upweights rare peaks (high IDF — these are informative markers of specific cell types) and downweights ubiquitously-accessible peaks (low IDF — these are promoters active in all cells and carry little cell-type information). After TF-IDF, SVD (singular value decomposition) produces LSI components, which play the same role as PCs in RNA-seq.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — Signac / FindTopFeatures(min.cutoff)"}
+`FindTopFeatures(pbmc, min.cutoff = "q0")` selects peaks above a minimum accessibility cutoff before running TF-IDF and SVD. **Default with `min.cutoff = "q0"`: keep all peaks** (the 0th percentile, meaning no filtering). Setting `min.cutoff = "q75"` retains only the top 25% most accessible peaks, reducing noise from very rarely accessible peaks. For most analyses `"q0"` (all peaks) or `"q5"` (discard bottom 5%) is appropriate; raising the cutoff aggressively can discard peaks specific to rare cell types. The value `"q0"` is explicitly used in the tutorial to match the Signac vignette and is appropriate for the PBMC 10k dataset; for noisier data or datasets with many cell types consider `"q5"` or `"q10"`.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — RunSVD / dims to use (drop LSI component 1)"}
+After `RunSVD(pbmc)`, downstream functions use `dims = 2:30` rather than `dims = 1:30`. **Default if unspecified: `dims = 1:30`**, which includes the depth-confounded first LSI component. LSI component 1 almost universally tracks sequencing depth (total fragment count) rather than biology: `DepthCor(pbmc)` shows the Pearson correlation between each LSI component and `nCount_ATAC`, and component 1 typically has |r| > 0.9. Including it drives UMAP layout and cluster assignments by library size rather than chromatin state. Always run `DepthCor` and exclude any early components with |depth correlation| > 0.75.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — CreateChromatinAssay / min.cells"}
+`CreateChromatinAssay(counts = counts, min.cells = 10, min.features = 200)` filters peaks and cells at object creation. **`min.cells = 10` default**: a peak must be accessible in at least 10 cells to be retained. Lowering this (e.g. to 5) retains more peaks and may recover rare-cell-type–specific elements, but increases the matrix size and noise. Raising it (e.g. to 20–50) removes rare peaks aggressively — appropriate for atlas-scale data where rare peaks dominate the sparse background. The `min.features = 200` filter removes cells with fewer than 200 accessible peaks — analogous to `nFeature_RNA > 200` in scRNA-seq QC.
+:::
+
 ## 15.5 Gene-activity scores — translating ATAC to RNA-like
 
 Signac's `GeneActivity()` translates ATAC into pseudo-RNA: for each gene, sum the fragment counts in a window around the TSS (e.g. ±2 kb upstream + the gene body). The result is a **genes × cells matrix** that looks like RNA expression but is derived from ATAC.
@@ -101,6 +121,8 @@ Why bother?
 - It enables **label transfer** from scRNA-seq (with cell types) to scATAC (without). The `FindTransferAnchors` workflow projects an scATAC dataset against a labeled scRNA reference and copies the labels over.
 
 Gene-activity scores are not as good as actual RNA expression — they're an approximation — but they're sufficient for cluster annotation and many downstream questions.
+
+The window used by `GeneActivity()` matters: the default ±2 kb from the TSS captures the proximal promoter and a bit of the gene body. For genes regulated primarily by distal enhancers (common in immune genes), accessibility at the TSS may be low even when the gene is actively transcribed. Widening the window to ±5 kb or including a separate enhancer set can improve gene activity scores for such genes, though at the cost of noisier scores from overlap between adjacent gene windows. Always check that known markers for your expected cell types show appropriately elevated gene activity scores after computing them.
 
 ## 15.6 Peak calling vs pre-called peaks
 
