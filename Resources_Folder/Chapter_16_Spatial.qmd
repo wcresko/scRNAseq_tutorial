@@ -34,6 +34,8 @@ scRNA-seq starts with **dissociation**: tissue → cell suspension. That gives e
 
 ## 16.2 The technology landscape
 
+Two axes define the spatial transcriptomics landscape: **resolution** (spot vs. single-cell vs. sub-cellular) and **coverage** (whole-transcriptome vs. targeted gene panel). Visium is high-coverage / low-resolution; Xenium and MERFISH are targeted / high-resolution. Match the platform to your hypothesis. @tbl-ch16-platforms summarizes the major current options.
+
 | Technology | Resolution | Throughput | Genome coverage | Best for |
 |---|---|---|---|---|
 | **10x Visium (v1, v2)** | 55 µm spots | ~5,000 spots / section | Whole transcriptome | First spatial study; tissue overview |
@@ -43,7 +45,7 @@ scRNA-seq starts with **dissociation**: tissue → cell suspension. That gives e
 | **NanoString CosMx** | Sub-cellular | similar to MERFISH | ~1000 genes (extending to whole-tx) | Clinical samples, FFPE |
 | **Slide-seq / Slide-tags** | 10 µm | ~50k beads | Whole-tx | Higher resolution than Visium, less spatial-uniform |
 
-Two axes matter: **resolution** (spot vs cell vs sub-cellular) and **coverage** (whole-transcriptome vs targeted). Visium is high-coverage / low-resolution; Xenium is targeted / high-resolution. Match to your hypothesis.
+: Major spatial transcriptomics platforms by resolution and transcriptome coverage. Visium is the established whole-transcriptome entry point; imaging-based platforms (Xenium, MERFISH, CosMx) provide single-cell resolution at the cost of a targeted gene panel. {#tbl-ch16-platforms}
 
 ## 16.3 What a Visium spot is — and isn't
 
@@ -114,7 +116,7 @@ Compare to `FindVariableFeatures` (which finds variable-but-not-necessarily-spat
 
 Each Visium spot is a mixture. Deconvolution decomposes each spot's transcriptome into estimated cell-type fractions, using a single-cell **reference** of the same tissue.
 
-Tools:
+Tools differ in their statistical model and whether they incorporate spatial smoothing; @tbl-ch16-deconv summarizes the main options. The reference choice is critical regardless of tool: deconvolving a brain Visium with a PBMC reference returns garbage (PBMCs don't include neurons). Match the reference to the tissue you sampled.
 
 | Tool | Method | Notes |
 |---|---|---|
@@ -124,7 +126,7 @@ Tools:
 | **SPOTlight** | Non-negative matrix factorization | Good when you don't have a great reference |
 | **CIBERSORTx** | Support-vector regression | Originally bulk; works on spatial |
 
-The reference choice is critical. Deconvolving a brain Visium with a PBMC reference returns garbage (PBMCs don't include neurons). Match the reference to the tissue you sampled.
+: Spatial deconvolution tools and their statistical approaches. RCTD is the workshop default; cell2location is preferred for atlas-scale references. All require a tissue-matched single-cell reference. {#tbl-ch16-deconv}
 
 The output: per-spot, a probability vector over cell types. Plot each cell-type fraction as a `SpatialFeaturePlot`; you see the spatial distribution of each cell type as it's distributed across the tissue.
 
@@ -143,6 +145,8 @@ These produce smoother, more biologically interpretable spatial domains. Worth u
 
 ## 16.9 Common errors
 
+@tbl-ch16-errors collects the errors most commonly encountered in a Seurat/Signac Visium workflow, their causes, and the fix.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `SeuratData::InstallData("stxBrain")` is slow | First-time download (~50 MB) | Subsequent runs are instant |
@@ -150,6 +154,8 @@ These produce smoother, more biologically interpretable spatial domains. Worth u
 | `SpatialFeaturePlot` shows nothing on the tissue | The `images` slot wasn't loaded | `Read10X_Image(dirname(seu@tools$Staffli@imgs[1]))` to re-attach |
 | Section integration OOMs | SCT-anchor integration is RAM-hungry on Visium | Downsample spots first, or use Harmony on SCT residuals |
 | Deconvolution returns flat per-cell-type fractions | Your reference doesn't match the tissue | Use a tissue-matched single-cell reference |
+
+: Common Visium / spatial transcriptomics errors, their underlying causes, and fixes. {#tbl-ch16-errors}
 
 ## 16.10 Where this material is also discussed
 

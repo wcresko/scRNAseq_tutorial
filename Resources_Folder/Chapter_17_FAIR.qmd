@@ -38,7 +38,7 @@ The cost of doing FAIR is paid up-front during the project. The payoff is paid b
 
 ## 17.2 The FAIR principles
 
-Wilkinson et al. [@wilkinson2016fair] proposed four guiding principles for data management:
+Wilkinson et al. [@wilkinson2016fair] proposed four guiding principles for data management, summarized in @tbl-ch17-fair.
 
 | Principle | One-line definition |
 |---|---|
@@ -46,6 +46,8 @@ Wilkinson et al. [@wilkinson2016fair] proposed four guiding principles for data 
 | **A**ccessible | Anyone (or anyone authorized) can retrieve the data via an open protocol |
 | **I**nteroperable | Data uses shared vocabularies so different datasets combine cleanly |
 | **R**eusable | Provenance + clear licence + sufficient metadata for reanalysis |
+
+: The four FAIR principles [@wilkinson2016fair]. FAIR is not synonymous with "open" — FAIR data can be access-controlled while still satisfying all four criteria. {#tbl-ch17-fair}
 
 FAIR is not "open" — FAIR data can be access-controlled (e.g. patient genomes in a controlled-access archive). The "A" requires that the *protocol* for access is open and standardized, not that the data itself is.
 
@@ -66,7 +68,7 @@ For scRNA-seq, you create all four. The [Appendix E](Appendix_E_Databases_FileFo
 
 ### Single-cell-aware repositories
 
-Beyond the generic raw archive, deposit in a scRNA-seq–native repository so the data is *queryable as scRNA-seq*:
+Beyond the generic raw archive, deposit in a scRNA-seq–native repository so the data is *queryable as scRNA-seq*. @tbl-ch17-repos summarizes the major options.
 
 | Repository | Run by | What it accepts | Strengths |
 |---|---|---|---|
@@ -74,6 +76,8 @@ Beyond the generic raw archive, deposit in a scRNA-seq–native repository so th
 | **Human Cell Atlas Data Portal** [@regev2017hca] | HCA Consortium | Raw + processed, full provenance graph | Strict QC, integrated atlas |
 | **Single Cell Expression Atlas** | EBI | Counts + author annotations | Curated, queryable per-gene across studies |
 | **Single Cell Portal** | Broad Institute | Loose; raw + processed | Easy upload, less curation |
+
+: Single-cell-aware repositories for scRNA-seq data deposition. The recommended workflow is triple-deposit: raw FASTQs to SRA, processed data to GEO, and AnnData to CELLxGENE. {#tbl-ch17-repos}
 
 The recommended workflow in 2026: **raw FASTQs to SRA + BioProject; processed data to GEO; AnnData with cell-type metadata to CELLxGENE**. The triple-deposit is not redundant — each repository serves a different audience (raw-data reanalyzers, traditional bench biologists, single-cell-tool users).
 
@@ -91,7 +95,7 @@ Three fields deserve a brief explanation that is easy to get wrong:
 - **`is_primary_data`** is a Boolean flag: `TRUE` for data deposited by the generating lab for the first time; `FALSE` for a re-analysis of someone else's data. This flag is how atlases avoid double-counting the same cells.
 - **`suspension_type`** distinguishes `cell` (dissociated whole cells, the usual case) from `nucleus` (single-nucleus RNA-seq / snRNA-seq). This field matters for atlas integration because snRNA-seq counts are systematically lower than scRNA-seq counts for the same cell type.
 
-Required fields:
+The CELLxGENE schema's required fields are listed in @tbl-ch17-cellxgene. Meeting this bar gets you GEO + HCA compatibility for free.
 
 | Field | Vocabulary |
 |---|---|
@@ -107,9 +111,13 @@ Required fields:
 | `is_primary_data` | Boolean |
 | `suspension_type` | `cell` / `nucleus` |
 
+: Required CELLxGENE schema fields [@czi2025cellxgene] and their controlled vocabularies. Ontology IDs are looked up at the [Ontology Lookup Service](https://www.ebi.ac.uk/ols4/). The mapping from "B cell" to `CL:0000236` is what makes your dataset interoperable with every other CELLxGENE-deposited dataset. {#tbl-ch17-cellxgene}
+
 These ontology IDs are looked up at the [Ontology Lookup Service](https://www.ebi.ac.uk/ols4/). The mapping from "B cell" to `CL:0000236` is what makes your dataset interoperable with every other CELLxGENE-deposited dataset.
 
 ## 17.5 File formats and what to deposit
+
+@tbl-ch17-formats lists the file types you should deposit at each layer of the data lifecycle.
 
 | Layer | Format | Why |
 |---|---|---|
@@ -119,6 +127,8 @@ These ontology IDs are looked up at the [Ontology Lookup Service](https://www.eb
 | Annotated object | **`.h5ad`** (AnnData) preferred; `.rds` (Seurat) accepted by some | CELLxGENE / scverse-native |
 | Metadata sheet | `.csv` / `.tsv` (also embedded in `.h5ad` via `.obs`) | Sample-level + per-cell |
 | Analysis code | git repo (Zenodo for archival) | Reproducibility |
+
+: Recommended file formats for each layer of an scRNA-seq data deposition. AnnData (`.h5ad`) is the preferred archival format for annotated objects; `.rds` files are Seurat-version-locked and are not future-proof. {#tbl-ch17-formats}
 
 ::: callout-warning
 **Seurat `.rds` files are not future-proof.** They lock the data to the Seurat version that wrote them. For long-term archival use **AnnData (`.h5ad`)** — versioned, language-agnostic, HDF5-based, readable by Scanpy / Seurat 5 / `anndata-rs`.

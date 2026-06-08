@@ -25,7 +25,7 @@ editor: visual
 
 Single-cell RNA-seq measures **transcription**: it captures polyadenylated mRNA and counts molecules (UMIs) per gene. Single-cell ATAC-seq measures **chromatin accessibility**: a hyperactive Tn5 transposase cuts DNA preferentially where the chromatin is open, and the assay captures and sequences those cut fragments [@buenrostro2013atacseq]. The per-cell readout is not "how many copies of gene X" but "how many fragments fell in open region Y" — a direct readout of the regulatory, rather than the expressed, state of the cell [@klemm2019chromatin].
 
-Because the underlying measurement differs, the raw-processing pipeline diverges from RNA at almost every output even though the surrounding machinery is the same. The table below lines them up:
+Because the underlying measurement differs, the raw-processing pipeline diverges from RNA at almost every output even though the surrounding machinery is the same. @tbl-ch12-comparison lines them up.
 
 | Step | scRNA-seq | scATAC-seq |
 |---|---|---|
@@ -35,6 +35,8 @@ Because the underlying measurement differs, the raw-processing pipeline diverges
 | Per-cell QC | nUMI, nFeature, % mito | nFragments, TSS enrichment, nucleosome signal, blacklist ratio |
 | Cell calling | Knee + EmptyDrops on UMIs | Signal-vs-background on fragments |
 | `count` output | counts matrix + BAM | **fragments.tsv.gz** + **peaks.bed** + per-barcode QC |
+
+: Side-by-side comparison of scRNA-seq and scATAC-seq raw-processing steps. The SLURM submission patterns, FASTQ-naming rules, and reference-storage discipline are identical; the outputs and QC metrics differ because the biological measurement is different. {#tbl-ch12-comparison}
 
 The tool that does the work is `cellranger-atac` (distinct from `cellranger`), and its main subcommand is again `count`. The SLURM patterns, the strict FASTQ naming, and the "reference lives in shared storage, not home" discipline are all identical to Chapter 11 — so this chapter spends its time on what is genuinely new.
 
@@ -58,11 +60,15 @@ A consequence worth noting: because peaks are dataset-specific, two experiments 
 
 The reference for `cellranger-atac` is **not** the RNA reference, and confusing them is the most common failure mode. The RNA reference (`refdata-gex-...`) is built around the transcriptome; the ATAC reference indexes the whole genome and ships with motif annotations the RNA build lacks. They even share `fasta/` and `genes/` subdirectories, which makes the wrong one look superficially plausible — but the indexes and annotations differ, and a wrong-reference run usually fails to start with a cryptic error rather than a clear one.
 
-Three names you will encounter:
+The three reference names you will encounter are collected in @tbl-ch12-references.
 
-- `refdata-gex-GRCh38-...` — **RNA only**. Never pass this to `cellranger-atac`.
-- `refdata-cellranger-arc-GRCh38-2024-A` — the current human reference for ATAC and multiome. This is the one to use for new work.
-- `refdata-cellranger-atac-GRCh37-1.2.0` — an older hg19 build, useful only when you must match a downstream annotation pinned to hg19 (for example, Chapter 15's `EnsDb.Hsapiens.v75`).
+| Reference bundle | Tool | Genome | When to use |
+|---|---|---|---|
+| `refdata-gex-GRCh38-2024-A` | `cellranger` (RNA only) | hg38 | scRNA-seq only — **never** pass to `cellranger-atac` |
+| `refdata-cellranger-arc-GRCh38-2024-A` | `cellranger-atac`, `cellranger-arc` | hg38 | New scATAC-seq and multiome work; recommended default |
+| `refdata-cellranger-atac-GRCh37-1.2.0` | `cellranger-atac` (legacy) | hg19 | Only when downstream annotation is pinned to hg19 (e.g. Chapter 15's `EnsDb.Hsapiens.v75`) |
+
+: Cell Ranger reference bundles for human ATAC and multiome experiments. The arc bundle is the recommended choice for all new work; the GEX bundle cannot be used with `cellranger-atac` even though its subdirectory structure looks similar. {#tbl-ch12-references}
 
 ```bash
 cd /projects/<PIRG>/<user>/refs
@@ -78,7 +84,7 @@ ATAC has no UMIs, so the RNA cell-calling logic does not transfer directly. Inst
 
 ## 12.6 ATAC-specific QC
 
-The `web_summary.html` for an ATAC run looks similar to the RNA one but its key numbers are different, and they are worth understanding rather than just thresholding.
+The `web_summary.html` for an ATAC run looks similar to the RNA one but its key numbers are different, and they are worth understanding rather than just thresholding. @tbl-ch12-qcmetrics summarizes the six metrics that matter most.
 
 | Metric | What it measures | Worry threshold |
 |---|---|---|
@@ -88,6 +94,8 @@ The `web_summary.html` for an ATAC run looks similar to the RNA one but its key 
 | Fraction of fragments in peaks (FRiP) | Share of signal in real open regions | < 0.4 → poor capture / wrong reference |
 | Fraction in blacklist | Artefactual repetitive-region signal | > 0.05 |
 | Fraction nucleosome-free | Tn5 tagmentation quality | < 0.3 → over-tagmentation |
+
+: ATAC-seq QC metrics from `web_summary.html` / `summary.csv`. TSS enrichment is the single best overall quality indicator; FRiP and nucleosome signal provide complementary evidence about library quality. A TSS enrichment below 4 or FRiP below 0.4 signals a fundamental library or reference problem that cannot be recovered by downstream filtering. {#tbl-ch12-qcmetrics}
 
 Three of these deserve a sentence of intuition:
 
@@ -101,7 +109,19 @@ When `cellranger-atac count` finishes, open `web_summary.html` first — before 
 
 ## 12.7 The hand-off to Signac
 
-What `cellranger-atac count` writes is exactly what the downstream Signac analysis (Chapter 15) expects — no reformatting required. The files that matter are:
+What `cellranger-atac count` writes is exactly what the downstream Signac analysis (Chapter 15) expects — no reformatting required. @tbl-ch12-outputs lists the files from `outs/` that matter for downstream analysis.
+
+| File | Contents | When you need it |
+|---|---|---|
+| `filtered_peak_bc_matrix.h5` | Peaks × barcodes sparse counts (HDF5) | Always — primary matrix input for Signac and ArchR |
+| `fragments.tsv.gz` | Sorted, bgzipped fragment table (chrom, start, end, barcode, count) | Always — Signac uses this for all region-level operations |
+| `fragments.tsv.gz.tbi` | Tabix index for the fragments file | Must travel with fragments file; without it, Signac region queries fail |
+| `singlecell.csv` | Per-barcode QC summary (TSS enrichment, fragment count, etc.) | ATAC QC in Signac; used to filter low-quality barcodes |
+| `peaks.bed` | Genomic coordinates of called peaks | Re-quantification against a custom peak set; motif annotation |
+| `summary.csv` | Aggregate run QC metrics (same as `web_summary.html`) | Automated QC reporting across multiple samples |
+| `web_summary.html` | Interactive QC page | Open first, before loading any files into R |
+
+: Key output files from `cellranger-atac count`. The fragments file and its `.tbi` index always travel together — losing the index breaks Signac silently. Keep `singlecell.csv` alongside the matrix because it provides the per-barcode QC statistics that Signac uses to filter cells. {#tbl-ch12-outputs}
 
 ```bash
 outs/

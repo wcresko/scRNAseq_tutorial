@@ -45,15 +45,19 @@ The workshop's `ifnb` shows the second pattern dramatically: PC1 is essentially 
 
 ## 5.3 The conceptual taxonomy of integration methods
 
+The methods that have been developed for batch correction span a wide range of conceptual approaches, from simple linear regression to deep generative models. @tbl-ch05-methods places the five main families in context; the two the workshop implements in depth are Harmony and Seurat anchors.
+
 | Family | Examples | Mechanism | When to use |
 |---|---|---|---|
 | **Linear / regression** | ComBat, `sc.pp.regress_out` | Fit batch as a covariate; subtract its linear effect | Simple cases; rarely sufficient on its own for scRNA-seq |
 | **Mutual nearest neighbors** | MNN [@haghverdi2018mnn], fastMNN, Seurat anchors [@stuart2019integration] | Find pairs of cells that are nearest neighbors *across* batches; learn a correction from those anchors | Two or a few batches with similar cell-type compositions |
-| **Soft clustering in PC space** | **Harmony** | Iteratively re-cluster cells with a batch-mixing penalty; shift centroids toward batch balance | Most-used in 2026 — fast, scales to atlas sizes, works well for 2–50 batches |
+| **Soft clustering in PC space** | **Harmony** [@korsunsky2019harmony] | Iteratively re-cluster cells with a batch-mixing penalty; shift centroids toward batch balance | Most-used in 2026 — fast, scales to atlas sizes, works well for 2–50 batches |
 | **Variational autoencoders** | scVI [@lopez2018scvi], scANVI [@xu2021scanvi] | Learn a latent representation conditioned on batch; the decoder can be ignored, the latent used like PCs | Atlas-scale; especially with strong batch heterogeneity |
 | **Graph-based** | BBKNN, Conos | Modify the kNN graph to balance cross-batch edges | Fast; works well on already-PCA'd data |
 
-The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks **Harmony** and **Seurat anchors** because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy. There is no universally best method: large benchmarks of 14+ batch-correction tools, and the atlas-level integration benchmark, find that the right choice depends on dataset complexity and on the trade-off between *removing batch* and *conserving biological variation* — Harmony, Seurat, scVI and scANVI all rank near the top under different conditions [@tran2020benchmark; @luecken2022benchmarking].
+: The five conceptual families of single-cell batch-correction methods. There is no universally best method: large benchmarks find that the right choice depends on dataset complexity and the trade-off between batch removal and biological-variation conservation [@tran2020benchmark; @luecken2022benchmarking]. {#tbl-ch05-methods}
+
+The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks **Harmony** and **Seurat anchors** because they are the two dominant in-R methods. scVI requires Python; BBKNN is mainly used in Scanpy. Harmony, Seurat, scVI and scANVI all rank near the top under different conditions in the benchmarks, with no single winner across all datasets [@tran2020benchmark; @luecken2022benchmarking].
 
 ## 5.4 Harmony in detail
 
@@ -109,6 +113,23 @@ Seurat anchors' weaknesses:
 - **Slow** — for atlas data, easily an hour+; Harmony is 10× faster
 - **Complex** — multiple steps each with parameters; harder to tune
 
+## 5.5b Harmony vs. Seurat anchors — a direct comparison
+
+Because the workshop implements both methods, it is worth pausing to contrast them explicitly before working through their shared failure modes. @tbl-ch05-harmony-vs-anchors places them side by side on the dimensions that most affect the analysis decision.
+
+| Dimension | Harmony | Seurat anchors |
+|---|---|---|
+| **Speed** | Fast — minutes for millions of cells | Slow — hours for large datasets |
+| **Operating space** | PC space (corrects coordinates) | Gene expression space (corrects an assay) |
+| **Output slot** | `reductions$harmony` (drop-in for `pca`) | `assays$integrated` (separate assay) |
+| **Memory footprint** | Low | High (stores corrected expression matrix) |
+| **Rare cell conservation** | Good | Good to excellent (anchor scoring filters bad pairs) |
+| **Key tuning parameter** | `theta` (default 2; higher = more aggressive mixing) | `k.filter`, `k.anchor`, `dims` |
+| **Downstream DE** | Always use `RNA` assay | Always use `RNA` assay — integrated assay is not valid for DE |
+| **Atlas scale (>500k cells)** | Yes | Not recommended |
+
+: Direct comparison of Harmony and Seurat anchors on the dimensions most relevant to choosing between them. For most PBMC-scale studies (10k–200k cells), both work well; Harmony is the practical default for speed; Seurat anchors can provide more conservative correction when cell-type compositions are very unequal across batches. {#tbl-ch05-harmony-vs-anchors}
+
 ## 5.6 The over-correction problem
 
 The cardinal failure mode of integration is **erasing real biological differences** by being too aggressive. If your two samples are *biologically* different (CTRL vs IFN-β–stimulated), and integration spatially mixes them too completely, you also erase the IFN response — which is the actual biology of the experiment.
@@ -127,10 +148,7 @@ If the gap is gone, integration over-corrected. Push *less* hard (lower Harmony 
 
 The opposite failure: clusters *remain* sample-specific after integration. There are two interpretations and they require different responses:
 
-::: incremental
-1. **Genuinely sample-specific biology.** A cell type that exists in one sample but not the other (e.g. an "activated" T-cell state present only in stimulated samples) *should* remain sample-specific after integration — that's real biology, not residual batch effect. Integration *should not* mix it.
-2. **Residual batch effect.** A cell type clearly present in both samples but still split into two clusters after integration. That's under-correction; push integration harder.
-:::
+Two interpretations are possible and they require different responses. The first is **genuinely sample-specific biology**: a cell state that exists in one sample but not the other — for example, an interferon-activated T-cell subpopulation present only in the stimulated condition — *should* remain sample-specific after integration, because that's real biological information, not a technical artifact. Integration that erases it is over-correcting, not under-correcting. The second is a **residual batch effect**: a cell type that is clearly present in both samples but still splits into two clusters after integration. Here the method has not fully aligned the shared population, and pushing integration harder (higher Harmony `theta`, or more stringent anchor filtering in Seurat) is warranted.
 
 Distinguishing them requires biological knowledge and careful inspection of cluster markers. If the sample-specific cluster's markers match an *activation state* (cytokines, ISGs) rather than a *lineage* (CD4, CD79A), it's likely real biology. If the markers are the same lineage markers as a sample-mixed cluster, it's under-correction.
 
@@ -161,12 +179,18 @@ This is one of the most-violated rules in scRNA-seq analysis. Always explicit.
 
 ## 5.10 Common errors
 
+@tbl-ch05-errors collects the errors most frequently encountered during integration and the integrated-object diagnostics. The single most important habit to develop is checking `DefaultAssay` before any expression-level operation.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | Harmony errors "no `pca` reduction" | You skipped `RunPCA` | Run PCA first; Harmony works on PCs |
 | ISG score gap is zero after integration | You scored on the integrated assay | Set `DefaultAssay(seu) <- "RNA"` before `AddModuleScore` |
 | Clusters after integration look identical to unintegrated | `FindNeighbors` is using `pca` not `harmony` | `FindNeighbors(seu, reduction = "harmony", dims = 1:30)` |
 | `IntegrateData` returns a 5-dim object that won't slot into `RunPCA` | Seurat v5 / v4 API mismatch | In v5, anchor integration produces a layered Assay5; consult the [Seurat v5 vignette](https://satijalab.org/seurat/articles/seurat5_integration) |
+| `FindAllMarkers` returns empty results after integration | DefaultAssay is still `"integrated"` | `DefaultAssay(seu) <- "RNA"` before marker tests |
+| `JoinLayers` errors on a non-merged object | Object was never `merge()`-d | `JoinLayers` is only needed after `merge()` creates split layers |
+
+: Common errors in multi-sample integration, their root causes, and fixes. The `DefaultAssay` confusion (integrated vs. RNA) is the single most common bug; always be explicit about which assay is active before each analysis step. {#tbl-ch05-errors}
 
 ## 5.11 Where this material is also discussed
 
