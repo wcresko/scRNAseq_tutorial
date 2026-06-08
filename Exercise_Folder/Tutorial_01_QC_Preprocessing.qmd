@@ -181,12 +181,29 @@ sce <- Kang18_8vs8()
 # cells without an author-assigned cell type label.
 sce <- sce[, sce$multiplets == "singlet" & !is.na(sce$cell)]
 
+# A few gene (feature) symbols in this dataset contain underscores, and Seurat
+# does not allow '_' in feature names: CreateSeuratObject() would silently rewrite
+# them to '-' and print
+#   "Feature names cannot have underscores ('_'), replacing with dashes ('-')".
+# Dashes ARE valid Seurat gene names (e.g. HLA-A, MT-CO1), so the rewrite is
+# harmless — but we do it explicitly here so the change is visible and
+# reproducible, and we guard against the rare case where renaming would collide
+# with an existing symbol (make.unique() de-duplicates if so).
+cm <- counts(sce)
+flagged <- grep("_", rownames(cm), value = TRUE)
+if (length(flagged) > 0) {
+  message(length(flagged), " feature name(s) contain '_'; renaming '_' -> '-': ",
+          paste(head(flagged, 10), collapse = ", "),
+          if (length(flagged) > 10) ", ..." else "")
+  rownames(cm) <- make.unique(gsub("_", "-", rownames(cm)))
+}
+
 # Convert to a Seurat object, mirroring the metadata column names the rest of
 # this tutorial series expects:
 #   - `stim` as a factor with levels c("CTRL", "STIM")
 #   - `seurat_annotations` for the author-curated cell-type labels
 ifnb <- CreateSeuratObject(
-  counts    = counts(sce),
+  counts    = cm,
   meta.data = as.data.frame(colData(sce))
 )
 ifnb$stim <- factor(toupper(ifnb$stim), levels = c("CTRL", "STIM"))
@@ -376,12 +393,27 @@ In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambi
 #| eval: false
 
 # Pattern for any 10x dataset where you have the raw Cell Ranger output.
+# This block does NOT run on ifnb (which ships only *filtered* counts) and will
+# NOT run as-is: edit CR_OUTS to point at a real Cell Ranger 'outs/' directory
+# that contains BOTH raw_feature_bc_matrix/ and filtered_feature_bc_matrix/.
 library(SoupX)
 library(DropletUtils)
 
 # 1. Point at the Cell Ranger 'outs/' directory (containing raw_feature_bc_matrix/
 #    and filtered_feature_bc_matrix/)
-sc <- load10X("path/to/cellranger/outs")
+CR_OUTS <- "path/to/cellranger/outs"   # <-- EDIT to your own Cell Ranger outs/
+
+# Fail early with a clear message rather than a cryptic "subscript out of bounds"
+# if the path is still the placeholder or is missing the two required matrices.
+if (!dir.exists(file.path(CR_OUTS, "raw_feature_bc_matrix")) ||
+    !dir.exists(file.path(CR_OUTS, "filtered_feature_bc_matrix"))) {
+  stop("SoupX needs a real Cell Ranger 'outs/' folder containing BOTH ",
+       "raw_feature_bc_matrix/ and filtered_feature_bc_matrix/.\n",
+       "  '", CR_OUTS, "' is not valid — ifnb ships only the filtered counts, so ",
+       "this block is a template for your OWN 10x data, not a step you run on ifnb.")
+}
+
+sc <- load10X(CR_OUTS)
 
 # 2. (Recommended) provide preliminary clusters so SoupX can refine the soup
 #    profile per cluster — compute them with a quick Seurat workflow first:
