@@ -2252,6 +2252,24 @@ vertical-align: -.125em;
 </header>
 
 
+<div class="callout callout-style-default callout-note callout-titled" title="Running the code in this tutorial">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Running the code in this tutorial
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every code chunk here is tagged with <code>#| eval: false</code>, so the published page shows the code <strong>without running it</strong>. To run it yourself, open the downloaded <code>.qmd</code> in <strong>RStudio</strong>:</p>
+<ul>
+<li><strong>Run one chunk:</strong> click the green ▶ (<em>Run Current Chunk</em>) at the chunk’s top-right, or press <em>Ctrl/Cmd + Enter</em>. This runs the chunk <strong>regardless of its <code>eval</code> setting</strong> — the easiest way to work through the tutorial interactively.</li>
+<li><strong>Run a chunk on render:</strong> change that chunk’s <code>#| eval: false</code> to <code>#| eval: true</code> (or delete the line) so it executes when the document is rendered.</li>
+<li><strong>Render the whole tutorial:</strong> click the <strong>Render</strong> button in RStudio (or run <code>quarto render</code> in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set <code>eval: true</code> once in the YAML header at the top.</li>
+</ul>
+</div>
+</div>
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
 <p>Tutorial 05 in the laptop-friendly <code>ifnb</code> series. So far we’ve:</p>
@@ -2355,7 +2373,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong><code>harmony</code> is not installed</strong> — <code>install.packages(&quot;harmony&quot;)</code>. The Seurat-anchor path doesn’t need harmony, but Method A in this tutorial does.</p>
+<p><strong><code>harmony</code> is not installed</strong> — it’s installed in the <a href="Tutorial_00_Setup_RStudio_Packages.html">Tutorial 00 setup</a>; Method A here needs it (the Seurat-anchor path does not).</p>
 <p><strong><code>DefaultAssay()</code> is <code>&quot;integrated&quot;</code> when running <code>FindMarkers</code></strong> — the <code>IntegrateData</code> step switches the default assay. Always <code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> <em>before</em> any DE / marker work. The integrated assay holds <em>batch-corrected</em> values that are valid for <em>geometry</em> (PCA, UMAP, clustering) but NOT for differential expression.</p>
 <p><strong>ISG score gap looks zero after integration</strong> — you scored on the integrated assay instead of the <code>RNA</code> assay. <code>AddModuleScore</code> uses <code>DefaultAssay(seu)</code>. Switch back to <code>RNA</code> first.</p>
 <p><strong>Harmony’s <code>RunHarmony</code> errors with “object has no <code>pca</code> reduction”</strong> — you skipped the <code>RunPCA</code> step. Harmony works on PC space, not on the raw scaled counts.</p>
@@ -2385,20 +2403,19 @@ Note
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat)</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># install.packages(&quot;harmony&quot;)  # if not yet installed</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(harmony)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Output directory for this module&#39;s figures and tables.</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Every figure/table chunk below writes a file named  Mod5_C&lt;chunk&gt;_&lt;name&gt;</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co"># into ../output/Mod5/ so it can be cross-referenced from the rest of the site.</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   Mod5 = Module 5 (this tutorial);  C&lt;n&gt; = the nth code chunk.</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod5&quot;</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(harmony)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Output directory for this module&#39;s figures and tables.</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Every figure/table chunk below writes a file named  Mod5_C&lt;chunk&gt;_&lt;name&gt;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="co"># into ../output/Mod5/ so it can be cross-referenced from the rest of the site.</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   Mod5 = Module 5 (this tutorial);  C&lt;n&gt; = the nth code chunk.</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod5&quot;</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_annotated.rds&quot;</span>)</span>

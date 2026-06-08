@@ -2251,6 +2251,24 @@ vertical-align: -.125em;
 </header>
 
 
+<div class="callout callout-style-default callout-note callout-titled" title="Running the code in this tutorial">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Running the code in this tutorial
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every code chunk here is tagged with <code>#| eval: false</code>, so the published page shows the code <strong>without running it</strong>. To run it yourself, open the downloaded <code>.qmd</code> in <strong>RStudio</strong>:</p>
+<ul>
+<li><strong>Run one chunk:</strong> click the green ▶ (<em>Run Current Chunk</em>) at the chunk’s top-right, or press <em>Ctrl/Cmd + Enter</em>. This runs the chunk <strong>regardless of its <code>eval</code> setting</strong> — the easiest way to work through the tutorial interactively.</li>
+<li><strong>Run a chunk on render:</strong> change that chunk’s <code>#| eval: false</code> to <code>#| eval: true</code> (or delete the line) so it executes when the document is rendered.</li>
+<li><strong>Render the whole tutorial:</strong> click the <strong>Render</strong> button in RStudio (or run <code>quarto render</code> in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set <code>eval: true</code> once in the YAML header at the top.</li>
+</ul>
+</div>
+</div>
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
 <p>A bonus hands-on companion to <strong><a href="../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html">Lecture 14 — Trajectory Inference &amp; Cell–Cell Communication</a></strong>. These are <em>optional</em> downstream analyses; they build on the annotated, integrated object from the core workflow. We:</p>
@@ -2307,19 +2325,20 @@ Note
 </section>
 <section id="setup" class="level2">
 <h2 class="anchored" data-anchor-id="setup">Setup</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Bioconductor: slingshot, tradeSeq, CytoTRACE; CRAN/GitHub: monocle3, CellChat</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co"># BiocManager::install(c(&quot;slingshot&quot;, &quot;tradeSeq&quot;, &quot;SingleCellExperiment&quot;))</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co"># remotes::install_github(c(&quot;cole-trapnell-lab/monocle3&quot;, &quot;jinworks/CellChat&quot;))</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat); <span class="fu">library</span>(slingshot); <span class="fu">library</span>(SingleCellExperiment)</span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_annotated.rds&quot;</span>)</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(seu) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Packages are installed in Tutorial 00 (Setup → bonus modules) — load them here.</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Seurat); <span class="fu">library</span>(slingshot); <span class="fu">library</span>(SingleCellExperiment)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>seu <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_annotated.rds&quot;</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(seu) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </section>
 <section id="part-a-pseudotime-with-slingshot" class="level2">
 <h2 class="anchored" data-anchor-id="part-a-pseudotime-with-slingshot">Part A — Pseudotime with Slingshot</h2>
 <p><code>slingshot</code> fits smooth principal curves through your clusters in a reduced space. You give it a <strong>start cluster</strong> (the root) — here we <em>pretend</em> one cell type is the progenitor purely to demonstrate the mechanics.</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(seu)</span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(seu)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">slingshot</span>(sce,</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">clusterLabels =</span> <span class="st">&quot;seurat_annotations&quot;</span>,</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                 <span class="at">reducedDim    =</span> <span class="st">&quot;UMAP&quot;</span>,</span>
@@ -2333,6 +2352,7 @@ Note
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(grDevices)</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">reducedDims</span>(sce)<span class="sc">$</span>UMAP, <span class="at">pch =</span> <span class="dv">16</span>, <span class="at">cex =</span> <span class="fl">0.5</span>, <span class="at">col =</span> <span class="st">&quot;grey70&quot;</span>)</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(<span class="fu">SlingshotDataSet</span>(sce), <span class="at">lwd =</span> <span class="dv">2</span>, <span class="at">col =</span> <span class="st">&quot;black&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2354,24 +2374,41 @@ You’d want an independent reason the start cells are the least-differentiated:
 </div>
 <section id="monocle3-alternative" class="level3">
 <h3 class="anchored" data-anchor-id="monocle3-alternative">Monocle3 alternative</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(monocle3)</span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(monocle3)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">as.cell_data_set</span>(seu)                 <span class="co"># SeuratWrappers</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">cluster_cells</span>(cds)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">learn_graph</span>(cds)</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">order_cells</span>(cds)                       <span class="co"># interactive: pick the root node</span></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_cells</span>(cds, <span class="at">color_cells_by =</span> <span class="st">&quot;pseudotime&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </section>
 </section>
 <section id="part-b-rna-velocity-scvelo-python-sketch" class="level2">
 <h2 class="anchored" data-anchor-id="part-b-rna-velocity-scvelo-python-sketch">Part B — RNA velocity (scVelo, Python sketch)</h2>
 <p>Velocity needs a <strong>spliced/unspliced</strong> count matrix, which the standard Cell Ranger <em>filtered</em> matrix does <strong>not</strong> contain. Generate it first with <code>velocyto run</code> or <code>kb count --workflow lamanno</code>, then:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scvelo <span class="im">as</span> scv, scanpy <span class="im">as</span> sc</span>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This Python step is also packaged as a downloadable script — <strong><code>14_rna_velocity_scvelo.py</code></strong> (Materials → Module 14 → <em>Script · py</em>). On Talapas, submit it with the Python SLURM wrapper: <code>sbatch run_python.sbatch 14_rna_velocity_scvelo.py</code>.</p>
+</div>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scvelo <span class="im">as</span> scv, scanpy <span class="im">as</span> sc</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> scv.read(<span class="st">&quot;ifnb_velocyto.loom&quot;</span>)        <span class="co"># spliced + unspliced layers</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>scv.pp.filter_and_normalize(adata, min_shared_counts<span class="op">=</span><span class="dv">20</span>, n_top_genes<span class="op">=</span><span class="dv">2000</span>)</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>scv.pp.moments(adata, n_pcs<span class="op">=</span><span class="dv">30</span>, n_neighbors<span class="op">=</span><span class="dv">30</span>)</span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>scv.tl.velocity(adata, mode<span class="op">=</span><span class="st">&quot;dynamical&quot;</span>)      <span class="co"># dynamical model (Bergen 2020)</span></span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>scv.tl.velocity_graph(adata)</span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>scv.pl.velocity_embedding_stream(adata, basis<span class="op">=</span><span class="st">&quot;umap&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2387,15 +2424,18 @@ Warning
 </div>
 <section id="cytotrace-cross-check" class="level3">
 <h3 class="anchored" data-anchor-id="cytotrace-cross-check">CytoTRACE cross-check</h3>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CytoTRACE)</span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CytoTRACE)</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>cyto <span class="ot">&lt;-</span> <span class="fu">CytoTRACE</span>(<span class="fu">as.matrix</span>(<span class="fu">GetAssayData</span>(seu, <span class="at">slot =</span> <span class="st">&quot;counts&quot;</span>)))</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>cytotrace <span class="ot">&lt;-</span> cyto<span class="sc">$</span>CytoTRACE</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">FeaturePlot</span>(seu, <span class="st">&quot;cytotrace&quot;</span>)   <span class="co"># higher = less differentiated (more genes detected)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 </section>
 </section>
 <section id="part-c-cellcell-communication-with-cellchat" class="level2">
 <h2 class="anchored" data-anchor-id="part-c-cellcell-communication-with-cellchat">Part C — Cell–cell communication with CellChat</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CellChat)</span>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CellChat)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>cc  <span class="ot">&lt;-</span> <span class="fu">createCellChat</span>(<span class="at">object =</span> seu, <span class="at">group.by =</span> <span class="st">&quot;seurat_annotations&quot;</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>cc<span class="sc">@</span>DB <span class="ot">&lt;-</span> CellChatDB.human                       <span class="co"># human L–R database</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>cc <span class="ot">&lt;-</span> <span class="fu">subsetData</span>(cc)</span>
@@ -2411,6 +2451,7 @@ Warning
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Drill into one pathway</span></span>
 <span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">netVisual_aggregate</span>(cc, <span class="at">signaling =</span> <span class="st">&quot;MIF&quot;</span>, <span class="at">layout =</span> <span class="st">&quot;circle&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">

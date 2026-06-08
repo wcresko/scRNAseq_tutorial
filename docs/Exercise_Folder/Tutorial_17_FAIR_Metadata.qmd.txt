@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ## About this tutorial
 
 The hands-on companion to **[Lecture 17 — FAIR Principles & Data Sharing](../Lecture_Folder/Lecture_17_FAIR_DataSharing.html)** and the parallel of [scNotebooks Module 13](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module13/module13.html). We take the annotated `ifnb` object from Tutorial 04 and walk through what it would take to **deposit it for real** in NCBI + CELLxGENE Discover:
@@ -83,11 +92,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 library(Seurat)
 library(tidyverse)
 
-# Optional packages used below — install once if you don't have them.
-# install.packages("readr")
-# install.packages("jsonlite")
-# install.packages("yaml")
-# remotes::install_github("mojaveazure/seurat-disk")  # Seurat -> h5ad bridge
+# Packages are installed in Tutorial 00 (Setup → bonus modules) — load them here.
 library(SeuratDisk)        # SaveH5Seurat / Convert
 library(jsonlite)
 library(yaml)
@@ -96,11 +101,11 @@ set.seed(2026)
 
 # ---------------------------------------------------------------------------
 # Output directory for this module's figures and tables.
-# Every figure/table chunk below writes a file named  Mod13_C<chunk>_<name>
-# into ../output/Mod13/ so it can be cross-referenced from the rest of the site.
-#   Mod13 = Module 13 (this tutorial);  C<n> = the nth code chunk.
+# Every figure/table chunk below writes a file named  Mod17_C<chunk>_<name>
+# into ../output/Mod17/ so it can be cross-referenced from the rest of the site.
+#   Mod17 = Module 17 (this tutorial);  C<n> = the nth code chunk.
 # ---------------------------------------------------------------------------
-out_dir <- "../output/Mod13"
+out_dir <- "../output/Mod17"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 ifnb <- readRDS("../data/ifnb_annotated_final.rds")
@@ -120,12 +125,12 @@ table(ifnb$stim)
 
 # --- Tables out: metadata column inventory and per-sample cell counts -------
 tibble::tibble(metadata_column = colnames(ifnb@meta.data)) |>
-  readr::write_csv(file.path(out_dir, "Mod13_C2_metadata_columns.csv"))
+  readr::write_csv(file.path(out_dir, "Mod17_C2_metadata_columns.csv"))
 
 tibble::enframe(table(ifnb$stim),
                 name = "stim", value = "n_cells") |>
   dplyr::mutate(n_cells = as.integer(n_cells)) |>
-  readr::write_csv(file.path(out_dir, "Mod13_C2_cells_per_sample.csv"))
+  readr::write_csv(file.path(out_dir, "Mod17_C2_cells_per_sample.csv"))
 ```
 
 Most Seurat objects you'll meet have **rich per-cell** metadata (cluster, cell-type label, QC metrics) and **almost no sample-level metadata** (just `stim` here). Submission needs both.
@@ -153,7 +158,7 @@ canonical <- read_csv("../Resources_Folder/metadata_templates/canonical_sample_s
 canonical
 
 # --- Table out: the canonical sample sheet as loaded -----------------------
-readr::write_csv(canonical, file.path(out_dir, "Mod13_C3_canonical_sample_sheet.csv"))
+readr::write_csv(canonical, file.path(out_dir, "Mod17_C3_canonical_sample_sheet.csv"))
 ```
 
 The sheet contains everything a downstream consumer needs. Note the **paired columns**: `tissue` (human-readable) + `tissue_uberon` (ontology ID). Always carry both — the ontology ID is what makes the metadata interoperable.
@@ -232,7 +237,7 @@ head(per_cell)
 sum(is.na(per_cell$cell_type_ontology_term_id))   # any unmapped cell types?
 
 # --- Table out: the per-cell CELLxGENE-schema metadata frame ---------------
-readr::write_csv(per_cell, file.path(out_dir, "Mod13_C4_per_cell_metadata.csv"))
+readr::write_csv(per_cell, file.path(out_dir, "Mod17_C4_per_cell_metadata.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -268,7 +273,7 @@ tibble::enframe(table(ifnb$cell_type_ontology_term_id),
                 name = "cell_type_ontology_term_id", value = "n_cells") |>
   dplyr::mutate(n_cells = as.integer(n_cells)) |>
   dplyr::arrange(dplyr::desc(n_cells)) |>
-  readr::write_csv(file.path(out_dir, "Mod13_C5_cells_per_ontology_term.csv"))
+  readr::write_csv(file.path(out_dir, "Mod17_C5_cells_per_ontology_term.csv"))
 ```
 
 ## Step 5 — Convert Seurat → AnnData (`.h5ad`)
@@ -288,7 +293,8 @@ file.info("../data/ifnb_for_submission.h5ad")$size / 1e6   # MB
 
 CELLxGENE provides a **Python** validator (`cellxgene-schema`) that you can run from the command line on the resulting `.h5ad`. From a shell:
 
-```bash
+```{bash}
+#| eval: false
 # pip install cellxgene-schema
 cellxgene-schema validate ../data/ifnb_for_submission.h5ad
 ```
@@ -329,7 +335,7 @@ write_tsv(biosample, "../data/submission_biosample.tsv")
 biosample
 
 # --- Table out: BioSample upload template ----------------------------------
-readr::write_csv(biosample, file.path(out_dir, "Mod13_C7_biosample_template.csv"))
+readr::write_csv(biosample, file.path(out_dir, "Mod17_C7_biosample_template.csv"))
 ```
 
 ### 7b. SRA metadata TSV (one row per sequencing run)
@@ -358,7 +364,7 @@ write_tsv(sra, "../data/submission_sra.tsv")
 sra
 
 # --- Table out: SRA metadata upload template -------------------------------
-readr::write_csv(sra, file.path(out_dir, "Mod13_C8_sra_template.csv"))
+readr::write_csv(sra, file.path(out_dir, "Mod17_C8_sra_template.csv"))
 ```
 
 ### 7c. GEO sample sheet (processed data)
@@ -392,7 +398,7 @@ write_tsv(geo_samples, "../data/submission_geo_samples.tsv")
 geo_samples
 
 # --- Table out: GEO sample-section upload template -------------------------
-readr::write_csv(geo_samples, file.path(out_dir, "Mod13_C9_geo_samples_template.csv"))
+readr::write_csv(geo_samples, file.path(out_dir, "Mod17_C9_geo_samples_template.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}

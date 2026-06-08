@@ -2252,6 +2252,24 @@ vertical-align: -.125em;
 </header>
 
 
+<div class="callout callout-style-default callout-note callout-titled" title="Running the code in this tutorial">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Running the code in this tutorial
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every code chunk here is tagged with <code>#| eval: false</code>, so the published page shows the code <strong>without running it</strong>. To run it yourself, open the downloaded <code>.qmd</code> in <strong>RStudio</strong>:</p>
+<ul>
+<li><strong>Run one chunk:</strong> click the green ▶ (<em>Run Current Chunk</em>) at the chunk’s top-right, or press <em>Ctrl/Cmd + Enter</em>. This runs the chunk <strong>regardless of its <code>eval</code> setting</strong> — the easiest way to work through the tutorial interactively.</li>
+<li><strong>Run a chunk on render:</strong> change that chunk’s <code>#| eval: false</code> to <code>#| eval: true</code> (or delete the line) so it executes when the document is rendered.</li>
+<li><strong>Render the whole tutorial:</strong> click the <strong>Render</strong> button in RStudio (or run <code>quarto render</code> in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set <code>eval: true</code> once in the YAML header at the top.</li>
+</ul>
+</div>
+</div>
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
 <p>A short hands-on companion to <strong><a href="../Lecture_Folder/Lecture_04_Reference_Annotation.html">Lecture 04 — Reference-based Annotation</a></strong>. We start from the <strong>annotated object saved at the end of Tutorial 03</strong> (<code>ifnb_annotated.rds</code>) — reference-based methods like SingleR and Azimuth run per cell and don’t need your own integration, so this step slots in right after manual annotation and before integration. We:</p>
@@ -2473,34 +2491,32 @@ Click for answer
 <h2 class="anchored" data-anchor-id="path-2-azimuth-seurat-reference-mapping">Path 2 — Azimuth (Seurat reference mapping)</h2>
 <p>Azimuth wraps Seurat’s anchor-based reference mapping with curated atlases. The PBMC reference is the most widely tested.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># install if needed</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># remotes::install_github(&quot;satijalab/azimuth&quot;)</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Will download the PBMC reference on first use (~1 GB)</span></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(ifnb, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="co"># New columns: predicted.celltype.l1 / l2 / l3 + scores</span></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data))])</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: per-cell Azimuth predictions (l1/l2/l3 + scores) -----------</span></span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)), drop <span class="ot">=</span> <span class="cn">FALSE</span>] <span class="sc">|&gt;</span></span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;cell&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_azimuth_predictions.csv&quot;</span>))</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Azimuth predicted cell types (level 2) on the unintegrated UMAP&quot;</span>,</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Anchor-based mapping against the Azimuth pbmcref reference&quot;</span>,</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_azimuth_labels_umap.png&quot;</span>), p_azimuth_umap,</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Will download the PBMC reference on first use (~1 GB)</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(ifnb, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># New columns: predicted.celltype.l1 / l2 / l3 + scores</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data))])</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: per-cell Azimuth predictions (l1/l2/l3 + scores) -----------</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">@</span>meta.data[, <span class="fu">grep</span>(<span class="st">&quot;predicted&quot;</span>, <span class="fu">colnames</span>(ifnb<span class="sc">@</span>meta.data)), drop <span class="ot">=</span> <span class="cn">FALSE</span>] <span class="sc">|&gt;</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;cell&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_azimuth_predictions.csv&quot;</span>))</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">group.by =</span> <span class="st">&quot;predicted.celltype.l2&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>,</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Azimuth predicted cell types (level 2) on the unintegrated UMAP&quot;</span>,</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Anchor-based mapping against the Azimuth pbmcref reference&quot;</span>,</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>,</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>p_azimuth_umap</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_azimuth_labels_umap.png&quot;</span>), p_azimuth_umap,</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

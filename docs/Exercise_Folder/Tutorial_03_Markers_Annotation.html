@@ -2257,6 +2257,24 @@ vertical-align: -.125em;
 </header>
 
 
+<div class="callout callout-style-default callout-note callout-titled" title="Running the code in this tutorial">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Running the code in this tutorial
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Every code chunk here is tagged with <code>#| eval: false</code>, so the published page shows the code <strong>without running it</strong>. To run it yourself, open the downloaded <code>.qmd</code> in <strong>RStudio</strong>:</p>
+<ul>
+<li><strong>Run one chunk:</strong> click the green ▶ (<em>Run Current Chunk</em>) at the chunk’s top-right, or press <em>Ctrl/Cmd + Enter</em>. This runs the chunk <strong>regardless of its <code>eval</code> setting</strong> — the easiest way to work through the tutorial interactively.</li>
+<li><strong>Run a chunk on render:</strong> change that chunk’s <code>#| eval: false</code> to <code>#| eval: true</code> (or delete the line) so it executes when the document is rendered.</li>
+<li><strong>Render the whole tutorial:</strong> click the <strong>Render</strong> button in RStudio (or run <code>quarto render</code> in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set <code>eval: true</code> once in the YAML header at the top.</li>
+</ul>
+</div>
+</div>
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
 <p>Part three of the series. We start from the <strong>unintegrated clustered object saved in Tutorial 02</strong> and walk through:</p>
@@ -2354,7 +2372,7 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong><code>FindAllMarkers</code> takes 5+ minutes</strong> — install <code>presto</code> (<code>install.packages(&quot;presto&quot;)</code>); Seurat detects it automatically and is ~10× faster.</p>
+<p><strong><code>FindAllMarkers</code> takes 5+ minutes</strong> — <code>presto</code> (installed in the <a href="Tutorial_00_Setup_RStudio_Packages.html">Tutorial 00 setup</a>) makes it ~10× faster; Seurat detects it automatically.</p>
 <p><strong>Markers list is dominated by ISGs (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>)</strong> — that’s expected on the <em>unintegrated</em> <code>ifnb</code> data because clusters here are partly driven by <code>stim</code>. Tutorial 05 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.</p>
 <p><strong><code>Idents()</code> is set to the wrong column</strong> — clusters at multiple resolutions all live in <code>meta.data</code> (<code>RNA_snn_res.0.1</code>, <code>_0.3</code>, etc.) but only one is the “active” identity. <code>Idents(seu) &lt;- &quot;RNA_snn_res.0.5&quot;</code> switches; <code>levels(Idents(seu))</code> confirms.</p>
 <p><strong><code>FindMarkers</code> errors with “data layers are not joined. Please run JoinLayers”</strong> — Seurat v5 keeps per-sample split layers (<code>counts.CTRL</code>, <code>counts.STIM</code>, <code>data.CTRL</code>, <code>data.STIM</code>) after <code>merge()</code>, and <code>FindMarkers</code> refuses to run until they’re collapsed. Fix with <code>ifnb &lt;- JoinLayers(ifnb)</code> before calling <code>FindMarkers</code> / <code>FindAllMarkers</code>. The resume chunk above does this automatically. <code>Layers(ifnb)</code> shows the current layer list.</p>
@@ -2677,30 +2695,31 @@ Show answers
 <h2 class="anchored" data-anchor-id="step-4-manual-annotation">Step 4 — Manual annotation</h2>
 <p>Use the canonical marker table above and the dot plot to assign labels. Your cluster numbering will depend on the random seed and Seurat version, so <strong>do not copy these labels blindly</strong> — pick from the table that matches <em>your</em> dot plot.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># EXAMPLE — replace each entry below with the label appropriate for YOUR</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># clusters. The order must match levels(Idents(ifnb)) at this point.</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># new.cluster.ids &lt;- c(</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;0&quot; = &quot;CD14 Mono&quot;,</span></span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;1&quot; = &quot;CD4 Naive T&quot;,</span></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;2&quot; = &quot;CD4 Memory T&quot;,</span></span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;3&quot; = &quot;B&quot;,</span></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;4&quot; = &quot;CD8 T&quot;,</span></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;5&quot; = &quot;NK&quot;,</span></span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;6&quot; = &quot;CD16 Mono&quot;,</span></span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;7&quot; = &quot;T activated&quot;,</span></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;8&quot; = &quot;DC&quot;,</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;9&quot; = &quot;Mk&quot;,</span></span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;10&quot; = &quot;B activated&quot;,</span></span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;11&quot; = &quot;pDC&quot;,</span></span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a><span class="co">#   &quot;12&quot; = &quot;Eryth&quot;</span></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="co"># )</span></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="co"># names(new.cluster.ids) &lt;- levels(ifnb)</span></span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="co"># ifnb &lt;- RenameIdents(ifnb, new.cluster.ids)</span></span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="co"># ifnb$celltype_manual &lt;- Idents(ifnb)</span></span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a><span class="co"># DimPlot(ifnb, reduction = &quot;umap&quot;, label = TRUE, repel = TRUE) + NoLegend()</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># TEMPLATE — edit the labels to match YOUR clusters (the order must match</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># levels(Idents(ifnb)) at this point). This chunk is left `eval: false` because</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># the labels below are placeholders; once they match your dot plot, change it to</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># `eval: true` (or just run the chunk) to apply them.</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>new.cluster.ids <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;0&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD14 Mono&quot;</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;1&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD4 Naive T&quot;</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;2&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD4 Memory T&quot;</span>,</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;3&quot;</span>  <span class="ot">=</span> <span class="st">&quot;B&quot;</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;4&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD8 T&quot;</span>,</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;5&quot;</span>  <span class="ot">=</span> <span class="st">&quot;NK&quot;</span>,</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;6&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD16 Mono&quot;</span>,</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;7&quot;</span>  <span class="ot">=</span> <span class="st">&quot;T activated&quot;</span>,</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;8&quot;</span>  <span class="ot">=</span> <span class="st">&quot;DC&quot;</span>,</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;9&quot;</span>  <span class="ot">=</span> <span class="st">&quot;Mk&quot;</span>,</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;10&quot;</span> <span class="ot">=</span> <span class="st">&quot;B activated&quot;</span>,</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;11&quot;</span> <span class="ot">=</span> <span class="st">&quot;pDC&quot;</span>,</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;12&quot;</span> <span class="ot">=</span> <span class="st">&quot;Eryth&quot;</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(new.cluster.ids) <span class="ot">&lt;-</span> <span class="fu">levels</span>(ifnb)</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RenameIdents</span>(ifnb, new.cluster.ids)</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype_manual <span class="ot">&lt;-</span> <span class="fu">Idents</span>(ifnb)</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

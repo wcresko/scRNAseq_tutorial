@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ## About this tutorial
 
 This is the **runnable companion** to the P2 reading — the second hour of the optional **Tuesday (Day 0)** computational refresher. The reading lays out the concepts (what a shell is, why R, what the tidyverse is); here you actually **do it** at a keyboard. The tutorial has three parts: **Part A** is the Unix command line — navigating the filesystem, making and moving files, viewing data, wildcards, pipes, and redirection; **Part B** is R and RStudio — the interface, assignment, the core data structures, functions, and the tidyverse pipe; and **Part C** is where everyone **installs the workshop packages**, so that by Day 1 your machine has every R / Bioconductor package the tutorials need and the demo datasets are pre-cached. Work along in a terminal and an R session — don't just read.
@@ -45,7 +54,8 @@ The shell is how you move around a computer, manage files, download data, and st
 
 Open a terminal and orient yourself. A shell command is a **command** plus optional **options** (flags like `-l`) and **arguments** (what to act on).
 
-``` bash
+```{bash}
+#| eval: false
 pwd                 # "print working directory" — the absolute path you're in
 ls                  # list files & folders in the current directory
 ls -F               # mark directories with /, executables with *
@@ -69,7 +79,8 @@ No — it just contains only **hidden files**, whose names start with a dot (`.b
 
 An **absolute path** starts at the root `/` and is unambiguous from anywhere (`/Users/wcresko/Documents`). A **relative path** is interpreted from wherever you currently are (`../data`, `./scripts`). The shortcuts: `.` = here, `..` = one level up, `~` = your home, `-` = the directory you were in last.
 
-``` bash
+```{bash}
+#| eval: false
 cd /                # jump to the root (absolute)
 ls                  # the top-level directories of the whole machine
 cd ~                # back home (absolute, via shortcut)
@@ -96,7 +107,8 @@ Relative paths are shorter and survive moving the whole project to a new locatio
 
 Create a small scratch workspace and practice the core file operations. A few rules: **the shell trusts you** — it deletes what you tell it to and overwrites same-named files without asking. Avoid spaces in names; stick to letters, numbers, `.`, `-`, and `_`.
 
-``` bash
+```{bash}
+#| eval: false
 cd ~
 mkdir p2_practice            # make a new directory
 cd p2_practice
@@ -116,7 +128,8 @@ ls archive/
 
 Now clean up selectively (you'll keep the folder for Part A4):
 
-``` bash
+```{bash}
+#| eval: false
 rm archive/notes_backup.txt      # remove a file
 rmdir archive                    # remove an *empty* directory
 # rm -r somedir                  # remove a directory AND its contents (careful!)
@@ -136,7 +149,8 @@ rmdir archive                    # remove an *empty* directory
 
 You rarely open data files in a GUI; you peek at them from the shell. Make a slightly bigger file first, then look at it different ways.
 
-``` bash
+```{bash}
+#| eval: false
 cd ~/p2_practice
 # write 100 numbered lines into a file using a brace-expansion loop
 for i in {1..100}; do echo "line $i"; done > big.txt
@@ -158,7 +172,8 @@ less big.txt            # page through: SPACE = down, b = up, /pattern = search,
 
 Wildcards let one command act on many files. `*` matches any run of characters, `?` matches exactly one, and `[...]` matches a character from a set.
 
-``` bash
+```{bash}
+#| eval: false
 cd ~/p2_practice
 touch sample_01.fastq sample_02.fastq sample_03.fastq control.fastq notes.md
 
@@ -173,7 +188,8 @@ ls *.{fastq,md}         # brace expansion: .fastq OR .md
 
 Two ideas power most command-line work. **Redirection** sends a command's output to (or input from) a file: `>` writes (overwriting), `>>` appends, `<` reads input, `2>` captures errors. **Pipes** (`|`) connect the output of one command straight into the input of the next — no temp files needed. This is the Unix philosophy: small tools that each do one thing, combined into pipelines.
 
-``` bash
+```{bash}
+#| eval: false
 cd ~/p2_practice
 
 # redirection: save output to a file, then append
@@ -206,7 +222,8 @@ What is the difference between `ls > out.txt` and `ls | wc -l`? When would you r
 
 Genomic references and datasets usually come from a URL. `wget` (or `curl`) fetches them straight to the cluster or your laptop — no browser needed.
 
-``` bash
+```{bash}
+#| eval: false
 cd ~/p2_practice
 
 # download a small text file to the current directory
@@ -223,7 +240,8 @@ head README.txt
 
 When you're done with Part A, you can remove the whole practice folder:
 
-``` bash
+```{bash}
+#| eval: false
 cd ~
 rm -r p2_practice        # deletes the folder and everything in it — intended here
 ```
@@ -249,7 +267,8 @@ When RStudio opens you see four panes:
 
 R assigns values with `<-`. Names are case-sensitive (`x` ≠ `X`) and must start with a letter.
 
-``` r
+```{r}
+#| eval: false
 4 * 4
 (4 + 3 * 2^2)        # R obeys PEMDAS; parentheses control order
 
@@ -267,7 +286,8 @@ log(1000, base = 10) # functions take arguments that modify behavior
 
 R "thinks in vectors": a vector is an ordered set of values of one type. Build one with `c()` ("concatenate"). Math and functions operate **element-wise**.
 
-``` r
+```{r}
+#| eval: false
 counts <- c(8, 3, 0, 12, 5, 1, 0, 9)
 counts
 counts * 2           # every element doubled
@@ -288,7 +308,8 @@ s
 
 Vectors come in types: `dbl` (real numbers), `int` (integers), `chr` (character strings), `lgl` (logical `TRUE`/`FALSE`/`NA`), and `fctr` (factors — categorical with fixed levels). `NA` marks a missing value.
 
-``` r
+```{r}
+#| eval: false
 genes <- c("CD3D", "MS4A1", "LYZ", "NKG7")   # a character vector
 genes
 expressed <- c(TRUE, TRUE, FALSE, TRUE)       # a logical vector
@@ -309,7 +330,8 @@ R **vectorizes** operations: they apply to every element at once, which is both 
 
 A **data frame** is the workhorse for tabular data — columns can be different types (one type per column), rows are observations. Build one from vectors, inspect it, and index it.
 
-``` r
+```{r}
+#| eval: false
 cells <- data.frame(
   barcode    = c("AAAC", "AAAG", "AAAT", "AACA"),
   sample     = c("CTRL", "CTRL", "STIM", "STIM"),
@@ -335,7 +357,8 @@ mean(cells$nCount_RNA)
 
 Two more structures you'll meet constantly. A **list** is the flexible container — each slot can hold anything (a number, a vector, a data frame, even another list). Seurat and `SingleCellExperiment` objects are lists underneath.
 
-``` r
+```{r}
+#| eval: false
 experiment <- list(
   sample_id  = "donor_01_CTRL",
   age        = 42,
@@ -348,7 +371,8 @@ experiment[3]               # single [ ] returns a length-1 *list*, not the cont
 
 A **factor** is a categorical variable with a fixed, ordered set of allowed values ("levels"). It matters for statistics: the **first level is the reference** in a model.
 
-``` r
+```{r}
+#| eval: false
 condition <- factor(c("CTRL", "STIM", "CTRL", "STIM"),
                     levels = c("CTRL", "STIM"))
 condition
@@ -370,7 +394,8 @@ A plain character vector is just text — R has no idea the values form a design
 
 You'll write short helper functions all the time — usually 5–15-line wrappers around Seurat/Bioconductor calls. The structure is `name <- function(args) { ... }`; the last expression is returned.
 
-``` r
+```{r}
+#| eval: false
 # coefficient of variation, with an option to drop missing values
 cv <- function(x, na.rm = TRUE) {
   if (na.rm) x <- x[!is.na(x)]
@@ -394,7 +419,8 @@ This is the single most common point of confusion for new R users, so internaliz
 - **`install.packages("pkg")`** downloads the package onto your machine. Do it **once** (from **CRAN**); for Bioconductor packages use **`BiocManager::install("pkg")`**.
 - **`library(pkg)`** makes that installed package's functions available in your **current** R session. Do it **every time you start R**.
 
-``` r
+```{r}
+#| eval: false
 install.packages("tidyverse")   # ONCE — downloads & installs
 library(tidyverse)              # EVERY SESSION — makes its functions usable now
 ```
@@ -405,7 +431,8 @@ Restarting R does **not** require re-installing — but it **does** require re-`
 
 Most modern R for biology is written in **tidyverse** style. Six `dplyr` verbs — `filter()`, `select()`, `mutate()`, `arrange()`, `group_by()`, `summarise()` — cover most data-frame work, and the **pipe** `|>` chains them so the code reads top-to-bottom.
 
-``` r
+```{r}
+#| eval: false
 library(tidyverse)
 
 cells |>
@@ -426,7 +453,8 @@ Read it as: "take `cells`, filter, add a column, group by sample, summarise to o
 
 Get data in and out of R. Base R uses `read.csv()`/`write.csv()`; the tidyverse equivalents (`read_csv()`/`write_csv()`) return tibbles and are a bit faster and friendlier.
 
-``` r
+```{r}
+#| eval: false
 # write our data frame out, then read it back
 write_csv(cells, "cells_demo.csv")           # tidyverse writer
 back <- read_csv("cells_demo.csv")           # tidyverse reader (a tibble)
@@ -457,7 +485,8 @@ You only do this **once**. After it finishes, every workshop tutorial just needs
 
 Paste the **entire block** into your R **Console** — it installs everything you need for Tuesday–Friday, then pre-warms the `ifnb` cache so the first tutorial run is instant.
 
-``` r
+```{r}
+#| eval: false
 # CRAN
 cran_pkgs <- c(
   "tidyverse",     # dplyr, ggplot2, tidyr, readr, purrr, tibble, stringr, forcats
@@ -483,11 +512,21 @@ bioc_pkgs <- c(
   "fgsea", "clusterProfiler", "ReactomePA", "enrichplot",  # functional analysis (Module 07)
   "org.Hs.eg.db", "org.Mm.eg.db",                          # gene-ID maps (Module 07)
   "miloR",             # differential abundance (Module 08)
-  "SingleR", "celldex",# reference-based annotation (Module 04)
+  "SingleR",           # reference-based annotation method (Module 04)
   "muscData"           # ifnb (Kang18_8vs8) loader (Modules 01–08)
 )
 BiocManager::install(setdiff(bioc_pkgs, rownames(installed.packages())),
                      update = FALSE, ask = FALSE)
+
+# celldex provides the SingleR REFERENCE DATA (Module 04). It is built on
+# Bioconductor's alabaster/gypsum framework, so install it on its own with
+# dependency updates ALLOWED. Leaving it in the block above with update = FALSE
+# is the usual cause of:
+#   installation of package 'alabaster.base' had non-zero exit status
+#   installation of package 'celldex'        had non-zero exit status
+# because a stale dependency left from an older install can't satisfy the newer
+# alabaster build. update = TRUE keeps the whole chain on one Bioconductor release.
+BiocManager::install("celldex", update = TRUE, ask = FALSE)
 
 # GitHub / R-universe
 remotes::install_github("satijalab/seurat-data", quiet = TRUE, upgrade = "never")  # SeuratData
@@ -496,6 +535,23 @@ remotes::install_github("satijalab/azimuth",     quiet = TRUE, upgrade = "never"
 # Pre-warm the ifnb cache (Kang et al. 2017; Modules 01–08) — first call downloads ~25 MB.
 invisible(muscData::Kang18_8vs8())
 ```
+
+::: {.callout-warning title="If `celldex` / `alabaster.base` fails to install"}
+`celldex` (the SingleR reference loader, Module 04) is built on Bioconductor's **alabaster/gypsum** framework, so it pulls in `alabaster.base` and friends. If you see `installation of package 'alabaster.base' had non-zero exit status` (which then fails `celldex`):
+
+1. **Confirm your compiler toolchain** — `alabaster.base` builds C++ from source ([Software Setup §3](../Software_Setup.html)): Xcode CLT (macOS), Rtools (Windows), `build-essential` (Linux).
+2. **Re-run it with updates allowed** — the usual cause is a stale dependency from an older install:
+
+   ```{r}
+   #| eval: false
+   BiocManager::install("celldex", update = TRUE, ask = FALSE)
+   ```
+
+   Re-running resumes where it left off, so transient download failures clear on a second try.
+3. **Check for version mismatches** with `BiocManager::valid()` — it lists out-of-sync packages and the exact command to repair them.
+
+`celldex` is only used in **Module 04**, so you can keep going and circle back to this one package.
+:::
 
 ## C2. Bonus packages — only for the self-paced bonus modules (11–17)
 
@@ -535,7 +591,8 @@ The first install will take 20–60 minutes depending on your machine and whethe
 
 Quarto renders to HTML with nothing extra, but rendering to **PDF** needs a LaTeX engine. The easiest cross-platform option is **TinyTeX**, installed from R:
 
-``` r
+```{r}
+#| eval: false
 install.packages("tinytex")
 tinytex::install_tinytex()   # one-time; ~1–2 min, no admin rights needed
 # tinytex::is_tinytex()      # after restarting RStudio, should return TRUE
@@ -545,7 +602,8 @@ tinytex::install_tinytex()   # one-time; ~1–2 min, no admin rights needed
 
 Stale packages can collide with newer code. Update occasionally:
 
-``` r
+```{r}
+#| eval: false
 update.packages(ask = FALSE)   # update CRAN packages
 BiocManager::install()         # check for / update Bioconductor packages
 BiocManager::valid()           # report packages that are out of sync

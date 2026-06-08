@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ## About this tutorial
 
 A laptop-friendly **introduction to spatial transcriptomics** using 10x **Visium** — the most accessible spatial platform today. We use the `stxBrain` dataset from `SeuratData`: matched **anterior** and **posterior** sagittal sections of an adult mouse brain, \~50 MB total, installed with one R command (no manual download, no 10x click-through).
@@ -92,12 +101,8 @@ If you're running a graded course, link the rendered solutions page from your LM
 ```{r}
 #| label: setup
 
-# One-time install (skip if already installed)
-# install.packages(c("Seurat", "tidyverse"))
-# install.packages("SeuratData",
-#                  repos = c("https://satijalab.r-universe.dev", getOption("repos")))
-# SeuratData::InstallData("stxBrain")
-
+# Packages are installed in Tutorial 00 (Setup → bonus modules); the stxBrain
+# dataset install is on the Datasets page. Here we just load the libraries.
 library(Seurat)
 library(SeuratData)
 library(tidyverse)
@@ -105,11 +110,11 @@ library(patchwork)
 
 # ---------------------------------------------------------------------------
 # Output directory for this module's figures and tables.
-# Every figure/table chunk below writes a file named  Mod11_C<chunk>_<name>
-# into ../output/Mod11/ so it can be cross-referenced from the rest of the site.
-#   Mod11 = Module 11 (this tutorial);  C<n> = the nth code chunk.
+# Every figure/table chunk below writes a file named  Mod16_C<chunk>_<name>
+# into ../output/Mod16/ so it can be cross-referenced from the rest of the site.
+#   Mod16 = Module 16 (this tutorial);  C<n> = the nth code chunk.
 # ---------------------------------------------------------------------------
-out_dir <- "../output/Mod11"
+out_dir <- "../output/Mod16"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 set.seed(2026)
@@ -135,7 +140,7 @@ tibble::tibble(
   features = c(nrow(ant), nrow(post)),
   spots    = c(ncol(ant), ncol(post))
 ) |>
-  readr::write_csv(file.path(out_dir, "Mod11_C2_section_dimensions.csv"))
+  readr::write_csv(file.path(out_dir, "Mod16_C2_section_dimensions.csv"))
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -192,9 +197,9 @@ p1
 p2
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod11_C3_qc_violins.png"), p1,
+ggsave(file.path(out_dir, "Mod16_C3_qc_violins.png"), p1,
        width = 10, height = 4, dpi = 300)
-ggsave(file.path(out_dir, "Mod11_C3_qc_spatial.png"), p2,
+ggsave(file.path(out_dir, "Mod16_C3_qc_spatial.png"), p2,
        width = 10, height = 5, dpi = 300)
 ```
 
@@ -262,9 +267,9 @@ p_markers_ant
 p_markers_post
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod11_C5_markers_anterior.png"),  p_markers_ant,
+ggsave(file.path(out_dir, "Mod16_C5_markers_anterior.png"),  p_markers_ant,
        width = 12, height = 4, dpi = 300)
-ggsave(file.path(out_dir, "Mod11_C5_markers_posterior.png"), p_markers_post,
+ggsave(file.path(out_dir, "Mod16_C5_markers_posterior.png"), p_markers_post,
        width = 12, height = 4, dpi = 300)
 ```
 
@@ -310,7 +315,7 @@ p_cluster <- (p_umap + p_tis) +
 p_cluster
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod11_C6_anterior_clusters.png"), p_cluster,
+ggsave(file.path(out_dir, "Mod16_C6_anterior_clusters.png"), p_cluster,
        width = 12, height = 5, dpi = 300)
 ```
 
@@ -355,9 +360,9 @@ p_svf
 
 # --- Outputs: top spatially variable genes (table) + tissue overlay --------
 tibble::tibble(rank = seq_along(top_sv), gene = top_sv) |>
-  readr::write_csv(file.path(out_dir, "Mod11_C7_spatially_variable_features.csv"))
+  readr::write_csv(file.path(out_dir, "Mod16_C7_spatially_variable_features.csv"))
 
-ggsave(file.path(out_dir, "Mod11_C7_spatially_variable_features.png"), p_svf,
+ggsave(file.path(out_dir, "Mod16_C7_spatially_variable_features.png"), p_svf,
        width = 12, height = 7, dpi = 300)
 ```
 
@@ -427,9 +432,9 @@ p_int_spatial <- SpatialDimPlot(brain, label = TRUE) +
 p_int_spatial
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod11_C8_integrated_umap.png"), p_int_umap,
+ggsave(file.path(out_dir, "Mod16_C8_integrated_umap.png"), p_int_umap,
        width = 12, height = 5, dpi = 300)
-ggsave(file.path(out_dir, "Mod11_C8_integrated_spatial_clusters.png"), p_int_spatial,
+ggsave(file.path(out_dir, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial,
        width = 10, height = 5, dpi = 300)
 ```
 
@@ -451,38 +456,40 @@ A Visium spot covers \~1–10 cells, so each spot's transcriptome is a *mixture*
 
 This is too heavy to install and run end-to-end here, but the recipe is:
 
+*Optional reference recipe — left `#| eval: false`; it's heavy to run and is here as a pattern for your own data, so you don't need to change anything.*
+
 ```{r}
 #| label: deconv-recipe
 #| eval: false
 
-# Pseudo-code — install + run for an actual deconvolution
-# remotes::install_github("dmcable/spacexr")
-# library(spacexr)
-#
-# # 1. Build a reference from a single-cell brain dataset (e.g. Allen Mouse Brain
-# #    Atlas, or a Tabula Muris brain subset). The reference is a Reference()
-# #    object with cell-type labels.
-#
-# # 2. Build a SpatialRNA() object from your Visium counts + spot coordinates.
-#
-# # 3. Run RCTD:
-# rctd <- create.RCTD(spatial_rna, reference, max_cores = 4)
-# rctd <- run.RCTD(rctd, doublet_mode = "doublet")
-#
-# # 4. Each spot now has weights for the contributing cell types.
-# #    Visualize as a per-cell-type SpatialFeaturePlot.
+# Reference recipe for an actual deconvolution with spacexr (RCTD).
+library(spacexr)
+
+# 1. Build a reference from a single-cell brain dataset (e.g. Allen Mouse Brain
+#    Atlas or a Tabula Muris brain subset) — a Reference() object with cell-type labels.
+# 2. Build a SpatialRNA() object from your Visium counts + spot coordinates.
+
+# 3. Run RCTD:
+rctd <- create.RCTD(spatial_rna, reference, max_cores = 4)
+rctd <- run.RCTD(rctd, doublet_mode = "doublet")
+
+# 4. Each spot now has weights for the contributing cell types; visualize as a
+#    per-cell-type SpatialFeaturePlot.
 ```
 
 For the laptop workflow here, **a fast proxy** is to compute a **module score** for each cell type using its top markers from a single-cell reference. We borrow markers from the `ifnb` PBMC reference for one quick example (mouse brain doesn't have PBMCs, so this is purely illustrative — for a real run, use a brain-tissue scRNA-seq reference):
 
+*Optional illustrative sketch — left `#| eval: false`; you don't need to change it.*
+
 ```{r}
 #| label: module-score
+#| eval: false
 
-# Cross-species name conversion is non-trivial; this is a sketch only:
-# brain <- AddModuleScore(brain,
-#                         features = list(Microglia = c("Cx3cr1","P2ry12","Tmem119")),
-#                         name     = "Microglia")
-# SpatialFeaturePlot(brain, features = "Microglia1")
+# Illustrative sketch only (cross-species gene-name conversion is non-trivial):
+brain <- AddModuleScore(brain,
+                        features = list(Microglia = c("Cx3cr1", "P2ry12", "Tmem119")),
+                        name     = "Microglia")
+SpatialFeaturePlot(brain, features = "Microglia1")
 ```
 
 ## Step 9 — Save
