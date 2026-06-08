@@ -4,7 +4,7 @@
 # Learning notebook: Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.qmd
 # Runs on the annotated ifnb object (the same dataset as the laptop notebook).
 # Run:  sbatch --job-name=traj --mem=64G run_rscript.sbatch 14_trajectory_cellcomm.R
-# In:   ../objects/ifnb_annotated.rds   Out: ../objects/ifnb_slingshot_pseudotime.csv
+# In:   ../data/ifnb_annotated.rds   Out: ../data/ifnb_slingshot_pseudotime.csv
 # Figures/tables: ../output/Mod14/Mod14_*  (Tutorial_14 has no executable chunks, so
 # there are no canonical ModN_C{k}_ filenames to mirror — Mod14_<name> is used here.)
 
@@ -13,12 +13,12 @@ suppressPackageStartupMessages({
   library(patchwork)
 })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod14") # figures/tables for this module
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
-seu <- readRDS(file.path(OBJ_DIR, "ifnb_annotated.rds"))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+seu <- readRDS(file.path(DATA_DIR, "ifnb_annotated.rds"))
 DefaultAssay(seu) <- "RNA"
 
 # Part A — Pseudotime with Slingshot. The root flips the whole ordering, so you MUST
@@ -29,7 +29,7 @@ root <- levels(factor(seu$celltype_manual))[1]   # <- replace with a justified p
 sce  <- slingshot(sce, clusterLabels = "celltype_manual",
                   reducedDim = "UMAP", start.clus = root)
 pt_tbl <- as.data.frame(slingPseudotime(sce)) |> rownames_to_column("cell")
-write_csv(pt_tbl, file.path(OBJ_DIR, "ifnb_slingshot_pseudotime.csv"))
+write_csv(pt_tbl, file.path(DATA_DIR, "ifnb_slingshot_pseudotime.csv"))
 # Table out: same pseudotime table mirrored into the module output dir
 write_csv(pt_tbl, file.path(OUT_DIR, "Mod14_slingshot_pseudotime.csv"))
 
@@ -63,4 +63,4 @@ cat("Wrote Mod14 figures/tables to", OUT_DIR, "\n")
 # cc <- subsetData(cc); cc <- identifyOverExpressedGenes(cc)
 # cc <- identifyOverExpressedInteractions(cc); cc <- computeCommunProb(cc)
 # cc <- filterCommunication(cc, min.cells = 10); cc <- aggregateNet(cc)
-# saveRDS(cc, file.path(OBJ_DIR, "ifnb_cellchat.rds"))
+# saveRDS(cc, file.path(DATA_DIR, "ifnb_cellchat.rds"))

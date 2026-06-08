@@ -16,10 +16,10 @@
 # IMPORTANT — unlike the core pipeline, these scripts are LARGELY STANDALONE:
 # they do NOT chain on each other, and each needs its own input data:
 #   13_wgcna.R            -> ../data/GSE152418_p20047_Study1_RawCounts.txt  (Module 13)
-#   14_trajectory_cellcomm.R -> ../objects/ifnb_annotated.rds   (from the core run; Module 14)
+#   14_trajectory_cellcomm.R -> ../data/ifnb_annotated.rds   (from the core run; Module 14)
 #   15_scatac_signac.R    -> ../data/atac_v1_pbmc_10k_*          (Module 15)
 #   16_spatial.R          -> stxBrain via SeuratData            (Module 16)
-#   17_fair_metadata.R    -> ../objects/ifnb_annotated_final.rds (from the core run; Module 17)
+#   17_fair_metadata.R    -> ../data/ifnb_annotated_final.rds (from the core run; Module 17)
 # Because they are independent, this wrapper does NOT abort if one step fails
 # (e.g. its dataset isn't downloaded) — it logs the failure and continues.
 #

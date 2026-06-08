@@ -2,8 +2,8 @@
 # Talapas analysis pipeline 06 — parallels laptop Tutorial 06 (Pseudobulk DE, DESeq2).
 # Learning notebook: Exercise_Folder/Tutorial_06_DESeq2_DE.qmd
 # Run:  sbatch --job-name=pb_de --time=04:00:00 --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
-# In:   ../objects/ifnb_integrated.rds
-# Out:  ../objects/ifnb_pseudobulk_de.csv  +  ../output/Mod6 figures/tables (match Tutorial_06.qmd)
+# In:   ../data/ifnb_integrated.rds
+# Out:  ../data/ifnb_pseudobulk_de.csv  +  ../output/Mod6 figures/tables (match Tutorial_06.qmd)
 #
 # ifnb has a REAL biological contrast (IFN-beta STIM vs CTRL) and REAL donors
 # (8 lupus patients, `ind`), so this is genuine pseudobulk DE — expect a strong
@@ -11,12 +11,12 @@
 
 suppressPackageStartupMessages({ library(Seurat); library(DESeq2); library(tidyverse); library(patchwork) })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod6") # figures/tables, named to match Tutorial_06.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
-seu <- readRDS(file.path(OBJ_DIR, "ifnb_integrated.rds"))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+seu <- readRDS(file.path(DATA_DIR, "ifnb_integrated.rds"))
 DefaultAssay(seu) <- "RNA"
 
 # Real donor (ind) and real condition (stim)
@@ -58,9 +58,9 @@ run_de <- function(ct) {
 }
 de_all <- map_dfr(unique(meta_pb$celltype), run_de) |> filter(!is.na(padj))
 
-# Pipeline hand-off: script 07 reads this from OBJ_DIR — keep it there.
-write_csv(de_all, file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"))
-cat("Wrote", file.path(OBJ_DIR, "ifnb_pseudobulk_de.csv"), "with", nrow(de_all),
+# Pipeline hand-off: script 07 reads this from DATA_DIR — keep it there.
+write_csv(de_all, file.path(DATA_DIR, "ifnb_pseudobulk_de.csv"))
+cat("Wrote", file.path(DATA_DIR, "ifnb_pseudobulk_de.csv"), "with", nrow(de_all),
     "rows across", length(unique(de_all$celltype)), "cell types\n")
 
 # ===========================================================================

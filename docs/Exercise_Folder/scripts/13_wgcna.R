@@ -4,7 +4,7 @@
 # Learning notebook: Exercise_Folder/Tutorial_13_WGCNA.qmd
 # Run:  sbatch --job-name=wgcna --mem=64G run_rscript.sbatch 13_wgcna.R
 # In:   ../data/GSE152418_p20047_Study1_RawCounts.txt
-# Out:  ../objects/wgcna_*.csv, ../output/Mod13/
+# Out:  ../data/wgcna_*.csv, ../output/Mod13/
 # Figures/tables (match the Mod13 notebook filenames): ../output/Mod13/Mod13_C*_*
 
 suppressPackageStartupMessages({
@@ -13,12 +13,10 @@ suppressPackageStartupMessages({
 })
 set.seed(2026)
 DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
-OBJ_DIR  <- Sys.getenv("OBJ_DIR",  "../objects")
 OUT_DIR  <- Sys.getenv("OUT_DIR",  "../output/Mod13") # figures/tables, named to match Tutorial_13.qmd
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)  # input datasets land here
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Load counts + GEO metadata, reshape to a counts matrix
 data <- read.delim(file.path(DATA_DIR, "GSE152418_p20047_Study1_RawCounts.txt"), header = TRUE)
@@ -97,8 +95,8 @@ norm.counts <- assay(vst(dds75)) |> t()    # WGCNA wants samples x genes
 sft <- pickSoftThreshold(norm.counts, powerVector = c(1:10, seq(12, 30, by = 2)),
                          networkType = "signed", verbose = 5)
 sft.data <- sft$fitIndices
-# Pipeline hand-off: keep the OBJ_DIR copy.
-write_csv(sft.data, file.path(OBJ_DIR, "wgcna_softpower.csv"))
+# Pipeline hand-off: keep the DATA_DIR copy.
+write_csv(sft.data, file.path(DATA_DIR, "wgcna_softpower.csv"))
 
 # Figure out: soft-threshold scan — scale-free fit + mean connectivity (Mod13_C10)
 a1 <- ggplot(sft.data, aes(Power, SFT.R.sq, label = Power)) +
@@ -187,12 +185,12 @@ as.data.frame(module.trait.corr.p) |>
   rownames_to_column("module") |>
   write_csv(file.path(OUT_DIR, "Mod13_C15_module_trait_pvalues.csv"))
 
-# Pipeline hand-off: keep the OBJ_DIR copies so downstream steps pick them up unchanged.
+# Pipeline hand-off: keep the DATA_DIR copies so downstream steps pick them up unchanged.
 write_csv(as.data.frame(module.trait.corr) |> rownames_to_column("module"),
-          file.path(OBJ_DIR, "wgcna_module_trait_cor.csv"))
+          file.path(DATA_DIR, "wgcna_module_trait_cor.csv"))
 write_csv(as.data.frame(bwnet$colors) |> rownames_to_column("gene") |>
             rename(module = `bwnet$colors`),
-          file.path(OBJ_DIR, "wgcna_gene_modules.csv"))
+          file.path(DATA_DIR, "wgcna_gene_modules.csv"))
 
 # Step 7 — Hub genes within a module (kME = gene-module eigengene correlation)
 module.gene.mapping <- as.data.frame(bwnet$colors)
@@ -208,5 +206,5 @@ mm |>
   head(15) |>
   write_csv(file.path(OUT_DIR, "Mod13_C16_turquoise_hub_genes.csv"))
 
-cat("Wrote WGCNA soft-power, module assignments, and trait-correlation tables to", OBJ_DIR, "\n")
+cat("Wrote WGCNA soft-power, module assignments, and trait-correlation tables to", DATA_DIR, "\n")
 cat("Wrote Mod13 figures/tables to", OUT_DIR, "\n")

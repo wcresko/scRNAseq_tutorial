@@ -3,18 +3,18 @@
 # Standalone bonus track. Dataset: stxBrain (10x Visium adult mouse brain) via SeuratData.
 # Learning notebook: Exercise_Folder/Tutorial_16_Spatial_Transcriptomics.qmd
 # Run:  sbatch --job-name=spatial --mem=64G run_rscript.sbatch 16_spatial.R
-# Out:  ../objects/brain_spatial_integrated.rds
+# Out:  ../data/brain_spatial_integrated.rds
 # Figures/tables (match the Mod16 notebook filenames): ../output/Mod16/Mod16_C*_*
 
 suppressPackageStartupMessages({
   library(Seurat); library(SeuratData); library(tidyverse); library(patchwork)
 })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod16") # figures/tables, named to match Tutorial_16.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Load both sections (run SeuratData::InstallData("stxBrain") once first)
 ant  <- LoadData("stxBrain", type = "anterior1")
@@ -133,6 +133,6 @@ p_int_spatial <- SpatialDimPlot(brain, label = TRUE) +
     caption  = "Module 16 · Spatial Transcriptomics")
 ggsave(file.path(OUT_DIR, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial, width = 10, height = 5, dpi = 300)
 
-saveRDS(brain, file.path(OBJ_DIR, "brain_spatial_integrated.rds"))
-cat("Wrote", file.path(OBJ_DIR, "brain_spatial_integrated.rds"), "with", ncol(brain), "spots\n")
+saveRDS(brain, file.path(DATA_DIR, "brain_spatial_integrated.rds"))
+cat("Wrote", file.path(DATA_DIR, "brain_spatial_integrated.rds"), "with", ncol(brain), "spots\n")
 cat("Wrote Mod16 figures/tables to", OUT_DIR, "\n")

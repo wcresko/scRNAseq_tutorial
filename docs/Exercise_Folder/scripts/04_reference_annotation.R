@@ -2,7 +2,7 @@
 # Talapas analysis pipeline 04 — parallels laptop Tutorial 04 (Reference Annotation, Azimuth).
 # Learning notebook: Exercise_Folder/Tutorial_04_Reference_Annotation.qmd
 # Run:  sbatch --job-name=refannot run_rscript.sbatch 04_reference_annotation.R
-# In:   ../objects/ifnb_annotated.rds   Out: ../objects/ifnb_annotated_final.rds
+# In:   ../data/ifnb_annotated.rds   Out: ../data/ifnb_annotated_final.rds
 # Figures/tables (match the Mod4 notebook filenames): ../output/Mod4/Mod4_C*_*
 #
 # NOTE: RunAzimuth downloads the ~1 GB pbmcref reference on first use. On a
@@ -14,12 +14,12 @@ suppressPackageStartupMessages({
   library(tidyverse); library(patchwork)
 })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod4") # figures/tables, named to match Tutorial_04.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
-seu <- readRDS(file.path(OBJ_DIR, "ifnb_annotated.rds"))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+seu <- readRDS(file.path(DATA_DIR, "ifnb_annotated.rds"))
 DefaultAssay(seu) <- "RNA"
 
 # Figure out: starting point — manual/author annotations on the UMAP (Mod4_C1)
@@ -82,6 +82,6 @@ enframe(table(seu$celltype_final), name = "celltype_final", value = "n_cells") |
   arrange(desc(n_cells)) |>
   write_csv(file.path(OUT_DIR, "Mod4_C6_celltype_final_counts.csv"))
 
-saveRDS(seu, file.path(OBJ_DIR, "ifnb_annotated_final.rds"))
-message("Wrote ", file.path(OBJ_DIR, "ifnb_annotated_final.rds"))
+saveRDS(seu, file.path(DATA_DIR, "ifnb_annotated_final.rds"))
+message("Wrote ", file.path(DATA_DIR, "ifnb_annotated_final.rds"))
 cat("Wrote Mod4 figures/tables to", OUT_DIR, "\n")
