@@ -290,6 +290,10 @@ abline(v = 20000, lty = 2, col = "darkorange"); text(22000, 60, "ambient soup", 
 **Doublet detection runs *per sample*, not on a merged object.** Inter-sample mixtures are not doublets — they're integration noise, and pretending they are will silently drop real cells.
 :::
 
+::: callout-note
+**Seurat v5 note.** After `merge()` in Seurat v5, the RNA assay stores *split layers* (`counts.CTRL`, `counts.STIM`, …). Run `JoinLayers()` after merging the per-sample objects so that downstream steps (`FindMarkers`, normalization) see a single layer. The tutorial does this automatically after the doublet-detection merge.
+:::
+
 ## What a doublet-score distribution looks like
 
 ```{r}
@@ -493,7 +497,30 @@ ggplot(genes, aes(mean, variance)) +
 -   HVGs give you the gene-space PCA will operate on
 :::
 
+## The `ifnb` dataset — what you'll see
+
+The workshop dataset (`muscData::Kang18_8vs8()`) starts at **\~24,500 annotated singlets** across CTRL and STIM. After the QC filters in Tutorial 01 (`nFeature_RNA > 200 & < 2500`, `percent.mt < 5`, `scDblFinder.class == "singlet"`) you should retain **\~23,000 cells**.
+
+| Stage | Cells |
+|---|---|
+| Loaded (`Kang18_8vs8`, annotated singlets) | \~24,500 |
+| After `subset()` QC filter | \~23,000 |
+| After `NormalizeData` (no cell loss) | \~23,000 |
+
+::: callout-tip
+**Doublet detection in this tutorial runs *per sample* (CTRL then STIM separately)** with `scDblFinder`. The two per-sample objects are then merged back with `merge()` and `JoinLayers()` before the final filter. Running doublet detection on the merged object would treat cross-sample cell pairs as doublets — they are not.
+:::
+
+## Design consideration — `percent.rb` and when to use it
+
+Tutorial 01 also computes `percent.rb` (ribosomal-protein fraction). It is **not** a standard QC filter; rather:
+
+-   A very high `percent.rb` (\>50%) in a cluster often signals a *metabolically active* or *activated* state, not a low-quality cell.
+-   Monitor it per sample: if one sample has dramatically higher `percent.rb`, check whether library prep differed.
+-   Do **not** filter on `percent.rb` by default — just note it.
+
 ## Coming up next
 
 -   **Lec 02** — [Dim reduction, integration, clustering](Lecture_02_DimReduction_Clustering.html)
 -   **Hands-on:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
+-   **Companion book chapter:** [Chapter 1 — Preprocessing](../Resources_Folder/Chapter_01_Preprocessing.html)

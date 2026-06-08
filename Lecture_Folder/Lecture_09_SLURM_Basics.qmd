@@ -248,12 +248,50 @@ sacct -j 123456 --format=JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode
 -   **Back up anything you care about** — RACS does not back up Talapas.
 :::
 
+## `SLURM_ACCOUNT` — set it once
+
+``` bash
+echo 'export SLURM_ACCOUNT=<myPIRG>'  >> ~/.bash_profile
+echo 'export SBATCH_ACCOUNT=<myPIRG>' >> ~/.bash_profile
+source ~/.bash_profile
+```
+
+::: incremental
+-   Once set, you can omit `--account=` from every command
+-   Your PIRG name appears in the output of `groups` after you log in
+:::
+
 ## What's next — Module 10
 
 ::: incremental
 -   You can now request resources and submit jobs — the *mechanics*.
 -   **Module 10** uses these to run the **real scRNA-seq pipeline** on Talapas: the numbered `01`–`08` scripts, chained through `.rds` hand-offs.
 -   Read the [companion chapter](../Resources_Folder/Chapter_09_SLURM_Basics.html) for the conceptual deep-dive on schedulers and fair-share.
+:::
+
+## Monitoring a running job
+
+``` bash
+# Live log tail (follow output as it writes)
+tail -f logs/seurat_qc_*.out
+
+# Friendly resource summary after completion
+seff 123456
+```
+
+::: incremental
+-   `tail -f` lets you watch progress without opening an interactive session
+-   After each step confirms `State: COMPLETED` (not `OUT_OF_MEMORY`/`TIMEOUT`), move to the next
+-   A job killed mid-write leaves a **corrupt `.rds`** — always confirm before chaining
+:::
+
+## Design considerations
+
+::: incremental
+-   **Interactive vs batch**: prototype interactively; always use batch for anything you'll run to completion or repeat.
+-   **Right-size honestly**: over-requesting delays your job and hurts others; under-requesting kills the job. Run once high, trim with `seff`.
+-   **`set -euo pipefail`** at the top of every batch script — exits immediately on any command failure, preventing silent partial runs.
+-   **`/scratch` is not backed up** and purges after 90 days — keep only intermediates there; archive results to `/projects`.
 :::
 
 ## Key takeaways
