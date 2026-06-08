@@ -2,19 +2,19 @@
 # Talapas analysis pipeline 05 — parallels laptop Tutorial 05 (Integration, Harmony).
 # Learning notebook: Exercise_Folder/Tutorial_05_Integration.qmd
 # Run:  sbatch --job-name=integrate run_rscript.sbatch 05_integration.R
-# In:   ../objects/ifnb_annotated_final.rds
-# Out:  ../objects/ifnb_integrated.rds  +  ../output/Mod5 figures/tables (match Tutorial_05.qmd)
+# In:   ../data/ifnb_annotated_final.rds
+# Out:  ../data/ifnb_integrated.rds  +  ../output/Mod5 figures/tables (match Tutorial_05.qmd)
 
 suppressPackageStartupMessages({ library(Seurat); library(harmony); library(tidyverse); library(patchwork) })
 set.seed(2026)
-OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
+DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod5") # figures/tables, named to match Tutorial_05.qmd
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 # Prefer the reference-reconciled object from step 04; fall back to step 03.
-in_file <- file.path(OBJ_DIR, "ifnb_annotated_final.rds")
-if (!file.exists(in_file)) in_file <- file.path(OBJ_DIR, "ifnb_annotated.rds")
+in_file <- file.path(DATA_DIR, "ifnb_annotated_final.rds")
+if (!file.exists(in_file)) in_file <- file.path(DATA_DIR, "ifnb_annotated.rds")
 seu <- readRDS(in_file)
 DefaultAssay(seu) <- "RNA"
 
@@ -34,8 +34,8 @@ seu <- FindClusters(seu, resolution = 0.5, verbose = FALSE)
 seu <- RunUMAP(seu, reduction = "harmony", dims = 1:30,
                reduction.name = "umap_harmony", verbose = FALSE)
 
-saveRDS(seu, file.path(OBJ_DIR, "ifnb_integrated.rds"))
-cat("Wrote", file.path(OBJ_DIR, "ifnb_integrated.rds"), "\n")
+saveRDS(seu, file.path(DATA_DIR, "ifnb_integrated.rds"))
+cat("Wrote", file.path(DATA_DIR, "ifnb_integrated.rds"), "\n")
 
 # ===========================================================================
 # Mod5 figures/tables — reuse the Tutorial_05.qmd filenames.

@@ -11,7 +11,7 @@
 #   2. LIBRARY     — flag scripts that call ggplot2/dplyr/readr/patchwork/...
 #                    functions without loading the package that provides them
 #                    ("could not find function" at runtime).
-#   3. HAND-OFFS   — every readRDS()/read_csv() of an OBJ_DIR/ data file must be
+#   3. HAND-OFFS   — every readRDS()/read_csv() of a DATA_DIR/ data file must be
 #                    produced by an earlier pipeline script's saveRDS/write_csv
 #                    ("cannot open the connection" at runtime).
 #

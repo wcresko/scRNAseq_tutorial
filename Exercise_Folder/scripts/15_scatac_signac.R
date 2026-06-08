@@ -3,7 +3,7 @@
 # Standalone bonus track. Dataset: PBMC 10k scATAC-seq v1 (hg19) in ../data/.
 # Learning notebook: Exercise_Folder/Tutorial_15_scATACseq_Signac.qmd
 # Run:  sbatch --job-name=atac --mem=64G run_rscript.sbatch 15_scatac_signac.R
-# Out:  ../objects/pbmc_atac_clustered.rds, ../output/Mod15/
+# Out:  ../data/pbmc_atac_clustered.rds, ../output/Mod15/
 # Figures/tables (match the Mod15 notebook filenames): ../output/Mod15/Mod15_C*_*
 
 suppressPackageStartupMessages({
@@ -12,12 +12,10 @@ suppressPackageStartupMessages({
 })
 set.seed(2026)
 DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
-OBJ_DIR  <- Sys.getenv("OBJ_DIR",  "../objects")
 OUT_DIR  <- Sys.getenv("OUT_DIR",  "../output/Mod15") # figures/tables, named to match Tutorial_15.qmd
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)  # input datasets land here
-dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
-message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Peek at the raw fragment file
 frag.file <- read.delim(file.path(DATA_DIR, "atac_v1_pbmc_10k_fragments.tsv.gz"),
@@ -115,6 +113,6 @@ p_umap <- DimPlot(pbmc, label = TRUE) +
 ggsave(file.path(OUT_DIR, "Mod15_C9_umap_clusters.png"), p_umap,
        width = 7, height = 6, dpi = 300)
 
-saveRDS(pbmc, file.path(OBJ_DIR, "pbmc_atac_clustered.rds"))
-cat("Wrote", file.path(OBJ_DIR, "pbmc_atac_clustered.rds"), "with", ncol(pbmc), "cells\n")
+saveRDS(pbmc, file.path(DATA_DIR, "pbmc_atac_clustered.rds"))
+cat("Wrote", file.path(DATA_DIR, "pbmc_atac_clustered.rds"), "with", ncol(pbmc), "cells\n")
 cat("Wrote Mod15 figures/tables to", OUT_DIR, "\n")
