@@ -68,7 +68,7 @@ run_de <- function(ct) {
   if (sum(k) < 4 || length(unique(meta_pb$condition[k])) < 2) return(NULL)
   cd <- as.data.frame(meta_pb[k, ])
   cd$condition <- factor(cd$condition, levels = c("CTRL", "STIM"))
-  dds <- DESeqDataSetFromMatrix(countData = pb[, k], colData = cd, design = ~ condition)
+  dds <- DESeqDataSetFromMatrix(countData = round(pb[, k]), colData = cd, design = ~ condition)
   dds <- DESeq(dds, quiet = TRUE)
   res <- lfcShrink(dds, coef = "condition_STIM_vs_CTRL", type = "apeglm")
   as.data.frame(res) |> rownames_to_column("gene") |> mutate(celltype = ct)
@@ -104,7 +104,10 @@ de_top <- de_all |>
 write_csv(de_top, file.path(OUT_DIR, "Mod6_C19_pseudobulk_de_top.csv"))
 
 # --- Figure: per-cell-type pseudobulk volcano plots (Mod6_C20) -------------
-plot_types <- intersect(c("CD14 Mono", "CD4 Naive T", "B"), unique(de_all$celltype))
+# Data-driven: 3 cell types with the most significant genes (robust to labels).
+plot_types <- de_all |> dplyr::filter(padj < 0.05) |>
+  dplyr::count(celltype, sort = TRUE) |> head(3) |> dplyr::pull(celltype)
+if (length(plot_types) == 0) plot_types <- head(unique(de_all$celltype), 3)
 p_volcano <- de_all |>
   filter(celltype %in% plot_types) |>
   ggplot(aes(log2FoldChange, -log10(padj))) +
