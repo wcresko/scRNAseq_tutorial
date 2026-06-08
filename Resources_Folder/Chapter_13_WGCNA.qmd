@@ -41,6 +41,21 @@ Three pre-processing steps precede network building and each has a non-obvious c
 
 Note that WGCNA expects the expression matrix as **samples × genes** (rows = samples, columns = genes) — the transpose of the standard RNA-seq convention of genes × samples. This is the most common orientation error and the tutorial transposes explicitly before passing to `pickSoftThreshold`.
 
+The three pre-processing steps and the four network-construction/downstream steps are summarized in @tbl-ch13-workflow.
+
+| Step | Function / action | Key choice | Common pitfall |
+|---|---|---|---|
+| 1. Outlier removal | `goodSamplesGenes()` + hierarchical clustering | Remove outlier samples visually | Outliers bias VST downstream |
+| 2. VST normalization | `DESeq2::vst(design = ~ 1)` | Intercept-only design | Encoding the trait in design = circular correlation |
+| 3. Gene filtering | `rowSums(counts >= 15) >= 0.75 × N` | Retain genes with reliable counts | Too many low-count genes inflate TOM memory |
+| 4. Soft-threshold power | `pickSoftThreshold()` | Smallest $\beta$ with $R^2 > 0.8$ | Forcing $\beta$ when $R^2$ never reaches 0.8 |
+| 5. Network construction | `blockwiseModules()` | `maxBlockSize`; `minModuleSize` | Memory overflow without block-wise mode |
+| 6. Module eigengenes | `moduleEigengenes()` | None; deterministic | Wrong orientation (samples × genes required) |
+| 7. Module–trait correlation | `cor()` + `corPvalueStudent()` | Pearson; N ≥ 10 | `WGCNA::cor()` shadows `base::cor()` globally |
+| 8. Hub genes | kME or `intramodularConnectivity()` | kME preferred for interpretability | TF analysis not shown; cross-reference to Chapter 7 |
+
+: The eight-step WGCNA workflow: pre-processing through hub-gene identification. Each step lists the primary R call, the key user choice, and the most common pitfall. {#tbl-ch13-workflow}
+
 ## 13.2 The network construction
 
 Three steps build the gene co-expression network:
@@ -136,6 +151,16 @@ Two practical strategies:
 2. **`hdWGCNA`** [@morabito2023hdwgcna] — a single-cell-aware reimplementation that uses metacells (groups of \~10-20 cells aggregated by cluster) as the unit and adapts the network construction for sparsity. Modern, recommended for scRNA-seq specifically.
 :::
 
+@tbl-ch13-methods compares the three approaches to co-expression network analysis across key practical dimensions.
+
+| Approach | Input unit | Memory demand | Min recommended N | scRNA-seq sparsity handled? | R package |
+|---|---|---|---|---|---|
+| Classic WGCNA [@zhang2005general; @langfelder2008wgcna] | Bulk sample | Moderate (TOM ∝ genes²) | ~15 samples | No — use pseudobulk first | `WGCNA` |
+| Pseudobulk WGCNA | Sample × cell-type pseudobulk | Same as bulk | ~8 samples per cell type | Partially (aggregation reduces zeros) | `WGCNA` |
+| hdWGCNA [@morabito2023hdwgcna] | Metacells (~10–20 cells each) | Lower per-cell-type | ~5 donors | Yes — designed for single-cell data | `hdWGCNA` |
+
+: Comparison of co-expression network approaches for bulk and single-cell RNA-seq data. Classic WGCNA is the foundational method; hdWGCNA is the modern single-cell adaptation. {#tbl-ch13-methods}
+
 [Lecture 13](../Lecture_Folder/Lecture_13_WGCNA.html) and the associated [tutorial](../Exercise_Folder/Tutorial_13_WGCNA.html) use the **bulk** workflow on the GSE152418 COVID-19 PBMC bulk RNA-seq dataset, since classic WGCNA on bulk is the foundational technique. For sc-specific WGCNA, see hdWGCNA.
 
 ## 13.7 Reading module-trait correlation heatmaps
@@ -176,6 +201,8 @@ For downstream functional analysis, export the module gene list and run [Chapter
 
 ## 13.9 Common errors
 
+@tbl-ch13-errors collects the errors most frequently encountered in the WGCNA workflow, their causes, and the fix.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | WGCNA's `expr` matrix has wrong orientation | WGCNA expects samples in **rows**, genes in **columns** (opposite of most RNA-seq workflows) | Transpose before calling WGCNA functions |
@@ -183,6 +210,8 @@ For downstream functional analysis, export the module gene list and run [Chapter
 | `blockwiseModules` runs out of memory | TOM matrix doesn't fit | Set `maxBlockSize = 5000`; accept the loss in cross-block module assignments |
 | All genes end up in the grey module | `minModuleSize` too high or no real co-expression structure | Lower `minModuleSize` to 20; investigate whether the data has clear biology |
 | Module-trait correlations all p > 0.05 | Too few samples (N < 10) for the test to have power | Need bigger N; WGCNA's downstream tests are not magic |
+
+: Common WGCNA errors, their underlying causes, and fixes. {#tbl-ch13-errors}
 
 ## 13.10 Where this material is also discussed
 

@@ -34,7 +34,7 @@ Best practice: **run both, reconcile disagreements, document choices.** Disagree
 
 ## 3.2 Finding markers — the statistical core
 
-`FindAllMarkers(seu)` runs, for each cluster $c$, a Wilcoxon rank-sum test comparing the gene's expression in cluster $c$ vs all other clusters combined. The output is a per-cluster ranked gene list with:
+`FindAllMarkers(seu)` runs, for each cluster $c$, a Wilcoxon rank-sum test comparing the gene's expression in cluster $c$ vs all other clusters combined. The output is a per-cluster ranked gene list. @tbl-ch03-findmarkers describes each output column and how to read it.
 
 | Column | Meaning |
 |---|---|
@@ -45,6 +45,8 @@ Best practice: **run both, reconcile disagreements, document choices.** Disagree
 | `pct.2` | fraction of cells in *other* clusters expressing the gene |
 | `p_val` | raw Wilcoxon p-value |
 | `p_val_adj` | Bonferroni-adjusted (Seurat's choice) |
+
+: Columns returned by `FindAllMarkers` and `FindConservedMarkers`. A "good" marker has high `pct.1`, low `pct.2`, and high `avg_log2FC`; ranking by `avg_log2FC` (or the derived score `pct.1 - pct.2`) gives a practical top-N list per cluster. {#tbl-ch03-findmarkers}
 
 A "good" marker has high `pct.1`, low `pct.2`, and high `avg_log2FC`. The ranking by `avg_log2FC` (or a score like `pct.1 - pct.2`) gets you a top-N list per cluster.
 
@@ -72,7 +74,17 @@ Use `FindConservedMarkers` whenever you have a non-trivial perturbation in your 
 
 ## 3.4 The five marker visualizations
 
-[Tutorial 03 §3](../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers) walks five canonical plot types. Each is best for a different question.
+[Tutorial 03 §3](../Exercise_Folder/Tutorial_03_Markers_Annotation.html#step-3-visualizing-markers) walks five canonical plot types. Each answers a different diagnostic question; choosing the right one speeds interpretation and produces clearer figures. @tbl-ch03-viztools summarizes the five, then the subsections explain when each pays off.
+
+| Function | Best question to ask | Strength | Caveat |
+|---|---|---|---|
+| `VlnPlot` | Is this gene on/off in exactly one cluster? | Shows full distribution; reveals bimodality | One gene per panel; clutters above 8 genes |
+| `FeaturePlot` | Where on the UMAP does this gene concentrate? | Reveals spatial/topological structure | Overplotting in dense regions; use `order = TRUE` |
+| `DotPlot` | Which markers define which clusters, at a glance? | Many genes × clusters in one compact figure | Hides bimodality; means can mask high-expressing minorities |
+| `DoHeatmap` | Does the global cluster ↔ marker block structure look right? | Shows whole-dataset diagonal block pattern | Dominant clusters monopolize space; noisy at high cell counts |
+| `RidgePlot` | Is this a graded / continuum marker? | Density curves capture soft boundaries | Less compact than VlnPlot; best for 3–8 clusters |
+
+: The five Seurat marker visualization functions, their primary diagnostic use case, and their main limitation. `DotPlot` is the most widely used in publications; `VlnPlot` is best at the single-gene investigation stage. {#tbl-ch03-viztools}
 
 ### 3.4.1 VlnPlot — distribution per cluster, one gene at a time
 
@@ -114,7 +126,7 @@ The practical workflow:
 4. **Assign labels** with `RenameIdents`, store in `seu$celltype_manual`
 5. **Document** *why* you assigned each label — write a sentence per cluster in your lab notebook (a future reviewer or future-you will thank you)
 
-For the workshop's `ifnb` PBMCs, the canonical panel is small and highly stereotyped (see also §3.5 above for how the unintegrated embedding changes how many clusters you will label):
+For the workshop's `ifnb` PBMCs, the canonical panel is small and highly stereotyped (see also §3.5 above for how the unintegrated embedding changes how many clusters you will label). @tbl-ch03-pbmc-markers lists the ten major PBMC populations and their most reliable lineage markers.
 
 | Cell type | Canonical markers |
 |---|---|
@@ -128,6 +140,8 @@ For the workshop's `ifnb` PBMCs, the canonical panel is small and highly stereot
 | NK | `GNLY`, `NKG7`, `KLRD1` |
 | B | `MS4A1`, `CD79A`, `CD79B` |
 | Megakaryocyte | `PPBP`, `PF4` |
+
+: Canonical lineage markers for the ten major PBMC populations in the workshop `ifnb` dataset. Markers are chosen for high `pct.1` / low `pct.2` on healthy donor PBMCs; expression patterns shift with activation state and may require `FindConservedMarkers` on multi-condition data. {#tbl-ch03-pbmc-markers}
 
 These panels are not folklore — they are curated in searchable databases such as **PanglaoDB** [@franzen2019panglaodb] and **CellMarker 2.0** [@hu2023cellmarker2], which compile cell-type markers from thousands of single-cell studies. For tumor / non-immune tissues, the panel is much larger and more disputed; consult tissue-specific atlases.
 
@@ -149,12 +163,15 @@ After integration (Chapter 5), re-cluster and re-annotate; the same cross-tab sh
 
 ## 3.8 Risks and how to avoid them
 
-::: incremental
-- **Single-marker labels.** A cluster top-marked by `CD3D` is "T cell" — but is it CD4 or CD8? Naive or memory? Activated or resting? Always label from **combinations**: marker presence *plus* absence of competing markers.
-- **Marker leakage from ambient RNA.** If you skipped SoupX (Chapter 1) and your suspension was complex, low-level marker expression in the wrong cluster may be ambient bleed, not real expression. Symptom: every cluster shows low non-zero `HBB`. Fix: re-run with SoupX.
-- **Treatment-state mistaken for cell type.** ISGs (interferon-stimulated genes) lighting up half a dataset usually means a stimulation, not a new cell type. Use `FindConservedMarkers` (§3.3).
-- **Doublet-driven "intermediate" types.** A "T-myeloid intermediate" cluster expressing both `CD3D` and `CD14` is almost always doublets. Verify with `scDblFinder` per-cluster doublet fraction; if elevated, drop the cluster.
-:::
+Four annotation mistakes account for the majority of published errors in single-cell cell-type assignments.
+
+**Single-marker labels** are the most common. A cluster top-marked by `CD3D` is "T cell" — but is it CD4 or CD8? Naive or memory? Activated or resting? Always label from **combinations**: marker presence *plus* absence of competing markers. The `DotPlot` format is ideally suited to this because it places the confirmatory and exclusionary markers side-by-side across all clusters simultaneously.
+
+**Marker leakage from ambient RNA** can mislead annotation when the cell suspension was complex or had high cell death. If you skipped SoupX (Chapter 1), low-level marker expression in the wrong cluster may reflect ambient bleed rather than genuine expression. The classic symptom is every cluster showing low non-zero `HBB` — hemoglobin is a dominant ambient contaminant in whole-blood or bone-marrow samples. The fix is to re-run from Chapter 1 with SoupX applied.
+
+**Treatment state mistaken for cell type** is a recurrent trap in perturbation studies. Interferon-stimulated genes (`ISG15`, `IFI6`, `IFIT1`, `MX1`) lighting up half a dataset usually reflects a stimulation condition, not a new cell type. Use `FindConservedMarkers` (§3.3) to see whether the lineage markers underneath the ISG signal are consistent with known types.
+
+**Doublet-driven "intermediate" types** appear when two highly distinct cell populations (e.g. T and myeloid cells) end up doublet-enriched in the same cluster. A "T-myeloid intermediate" expressing both `CD3D` and `CD14` is almost always a doublet artifact. Verify by inspecting the `scDblFinder.class` distribution per cluster — a cluster where >15–20% of cells were called doublets by `scDblFinder` should be discarded, not annotated.
 
 ## 3.9 The relationship to the Cell Ontology
 
@@ -168,6 +185,8 @@ The mapping from Seurat label to CL ID is a manual step. The [Ontology Lookup Se
 
 ## 3.10 Common errors
 
+@tbl-ch03-errors lists the most common mistakes at the marker-detection and annotation stage, their root causes, and the fixes.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `FindAllMarkers` is very slow | Wilcoxon implementation is the bottleneck | `install.packages("presto")` — Seurat detects it automatically |
@@ -175,6 +194,8 @@ The mapping from Seurat label to CL ID is a manual step. The [Ontology Lookup Se
 | Marker dot plot has gaps where canonical markers should be | Your dataset lacks that cell type, or you're using the wrong assay | Check `DefaultAssay(seu)` is `"RNA"` for marker tests, not `"integrated"` |
 | `RenameIdents` errors | Argument order or factor levels mismatch | Build the named vector explicitly: `c("0" = "B", "1" = "CD14 Mono", ...)` |
 | Manual labels on the unintegrated object don't match labels on the integrated object | Cluster numbers differ between integrations | Re-annotate after integration; Cluster *numbers* are not stable across re-clusterings, only per-cell labels are |
+
+: Common errors encountered during marker detection and manual annotation. The most consequential is using the `"integrated"` assay for `FindAllMarkers` — always reset `DefaultAssay(seu) <- "RNA"` before running marker tests. {#tbl-ch03-errors}
 
 ## 3.11 Where this material is also discussed
 

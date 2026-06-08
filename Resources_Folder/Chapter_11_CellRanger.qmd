@@ -90,7 +90,7 @@ Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a
 
 Every `count` run writes a `web_summary.html`. It is the single most informative QC document in the entire pipeline, and it should be the *first* thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in `metrics_summary.csv` for programmatic use. Save the `web_summary.html` alongside your raw data, because reviewers and collaborators will ask for it. To inspect it on Talapas without downloading, use VS Code's "Remote - SSH" extension and simply double-click the `.html` file in the explorer panel, or `scp` the file to your laptop.
 
-A short list of the numbers that most often reveal a problem:
+A short list of the numbers that most often reveal a problem is given in @tbl-ch11-websummary.
 
 | Metric | What it tells you | Worry threshold |
 |---|---|---|
@@ -101,11 +101,26 @@ A short list of the numbers that most often reveal a problem:
 | Q30 bases in RNA read | cDNA sequencing quality | < 70% |
 | Reads mapped confidently to transcriptome | Reference correctness | < 60% → wrong reference / contamination |
 
+: Key metrics from `web_summary.html` (also available as `metrics_summary.csv`). None of these is a hard pass/fail — they are prompts to investigate. A low "median genes per cell" in a sample of small resting lymphocytes may be biology rather than failure; read the numbers together and against your expectations for the tissue. {#tbl-ch11-websummary}
+
 None of these is a hard pass/fail; they are prompts. A low "median genes per cell" in a sample of small resting lymphocytes may be biology, not failure. The skill is reading the numbers together and against your expectations for the tissue.
 
 ## 11.8 The hand-off to the core pipeline
 
-When `count` finishes, the directory that matters for everything downstream is one subfolder of `outs/`:
+When `count` finishes, the output lives under the `outs/` subdirectory of the run folder. @tbl-ch11-outputs describes the files most relevant to downstream analysis.
+
+| File / folder | Contents | When you need it |
+|---|---|---|
+| `filtered_feature_bc_matrix/` | Sparse counts matrix (3 files: `barcodes.tsv.gz`, `features.tsv.gz`, `matrix.mtx.gz`) | Always — the primary input to the core pipeline |
+| `raw_feature_bc_matrix/` | Same format but all barcodes including empty droplets | SoupX ambient-RNA correction; DropletUtils re-calling |
+| `web_summary.html` | Interactive QC report — mapping, cell calling, barcode-rank plot | Open first, before any R |
+| `metrics_summary.csv` | Same numbers as `web_summary.html` in machine-readable form | Automated QC pipelines; batch reporting |
+| `molecule_info.h5` | Per-molecule barcode/UMI/gene record | Aggregation (`cellranger aggr`); advanced QC |
+| `possorted_genome_bam.bam` + `.bai` | Position-sorted aligned BAM | Re-alignment, splice-junction analysis, allele-specific methods; only written with `--create-bam=true` |
+
+: Key output files from `cellranger count`. Only `filtered_feature_bc_matrix/` and `web_summary.html` are needed for a standard scRNA-seq analysis; the BAM is optional and large (10–30 GB per sample). Keep `raw_feature_bc_matrix/` if you plan to run SoupX or re-call cells with EmptyDrops. {#tbl-ch11-outputs}
+
+The directory that matters for everything downstream is one subfolder of `outs/`:
 
 ```bash
 outs/filtered_feature_bc_matrix/
@@ -145,7 +160,18 @@ A few recurring pitfalls are worth internalizing:
 
 ## 11.10 Alternatives to Cell Ranger
 
-Cell Ranger is the official 10x pipeline, but it is not the only way to turn FASTQs into a counts matrix, and the open-source alternatives are often faster and more flexible. **STARsolo** [@kaminow2021starsolo] reproduces Cell Ranger's logic inside the STAR aligner [@dobin2013star] and is largely concordant with it; **alevin-fry / salmon** [@srivastava2019alevin] and **kallisto | bustools (kb-python)** [@melsted2021kallistobustools] use lightweight (pseudo)alignment for constant-memory, very fast quantification. All three accept custom references easily, which matters for non-model organisms where no 10x reference exists. They differ mainly in how they handle multimapping reads, intronic counts, and EmptyDrops-style cell calling, so a sample quantified two ways will agree on most genes but not every count — worth knowing when you compare results across pipelines.
+Cell Ranger is the official 10x pipeline, but it is not the only way to turn FASTQs into a counts matrix, and the open-source alternatives are often faster and more flexible. @tbl-ch11-alternatives compares the three main options.
+
+| Tool | Approach | Speed vs Cell Ranger | Custom reference | Key use cases |
+|---|---|---|---|---|
+| Cell Ranger | STAR alignment + UMI deduplication + EmptyDrops cell calling | Baseline | `cellranger mkref` from FASTA + GTF | Official 10x support; full-featured web summary; required for many 10x-specific chemistries |
+| STARsolo [@kaminow2021starsolo] | Same STAR aligner, Cell Ranger–compatible logic | Similar | Standard STAR genome index | Drop-in replacement for Cell Ranger counts; open-source; easier cluster deployment |
+| alevin-fry / salmon [@srivastava2019alevin] | Selective alignment (quasimapping) | ~3–5× faster | Decoy-aware salmon index | Very fast; low memory; well-suited for high-throughput runs |
+| kallisto \| bustools (kb-python) [@melsted2021kallistobustools] | Pseudoalignment | ~5–10× faster | `kb ref` from genome/GTF | Rapid exploration; constant memory footprint; active Python ecosystem |
+
+: Open-source alternatives to Cell Ranger for FASTQs-to-counts. All three are concordant with Cell Ranger on well-mapped genes but differ in multimapping handling, intronic count logic, and cell calling. A sample quantified by two tools will agree on most genes but not every count — verify with a spot-check if you switch tools mid-project. {#tbl-ch11-alternatives}
+
+All three accept custom references easily, which matters for non-model organisms where no 10x reference exists.
 
 ## 11.11 See also
 

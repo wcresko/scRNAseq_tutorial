@@ -31,11 +31,21 @@ Cell-type labeling has two methodological camps:
 
 Best practice is to run **both** and **reconcile disagreements** — they catch different kinds of errors. Manual annotation catches references missing your cell type; reference-based annotation catches missed subdivisions and reduces annotator bias. Automated annotation is now a crowded field — large comparisons evaluate 20–30+ classifiers and find that the best correlation- and classifier-based methods are accurate when the reference matches the query, but degrade sharply on cell types absent from the reference [@abdelaal2019comparison; @pasquini2021automated].
 
-The workshop tutorial uses **Azimuth** as its reference-based method: it ships curated, atlas-quality references (including a PBMC reference that is a perfect fit for `ifnb`), downloads them on demand, and needs no separate Bioconductor reference-data packages. §4.4 sketches the two other paradigms — correlation (SingleR) and classifier (CellTypist) — you'll meet in the literature.
+The workshop tutorial uses **Azimuth** as its reference-based method: it ships curated, atlas-quality references (including a PBMC reference that is a perfect fit for `ifnb`), downloads them on demand, and needs no separate Bioconductor reference-data packages. @tbl-ch04-methods summarizes the three paradigms side by side; §4.4 walks SingleR and CellTypist further.
+
+| Method | Approach | Reference needed | Confidence metric | Best for |
+|---|---|---|---|---|
+| **Azimuth** | Anchor-based mapping (CCA + MNN) into a precomputed reference manifold | Pre-built atlas references (single-cell) | `mapping.score` per cell | PBMC, brain, lung, fetal: tissues with curated Seurat refs |
+| **SingleR** | Per-cell Spearman correlation against per-label reference profiles | Bulk or single-cell; `celldex` library | `delta` (top score − median); prune with `pruneScores()` | When only a bulk reference exists; Bioconductor-native workflows |
+| **CellTypist** | Logistic-regression classifier trained on atlas data | Pre-trained models (Python package) | Per-label probability (multi-label aware) | Python / Scanpy workflows; multi-label / ambiguous cells |
+
+: The three main reference-based annotation paradigms. All three degrade when the reference does not cover the query tissue — inspect the confidence metric and filter low-confidence cells rather than trusting every label [@abdelaal2019comparison; @pasquini2021automated]. {#tbl-ch04-methods}
+
+§4.4 sketches SingleR and CellTypist further.
 
 ## 4.2 Azimuth — anchor-based reference mapping
 
-Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same method as Seurat integration, applied with a query → reference orientation). Pre-built atlas-quality references are available:
+Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same method as Seurat integration, applied with a query → reference orientation). The key design advantage is that the reference UMAP and cell labels are precomputed once from a large atlas dataset; at query time, your cells are projected *into* that manifold rather than re-computing everything jointly. Pre-built atlas-quality references are available:
 
 | Reference | Tissue | Source |
 |---|---|---|
@@ -44,6 +54,8 @@ Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same metho
 | `fetusref` | human fetal | HCA Fetal Atlas |
 | `lungref` | adult lung | HCA Lung Cell Atlas |
 | (more) | various | atlas consortia |
+
+: Available Azimuth pre-built references as of 2025. Matching tissue type is mandatory — a PBMC reference applied to tumor or gut data will label every cell but with low `mapping.score` and high error rates. {#tbl-ch04-aziref}
 
 For each query cell, Azimuth:
 
@@ -71,7 +83,15 @@ Weaknesses:
 
 ## 4.3 Reading Azimuth's mapping score
 
-`mapping.score` reflects how well the cell's local neighborhood projects into the reference's manifold. Bimodal distributions are common: one peak is in-reference cells (mapping score 0.7–1.0), the other is out-of-reference cells (0.0–0.4).
+`mapping.score` is the primary quality filter for Azimuth output; it reflects how well the cell's local neighborhood projects into the reference's manifold. @tbl-ch04-mapscore gives practical interpretation ranges. Bimodal distributions are common: one peak represents in-reference cells (mapping score 0.7–1.0), the other out-of-reference cells (0.0–0.4).
+
+| Score range | Interpretation | Recommended action |
+|---|---|---|
+| 0.7 – 1.0 | Cell maps confidently into the reference manifold | Trust the label |
+| 0.4 – 0.7 | Borderline — cell is near but not firmly inside the reference | Inspect manually; cross-check against manual marker annotation |
+| 0.0 – 0.4 | Cell does not project into the reference | Label is unreliable; likely a cell type absent from the reference |
+
+: Practical interpretation of Azimuth `mapping.score`. On a well-matched reference (e.g. `pbmcref` applied to a healthy-donor PBMC dataset), the vast majority of cells should score above 0.7; a large low-scoring fraction indicates a reference mismatch. {#tbl-ch04-mapscore}
 
 For cells with low mapping score:
 
@@ -147,12 +167,17 @@ This is required for CELLxGENE submission [@czi2025cellxgene] (see [Tutorial 17]
 
 ## 4.7 Common errors
 
+@tbl-ch04-errors collects the most frequent problems encountered with reference-based annotation tools, their root causes, and the fixes.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `RunAzimuth` errors during reference download | Partial cache or no internet | Delete `~/.cache/Azimuth/`, confirm connectivity, retry |
-| Mapping scores are uniformly low | Wrong reference for your tissue | Match tissue; consider an atlas like Tabula Sapiens |
+| Mapping scores are uniformly low | Wrong reference for your tissue | Match tissue; consider an atlas like Tabula Sapiens [@tabulasapiens2022] |
 | All cells get a coarse label | Using `predicted.celltype.l1` | Use `predicted.celltype.l2` / `l3` for finer resolution |
 | Manual and Azimuth disagree on T-cell subsets | Normal — T-cell subdivision is genuinely hard | Inspect markers; document; sometimes both are partly right |
+| Every cell is labeled even with low mapping score | No confidence filter applied | Filter with `mapping.score > 0.7` before accepting labels |
+
+: Common errors in reference-based annotation and their fixes. The most important habit is checking `mapping.score` before using any labels — automated methods always produce a label, regardless of whether the cell type is represented in the reference. {#tbl-ch04-errors}
 
 ## 4.8 Where this material is also discussed
 

@@ -29,6 +29,16 @@ Pseudobulk differential expression for scRNA-seq (Part B of this chapter) is exa
 
 This is the most heavily used statistical model in functional genomics [@love2014deseq2]. Its closest relatives — edgeR [@robinson2010edger] and limma-voom [@law2014voom; @ritchie2015limma] — share the same negative-binomial-or-linear-model framing and routinely agree; benchmarks of bulk DE methods find that with adequate replication these established tools all perform well, and that **adding biological replicates buys far more than adding sequencing depth** [@rapaport2013comprehensive]. Earning a working understanding of this model is worth several lectures.
 
+@tbl-ch06-methods compares the three standard tools so you can navigate the literature and justify your choice.
+
+| Method | Statistical model | Dispersion handling | LFC shrinkage | Pseudobulk support | Workshop use |
+|---|---|---|---|---|---|
+| **DESeq2** [@love2014deseq2] | Negative-binomial GLM | Per-gene shrinkage toward a parametric trend | `apeglm` / `ashr` / `normal` priors | Yes — standard approach | Primary tool (this chapter) |
+| **edgeR** [@robinson2010edger] | Negative-binomial GLM (quasi-likelihood variant available) | Empirical Bayes across genes (common, trended, or tagwise) | Not built in; use `limma::treat` for threshold tests | Yes | Alternative; see §6.21 |
+| **limma-voom** [@law2014voom; @ritchie2015limma] | Linear model on variance-stabilized counts | Mean-variance weights via `voom`; eBayes shrinkage | Moderated t-statistics; `treat` for threshold | Yes | Alternative for large cohorts |
+
+: Comparison of the three standard bulk DE frameworks. All three perform similarly on well-powered experiments [@rapaport2013comprehensive]; the choice matters most at low replication ($n < 4$ per group), where DESeq2's stronger dispersion shrinkage tends to be more conservative and better calibrated. {#tbl-ch06-methods}
+
 ## 6.2 The negative-binomial GLM
 
 DESeq2 fits, for each gene, a generalized linear model:
@@ -124,16 +134,18 @@ dds <- DESeq(dds, test = "LRT", reduced = ~ donor)
 
 This compares the full model (`~ donor + condition`) to the reduced model (`~ donor`); the LRT statistic is $-2 \log(L_{reduced}/L_{full})$ and is $\chi^2$-distributed. Useful when `condition` has 3+ levels.
 
-For both tests, the output table from `results(dds)` has columns:
+For both tests, the output table from `results(dds)` has columns described in @tbl-ch06-results.
 
-| Column | Meaning |
-|---|---|
-| `baseMean` | mean of normalized counts |
-| `log2FoldChange` | effect size, base-2 log scale |
-| `lfcSE` | standard error of LFC |
-| `stat` | Wald statistic (or LRT statistic) |
-| `pvalue` | raw test p-value |
-| `padj` | Benjamini–Hochberg-adjusted [@benjamini1995controlling] (the FDR you should filter on) |
+| Column | Meaning | How to use it |
+|---|---|---|
+| `baseMean` | Mean of normalized counts across all samples | Low values (< 5) flag unreliable LFC estimates — apply LFC shrinkage |
+| `log2FoldChange` | Effect size on base-2 log scale (unshrunk unless `lfcShrink` is called) | Ranking and visualization: always shrink first with `lfcShrink` |
+| `lfcSE` | Standard error of the log2 fold-change estimate | Use to assess confidence; wide SE → noisy estimate |
+| `stat` | Wald z-statistic (or LRT $\chi^2$) | Directly from the GLM; positive = up in numerator condition |
+| `pvalue` | Raw per-gene test p-value | Never filter on this alone — apply BH correction first |
+| `padj` | Benjamini–Hochberg FDR [@benjamini1995controlling] | The primary filter: `padj < 0.05` is the standard threshold |
+
+: Columns in the `results(dds)` output table, their meaning, and how to interpret each. `padj = NA` indicates the gene was excluded by independent filtering or had a Cook's-distance outlier — this is normal behavior, not a bug (§6.9). {#tbl-ch06-results}
 
 ## 6.7 LFC shrinkage — never skip
 
@@ -204,6 +216,8 @@ Cook's-distance filtering also produces NAs: extreme outlier samples in a small 
 
 ## 6.10 Common errors (bulk)
 
+@tbl-ch06-errors-bulk collects the errors most frequently encountered when running the bulk DESeq2 workflow.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | Wrong sign on `log2FoldChange` | Reference level was alphabetical default | `relevel()` your factor before `DESeq()` |
@@ -212,7 +226,24 @@ Cook's-distance filtering also produces NAs: extreme outlier samples in a small 
 | Dispersion plot is U-shaped | Mean-variance modeling failed; usually too few samples or batch confound | Inspect; consider model design |
 | Significant gene count is 0 | Real biological effect is small, or you're underpowered | Lower LFC threshold; check sample size; verify dispersion looks right |
 
+: Common errors in the bulk DESeq2 workflow, their causes, and fixes. The pseudobulk-specific error table is @tbl-ch06-errors-pb. {#tbl-ch06-errors-bulk}
+
 # Part B — Pseudobulk DE on single-cell data
+
+## 6.10b Pseudobulk DE at a glance
+
+Before diving into the implementation details, @tbl-ch06-pb-steps summarizes the complete pseudobulk workflow in order. Each step is explained in the sections that follow.
+
+| Step | Action | Key function | Pitfall to watch |
+|---|---|---|---|
+| 1. Aggregate | Sum UMI counts per (donor × condition × cell type) | `AggregateExpression()` | Run after `JoinLayers()`; build `colData` from metadata, not parsed column names |
+| 2. Filter | Drop pseudobulk columns with fewer than 10 cells | Manual count filter | A cell type absent from any donor is not a bug — handle NA levels downstream |
+| 3. Build DDS | One `DESeqDataSetFromMatrix` per cell type | `DESeqDataSetFromMatrix()` | Include donor as blocking variable: `design = ~ donor + condition` |
+| 4. Fit | Run the NB GLM, shrink dispersions, compute Wald test | `DESeq()` | Check `plotDispEsts(dds)` per cell type |
+| 5. Extract | Pull results for the condition contrast; shrink LFC | `results()` → `lfcShrink()` | Use `resultsNames(dds)` to get the exact coefficient name for `apeglm` |
+| 6. Combine | Bind all cell-type results into one table | `map_dfr(cell_types, run_de)` | Drop `padj = NA` rows before downstream filtering |
+
+: Six-step pseudobulk DE workflow. Steps 1–2 convert single-cell counts to sample-level aggregates; steps 3–5 are standard bulk DESeq2 applied per cell type; step 6 consolidates results for functional analysis (Chapter 7). {#tbl-ch06-pb-steps}
 
 ## 6.11 The cardinal sin
 
@@ -314,13 +345,7 @@ Note: [Tutorial 06](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) uses the simp
 
 You could imagine running a *single* pseudobulk DESeq2 with `design = ~ donor + celltype + stim + celltype:stim` and reading off the `celltype:stim` interaction term. Why don't we?
 
-Three reasons:
-
-::: incremental
-1. **Different cell types have different dispersion structures.** Mean-variance trends differ between, say, CD4 T cells and CD14 monocytes. A single dispersion fit pools across them and over-shrinks some, under-shrinks others.
-2. **Different cell types have different tested gene sets.** A gene expressed only in monocytes shouldn't be tested at all in T cells; the per-cell-type approach lets you filter the universe correctly.
-3. **Interpretation.** Per-cell-type DE answers "in CD14 monocytes, which genes change?". The interaction-test answer is "which genes change *more* in CD14 monocytes than in the average cell type?". Both are valid questions but the per-cell-type framing is what biologists usually want.
-:::
+Three reasons argue against the joint model. First, different cell types have different dispersion structures: mean-variance trends differ between, say, CD4 T cells and CD14 monocytes, and a single pooled dispersion fit will over-shrink some cell types and under-shrink others. Second, different cell types have different tested gene sets — a gene expressed only in monocytes should not be tested at all in T cells, and the per-cell-type loop applies the right gene filter to each model automatically. Third, the questions are different: per-cell-type DE answers "in CD14 monocytes, which genes change?" while the joint interaction term answers "which genes change *more* in CD14 monocytes than in the average cell type?" — a valid but less common question.
 
 The cost of per-cell-type DE is multiple tests per gene (one per cell type). FDR correction *within* each cell type is appropriate; cross-cell-type meta-correction is rarely worth it.
 
@@ -342,14 +367,17 @@ The resulting per-cell-type DE table is the input to:
 
 ## 6.17 Replication requirements
 
-Pseudobulk's honesty depends on having enough donors. Power scales with the number of independent biological replicates, not cells:
+Pseudobulk's honesty depends on having enough donors. Power scales with the number of independent biological replicates, not cells. @tbl-ch06-power shows approximate power at a moderate effect size as a function of replicate count; the estimates assume a standard NB model with typical overdispersion values from bulk RNA-seq.
 
-| Design | Power for moderate effect (LFC=1) |
-|---|---|
-| 1 vs 1 donor | 0% (no degrees of freedom) |
-| 2 vs 2 | ~20% |
-| 4 vs 4 | ~55% |
-| 8 vs 8 | ~85% |
+| Design (donors per group) | Approx. power at LFC = 1 | What to expect |
+|---|---|---|
+| 1 vs 1 | 0% (no degrees of freedom) | No valid p-values — report fold-changes only |
+| 2 vs 2 | ~20% | Detect only the largest effects; expect few significant genes |
+| 4 vs 4 | ~55% | Reasonable for pilot experiments; report sample size prominently |
+| 8 vs 8 | ~85% | Adequate for well-powered studies |
+| 12 vs 12 | ~95% | Suitable for clinical cohort analyses |
+
+: Approximate pseudobulk DE power as a function of donor count per group, for a moderate effect (LFC = 1) at typical RNA-seq overdispersion levels. Cell count per donor does not contribute additional statistical power once aggregation has been performed; adding more cells improves the accuracy of each pseudobulk profile but does not substitute for biological replication. {#tbl-ch06-power}
 
 If you have only 2 vs 2, you can still run pseudobulk — it'll be honest — but you should expect few significant hits and report sample size openly. If you have only 1 vs 1, no DE method can give you valid p-values; report descriptive fold-changes only.
 
@@ -363,6 +391,8 @@ For your own data with real donor IDs, the workflow gives valid inferences witho
 
 ## 6.19 Common errors (pseudobulk)
 
+@tbl-ch06-errors-pb collects the errors most frequently encountered when running the pseudobulk workflow.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `AggregateExpression` returns a list, not a matrix | API differs across Seurat versions | In v5, returned object is Assay5; pull `$RNA$counts` |
@@ -370,6 +400,9 @@ For your own data with real donor IDs, the workflow gives valid inferences witho
 | Many cell types have no significant genes | Genuinely small effect, or low N | Inspect dispersion plots (`plotDispEsts`); check sample size |
 | `apeglm` errors with "coefficient not found" | Coef name doesn't match | Run `resultsNames(dds)`, copy the exact name |
 | Some donor × cell type combos missing | Real biology + filter | Tabulate `n_cells` before fitting; document explicitly |
+| `JoinLayers` required error in v5 | Seurat v5 assay still has split layers | Run `JoinLayers(seu)` before `AggregateExpression` |
+
+: Common errors in the pseudobulk DESeq2 workflow, their causes, and fixes. The bulk-specific error table is @tbl-ch06-errors-bulk. {#tbl-ch06-errors-pb}
 
 ## 6.20 Where this material is also discussed
 

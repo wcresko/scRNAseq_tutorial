@@ -47,19 +47,22 @@ where:
 
 In scRNA-seq the first \~10 PCs usually separate **major cell-type axes** (T vs B vs myeloid; epithelial vs stromal vs immune); PCs 10–30 resolve subtypes (CD4 vs CD8, naive vs memory); beyond \~50, you're almost entirely in noise.
 
-Why PCA *first*? Three reasons:
-
-::: incremental
-1. **Compression.** 2,000 genes → 30 PCs. Faster everything downstream.
-2. **Denoising.** The discarded high-PC directions are dominated by per-cell sampling noise, not signal.
-3. **Decorrelation.** PCs are orthogonal by construction, so Euclidean distance in PC space behaves the way intuition expects (which it does *not* in raw HVG space).
-:::
+Why PCA *first*? Three reasons work together. First, **compression**: 2,000 genes collapse to 30 PCs, making every downstream step faster. Second, **denoising**: the discarded high-PC directions are dominated by per-cell sampling noise rather than biological signal, so dropping them actually improves the quality of neighbor graphs and cluster solutions. Third, **decorrelation**: PCs are orthogonal by construction, so Euclidean distance in PC space behaves the way intuition expects — which it does *not* in raw HVG space, where correlated genes inflate distances along shared axes.
 
 UMAP and clustering operate on PCs, not raw expression, exactly because of (3). Skip PCA and try to UMAP the scaled HVG matrix and you'll get visibly worse embeddings, slower runtime, and unstable cluster solutions. In practice the SVD is computed by a **randomized / truncated** solver (`irlba` in Seurat, `scanpy`'s `arpack`/randomized backends), which returns only the top ~50 components and scales to atlas-sized matrices where a full eigendecomposition would be intractable [@amezquita2020orchestrating]. The choice of PCA as the linear backbone of the single-cell workflow is shared across Seurat, Scanpy, and Bioconductor [@satija2015spatial; @wolf2018scanpy; @amezquita2020orchestrating].
 
 ## 2.3 Choosing how many PCs to keep
 
-The standard tool is the **scree plot** (sometimes called an elbow plot): for each PC, plot the variance it explains, in descending order. The shape is a steep initial drop, an **elbow**, and a long noise floor.
+The standard tool is the **scree plot** (sometimes called an elbow plot): for each PC, plot the variance it explains, in descending order. The shape is a steep initial drop, an **elbow**, and a long noise floor. @tbl-ch02-pc-selection summarizes the main PC-selection strategies, their cost, and when to reach for each.
+
+| Strategy | How it works | Typical result | Notes |
+|---|---|---|---|
+| Scree / elbow plot (visual) | Identify the "elbow" in variance-explained curve | PC 15–30 for 5–50k-cell runs | Fast; subjective but usually fine |
+| JackStraw permutation test | Compare each PC's variance to a null by random permutation | Statistically principled cutoff | Very slow for >50k cells |
+| Fixed high bound (e.g. 50 PCs) | Accept more noise dimensions in exchange for not missing low-variance subtypes | Typical for atlas-scale (>100k cells) | Safest default when in doubt |
+| Marker-based sanity check | Inspect gene loadings; confirm biology not QC drives the retained PCs | Flags mito/ribo-dominated PCs | Should always accompany any other method |
+
+: PC-selection strategies and when to use each. Leaning high is the safer error: an extra few noise PCs slow runtime minimally but a discarded PC carrying a rare subtype cannot be recovered. {#tbl-ch02-pc-selection}
 
 Rules of thumb:
 
@@ -115,6 +118,20 @@ There is **no single "right" resolution.** The right one is the one that matches
 
 Once you have clusters defined on the SNN graph, you want a 2-D picture of them. Two non-linear methods dominate:
 
+@tbl-ch02-viz summarizes both methods side by side before the subsections walk the details.
+
+| Property | t-SNE | UMAP |
+|---|---|---|
+| Objective | Minimize KL divergence between Gaussian (high-D) and Student-$t$ (low-D) neighborhood distributions | Minimize cross-entropy between fuzzy topological graph representations |
+| Loss symmetry | **Asymmetric** — penalizes wrong-far neighbors heavily; barely penalizes wrong-close | **Symmetric** — penalizes both directions |
+| Local neighborhood preservation | Excellent | Good |
+| Global structure preservation | Poor (inter-cluster distances not meaningful) | Moderate (positions roughly interpretable) |
+| Key tuning parameter | **Perplexity** (default 30): lower → more local; higher → smoother | **`n.neighbors`** (default 30) + **`min.dist`** (default 0.3) |
+| Stability across parameter sweep | Sensitive to perplexity | More stable across `n.neighbors` |
+| Workshop default? | No (available via `RunTSNE`) | **Yes** (`RunUMAP`) |
+
+: Comparison of t-SNE and UMAP embedding methods for scRNA-seq visualization. Both algorithms are designed for visualization only — do not measure distances, densities, or trajectory direction from either plot. Global-structure preservation in UMAP is largely an artifact of PCA-based initialization rather than the algorithm itself [@kobak2021initialization]. {#tbl-ch02-viz}
+
 ### 2.6.1 t-SNE
 
 Models pairwise distances in high-D as a probability distribution (Gaussian, with bandwidth set per-cell to match a target perplexity), and tries to find a 2-D arrangement whose distance distribution (Student's $t$ in low-D, hence "t" in t-SNE) has minimal Kullback–Leibler divergence to the original [@vandermaaten2008tsne]. The heavy-tailed Student's $t$ in the low-D space is what solves the "crowding problem" of the original SNE — it gives moderately distant points room to spread out in 2-D.
@@ -156,11 +173,20 @@ A UMAP **is** good for: showing the cluster solution from §2.5, mapping a gene'
 
 ## 2.8 Reading the PC loadings output
 
-When you print PCA results with `print(seu[["pca"]], dims = 1:5, nfeatures = 5)`, you see the top 5 positive and negative gene loadings for the first five PCs. These are the genes pushing cells to the high or low end of each PC axis. What to look for:
+When you print PCA results with `print(seu[["pca"]], dims = 1:5, nfeatures = 5)`, you see the top 5 positive and negative gene loadings for the first five PCs. These are the genes pushing cells to the high or low end of each PC axis. @tbl-ch02-loadings shows the three canonical patterns and their interpretation. What to look for:
 
 - **PC1 dominated by interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT1`, `MX1`, etc.) signals that a condition/batch effect is the dominant source of variance — the axis is separating STIM from CTRL, not cell types. This is the expected starting state for the unintegrated `ifnb` data.
 - **Later PCs (2–5) showing cell-type markers** (`LYZ`, `CD14` for monocytes; `MS4A1`, `CD79A` for B cells; `GNLY`, `NKG7` for NK) are reassuring — cell-type biology is still recoverable even when a condition effect dominates PC1.
 - **A PC dominated by mitochondrial or ribosomal genes** is a red flag for insufficient QC: those axes are tracking cell quality, not biology.
+
+| Pattern in top loadings | Interpretation | Action |
+|---|---|---|
+| ISGs (`ISG15`, `IFI6`, `MX1`) dominate PC1 | Stimulation / condition effect is the largest variance axis | Expected for multi-condition data; proceed to integration (Chapter 5) |
+| Cell-type markers (`CD14`, `MS4A1`, `GNLY`) in PCs 2–5 | Cell-type biology is recoverable despite batch in PC1 | Keep these PCs; reassuring sign |
+| Mitochondrial genes (`MT-ND1`, `MT-CO1`) dominate any PC | Cell-quality axis survived filtering | Re-examine QC thresholds; consider regressing `percent.mt` |
+| Ribosomal genes (`RPL`, `RPS`) dominate any PC | Translational-activity axis; often confounded with cell state | Exclude `^RP[SL]` from HVGs or regress `percent.rb` |
+
+: Canonical PC loading patterns and their interpretation. Reading the top 5 positive and negative loadings per PC is the fastest sanity check after `RunPCA`. {#tbl-ch02-loadings}
 
 `DimHeatmap(seu, dims = 1, cells = 500, balanced = TRUE)` provides a complementary view: rows are genes (top positive and negative loadings), columns are the 500 cells with the most extreme PC1 scores. A clean two-block structure on PC1 is the visual signature of a strong batch or condition axis.
 
@@ -184,6 +210,8 @@ The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it
 
 ## 2.11 Common errors
 
+@tbl-ch02-errors collects the errors most frequently encountered during dimensionality reduction and clustering, together with their root cause and the fix.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `RunPCA` errors with "no variable features" | You skipped `FindVariableFeatures` | Run it before `ScaleData` |
@@ -191,6 +219,8 @@ The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it
 | Cluster numbers reshuffle between R sessions | You didn't `set.seed()` | `set.seed(2026)` before `FindClusters` and `RunUMAP`; use `random.seed = 2026` argument |
 | UMAP shows a cluster that has no biology | Sometimes batch / depth artifact, sometimes a rare cell type — inspect markers (Chapter 3) | Don't dismiss; investigate |
 | `FindClusters` is very slow | Install `presto` (CRAN); Seurat detects it automatically and uses a much faster Wilcoxon implementation | `install.packages("presto")` |
+
+: Common errors in dimensionality reduction and clustering, their root cause, and the fix. {#tbl-ch02-errors}
 
 ## 2.12 Where this material is also discussed
 

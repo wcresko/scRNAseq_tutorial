@@ -35,10 +35,7 @@ The scripts run the **`ifnb` dataset** [@kang2017multiplexed], the same one used
 
 `ifnb` carries two kinds of structure that most single-cell demo datasets lack:
 
-::: incremental
-- A **real biological condition** — `stim`, with two levels: `CTRL` (control) and `STIM` (cells stimulated with interferon-β). This is a genuine perturbation with a known biological consequence.
-- **Real biological replicates** — `ind`, identifying 8 lupus patient donors, each measured in *both* conditions. These are true replicates at the level that matters for statistics: the donor.
-:::
+A **real biological condition** — `stim`, with two levels: `CTRL` (control) and `STIM` (cells stimulated with interferon-β) — this is a genuine perturbation with a known biological consequence. And **real biological replicates** — `ind`, identifying 8 lupus patient donors, each measured in *both* conditions, providing true replicates at the level that matters for statistics: the donor.
 
 Contrast this with a single dissociated-tumor run, which gives you one sample, no condition, and no replicates. With such data you can cluster and annotate cells, but you cannot ask whether anything *changes* between conditions, because there is no condition and nothing to compare. `ifnb` has both axes by design, so the downstream steps — integration (05), pseudobulk differential expression (06), and differential abundance (08) — operate on genuine sample and donor structure. Integration corrects the CTRL/STIM batch axis; the DE and DA tests recover a real **interferon-stimulated gene (ISG)** response rather than returning a null result. The cluster run reproduces the workshop's actual biological findings, at scale, on the real machine.
 
@@ -57,7 +54,9 @@ The eight core scripts are not eight independent programs. They form a **pipelin
 | `07_functional_analysis.R` | Tutorial 07 — Functional Analysis | `ifnb_pseudobulk_de.csv` | `functional/*.csv` |
 | `08_differential_abundance.R` | Tutorial 08 — Differential Abundance | `ifnb_integrated.rds` | `ifnb_milo_da.csv` |
 
-Reading the table top to bottom traces the entire workflow: raw `ifnb` enters at step 01, becomes a QC'd object, then a clustered object, then an annotated object, then an integrated object — and from the integrated object the pipeline branches to pseudobulk DE (06, which 07 then interprets functionally) and to differential abundance (08). The only external input to the whole chain is `ifnb` itself, fetched once by script 01. Everything else is an internal hand-off.
+: Core pipeline scripts — input and output of each step. The chain reads left to right: each script reads the `.rds` written by the preceding step and writes a new one. Steps 06 and 08 both consume `ifnb_integrated.rds` independently, so they can run in parallel once step 05 completes. {#tbl-ch10-pipeline}
+
+Reading @tbl-ch10-pipeline top to bottom traces the entire workflow: raw `ifnb` enters at step 01, becomes a QC'd object, then a clustered object, then an annotated object, then an integrated object — and from the integrated object the pipeline branches to pseudobulk DE (06, which 07 then interprets functionally) and to differential abundance (08). The only external input to the whole chain is `ifnb` itself, fetched once by script 01. Everything else is an internal hand-off.
 
 Because the steps are linked by their inputs and outputs, they must run **in order**. Step 02 cannot run until step 01 has written `ifnb_preprocessed.rds`; step 06 cannot run until step 05 has written `ifnb_integrated.rds`. A missing or corrupt hand-off breaks the chain at that point.
 
@@ -65,11 +64,7 @@ Because the steps are linked by their inputs and outputs, they must run **in ord
 
 The hand-off format is R's native serialization, `.rds` (with `.csv` for the tabular results of steps 06–08). Saving a fully-formed Seurat object to a `.rds` file after each step is more than a convenience; it is a deliberate design pattern with several payoffs.
 
-::: incremental
-- **Each `.rds` is a checkpoint.** A step's output is a complete, self-contained object on disk. If step 06 fails, you do not re-run steps 01 through 05 — you fix step 06 and point it at the already-saved `ifnb_integrated.rds`.
-- **Steps can be right-sized independently.** Because each is its own SLURM job reading from disk, you can give step 06 (pseudobulk DE) and step 08 (differential abundance) the extra memory they need without inflating the cheaper steps. Right-sizing per step (the skill from Chapter 9) only works because the pipeline is decomposed this way.
-- **The contract between steps is inspectable.** The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.
-:::
+**Each `.rds` is a checkpoint.** A step's output is a complete, self-contained object on disk. If step 06 fails, you do not re-run steps 01 through 05 — you fix step 06 and point it at the already-saved `ifnb_integrated.rds`. **Steps can be right-sized independently.** Because each is its own SLURM job reading from disk, you can give step 06 (pseudobulk DE) and step 08 (differential abundance) the extra memory they need without inflating the cheaper steps. Right-sizing per step (the skill from Chapter 9) only works because the pipeline is decomposed this way. **The contract between steps is inspectable.** The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.
 
 The cost of this pattern is the discipline it demands: **you must confirm each step truly succeeded before launching the next.** A job that runs out of memory or time mid-write leaves behind a *truncated, corrupt* `.rds` — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.5c) before chaining onward.
 
@@ -141,7 +136,7 @@ You submit it once with `sbatch run_core_pipeline.sbatch` (after `mkdir -p logs`
 
 ## 10.7 The bonus scripts (13–17)
 
-Beyond the core chain, five **bonus scripts** parallel the downstream bonus laptop tutorials. Unlike the core, these are largely **standalone** — they run *after* the core pipeline rather than in a fixed sequence with each other, and several bring their own datasets.
+Beyond the core chain, five **bonus scripts** parallel the downstream bonus laptop tutorials. Unlike the core, these are largely **standalone** — they run *after* the core pipeline rather than in a fixed sequence with each other, and several bring their own datasets. @tbl-ch10-bonus lists each script with its inputs and outputs.
 
 | Script | Parallels notebook | Reads | Writes |
 |--------|--------------------|-------|--------|
@@ -151,22 +146,38 @@ Beyond the core chain, five **bonus scripts** parallel the downstream bonus lapt
 | `16_spatial.R` | Module 16 — Spatial Transcriptomics | `stxBrain` (SeuratData) | `brain_spatial_integrated.rds` |
 | `17_fair_metadata.R` | Module 17 — FAIR & Metadata | `ifnb_annotated_final.rds` | `ifnb_for_submission.h5ad` |
 
+: Bonus pipeline scripts (13–17). Unlike the core chain, these are largely standalone — each can run independently once its input data exist. The `run_bonus_pipeline.sbatch` wrapper runs all five in sequence but continues past failures so a missing dataset for one step does not abort the others. {#tbl-ch10-bonus}
+
 Scripts 13 (WGCNA) and 15 (scATAC) use their own datasets, downloaded into `../data/`; 14 and 17 run on the annotated `ifnb` object the core pipeline produces; 16 uses the `stxBrain` spatial dataset. Because they do not chain on each other, you can run whichever bonus analyses interest you in any order, once the relevant input exists.
 
 Just as the core eight have `run_core_pipeline.sbatch`, the bonus five have a parallel wrapper, **`run_bonus_pipeline.sbatch`**, that runs `13`–`17` in one allocation. Because they're standalone (each needs its own dataset), that wrapper does **not** abort if one step fails — it logs the failure and continues to the next — so a missing dataset for, say, WGCNA won't stop the spatial run. Submit it with `sbatch run_bonus_pipeline.sbatch` after `mkdir -p logs`.
 
 One caveat, consistent with the notebooks: steps that are inherently *interactive* or *Python-based* — Monocle3 root selection, scVelo, CellChat plotting, the `cellxgene-schema` validator — cannot be fully automated in a batch script and are kept as **commented sketches** inside the scripts, exactly as they appear in the notebooks. The bonus scripts mirror the *runnable core* of each notebook, not its interactive parts. The one exception is **RNA velocity** (Module 14), which is packaged as a runnable Python script, `14_rna_velocity_scvelo.py`, submitted via `sbatch run_python.sbatch 14_rna_velocity_scvelo.py`.
 
+## 10.7b Per-step resource guide
+
+Each core script has different CPU, memory, and wall-clock needs. @tbl-ch10-resources gives the practical defaults for the `ifnb` dataset and notes where to scale up for larger inputs. Use `seff` after each first run to verify your actual usage and trim accordingly.
+
+| Script | `--mem` | `--cpus-per-task` | `--time` | Notes |
+|---|---|---|---|---|
+| `01_qc_preprocessing.R` | 32G | 4 | 1:00:00 | Fetches `ifnb` on first run; pre-cache on login node |
+| `02_dimreduction_clustering.R` | 32G | 4 | 1:00:00 | PCA is the slow step; parallelizes with `future` |
+| `03_markers_annotation.R` | 32G | 4 | 2:00:00 | `FindAllMarkers` is CPU-bound; more cores help |
+| `04_reference_annotation.R` | 32G | 4 | 1:00:00 | SingleR reference download needs internet (pre-cache) |
+| `05_integration.R` | 64G | 8 | 4:00:00 | Harmony/anchor integration is memory-intensive |
+| `06_pseudobulk_de.R` | 96G | 4 | 2:00:00 | DESeq2 in-memory model matrix drives memory spike |
+| `07_functional_analysis.R` | 32G | 4 | 1:00:00 | fgsea is fast; MSigDB download needs pre-caching |
+| `08_differential_abundance.R` | 96G | 8 | 3:00:00 | Milo neighborhood graph is both CPU and memory hungry |
+
+: Per-step SLURM resource defaults for the `ifnb` dataset (~24,000 cells, 8 donors). Scale `--mem` proportionally for larger datasets; the pseudobulk DE (06) and differential abundance (08) steps spike highest. Always run `seff <jobid>` after first execution to right-size repeated runs. {#tbl-ch10-resources}
+
 ## 10.8 Adapting the pipeline to your own data
 
 The whole point of learning this pipeline on `ifnb` is to run it on *your* data afterward, and the chained architecture makes that swap clean. The only place the pipeline touches the external world is **script 01**, which loads `ifnb` from Bioconductor. To run the analysis on your own counts:
 
-::: incremental
-- **Replace the loader in script 01.** Swap the `muscData::Kang18_8vs8()` call for code that builds a Seurat object from your own counts matrix — for example, reading a Cell Ranger output directory or a 10x `.h5` file — and carry your condition and donor information into the object's metadata.
-- **Keep the rest of the chain.** Steps 02–08 read from the previous step's `.rds`, so once script 01 writes a Seurat object in the expected shape, the downstream steps run unchanged.
-- **Mind the design.** The DE and DA steps (05/06/08) depend on having a real condition and real replicates in the metadata. If your data lacks a condition or has no biological replication, those steps will not return meaningful results — the limitation is your experimental design, not the scripts. This is the same lesson §10.2 drew from why `ifnb` was chosen.
-- **Right-size for your scale.** A dataset much larger than `ifnb` will need more memory and time; use `seff` from Chapter 9 to tune each step.
-:::
+**Replace the loader in script 01.** Swap the `muscData::Kang18_8vs8()` call for code that builds a Seurat object from your own counts matrix — for example, reading a Cell Ranger output directory or a 10x `.h5` file — and carry your condition and donor information into the object's metadata.
+
+**Keep the rest of the chain.** Steps 02–08 read from the previous step's `.rds`, so once script 01 writes a Seurat object in the expected shape, the downstream steps run unchanged. **Mind the design:** the DE and DA steps (05/06/08) depend on having a real condition and real replicates in the metadata. If your data lacks a condition or has no biological replication, those steps will not return meaningful results — the limitation is your experimental design, not the scripts. This is the same lesson §10.2 drew from why `ifnb` was chosen. **Right-size for your scale:** a dataset much larger than `ifnb` will need more memory and time; @tbl-ch10-resources gives the `ifnb` defaults as a starting point, and `seff` from Chapter 9 is how you tune each step once you have a first-run baseline.
 
 ## 10.9 Where this leads
 
