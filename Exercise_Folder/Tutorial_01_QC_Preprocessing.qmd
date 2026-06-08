@@ -105,7 +105,11 @@ By the end of this tutorial you will be able to:
 
 **`scDblFinder` returns a different result than the workshop** — `scDblFinder` is stochastic. The workshop uses `set.seed(2026)` *immediately before* calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.
 
-**SoupX errors with "no raw matrix found"** — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The Step 5 callout flags this — the SoupX block is illustrative on `ifnb`. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
+**SoupX errors with "no raw matrix found"** (or `subscript out of bounds` from `load10X`) — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The Step 5 block is an **illustrative template** for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
+
+**Warnings (not errors) during doublet detection** — when Step 6 runs you'll see `Layer 'data'/'scale.data' is empty` and `'normalizeCounts'/'librarySizeFactors' is deprecated`. Both are harmless: doublet detection runs on **raw counts before normalization** (so those layers are legitimately empty), and the deprecation notes come from `scran`/`scuttle` *inside* `scDblFinder`, not your code. As long as you see `Creating … artificial doublets`, it's working.
+
+**Feature/gene-name message `replacing '_' with '-'`** — a few gene symbols in `ifnb` contain underscores, which Seurat disallows in feature names, so they're renamed to dashes (valid names like `HLA-A`). The loader does this explicitly and reports which genes; no marker used downstream has an underscore, so nothing breaks.
 :::
 
 
@@ -181,12 +185,29 @@ sce <- Kang18_8vs8()
 # cells without an author-assigned cell type label.
 sce <- sce[, sce$multiplets == "singlet" & !is.na(sce$cell)]
 
+# A few gene (feature) symbols in this dataset contain underscores, and Seurat
+# does not allow '_' in feature names: CreateSeuratObject() would silently rewrite
+# them to '-' and print
+#   "Feature names cannot have underscores ('_'), replacing with dashes ('-')".
+# Dashes ARE valid Seurat gene names (e.g. HLA-A, MT-CO1), so the rewrite is
+# harmless — but we do it explicitly here so the change is visible and
+# reproducible, and we guard against the rare case where renaming would collide
+# with an existing symbol (make.unique() de-duplicates if so).
+cm <- counts(sce)
+flagged <- grep("_", rownames(cm), value = TRUE)
+if (length(flagged) > 0) {
+  message(length(flagged), " feature name(s) contain '_'; renaming '_' -> '-': ",
+          paste(head(flagged, 10), collapse = ", "),
+          if (length(flagged) > 10) ", ..." else "")
+  rownames(cm) <- make.unique(gsub("_", "-", rownames(cm)))
+}
+
 # Convert to a Seurat object, mirroring the metadata column names the rest of
 # this tutorial series expects:
 #   - `stim` as a factor with levels c("CTRL", "STIM")
 #   - `seurat_annotations` for the author-curated cell-type labels
 ifnb <- CreateSeuratObject(
-  counts    = counts(sce),
+  counts    = cm,
   meta.data = as.data.frame(colData(sce))
 )
 ifnb$stim <- factor(toupper(ifnb$stim), levels = c("CTRL", "STIM"))
@@ -376,12 +397,27 @@ In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambi
 #| eval: false
 
 # Pattern for any 10x dataset where you have the raw Cell Ranger output.
+# This block does NOT run on ifnb (which ships only *filtered* counts) and will
+# NOT run as-is: edit CR_OUTS to point at a real Cell Ranger 'outs/' directory
+# that contains BOTH raw_feature_bc_matrix/ and filtered_feature_bc_matrix/.
 library(SoupX)
 library(DropletUtils)
 
 # 1. Point at the Cell Ranger 'outs/' directory (containing raw_feature_bc_matrix/
 #    and filtered_feature_bc_matrix/)
-sc <- load10X("path/to/cellranger/outs")
+CR_OUTS <- "path/to/cellranger/outs"   # <-- EDIT to your own Cell Ranger outs/
+
+# Fail early with a clear message rather than a cryptic "subscript out of bounds"
+# if the path is still the placeholder or is missing the two required matrices.
+if (!dir.exists(file.path(CR_OUTS, "raw_feature_bc_matrix")) ||
+    !dir.exists(file.path(CR_OUTS, "filtered_feature_bc_matrix"))) {
+  stop("SoupX needs a real Cell Ranger 'outs/' folder containing BOTH ",
+       "raw_feature_bc_matrix/ and filtered_feature_bc_matrix/.\n",
+       "  '", CR_OUTS, "' is not valid — ifnb ships only the filtered counts, so ",
+       "this block is a template for your OWN 10x data, not a step you run on ifnb.")
+}
+
+sc <- load10X(CR_OUTS)
 
 # 2. (Recommended) provide preliminary clusters so SoupX can refine the soup
 #    profile per cluster — compute them with a quick Seurat workflow first:
@@ -427,10 +463,17 @@ library(scDblFinder)
 
 set.seed(2026)
 
-# Run scDblFinder per sample, then merge the results back into the Seurat object
+# Run scDblFinder per sample, then merge the results back into the Seurat object.
+# NOTE on the messages you'll see here (all harmless, NOT errors):
+#   - "Layer 'data'/'scale.data' is empty" — doublet detection runs BEFORE
+#     normalization (Step 8), so those layers aren't populated yet; scDblFinder
+#     works on raw counts and normalizes internally. We wrap the conversion in
+#     suppressWarnings() to quiet those expected notes.
+#   - "'normalizeCounts'/'librarySizeFactors' is deprecated" — these come from
+#     scran/scuttle *inside* scDblFinder, not from this code; safe to ignore.
 ifnb_list <- SplitObject(ifnb, split.by = "stim")
 ifnb_list <- lapply(ifnb_list, function(x) {
-  sce <- as.SingleCellExperiment(x)
+  sce <- suppressWarnings(as.SingleCellExperiment(x))
   sce <- scDblFinder(sce, returnType = "sce")
   x$scDblFinder.score <- colData(sce)$scDblFinder.score
   x$scDblFinder.class <- colData(sce)$scDblFinder.class    # "singlet" or "doublet"
