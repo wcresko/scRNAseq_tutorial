@@ -108,6 +108,10 @@ This runs the marker test **inside each condition** and reports genes that come 
 **Don't skip this step in case-control designs.** Naïve `FindAllMarkers` on a stim-vs-ctrl dataset will surface treatment-response genes as "cluster markers", and you'll mis-label populations.
 :::
 
+::: callout-important
+**Interferon-stimulated genes (ISGs) on un-integrated data.** In the ifnb dataset, the STIM condition activates dozens of ISGs (`IFIT1`, `ISG15`, `MX1`, `IFI6`, …). When you run `FindAllMarkers` on *un-integrated* data (Tutorial 02 / Tutorial 03), ISGs will appear at the **top of the marker list for multiple clusters** — not because those clusters are distinct cell types, but because every STIM cell expresses them. Using `FindConservedMarkers(grouping.var = "stim")` filters these out; so does using integrated data (Tutorial 05 onward). If your top hit is `ISG15` or `MX1`, that is a condition signature, not a cell-type marker.
+:::
+
 # Reading marker plots well {background-color="#2c3e50"}
 
 ## What a "good" marker looks like
@@ -332,6 +336,16 @@ Genes that are merely *enriched* on a Wilcoxon test are not always **markers** i
 :::
 
 # Assigning labels {background-color="#2c3e50"}
+
+## More clusters than cell types — the un-integrated over-split
+
+::: callout-warning
+**On un-integrated data you will see more clusters than named cell types.** In Tutorial 03 (which follows Tutorial 02's un-integrated clustering), a resolution of ≈ 0.5 on the ifnb dataset typically yields **~15–20 clusters** even though the data contain roughly **13 annotatable PBMC cell types**. The excess clusters arise because each cell type appears as a CTRL version and a STIM version — two islands in the UMAP that get separate cluster IDs. Attempting to find conserved markers for all of them and label every one can trigger downstream errors (too few cells in a condition slice). The practical solutions:
+
+-   Use `FindConservedMarkers` only for clusters where both conditions are present in sufficient numbers.
+-   Accept that some cluster pairs will be annotated as the same cell type and merged before further analysis.
+-   Or move straight to integrated data (Tutorial 05) where CTRL and STIM cells of the same type co-cluster correctly.
+:::
 
 ## The decision loop
 

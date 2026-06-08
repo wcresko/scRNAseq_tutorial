@@ -154,7 +154,27 @@ A UMAP **is** good for: showing the cluster solution from §2.5, mapping a gene'
 **Build your intuition interactively.** If UMAP (or t-SNE) feels like a black box — which features of a plot are safe to read, and how the knobs reshape it — work through Google PAIR's interactive explainer **[Understanding UMAP](https://pair-code.github.io/understanding-umap/)**, which lets you turn `n.neighbors` and `min.dist` and watch the embedding respond in real time. For a step-by-step written walkthrough, see DataCamp's **[Understanding UMAP: a guide to dimensionality reduction](https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction)**. Both are the best cure for over-interpreting an embedding.
 :::
 
-## 2.8 The single-sample workflow ends here; multi-sample needs Chapter 5
+## 2.8 Reading the PC loadings output
+
+When you print PCA results with `print(seu[["pca"]], dims = 1:5, nfeatures = 5)`, you see the top 5 positive and negative gene loadings for the first five PCs. These are the genes pushing cells to the high or low end of each PC axis. What to look for:
+
+- **PC1 dominated by interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT1`, `MX1`, etc.) signals that a condition/batch effect is the dominant source of variance — the axis is separating STIM from CTRL, not cell types. This is the expected starting state for the unintegrated `ifnb` data.
+- **Later PCs (2–5) showing cell-type markers** (`LYZ`, `CD14` for monocytes; `MS4A1`, `CD79A` for B cells; `GNLY`, `NKG7` for NK) are reassuring — cell-type biology is still recoverable even when a condition effect dominates PC1.
+- **A PC dominated by mitochondrial or ribosomal genes** is a red flag for insufficient QC: those axes are tracking cell quality, not biology.
+
+`DimHeatmap(seu, dims = 1, cells = 500, balanced = TRUE)` provides a complementary view: rows are genes (top positive and negative loadings), columns are the 500 cells with the most extreme PC1 scores. A clean two-block structure on PC1 is the visual signature of a strong batch or condition axis.
+
+## 2.9 The cross-tabulation diagnostic
+
+After clustering, `table(seu$cluster_col, seu$sample)` is one of the most informative two-line diagnostics in scRNA-seq. Computing the **proportion** form:
+
+```r
+prop.table(table(cluster = seu$RNA_snn_res.0.5, sample = seu$stim), margin = 1)
+```
+
+gives a clusters × samples table where each row sums to 1. On unintegrated data, many clusters will be >80–95% one sample — a direct measure of how completely the batch effect has split the data. After integration, the same table should show most clusters at \~50% per sample (for a balanced design). Clusters that remain heavily skewed after integration are either genuine single-condition biology (e.g. an IFN-activated state present only in STIM) or residual under-correction — biological knowledge distinguishes the two.
+
+## 2.10 The single-sample workflow ends here; multi-sample needs Chapter 5
 
 Everything above is the **single-sample** workflow: one biological condition, one batch, no need to align across samples. If you have only one sample, you read off cell types from the clusters (Chapter 3) and you're done.
 
@@ -162,7 +182,7 @@ If you have **two or more samples** and the unintegrated UMAP shows them as sepa
 
 The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it by sample. If samples interleave within clusters, you don't need integration. If samples form parallel structures, you do.
 
-## 2.9 Common errors
+## 2.11 Common errors
 
 | You see | What's wrong | What to do |
 |---|---|---|
@@ -172,7 +192,7 @@ The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it
 | UMAP shows a cluster that has no biology | Sometimes batch / depth artifact, sometimes a rare cell type — inspect markers (Chapter 3) | Don't dismiss; investigate |
 | `FindClusters` is very slow | Install `presto` (CRAN); Seurat detects it automatically and uses a much faster Wilcoxon implementation | `install.packages("presto")` |
 
-## 2.10 Where this material is also discussed
+## 2.12 Where this material is also discussed
 
 - **Lecture:** [Lecture 02 — Dim Reduction & Clustering](../Lecture_Folder/Lecture_02_DimReduction_Clustering.html)
 - **Tutorial:** [Tutorial 02 — Dim Reduction & Clustering](../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html)
@@ -181,7 +201,7 @@ The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it
 - **Next chapter:** [Chapter 3 — Markers & Manual Annotation](Chapter_03_Markers_Annotation.html)
 - **For multi-sample data:** [Chapter 5 — Multi-Sample Integration](Chapter_05_Integration.html)
 
-## 2.11 Going further
+## 2.13 Going further
 
 For the embedding methods, go to the primary sources: the t-SNE [@vandermaaten2008tsne] and UMAP [@mcinnes2018umap] papers, UMAP's single-cell debut [@becht2019umap], and the two essential "how to use them responsibly" papers [@kobak2019art; @kobak2021initialization]. For clustering, the challenges review [@kiselev2019challenges] and two benchmarks — of clustering methods [@duo2018systematic] and of cell-number estimation [@yu2022benchmarking] — are the references to consult when choosing an algorithm and resolution. Hands-on intuition is best built with Google PAIR's interactive **[Understanding UMAP](https://pair-code.github.io/understanding-umap/)** and DataCamp's written **[guide to dimensionality reduction](https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction)**. Two further tools worth knowing: **`densMAP`**, a UMAP variant that also preserves cluster densities (addressing limitation 2 in §2.7), and **`openTSNE`**, a faster, more controllable t-SNE implementation. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
 
