@@ -182,6 +182,10 @@ The workshop's `ifnb` filter — `nFeature_RNA > 200`, `nFeature_RNA < 2500`, `p
 
 After filtering, every cell still has a different `nCount_RNA` — its sequencing depth. Without correction, a deeper-sequenced cell has higher absolute counts for every gene, regardless of biology. **Normalization** removes this technical variance. This is the step where the count nature of the data — and its mean–variance relationship — matters most; the statistical background is in [Appendix B §§2–3](Appendix_B_Statistical_Foundations.html).
 
+::: {.callout-note .key-concept title="🔑 Key concept — why depth normalization comes first"}
+A cell's total UMI count reflects how deeply that droplet happened to be sequenced, not how much RNA the cell biologically contained. Until that technical depth is divided out, the "most variable" genes are simply those in the most deeply sequenced cells, and PC1 tracks library size instead of biology. Normalization is the hinge of the whole workflow: every later step — HVG selection, scaling, PCA, clustering, and differential expression — assumes it has already happened, which is also why you must never normalize the same object twice.
+:::
+
 ### 1.8.1 Log-normalization (the default)
 
 The standard transformation is **log-normalize**:
@@ -224,6 +228,10 @@ The shortlist almost always includes recognizable cell-type markers (CD14, MS4A1
 - Above \~5,000: the list becomes diluted with low-information genes; PCA performance plateaus or degrades
 
 Going lower (e.g. 500 HVGs) is sometimes justified for atlas-scale data where speed matters more than fine resolution; going higher (3,000–5,000) helps for highly heterogeneous tissue with many subtle subtypes.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — nfeatures (number of HVGs)"}
+`FindVariableFeatures(nfeatures = 2000)` sets how many genes enter PCA. **Default: 2000.** Too few (≲1,000) and rare cell types vanish because their distinguishing genes never make the list; too many (≳5,000) and low-information genes dilute the signal so PCA plateaus or degrades. Raise it (3,000–5,000) for highly heterogeneous tissue with many subtle subtypes; lower it (≈500) only for atlas-scale data where speed outweighs fine resolution. Whatever you choose, select HVGs *after* normalization and — for multi-sample work — in a batch-aware way with `SelectIntegrationFeatures()` ([Chapter 5](Chapter_05_Integration.html)).
+:::
 
 **Design choices worth knowing:**
 
