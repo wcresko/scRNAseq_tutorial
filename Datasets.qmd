@@ -13,21 +13,23 @@ Where a tutorial mirrors Khushbu Patel's [YouTube Tutorials](https://github.com/
 
 ## Expected directory layout
 
-By convention every tutorial reads from `../data/` — a `data/` folder at the repository root. R-package datasets (ifnb, airway, stxBrain) are cached by their packages and never land in `data/`; only the manually-downloaded bonus datasets do:
+Each tutorial creates two folders **in the directory you run it from** (the folder the `.qmd` is in): a **`data/`** folder for the chained `.rds` objects passed from one tutorial to the next, and an **`output/ModN/`** folder for that module's figures and tables. So **keep all the tutorial `.qmd` files in one folder** and they will share a single `data/`. R-package datasets (ifnb, airway, stxBrain) are cached by their packages and never land in `data/`; only the manually-downloaded bonus datasets do:
 
 ```
-scrnaseq_workshop/
-├── Exercise_Folder/
-│   └── Tutorial_01 … Tutorial_17 (.qmd) + scripts/
-└── data/
-    ├── (ifnb → muscData cache; airway → R package; stxBrain → SeuratData — no files here)
-    ├── GSE152418_p20047_Study1_RawCounts.txt              # Module 13 (WGCNA)
-    ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5        # Module 15 (scATAC)
-    ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)         # Module 15 (scATAC)
-    └── atac_v1_pbmc_10k_singlecell.csv                    # Module 15 (scATAC)
+your_tutorial_folder/            # wherever you put the .qmd files
+├── Tutorial_01 … Tutorial_17 (.qmd)
+├── data/                        # created on first run, next to the .qmd
+│   ├── (ifnb → muscData cache; airway → R package; stxBrain → SeuratData — no files here)
+│   ├── ifnb_preprocessed.rds … ifnb_annotated_final.rds  # the chained hand-off objects (Tut 01→08)
+│   ├── GSE152418_p20047_Study1_RawCounts.txt              # Module 13 (WGCNA)
+│   ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5        # Module 15 (scATAC)
+│   ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)         # Module 15 (scATAC)
+│   └── atac_v1_pbmc_10k_singlecell.csv                    # Module 15 (scATAC)
+└── output/
+    └── Mod1/ … Mod17/           # each module's figures (.png) and tables (.csv)
 ```
 
-Tutorials 01–08 need nothing in `data/` to start — `ifnb` is cached by Bioconductor's `muscData` package on first use. They only *write* to `data/` (the chained `.rds` objects passed from one tutorial to the next).
+Tutorials 01–08 need nothing in `data/` to start — `ifnb` is cached by Bioconductor's `muscData` package on first use. They only *write* to `data/` (the chained `.rds` objects). When you run a setup chunk it prints the absolute path it's writing to, so you can always find your files. (On the Talapas HPC track the layout differs — the numbered scripts run from `Exercise_Folder/scripts/` and read/write `../objects/` and `../data/`.)
 
 # Core-module datasets
 
@@ -131,7 +133,8 @@ The full step-by-step (installing Cell Ranger, the SLURM batch script, scaling t
 **Download it.** One supplementary file from GEO, unzipped in place:
 
 ```bash
-mkdir -p ../data && cd ../data
+# Run this from the folder your Tutorial 13 .qmd is in (creates data/ next to it)
+mkdir -p data && cd data
 wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
 gunzip GSE152418_p20047_Study1_RawCounts.txt.gz
 ```
@@ -147,7 +150,8 @@ The per-sample metadata is fetched inside R with `GEOquery::getGEO()` during the
 **Download it.** Four files load directly into Signac (there is no R-package source for them):
 
 ```bash
-mkdir -p ../data && cd ../data
+# Run this from the folder your Tutorial 15 .qmd is in (creates data/ next to it)
+mkdir -p data && cd data
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz
