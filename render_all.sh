@@ -62,6 +62,11 @@ for f in Exercise_Folder/scripts/*; do
   cp -f "$f" "docs/Exercise_Folder/scripts/$(basename "$f")"
 done
 
+# Copy the project-setup README into docs/ so students can download it and drop
+# it into their project folder (explains the scripts/ + data/ + output/ layout).
+echo "=== Copying project README to docs/ ==="
+cp -f Exercise_Folder/project_README.txt docs/Exercise_Folder/project_README.txt
+
 # Copy metadata templates into the rendered docs so students can download them
 mkdir -p docs/Resources_Folder/metadata_templates
 cp -f Resources_Folder/metadata_templates/* docs/Resources_Folder/metadata_templates/ 2>/dev/null || true

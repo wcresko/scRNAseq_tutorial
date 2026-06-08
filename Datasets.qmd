@@ -13,23 +13,24 @@ Where a tutorial mirrors Khushbu Patel's [YouTube Tutorials](https://github.com/
 
 ## Expected directory layout
 
-Each tutorial creates two folders **in the directory you run it from** (the folder the `.qmd` is in): a **`data/`** folder for the chained `.rds` objects passed from one tutorial to the next, and an **`output/ModN/`** folder for that module's figures and tables. So **keep all the tutorial `.qmd` files in one folder** and they will share a single `data/`. R-package datasets (ifnb, airway, stxBrain) are cached by their packages and never land in `data/`; only the manually-downloaded bonus datasets do:
+Make a **project folder** with a **`scripts/`** subfolder, save the downloaded tutorial `.qmd` files into `scripts/`, and run them from there. On first run each tutorial auto-creates two **sibling** folders at the project root: **`data/`** for the chained `.rds` objects passed from one tutorial to the next, and **`output/ModN/`** for that module's figures and tables. (See the downloadable **README** linked on the [Materials](Materials.html) page.)
 
 ```
-your_tutorial_folder/            # wherever you put the .qmd files
-├── Tutorial_01 … Tutorial_17 (.qmd)
-├── data/                        # created on first run, next to the .qmd
+my_scrnaseq_project/             # the project folder you create
+├── scripts/                     # the downloaded .qmd files — run them from here
+│   └── Tutorial_01 … Tutorial_17 (.qmd)
+├── data/                        # auto-created on first run (sibling of scripts/)
 │   ├── (ifnb → muscData cache; airway → R package; stxBrain → SeuratData — no files here)
 │   ├── ifnb_preprocessed.rds … ifnb_annotated_final.rds  # the chained hand-off objects (Tut 01→08)
 │   ├── GSE152418_p20047_Study1_RawCounts.txt              # Module 13 (WGCNA)
 │   ├── atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5        # Module 15 (scATAC)
 │   ├── atac_v1_pbmc_10k_fragments.tsv.gz (+ .tbi)         # Module 15 (scATAC)
 │   └── atac_v1_pbmc_10k_singlecell.csv                    # Module 15 (scATAC)
-└── output/
+└── output/                      # auto-created on first run (sibling of scripts/)
     └── Mod1/ … Mod17/           # each module's figures (.png) and tables (.csv)
 ```
 
-Tutorials 01–08 need nothing in `data/` to start — `ifnb` is cached by Bioconductor's `muscData` package on first use. They only *write* to `data/` (the chained `.rds` objects). When you run a setup chunk it prints the absolute path it's writing to, so you can always find your files. (On the Talapas HPC track the layout differs — the numbered scripts run from `Exercise_Folder/scripts/` and read/write `../objects/` and `../data/`.)
+In code the folders are written as `../data` and `../output/ModN` — the `..` is "one level up from `scripts/`", i.e. the project root. Tutorials 01–08 need nothing in `data/` to start (`ifnb` is cached by Bioconductor's `muscData` package on first use); they only *write* the chained `.rds` objects there. When you run a setup chunk it prints the absolute path it's writing to, so you can always find your files. (The Talapas HPC track uses the same idea — the numbered scripts run from `Exercise_Folder/scripts/` and read/write sibling `../objects/` and `../output/` folders.)
 
 # Core-module datasets
 
@@ -133,8 +134,8 @@ The full step-by-step (installing Cell Ranger, the SLURM batch script, scaling t
 **Download it.** One supplementary file from GEO, unzipped in place:
 
 ```bash
-# Run this from the folder your Tutorial 13 .qmd is in (creates data/ next to it)
-mkdir -p data && cd data
+# Run this from your project's scripts/ folder; it puts the file in the project data/
+mkdir -p ../data && cd ../data
 wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
 gunzip GSE152418_p20047_Study1_RawCounts.txt.gz
 ```
@@ -150,8 +151,8 @@ The per-sample metadata is fetched inside R with `GEOquery::getGEO()` during the
 **Download it.** Four files load directly into Signac (there is no R-package source for them):
 
 ```bash
-# Run this from the folder your Tutorial 15 .qmd is in (creates data/ next to it)
-mkdir -p data && cd data
+# Run this from your project's scripts/ folder; it puts the files in the project data/
+mkdir -p ../data && cd ../data
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_filtered_peak_bc_matrix.h5
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_singlecell.csv
 wget https://cf.10xgenomics.com/samples/cell-atac/1.0.1/atac_v1_pbmc_10k/atac_v1_pbmc_10k_fragments.tsv.gz
