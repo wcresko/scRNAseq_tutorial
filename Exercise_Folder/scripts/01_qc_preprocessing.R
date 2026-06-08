@@ -56,12 +56,13 @@ enframe(table(seu$stim), name = "sample", value = "n_cells") |>
 seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
 seu[["percent.rb"]] <- PercentageFeatureSet(seu, pattern = "^RP[SL]")
 
-# Figure out: per-sample QC violins (Mod1_C5)
-p_qc_vln <- VlnPlot(seu,
+# Figure out: per-sample QC violins (Mod1_C5). Plotted pre-normalization on QC
+# metadata, so wrap to silence the expected "data layer empty, using counts" note.
+p_qc_vln <- suppressWarnings(VlnPlot(seu,
         features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
         group.by = "stim", ncol = 4, pt.size = 0) &
   xlab("Sample (stim condition)") &
-  theme(plot.title = element_text(size = 11))
+  theme(plot.title = element_text(size = 11)))
 p_qc_vln <- p_qc_vln + plot_annotation(
   title    = "Per-cell QC metrics by sample — ifnb (CTRL vs IFN-beta STIM)",
   subtitle = "Genes/cell, UMIs/cell, mitochondrial % and ribosomal % distributions",
