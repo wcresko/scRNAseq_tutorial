@@ -65,6 +65,14 @@ We'll do both per cell type and then **compare cell types** with `compareCluster
 **`enrichGO` returns 0 enriched terms** — most often you forgot the `universe = uni` argument and `enrichGO` is using "all annotated genes in the genome" as the background. That over-inflates the p-value of common terms and makes everything non-significant. Always pass the genes you actually tested.
 
 **GSEA produces "ties detected" warning** — `log2FoldChange` ties from multiple genes with identical effect sizes break the rank-based test. `arrange(desc(log2FoldChange))` followed by `distinct(ENTREZID, .keep_all = TRUE)` handles it. The tutorial does this in the helper.
+
+**`object '.' not found` inside a `bitr(...)` / pipe** — the **native pipe** `|>` has no `.` placeholder (that's magrittr `%>%`). Refer to the data frame by name (e.g. `unique(de$gene)`) instead of `.$symbol`.
+
+**`object 'de_mapped' not found` (or similar) further down** — that's a *consequence* of an earlier chunk failing (e.g. the `bitr` step), so the object was never created. Fix the first error and re-run from there; don't debug the downstream chunk.
+
+**Bare `select`/`filter`/`desc` misbehave** — `org.Hs.eg.db`/`clusterProfiler` (and their `AnnotationDbi`/`IRanges` deps) mask those dplyr verbs. The setup chunk re-binds them to dplyr (`select <- dplyr::select`, …) so the pipelines work; keep that block if you adapt the tutorial.
+
+**The GSEA highlight figure (Mod7_C6) is missing** — it's only drawn for one cell type. The tutorial picks it data-driven (a monocyte type if present, else the first with GSEA results); hardcoding a name that isn't in `names(gse_list)` silently skips the plot.
 :::
 
 
@@ -138,7 +146,9 @@ Most enrichment tools work in ENTREZ-ID space because that's how `OrgDb` package
 de_mapped <- de |>
   mutate(symbol = gene) |>
   inner_join(
-    bitr(unique(.$symbol),
+    # NB: the native pipe |> has no `.` placeholder (that's magrittr %>%), so refer
+    # to `de` directly here rather than `.$symbol`.
+    bitr(unique(de$gene),
          fromType = "SYMBOL",
          toType   = "ENTREZID",
          OrgDb    = org.Hs.eg.db),
@@ -329,9 +339,12 @@ A classic GSEA "running enrichment" plot for a single term in a single cell type
 #| label: gsea-plot
 #| fig-cap: "GSEA running-enrichment plot for the top 3 GO BP terms in CD14 monocytes."
 
-# Pick a cell type and a known interesting term
-ct_pick <- "CD14 Mono"
-if (!is.null(gse_list[[ct_pick]])) {
+# Pick a cell type to highlight — data-driven so it matches your labels: prefer a
+# monocyte type (strongest IFN response), else the first with GSEA results. (The
+# muscData ifnb labels are "CD14+ Monocytes" etc., not "CD14 Mono".)
+ct_pick <- grep("Mono", names(gse_list), value = TRUE)[1]
+if (is.na(ct_pick)) ct_pick <- if (length(gse_list)) names(gse_list)[1] else NA_character_
+if (!is.na(ct_pick) && nrow(gse_list[[ct_pick]]@result) > 0) {
   p_gsea <- gseaplot2(gse_list[[ct_pick]],
             geneSetID = head(gse_list[[ct_pick]]@result$ID, 3),
             title     = paste0(ct_pick, " — top 3 BP enrichments"))

@@ -127,8 +127,9 @@ gse_top5 <- map_dfr(names(gse_list),
 write_csv(gse_top5, file.path(OUT_DIR, "Mod7_C5_gsego_top5.csv"))
 
 # Figure: GSEA running-enrichment plot for the top 3 BP terms in CD14 monocytes (Mod7_C6)
-ct_pick <- "CD14 Mono"
-if (!is.null(gse_list[[ct_pick]]) && nrow(gse_list[[ct_pick]]@result) > 0) {
+ct_pick <- grep("Mono", names(gse_list), value = TRUE)[1]   # prefer a monocyte type
+if (is.na(ct_pick)) ct_pick <- if (length(gse_list)) names(gse_list)[1] else NA_character_
+if (!is.na(ct_pick) && nrow(gse_list[[ct_pick]]@result) > 0) {
   p_gsea <- gseaplot2(gse_list[[ct_pick]],
                       geneSetID = head(gse_list[[ct_pick]]@result$ID, 3),
                       title     = paste0(ct_pick, " — top 3 BP enrichments"))
