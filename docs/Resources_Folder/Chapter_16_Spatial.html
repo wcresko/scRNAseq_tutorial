@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 16 — Spatial Transcriptomics – Single Cell RNA-seq Workshop</title>
+<title>Chapter 16 — Spatial Transcriptomics – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4341,7 +4341,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4407,6 +4407,7 @@ z-index: 1;
   <li><a href="#spatial-aware-clustering-beyond-standard-snnleiden" id="toc-spatial-aware-clustering-beyond-standard-snnleiden" class="nav-link" data-scroll-target="#spatial-aware-clustering-beyond-standard-snnleiden">16.8 Spatial-aware clustering — beyond standard SNN+Leiden</a></li>
   <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">16.9 Common errors</a></li>
   <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">16.10 Where this material is also discussed</a></li>
+  <li><a href="#b-additional-design-considerations" id="toc-b-additional-design-considerations" class="nav-link" data-scroll-target="#b-additional-design-considerations">16.10b Additional design considerations</a></li>
   <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">16.11 Going further</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
@@ -4563,13 +4564,13 @@ Note
 </ol>
 <p>The bioinformatic pipeline:</p>
 <ol type="1">
-<li><strong>Load</strong> the Cell Ranger Spatial output (<code>spaceranger</code> produces a <code>Visium</code>-class assay with counts + image + spot coordinates)</li>
-<li><strong>QC</strong> per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus <strong>always plot them on the tissue</strong>, because spatial outliers are tissue artifacts (folds, bubbles), not random noise</li>
-<li><strong>Normalize</strong> with <code>SCTransform</code> — preferred over <code>LogNormalize</code> for spatial because spot-level counts have wider dynamic range (each spot pools 1–15 cells)</li>
-<li><strong>Run PCA + clustering</strong> as in scRNA — but expect clusters to recover <strong>anatomical regions</strong>, not single-cell-type populations</li>
-<li><strong>Spatially variable features</strong> with <strong>Moran’s I</strong> — see §16.6</li>
-<li><strong>Integrate</strong> sections if you have multiple — same Harmony / anchor methods as scRNA</li>
-<li><strong>Deconvolute</strong> to get cell-type fractions per spot (§16.7)</li>
+<li><strong>Load</strong> the <code>spaceranger</code> output into Seurat. The resulting object’s <code>@images</code> slot holds a <code>VisiumV1</code> object containing four things: the <strong>histology image</strong> (low-resolution JPEG), the <strong>per-spot tissue coordinates</strong> (which pixel each spot maps to in the image), the <strong>scale factors</strong> (ratios between the full-res, low-res, and hi-res coordinate systems), and a flag for which barcodes are “in tissue”. <code>SpatialFeaturePlot</code> uses all four to draw expression over the H&amp;E.</li>
+<li><strong>QC</strong> per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus <strong>always plot them on the tissue</strong>, because spatial outliers are tissue artifacts (folds, bubbles), not random noise.</li>
+<li><strong>Normalize</strong> with <code>SCTransform</code> — preferred over <code>LogNormalize</code> for spatial because each spot captures the transcriptome of 1–15 cells rather than one. This wider dynamic range means count distributions are further from the Poisson assumption that <code>LogNormalize</code> implicitly relies on; <code>SCTransform</code>’s regularized negative binomial model adjusts per-spot dispersion and handles outlier spots more robustly.</li>
+<li><strong>Run PCA + clustering</strong> as in scRNA — but expect clusters to recover <strong>anatomical regions</strong>, not single-cell-type populations.</li>
+<li><strong>Spatially variable features</strong> with <strong>Moran’s I</strong> — see §16.6.</li>
+<li><strong>Integrate</strong> sections if you have multiple — same Harmony / anchor methods as scRNA, using the SCT integration path.</li>
+<li><strong>Deconvolute</strong> to get cell-type fractions per spot (§16.7).</li>
 </ol>
 </section>
 <section id="spatial-qc-always-plot-metrics-on-the-tissue" class="level2">
@@ -4707,6 +4708,12 @@ Note
 <li><strong>Tutorial:</strong> <a href="../Exercise_Folder/Tutorial_16_Spatial_Transcriptomics.html">Tutorial 16</a></li>
 <li><strong>scNotebooks Module 10</strong> — parallel walkthrough on 10x Visium breast cancer</li>
 </ul>
+</section>
+<section id="b-additional-design-considerations" class="level2">
+<h2 class="anchored" data-anchor-id="b-additional-design-considerations">16.10b Additional design considerations</h2>
+<p><strong>Cell–cell communication in space.</strong> Standard CellChat (Chapter 14) asks which ligand–receptor pairs are co-expressed between clusters but ignores whether the sender and receiver cells are spatially adjacent. <code>LIANA+</code> (Python) extends the LIANA framework to spatial data by weighting predicted interactions by the physical proximity of spots, substantially reducing false positives from cell types that are co-expressed but never co-localized.</p>
+<p><strong>Image-aware normalization.</strong> Standard <code>SCTransform</code> does not account for tissue-section-edge effects, where spots at the periphery of the section are only partially covered and therefore show systematically lower UMI counts. <code>STUtility</code> and its successor <code>semla</code> add a tissue-image-based normalization step that corrects for spatial gradients in coverage before downstream analysis — particularly useful for sections with irregular edges or tissue damage.</p>
+<p><strong>Spot-level <code>percent.mt</code> pattern.</strong> In mouse brain, mitochondrial percentage typically varies systematically: it can be elevated at tissue edges (partial spots, damaged cells), and some cell types (neurons under stress) show higher baseline mitochondrial expression. Before filtering on <code>percent.mt</code>, plot it spatially; a ring of elevated signal around the section periphery is expected and does not warrant removing interior spots.</p>
 </section>
 <section id="going-further" class="level2">
 <h2 class="anchored" data-anchor-id="going-further">16.11 Going further</h2>

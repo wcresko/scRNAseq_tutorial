@@ -56,8 +56,6 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
 - **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_06_DESeq2_DE.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
-
-If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
 
 ------------------------------------------------------------------------
@@ -229,7 +227,8 @@ dds$dex <- relevel(dds$dex, ref = "untreated")
 ## A.7 — Run `DESeq()` and pull results
 
 ```{r}
-#| label: M6-run_deseq_airway
+#| label: lst-M6-run_deseq_airway
+#| lst-cap: "Run DESeq2 on the airway dataset and print the results summary (treated vs untreated)."
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("dex", "treated", "untreated"))
 summary(res)
@@ -239,6 +238,10 @@ as.data.frame(res) |>
   tibble::rownames_to_column("gene") |>
   readr::write_csv(file.path(out_dir, "Mod6_C8_airway_deseq_results.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+The `summary(res)` printout (@lst-M6-run_deseq_airway) reports the total number of genes tested and how many have `LFC > 0` (up) or `LFC < 0` (down) at the chosen `alpha` threshold (default 0.1). The "outliers" and "low counts" lines tell you how many genes were **removed from testing** before FDR adjustment: outliers have a Cook's-distance flag (one sample is wildly different) and are set to `padj = NA`; low-count genes fail DESeq2's independent filtering step because they lack statistical power at the chosen FDR. A healthy summary shows a handful of outliers (often 0–50), a moderate low-count fraction, and a biologically plausible number of significant genes — for `airway` treated vs untreated, expect several hundred significant genes.
+:::
 
 ::: {.callout-important title="Think about it"}
 `summary(res)` reports counts of "LFC > 0 (up)" and "outliers" and "low counts". What do "outliers" and "low counts" mean here?
@@ -254,8 +257,8 @@ as.data.frame(res) |>
 ## A.8 — Shrink the LFCs before ranking / plotting
 
 ```{r}
-#| label: M6-lfcshrink_airway
-#| fig-cap: "MA plot of apeglm-shrunken log2 fold changes (treated vs untreated) for the airway dataset."
+#| label: lst-M6-lfcshrink_airway
+#| lst-cap: "MA plot of apeglm-shrunken log2 fold changes (treated vs untreated) for the airway dataset."
 res_shrunk <- lfcShrink(dds,
                         coef = "dex_treated_vs_untreated",
                         type = "apeglm")
@@ -273,6 +276,10 @@ save_base_fig(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"), width = 7, heigh
 })
 ```
 
+::: {.callout-tip title="Reading the output"}
+The x-axis is average normalized expression (`baseMean`); the y-axis is the apeglm-shrunken `log2FoldChange` (positive = higher in treated). Each point is a gene; red points are significant at the chosen FDR. Notice that the cloud of points is narrow and centered near zero for low-`baseMean` genes — that is shrinkage working: raw fold changes for lowly-expressed genes are pulled back toward zero because they carry little information. Well-expressed, genuinely regulated genes (ISGs in `ifnb`, corticosteroid-response genes in `airway`) will sit away from the band and remain red even after shrinkage. A healthy MA plot looks like a horizontal band with a handful of off-axis red points; a funnel that opens up at low baseMean without shrinkage signals that you should always apply `lfcShrink` before ranking.
+:::
+
 ::: callout-tip
 **Always rank by shrunk LFCs.** Genes with `baseMean = 2` can show wild raw LFCs purely by sampling noise; `apeglm` shrinks those toward zero and de-clutters your top-hits list.
 :::
@@ -280,7 +287,8 @@ save_base_fig(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"), width = 7, heigh
 ## A.9 — Inspect a top hit
 
 ```{r}
-#| label: M6-top_hit_airway
+#| label: lst-M6-top_hit_airway
+#| lst-cap: "Per-sample normalized counts for the top 5 airway DE hits (by padj), faceted by gene."
 #| fig-cap: "Per-sample normalized counts for the top 5 airway hits (by padj), each panel labelled with its gene, split by treatment."
 top_genes <- as.data.frame(res_shrunk) |>
   rownames_to_column("gene") |>
@@ -320,6 +328,10 @@ save_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), p_top,
          width = 11, height = 4, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each panel (@lst-M6-top_hit_airway) shows one gene (ordered left to right by significance); the x-axis splits by treatment (`untreated` vs `treated`) and each point is one sample on a log-scale y-axis of normalized counts. What to look for: a clear, consistent shift in the median across all four cell lines — if any panel has one outlier sample dragging the effect, that gene deserves closer scrutiny before reporting it. For `airway`, the top hits should show tight, concordant up-regulation in all four treated replicates. A gene where two treated replicates are high and two are near the untreated level is a borderline call, regardless of the p-value.
+:::
+
 ::: {.callout-important title="Think about it"}
 Why is `plotCounts()` a more honest way to confirm a hit than just trusting the p-value?
 
@@ -335,8 +347,8 @@ It shows the **per-sample** values. A single outlier sample can drag the model i
 Quality-control your samples *post-hoc* with a variance-stabilizing transform (`vst`) and a PCA:
 
 ```{r}
-#| label: M6-vst_pca_airway
-#| fig-cap: "PCA of variance-stabilized airway samples, coloured by treatment and cell line."
+#| label: lst-M6-vst_pca_airway
+#| lst-cap: "PCA of variance-stabilized airway samples, coloured by treatment and cell line."
 vsd <- vst(dds, blind = FALSE)
 p_pca <- plotPCA(vsd, intgroup = c("dex", "cell")) +
   labs(
@@ -350,6 +362,10 @@ p_pca
 save_fig(file.path(out_dir, "Mod6_C11_airway_vst_pca.png"), p_pca,
        width = 7, height = 5, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+Each point is one of the eight samples; the axes are PC1 and PC2 from the variance-stabilized count matrix. Look for two things: (1) samples of the same treatment (`treated` vs `untreated`) should cluster together, ideally along the same PC; (2) the four cell lines should form paired clusters, with treated and untreated replicates from each line sitting near each other. In `airway`, PC1 typically captures the treatment effect and PC2 the cell-line differences — exactly the structure the `~ cell + dex` design exploits. If samples cluster purely by cell line with no treatment separation, the treatment effect is too small relative to the between-line variance to trust the DE calls.
+:::
 
 ::: callout-tip
 **What you want to see.** Treated and untreated separated on PC1 or PC2 *within* each cell line. If samples cluster by cell line only and not by `dex`, your treatment effect is small relative to between-line variation — interpret the DE results accordingly.
@@ -610,7 +626,8 @@ readr::write_csv(de_all, file.path(out_dir, "Mod6_C18_pseudobulk_de_all.csv"))
 ## B.6 — Inspect the top hits
 
 ```{r}
-#| label: M6-top_hits_pb
+#| label: lst-M6-top_hits_pb
+#| lst-cap: "Top 10 pseudobulk DE hits per cell type, ranked by padj."
 
 de_top <- de_all |>
   group_by(celltype) |>
@@ -621,6 +638,10 @@ de_top
 # --- Table out: top 10 hits per cell type by padj --------------------------
 readr::write_csv(de_top, file.path(out_dir, "Mod6_C19_pseudobulk_de_top.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+The printed tibble is grouped by `celltype`; within each group the rows are ordered by `padj` (smallest first). The `log2FoldChange` column uses apeglm-shrunken estimates: a value of 2 means the gene is four-fold higher in STIM than CTRL on average across donors. `baseMean` is the average normalized count across all pseudobulk samples for that gene — a very low `baseMean` with a large `log2FoldChange` is a warning sign (little evidence, large noise). The key sanity check: are the top rows dominated by well-known interferon-stimulated genes (`ISG15`, `MX1`, `OAS1`, `IFIT1`)? If so, the contrast is working exactly as expected.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  Many of the top hits per cell type will be **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT1/2/3`, `MX1`, `OAS1`, `RSAD2`). Are they up in STIM or CTRL?
@@ -641,8 +662,8 @@ readr::write_csv(de_top, file.path(out_dir, "Mod6_C19_pseudobulk_de_top.csv"))
 A simple per-cell-type volcano plot:
 
 ```{r}
-#| label: M6-volcano
-#| fig-cap: "Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."
+#| label: lst-M6-volcano
+#| lst-cap: "Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."
 
 # Pick the 3 cell types with the most significant genes — data-driven, so it works
 # whatever your cell-type labels are (the muscData ifnb uses "CD14+ Monocytes",
@@ -672,6 +693,10 @@ p_volcano
 save_fig(file.path(out_dir, "Mod6_C20_pseudobulk_volcano.png"), p_volcano,
        width = 10, height = 4, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+Each panel is one cell type; each point is one gene. The x-axis is the apeglm-shrunken `log2FoldChange` (positive = higher in STIM), and the y-axis is `-log10(padj)` — so genes in the upper-right corner are strongly induced in STIM with high statistical confidence. The horizontal dashed line marks `padj = 0.05`; the vertical dotted lines mark `|log2FC| = 1` (twofold change). For `ifnb`, you should see a dense cloud of significant points in the upper-right of monocyte panels (strong ISG response) and a sparser, flatter cloud in T and B cell panels. Points that are statistically significant but close to the x-axis origin have large sample sizes and small effects — biologically real but possibly not the most actionable hits. An enrichment tool (Tutorial 07) will help you interpret them collectively.
+:::
 
 ::: {.callout-important title="Think about it"}
 Some cell types will show many DE genes; others almost none. What can drive this pattern *that has nothing to do with biology*?

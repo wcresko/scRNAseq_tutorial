@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 15 — Bulk and Single-Cell ATAC-seq – Single Cell RNA-seq Workshop</title>
+<title>Chapter 15 — Bulk and Single-Cell ATAC-seq – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4202,7 +4202,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4265,6 +4265,9 @@ z-index: 1;
   <li><a href="#gene-activity-scores-translating-atac-to-rna-like" id="toc-gene-activity-scores-translating-atac-to-rna-like" class="nav-link" data-scroll-target="#gene-activity-scores-translating-atac-to-rna-like">15.5 Gene-activity scores — translating ATAC to RNA-like</a></li>
   <li><a href="#peak-calling-vs-pre-called-peaks" id="toc-peak-calling-vs-pre-called-peaks" class="nav-link" data-scroll-target="#peak-calling-vs-pre-called-peaks">15.6 Peak calling vs pre-called peaks</a></li>
   <li><a href="#motif-enrichment-and-tf-activity" id="toc-motif-enrichment-and-tf-activity" class="nav-link" data-scroll-target="#motif-enrichment-and-tf-activity">15.7 Motif enrichment and TF activity</a></li>
+  <li><a href="#b-clustering-algorithm-choice-in-scatac" id="toc-b-clustering-algorithm-choice-in-scatac" class="nav-link" data-scroll-target="#b-clustering-algorithm-choice-in-scatac">15.7b Clustering algorithm choice in scATAC</a></li>
+  <li><a href="#c-coordinate-conversion-liftover" id="toc-c-coordinate-conversion-liftover" class="nav-link" data-scroll-target="#c-coordinate-conversion-liftover">15.7c Coordinate conversion: liftOver</a></li>
+  <li><a href="#d-qc-threshold-design-consideration" id="toc-d-qc-threshold-design-consideration" class="nav-link" data-scroll-target="#d-qc-threshold-design-consideration">15.7d QC threshold design consideration</a></li>
   <li><a href="#hg19-vs-hg38-a-non-trivial-pitfall" id="toc-hg19-vs-hg38-a-non-trivial-pitfall" class="nav-link" data-scroll-target="#hg19-vs-hg38-a-non-trivial-pitfall">15.8 hg19 vs hg38 — a non-trivial pitfall</a></li>
   <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">15.9 Common errors</a></li>
   <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">15.10 Where this material is also discussed</a></li>
@@ -4389,6 +4392,7 @@ Note
 <section id="motif-enrichment-and-tf-activity" class="level2">
 <h2 class="anchored" data-anchor-id="motif-enrichment-and-tf-activity">15.7 Motif enrichment and TF activity</h2>
 <p>ChromVAR<span class="citation" data-cites="schep2017chromvar"><sup><a href="#ref-schep2017chromvar" role="doc-biblioref">7</a></sup></span> computes per-cell <strong>motif accessibility</strong> scores: for each known TF binding motif, how enriched is its presence in this cell’s peaks vs the genome-wide expectation? The score is per-cell, so you can plot it on UMAP, do DE on it, etc.</p>
+<p>An alternative for motif enrichment is <strong>HOMER</strong> (<code>findMotifsGenome.pl</code>) — a command-line tool that takes a BED file of peaks (or a subset of peaks such as a cluster’s differential peaks) and reports known motif enrichment against a background. HOMER is not per-cell (it works on a peak set, not individual cells), making it better suited to the question “which TF motifs are enriched in this cluster’s peaks relative to all other peaks?” rather than the per-cell question chromVAR answers. Input to HOMER is a tab-separated BED-format file with <code>chr / start / end / strand</code> columns; the <code>-size</code> flag should be set to roughly the width of a typical peak (~200 bp for <code>-size given</code> is appropriate for ATAC peaks that average 500–1000 bp). The genome assembly specified to HOMER must match the alignment build of your peaks.</p>
 <p>The ATAC pipeline often ends with:</p>
 <ul>
 <li>Cluster cells by chromatin accessibility (LSI + Leiden)</li>
@@ -4397,6 +4401,18 @@ Note
 <li>Identify positive TF regulators by joining motif accessibility with gene expression (TFs whose motif is up <em>and</em> whose gene expression is up)</li>
 </ul>
 <p>For tutorial-level worked examples of all of this, see <a href="https://integrativebioinformatics.github.io/scNotebooks/modules/en/module11/module11.html">scNotebooks Module 11</a> — the ArchR walkthrough on Kumegawa et al. 2022 breast-cancer data is more complete than our Signac one.</p>
+</section>
+<section id="b-clustering-algorithm-choice-in-scatac" class="level2">
+<h2 class="anchored" data-anchor-id="b-clustering-algorithm-choice-in-scatac">15.7b Clustering algorithm choice in scATAC</h2>
+<p>The tutorial uses <code>FindClusters(algorithm = 3)</code> — the <strong>SLM (Smart Local Moving)</strong> algorithm — rather than the default Louvain (<code>algorithm = 1</code>). SLM allows within-cluster re-optimization after each pass, producing more stable partitions on large, noisy graphs such as scATAC data. <strong>Leiden</strong> (<code>algorithm = 4</code>) is the modern default in many pipelines and generally preferred for its convergence guarantees. Either SLM or Leiden is a reasonable choice for scATAC; the key decision is to avoid the basic Louvain on noisy data where small parameter changes produce unstable clusterings.</p>
+</section>
+<section id="c-coordinate-conversion-liftover" class="level2">
+<h2 class="anchored" data-anchor-id="c-coordinate-conversion-liftover">15.7c Coordinate conversion: liftOver</h2>
+<p>If you need to bring a third-party peak set, motif reference, or annotation onto a different genome build than your data (for example, overlaying an hg38 ENCODE peak set onto an hg19-aligned experiment), use coordinate <strong>liftOver</strong> with <code>rtracklayer</code> and a UCSC chain file. Do not attempt to remap by gene name — coordinate offsets between hg19 and hg38 are nontrivial (insertions, deletions, chromosome rearrangements). The chain files (<code>hg19ToHg38.over.chain</code>, <code>hg38ToHg19.over.chain</code>, mouse equivalents <code>mm9ToMm10</code>, <code>mm10ToMm39</code>) are available from UCSC. <code>liftOver()</code> returns a <code>GRangesList</code>; always check <code>lengths(result) == 1</code> to confirm each interval mapped to exactly one target interval before downstream use.</p>
+</section>
+<section id="d-qc-threshold-design-consideration" class="level2">
+<h2 class="anchored" data-anchor-id="d-qc-threshold-design-consideration">15.7d QC threshold design consideration</h2>
+<p>The thresholds in the Signac PBMC vignette (and echoed in the tutorial) are a reasonable starting point for healthy PBMC data but should not be applied mechanically to other tissues or datasets. An adaptive alternative is MAD-based outlier detection via <code>scater::isOutlier()</code>: flag cells whose metrics are more than 3 MADs below (or above, for nucleosome signal) the sample median. This approach scales automatically as overall library quality shifts and is less sensitive to the exact distribution than fixed thresholds.</p>
 </section>
 <section id="hg19-vs-hg38-a-non-trivial-pitfall" class="level2">
 <h2 class="anchored" data-anchor-id="hg19-vs-hg38-a-non-trivial-pitfall">15.8 hg19 vs hg38 — a non-trivial pitfall</h2>

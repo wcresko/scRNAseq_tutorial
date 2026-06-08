@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 12 — Raw scATAC-seq Processing – Single Cell RNA-seq Workshop</title>
+<title>Chapter 12 — Raw scATAC-seq Processing – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4237,7 +4237,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4299,7 +4299,9 @@ z-index: 1;
   <li><a href="#the-atac-reference-arc-vs-gex-vs-atac" id="toc-the-atac-reference-arc-vs-gex-vs-atac" class="nav-link" data-scroll-target="#the-atac-reference-arc-vs-gex-vs-atac">12.4 The ATAC reference: arc vs gex vs atac</a></li>
   <li><a href="#cell-calling-without-umis" id="toc-cell-calling-without-umis" class="nav-link" data-scroll-target="#cell-calling-without-umis">12.5 Cell calling without UMIs</a></li>
   <li><a href="#atac-specific-qc" id="toc-atac-specific-qc" class="nav-link" data-scroll-target="#atac-specific-qc">12.6 ATAC-specific QC</a></li>
+  <li><a href="#b-reading-the-output-atac-web_summary.html-and-summary.csv" id="toc-b-reading-the-output-atac-web_summary.html-and-summary.csv" class="nav-link" data-scroll-target="#b-reading-the-output-atac-web_summary.html-and-summary.csv">12.6b Reading the output: ATAC <code>web_summary.html</code> and <code>summary.csv</code></a></li>
   <li><a href="#the-hand-off-to-signac" id="toc-the-hand-off-to-signac" class="nav-link" data-scroll-target="#the-hand-off-to-signac">12.7 The hand-off to Signac</a></li>
+  <li><a href="#b-design-consideration-re-calling-peaks-per-cluster" id="toc-b-design-consideration-re-calling-peaks-per-cluster" class="nav-link" data-scroll-target="#b-design-consideration-re-calling-peaks-per-cluster">12.7b Design consideration: re-calling peaks per cluster</a></li>
   <li><a href="#pitfalls-and-the-multiome-note" id="toc-pitfalls-and-the-multiome-note" class="nav-link" data-scroll-target="#pitfalls-and-the-multiome-note">12.8 Pitfalls and the multiome note</a></li>
   <li><a href="#see-also" id="toc-see-also" class="nav-link" data-scroll-target="#see-also">12.9 See also</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
@@ -4490,6 +4492,10 @@ Note
 <li><strong>Nucleosome signal.</strong> Fragment lengths carry a physical fingerprint: a clean library shows a nucleosome-free population below ~100 bp, then mono-nucleosomal (~200 bp) and di-nucleosomal (~400 bp) humps reflecting fragments that spanned one or two nucleosomes. A flat, featureless fragment-size distribution signals poor tagmentation or contamination.</li>
 </ul>
 </section>
+<section id="b-reading-the-output-atac-web_summary.html-and-summary.csv" class="level2">
+<h2 class="anchored" data-anchor-id="b-reading-the-output-atac-web_summary.html-and-summary.csv">12.6b Reading the output: ATAC <code>web_summary.html</code> and <code>summary.csv</code></h2>
+<p>When <code>cellranger-atac count</code> finishes, open <code>web_summary.html</code> first — before loading any files into R. The ATAC summary page looks similar to the RNA one but its numbers mean different things. <code>summary.csv</code> (note: ATAC uses <code>summary.csv</code> rather than RNA’s <code>metrics_summary.csv</code>) has the same numbers in a machine-readable form. The six metrics worth checking immediately are listed in §12.6; in the ATAC summary page they appear under “Cells” and “Sequencing” sections. A TSS enrichment below 4 or a fraction of fragments in peaks below 0.4 are the clearest flags that something went wrong at the library or reference level — fix those upstream before proceeding to Signac, because no amount of downstream filtering recovers a library with fundamentally low signal.</p>
+</section>
 <section id="the-hand-off-to-signac" class="level2">
 <h2 class="anchored" data-anchor-id="the-hand-off-to-signac">12.7 The hand-off to Signac</h2>
 <p>What <code>cellranger-atac count</code> writes is exactly what the downstream Signac analysis (Chapter 15) expects — no reformatting required. The files that matter are:</p>
@@ -4505,6 +4511,10 @@ Note
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>chrom  <span class="ot">&lt;-</span> <span class="fu">CreateChromatinAssay</span>(counts, <span class="at">fragments =</span> <span class="st">&quot;data/fragments.tsv.gz&quot;</span>)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># … continue at Chapter 15 (Signac QC and analysis)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The single most common transit error is losing the <code>.tbi</code> index. <code>fragments.tsv.gz</code> and <code>fragments.tsv.gz.tbi</code> must always travel together; with the index missing, Signac cannot perform the region queries it depends on.</p>
+</section>
+<section id="b-design-consideration-re-calling-peaks-per-cluster" class="level2">
+<h2 class="anchored" data-anchor-id="b-design-consideration-re-calling-peaks-per-cluster">12.7b Design consideration: re-calling peaks per cluster</h2>
+<p>The peak set produced by <code>cellranger-atac count</code> is called on the aggregate of all cells. For a first pass this is sufficient, but it misses <strong>cell-type-specific peaks</strong> that are open in only one cell type and therefore pile up too little signal in the bulk-equivalent to exceed the calling threshold. The recommended approach for publication-quality analysis is to cluster the cells using the Cell Ranger peak set, then re-call peaks within each cluster using MACS2 or MACS3 and re-quantify fragments against the merged cluster-specific peak set. Signac’s <code>CallPeaks()</code> automates this pattern. The cost is additional compute time; the payoff is a feature set that captures cell-type regulatory elements the initial call missed — this matters most for motif enrichment and differential accessibility analyses.</p>
 </section>
 <section id="pitfalls-and-the-multiome-note" class="level2">
 <h2 class="anchored" data-anchor-id="pitfalls-and-the-multiome-note">12.8 Pitfalls and the multiome note</h2>

@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 3 — Markers &amp; Manual Cell-Type Annotation – Single Cell RNA-seq Workshop</title>
+<title>Chapter 3 — Markers &amp; Manual Cell-Type Annotation – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4376,7 +4376,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4443,12 +4443,14 @@ z-index: 1;
   <li><a href="#doheatmap-top-markers-across-clusters-every-cell-as-a-column" id="toc-doheatmap-top-markers-across-clusters-every-cell-as-a-column" class="nav-link" data-scroll-target="#doheatmap-top-markers-across-clusters-every-cell-as-a-column">3.4.4 DoHeatmap — top markers across clusters, every cell as a column</a></li>
   <li><a href="#ridgeplot-density-per-cluster" id="toc-ridgeplot-density-per-cluster" class="nav-link" data-scroll-target="#ridgeplot-density-per-cluster">3.4.5 RidgePlot — density per cluster</a></li>
   </ul></li>
-  <li><a href="#the-decision-loop-for-assigning-labels" id="toc-the-decision-loop-for-assigning-labels" class="nav-link" data-scroll-target="#the-decision-loop-for-assigning-labels">3.5 The decision loop for assigning labels</a></li>
-  <li><a href="#risks-and-how-to-avoid-them" id="toc-risks-and-how-to-avoid-them" class="nav-link" data-scroll-target="#risks-and-how-to-avoid-them">3.6 Risks and how to avoid them</a></li>
-  <li><a href="#the-relationship-to-the-cell-ontology" id="toc-the-relationship-to-the-cell-ontology" class="nav-link" data-scroll-target="#the-relationship-to-the-cell-ontology">3.7 The relationship to the Cell Ontology</a></li>
-  <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">3.8 Common errors</a></li>
-  <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">3.9 Where this material is also discussed</a></li>
-  <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">3.10 Going further</a></li>
+  <li><a href="#the-unintegrated-data-special-case-more-clusters-than-cell-types" id="toc-the-unintegrated-data-special-case-more-clusters-than-cell-types" class="nav-link" data-scroll-target="#the-unintegrated-data-special-case-more-clusters-than-cell-types">3.5 The unintegrated-data special case: more clusters than cell types</a></li>
+  <li><a href="#the-decision-loop-for-assigning-labels" id="toc-the-decision-loop-for-assigning-labels" class="nav-link" data-scroll-target="#the-decision-loop-for-assigning-labels">3.6 The decision loop for assigning labels</a></li>
+  <li><a href="#validating-against-a-ground-truth-reading-the-confusion-table" id="toc-validating-against-a-ground-truth-reading-the-confusion-table" class="nav-link" data-scroll-target="#validating-against-a-ground-truth-reading-the-confusion-table">3.7 Validating against a ground truth — reading the confusion table</a></li>
+  <li><a href="#risks-and-how-to-avoid-them" id="toc-risks-and-how-to-avoid-them" class="nav-link" data-scroll-target="#risks-and-how-to-avoid-them">3.8 Risks and how to avoid them</a></li>
+  <li><a href="#the-relationship-to-the-cell-ontology" id="toc-the-relationship-to-the-cell-ontology" class="nav-link" data-scroll-target="#the-relationship-to-the-cell-ontology">3.9 The relationship to the Cell Ontology</a></li>
+  <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">3.10 Common errors</a></li>
+  <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">3.11 Where this material is also discussed</a></li>
+  <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">3.12 Going further</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
 </nav>
@@ -4604,8 +4606,18 @@ Warning
 <p>Best for <strong>graded/continuum genes</strong> (e.g. naive→memory T-cell markers like <code>S100A4</code>). The density curves overlap, showing where the cell-type boundaries are soft.</p>
 </section>
 </section>
+<section id="the-unintegrated-data-special-case-more-clusters-than-cell-types" class="level2">
+<h2 class="anchored" data-anchor-id="the-unintegrated-data-special-case-more-clusters-than-cell-types">3.5 The unintegrated-data special case: more clusters than cell types</h2>
+<p>When annotating <strong>unintegrated</strong> multi-condition data (as Tutorial 03 does), the condition effect is the dominant axis of variation, and cell types with a strong transcriptional response to the perturbation often split into <strong>two sister clusters</strong> — one CTRL cluster and one STIM cluster. The result is that you routinely see <strong>more clusters than biologically distinct cell types</strong>: for a PBMC dataset with ~12 known types, resolution 0.5 on unintegrated data typically yields 15–20 clusters. This is not a bug; it is the data faithfully representing what it sees before integration.</p>
+<p>Practical consequences:</p>
+<ul>
+<li>You may legitimately assign the <em>same</em> cell-type label to two clusters (e.g. “CD14 Mono” for both a CTRL-dominated and a STIM-dominated monocyte cluster).</li>
+<li>Clusters whose top markers are interferon-stimulated genes (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>) rather than canonical lineage genes are often condition-split copies of an existing cell type. Use <code>FindConservedMarkers</code> (§3.3) to identify the cell-type signal underneath the ISG layer.</li>
+<li>After integration (Chapter 5), these paired clusters collapse into single clusters, and per-cluster marker lists clean up considerably.</li>
+</ul>
+</section>
 <section id="the-decision-loop-for-assigning-labels" class="level2">
-<h2 class="anchored" data-anchor-id="the-decision-loop-for-assigning-labels">3.5 The decision loop for assigning labels</h2>
+<h2 class="anchored" data-anchor-id="the-decision-loop-for-assigning-labels">3.6 The decision loop for assigning labels</h2>
 <p>The practical workflow:</p>
 <ol type="1">
 <li><strong>Compute top markers</strong> per cluster with <code>FindAllMarkers</code> or <code>FindConservedMarkers</code></li>
@@ -4614,7 +4626,7 @@ Warning
 <li><strong>Assign labels</strong> with <code>RenameIdents</code>, store in <code>seu$celltype_manual</code></li>
 <li><strong>Document</strong> <em>why</em> you assigned each label — write a sentence per cluster in your lab notebook (a future reviewer or future-you will thank you)</li>
 </ol>
-<p>For the workshop’s <code>ifnb</code> PBMCs, the canonical panel is small and highly stereotyped:</p>
+<p>For the workshop’s <code>ifnb</code> PBMCs, the canonical panel is small and highly stereotyped (see also §3.5 above for how the unintegrated embedding changes how many clusters you will label):</p>
 <table class="caption-top table">
 <thead>
 <tr class="header">
@@ -4667,8 +4679,20 @@ Warning
 </table>
 <p>These panels are not folklore — they are curated in searchable databases such as <strong>PanglaoDB</strong><span class="citation" data-cites="franzen2019panglaodb"><sup><a href="#ref-franzen2019panglaodb" role="doc-biblioref">4</a></sup></span> and <strong>CellMarker 2.0</strong><span class="citation" data-cites="hu2023cellmarker2"><sup><a href="#ref-hu2023cellmarker2" role="doc-biblioref">5</a></sup></span>, which compile cell-type markers from thousands of single-cell studies. For tumor / non-immune tissues, the panel is much larger and more disputed; consult tissue-specific atlases.</p>
 </section>
+<section id="validating-against-a-ground-truth-reading-the-confusion-table" class="level2">
+<h2 class="anchored" data-anchor-id="validating-against-a-ground-truth-reading-the-confusion-table">3.7 Validating against a ground truth — reading the confusion table</h2>
+<p>When a ground-truth annotation is available (as with <code>ifnb</code>’s <code>seurat_annotations</code>), the standard check is to cross-tabulate your manual labels against the reference:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(<span class="at">manual =</span> <span class="fu">Idents</span>(seu), <span class="at">truth =</span> seu<span class="sc">$</span>seurat_annotations)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Reading the output: each <strong>row</strong> is one of your manual labels; each <strong>column</strong> is a ground-truth label; each cell is a count of cells with that combination. A perfect annotator sees each row concentrate its counts in a single column — one of your labels maps entirely to one ground-truth type. Off-diagonal counts are disagreements; their pattern is informative:</p>
+<ul>
+<li><strong>Row split across two columns</strong> — you lumped two cell types together (e.g. your “NK” cluster contains both NK and CD8 T cells).</li>
+<li><strong>Two rows that both map to the same column</strong> — you over-split one cell type into two clusters (common for condition-split clusters on unintegrated data).</li>
+<li><strong>Column with no strong row</strong> — a ground-truth type that your clustering did not recover as a distinct cluster (often rare populations like pDC or Mk).</li>
+</ul>
+<p>After integration (Chapter 5), re-cluster and re-annotate; the same cross-tab should tighten considerably because condition-split doublings collapse.</p>
+</section>
 <section id="risks-and-how-to-avoid-them" class="level2">
-<h2 class="anchored" data-anchor-id="risks-and-how-to-avoid-them">3.6 Risks and how to avoid them</h2>
+<h2 class="anchored" data-anchor-id="risks-and-how-to-avoid-them">3.8 Risks and how to avoid them</h2>
 <div class="incremental">
 <ul class="incremental">
 <li><strong>Single-marker labels.</strong> A cluster top-marked by <code>CD3D</code> is “T cell” — but is it CD4 or CD8? Naive or memory? Activated or resting? Always label from <strong>combinations</strong>: marker presence <em>plus</em> absence of competing markers.</li>
@@ -4679,7 +4703,7 @@ Warning
 </div>
 </section>
 <section id="the-relationship-to-the-cell-ontology" class="level2">
-<h2 class="anchored" data-anchor-id="the-relationship-to-the-cell-ontology">3.7 The relationship to the Cell Ontology</h2>
+<h2 class="anchored" data-anchor-id="the-relationship-to-the-cell-ontology">3.9 The relationship to the Cell Ontology</h2>
 <p>The <strong>Cell Ontology (CL)</strong> is a community-maintained hierarchy of ~2,400 cell-type terms, each with a stable identifier (e.g. <code>CL:0000236</code> = B cell). Ontologies are the backbone that lets atlas projects like the Human Cell Atlas combine annotations across thousands of datasets<span class="citation" data-cites="osumisutherland2021cell"><sup><a href="#ref-osumisutherland2021cell" role="doc-biblioref">6</a></sup></span>. When you annotate, you should be assigning <em>to</em> an ontology term, not just typing a free-text label. Reasons:</p>
 <ul>
 <li><strong>Interoperability.</strong> Cell-type labels in different studies can only be combined if they reference the same ontology</li>
@@ -4689,7 +4713,7 @@ Warning
 <p>The mapping from Seurat label to CL ID is a manual step. The <a href="https://www.ebi.ac.uk/ols4/">Ontology Lookup Service</a> is the searchable interface; type “B cell” and you get <code>CL:0000236</code>. Store the IDs in <code>seu@meta.data$cell_type_ontology_term_id</code>. <a href="../Exercise_Folder/Tutorial_17_FAIR_Metadata.html">Tutorial 17</a> walks the full mapping for the <code>ifnb</code> cell types.</p>
 </section>
 <section id="common-errors" class="level2">
-<h2 class="anchored" data-anchor-id="common-errors">3.8 Common errors</h2>
+<h2 class="anchored" data-anchor-id="common-errors">3.10 Common errors</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4733,7 +4757,7 @@ Warning
 </table>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
-<h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">3.9 Where this material is also discussed</h2>
+<h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">3.11 Where this material is also discussed</h2>
 <ul>
 <li><strong>Lecture:</strong> <a href="../Lecture_Folder/Lecture_03_Markers_Annotation.html">Lecture 03</a></li>
 <li><strong>Tutorial:</strong> <a href="../Exercise_Folder/Tutorial_03_Markers_Annotation.html">Tutorial 03</a></li>
@@ -4743,7 +4767,7 @@ Warning
 </ul>
 </section>
 <section id="going-further" class="level2">
-<h2 class="anchored" data-anchor-id="going-further">3.10 Going further</h2>
+<h2 class="anchored" data-anchor-id="going-further">3.12 Going further</h2>
 <p>The community protocol for cell-type annotation<span class="citation" data-cites="clarke2021tutorial"><sup><a href="#ref-clarke2021tutorial" role="doc-biblioref">1</a></sup></span> is the single best next read; pair it with the DE-method benchmark that justifies the Wilcoxon default<span class="citation" data-cites="soneson2018bias"><sup><a href="#ref-soneson2018bias" role="doc-biblioref">2</a></sup></span> and the best-practices tutorial’s clustering-and-annotation chapter<span class="citation" data-cites="luecken2019bestpractices"><sup><a href="#ref-luecken2019bestpractices" role="doc-biblioref">7</a></sup></span>. For marker panels, the curated databases — <strong>CellMarker 2.0</strong><span class="citation" data-cites="hu2023cellmarker2"><sup><a href="#ref-hu2023cellmarker2" role="doc-biblioref">5</a></sup></span> and <strong>PanglaoDB</strong><span class="citation" data-cites="franzen2019panglaodb"><sup><a href="#ref-franzen2019panglaodb" role="doc-biblioref">4</a></sup></span> — are searchable by tissue and cell type. The <strong><a href="https://azimuth.hubmapconsortium.org/">Azimuth web tool</a></strong> automates annotation against curated atlases (the subject of <a href="Chapter_04_Reference_Annotation.html">Chapter 4</a>), and <strong>scNotebooks <a href="https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html">Module 04</a></strong> is a parallel walkthrough of manual plus automated annotation. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
 </section>
 <section id="references" class="level2">

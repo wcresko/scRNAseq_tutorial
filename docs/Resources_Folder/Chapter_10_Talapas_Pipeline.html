@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 10 — The Talapas Analysis Pipeline – Single Cell RNA-seq Workshop</title>
+<title>Chapter 10 — The Talapas Analysis Pipeline – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4237,7 +4237,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4298,6 +4298,8 @@ z-index: 1;
   <li><a href="#pipeline-architecture-a-chain-of-object-hand-offs" id="toc-pipeline-architecture-a-chain-of-object-hand-offs" class="nav-link" data-scroll-target="#pipeline-architecture-a-chain-of-object-hand-offs">10.3 Pipeline architecture: a chain of object hand-offs</a></li>
   <li><a href="#why-.rds-checkpoints" id="toc-why-.rds-checkpoints" class="nav-link" data-scroll-target="#why-.rds-checkpoints">10.4 Why <code>.rds</code> checkpoints?</a></li>
   <li><a href="#reproducibility-pre-caching-and-data_dir" id="toc-reproducibility-pre-caching-and-data_dir" class="nav-link" data-scroll-target="#reproducibility-pre-caching-and-data_dir">10.5 Reproducibility: pre-caching and <code>DATA_DIR</code></a></li>
+  <li><a href="#b-design-consideration-one-allocation-vs-per-step-jobs" id="toc-b-design-consideration-one-allocation-vs-per-step-jobs" class="nav-link" data-scroll-target="#b-design-consideration-one-allocation-vs-per-step-jobs">10.5b Design consideration: one allocation vs per-step jobs</a></li>
+  <li><a href="#c-reading-the-output-confirming-each-step-succeeded" id="toc-c-reading-the-output-confirming-each-step-succeeded" class="nav-link" data-scroll-target="#c-reading-the-output-confirming-each-step-succeeded">10.5c Reading the output: confirming each step succeeded</a></li>
   <li><a href="#running-the-pipeline-the-two-wrappers" id="toc-running-the-pipeline-the-two-wrappers" class="nav-link" data-scroll-target="#running-the-pipeline-the-two-wrappers">10.6 Running the pipeline: the two wrappers</a></li>
   <li><a href="#the-bonus-scripts-1317" id="toc-the-bonus-scripts-1317" class="nav-link" data-scroll-target="#the-bonus-scripts-1317">10.7 The bonus scripts (13–17)</a></li>
   <li><a href="#adapting-the-pipeline-to-your-own-data" id="toc-adapting-the-pipeline-to-your-own-data" class="nav-link" data-scroll-target="#adapting-the-pipeline-to-your-own-data">10.8 Adapting the pipeline to your own data</a></li>
@@ -4453,7 +4455,7 @@ Note
 <li><strong>The contract between steps is inspectable.</strong> The interface from one step to the next is a named file with a known structure. You can open it, examine it, or hand it to a different downstream analysis. This is exactly how reproducible pipelines are built — explicit artifacts, not hidden in-memory state.</li>
 </ul>
 </div>
-<p>The cost of this pattern is the discipline it demands: <strong>you must confirm each step truly succeeded before launching the next.</strong> A job that runs out of memory or time mid-write leaves behind a <em>truncated, corrupt</em> <code>.rds</code> — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.6) before chaining onward.</p>
+<p>The cost of this pattern is the discipline it demands: <strong>you must confirm each step truly succeeded before launching the next.</strong> A job that runs out of memory or time mid-write leaves behind a <em>truncated, corrupt</em> <code>.rds</code> — a file that exists, so the next step happily tries to read it, but is incomplete, so the read fails in some confusing downstream way. The fix is to verify completion (covered in §10.5c) before chaining onward.</p>
 <p>This explicit-checkpoint pattern is a hand-rolled version of what dedicated workflow managers automate: <strong>Snakemake</strong><span class="citation" data-cites="molder2021snakemake"><sup><a href="#ref-molder2021snakemake" role="doc-biblioref">2</a></sup></span> and <strong>Nextflow</strong><span class="citation" data-cites="ditommaso2017nextflow"><sup><a href="#ref-ditommaso2017nextflow" role="doc-biblioref">3</a></sup></span> track the file-level dependency graph for you, re-running only the steps whose inputs changed and parallelizing independent branches. For an eight-step teaching pipeline, shell wrappers are clear and sufficient; once a pipeline grows or must run on many datasets, moving to one of these managers — combined with per-tool environments from <strong>Bioconda</strong><span class="citation" data-cites="gruning2018bioconda"><sup><a href="#ref-gruning2018bioconda" role="doc-biblioref">4</a></sup></span> and containers such as <strong>Singularity/Apptainer</strong><span class="citation" data-cites="kurtzer2017singularity"><sup><a href="#ref-kurtzer2017singularity" role="doc-biblioref">5</a></sup></span> for full reproducibility — is the natural next step.</p>
 </section>
 <section id="reproducibility-pre-caching-and-data_dir" class="level2">
@@ -4464,6 +4466,19 @@ Note
 <p>After this, the data sit in your local <code>ExperimentHub</code> cache, and script 01 finds them there with no network access required.</p>
 <p><strong><code>DATA_DIR</code> — controlling where the hand-off files land.</strong> By default the scripts write their <code>.rds</code>/<code>.csv</code> hand-offs into <code>../data/</code>. The <code>DATA_DIR</code> environment variable overrides that destination, which matters for two reasons. First, the intermediate Seurat objects can be large, and Chapter 9’s etiquette says large working data belongs in <code>/scratch/&lt;PIRG&gt;/</code>, not in <code>/home/</code>. Second, making the output location a variable rather than a hard-coded path is itself a reproducibility practice — the same scripts run unchanged whether the data go to your project directory, scratch, or somewhere else entirely:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">export</span> <span class="va">DATA_DIR</span><span class="op">=</span>/scratch/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>duckid<span class="op">&gt;</span>/ifnb/data</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="b-design-consideration-one-allocation-vs-per-step-jobs" class="level2">
+<h2 class="anchored" data-anchor-id="b-design-consideration-one-allocation-vs-per-step-jobs">10.5b Design consideration: one allocation vs per-step jobs</h2>
+<p>The two wrapper scripts embody opposite trade-offs. <code>run_rscript.sbatch</code> gives fine control — each step is its own SLURM job, can request its own memory and time, and can be re-run individually if something fails. The cost is that you must monitor the queue and wait between submissions. <code>run_core_pipeline.sbatch</code> is hands-off — submit once and come back — but the whole chain occupies a single large allocation, so the memory ceiling must accommodate the most memory-hungry step (pseudobulk DE and differential abundance, which each benefit from <code>--mem=96G</code>) even when earlier steps need far less. For a first run or for learning, <code>run_core_pipeline.sbatch</code> is simplest. For production runs on large or evolving datasets, the per-step approach wastes less shared compute and lets you re-run only the failing step.</p>
+</section>
+<section id="c-reading-the-output-confirming-each-step-succeeded" class="level2">
+<h2 class="anchored" data-anchor-id="c-reading-the-output-confirming-each-step-succeeded">10.5c Reading the output: confirming each step succeeded</h2>
+<p>Before launching the next script in the chain, confirm the preceding step genuinely completed. Two checks in combination:</p>
+<ol type="1">
+<li>Look at the <code>.out</code> log for the <code>Wrote ...</code> line each script prints when it successfully writes its hand-off object to disk.</li>
+<li>Run <code>seff &lt;jobid&gt;</code> and verify <code>State: COMPLETED</code> — not <code>OUT_OF_MEMORY</code> or <code>TIMEOUT</code>, either of which would have left a truncated, unreadable <code>.rds</code> on disk.</li>
+</ol>
+<p>A job killed mid-write by an OOM or timeout leaves a file that exists and appears to have a non-zero size, but the <code>.rds</code> is corrupt and the following <code>readRDS()</code> call will fail with a confusing error. The <code>Wrote ...</code> message in the log is the true signal that the object was fully written.</p>
 </section>
 <section id="running-the-pipeline-the-two-wrappers" class="level2">
 <h2 class="anchored" data-anchor-id="running-the-pipeline-the-two-wrappers">10.6 Running the pipeline: the two wrappers</h2>

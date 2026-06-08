@@ -2348,7 +2348,6 @@ Note
 <li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
 <li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_06_DESeq2_DE.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
 </ul>
-<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
 </div>
 </div>
 <hr>
@@ -2569,7 +2568,7 @@ Warning
 <section id="a.7-run-deseq-and-pull-results" class="level2">
 <h2 class="anchored" data-anchor-id="a.7-run-deseq-and-pull-results">A.7 — Run <code>DESeq()</code> and pull results</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7" data-lst-cap="Run DESeq2 on the airway dataset and print the results summary (treated vs untreated)."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>res <span class="ot">&lt;-</span> <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;untreated&quot;</span>))</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(res)</span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -2577,6 +2576,19 @@ Warning
 <span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(res) <span class="sc">|&gt;</span></span>
 <span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
 <span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C8_airway_deseq_results.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>summary(res)</code> printout (<strong>?@lst-M6-run_deseq_airway</strong>) reports the total number of genes tested and how many have <code>LFC &gt; 0</code> (up) or <code>LFC &lt; 0</code> (down) at the chosen <code>alpha</code> threshold (default 0.1). The “outliers” and “low counts” lines tell you how many genes were <strong>removed from testing</strong> before FDR adjustment: outliers have a Cook’s-distance flag (one sample is wildly different) and are set to <code>padj = NA</code>; low-count genes fail DESeq2’s independent filtering step because they lack statistical power at the chosen FDR. A healthy summary shows a handful of outliers (often 0–50), a moderate low-count fraction, and a biologically plausible number of significant genes — for <code>airway</code> treated vs untreated, expect several hundred significant genes.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2604,7 +2616,7 @@ Show answers
 <section id="a.8-shrink-the-lfcs-before-ranking-plotting" class="level2">
 <h2 class="anchored" data-anchor-id="a.8-shrink-the-lfcs-before-ranking-plotting">A.8 — Shrink the LFCs before ranking / plotting</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>res_shrunk <span class="ot">&lt;-</span> <span class="fu">lfcShrink</span>(dds,</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8" data-lst-cap="MA plot of apeglm-shrunken log2 fold changes (treated vs untreated) for the airway dataset."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>res_shrunk <span class="ot">&lt;-</span> <span class="fu">lfcShrink</span>(dds,</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>                        <span class="at">coef =</span> <span class="st">&quot;dex_treated_vs_untreated&quot;</span>,</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>                        <span class="at">type =</span> <span class="st">&quot;apeglm&quot;</span>)</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="fu">plotMA</span>(res_shrunk, <span class="at">ylim =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">3</span>, <span class="dv">3</span>),</span>
@@ -2619,6 +2631,19 @@ Show answers
 <span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>         <span class="at">xlab =</span> <span class="st">&quot;Mean of normalized counts&quot;</span>,</span>
 <span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">ylab =</span> <span class="st">&quot;log2 fold change (apeglm-shrunken)&quot;</span>)</span>
 <span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The x-axis is average normalized expression (<code>baseMean</code>); the y-axis is the apeglm-shrunken <code>log2FoldChange</code> (positive = higher in treated). Each point is a gene; red points are significant at the chosen FDR. Notice that the cloud of points is narrow and centered near zero for low-<code>baseMean</code> genes — that is shrinkage working: raw fold changes for lowly-expressed genes are pulled back toward zero because they carry little information. Well-expressed, genuinely regulated genes (ISGs in <code>ifnb</code>, corticosteroid-response genes in <code>airway</code>) will sit away from the band and remain red even after shrinkage. A healthy MA plot looks like a horizontal band with a handful of off-axis red points; a funnel that opens up at low baseMean without shrinkage signals that you should always apply <code>lfcShrink</code> before ranking.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -2637,7 +2662,7 @@ Tip
 <section id="a.9-inspect-a-top-hit" class="level2">
 <h2 class="anchored" data-anchor-id="a.9-inspect-a-top-hit">A.9 — Inspect a top hit</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>top_genes <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(res_shrunk) <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9" data-lst-cap="Per-sample normalized counts for the top 5 airway DE hits (by padj), faceted by gene."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>top_genes <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(res_shrunk) <span class="sc">|&gt;</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(padj) <span class="sc">|&gt;</span></span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">5</span>)</span>
@@ -2674,6 +2699,19 @@ Tip
 <span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C10_airway_top_hit_counts.png&quot;</span>), p_top,</span>
 <span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>         <span class="at">width =</span> <span class="dv">11</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each panel (<strong>?@lst-M6-top_hit_airway</strong>) shows one gene (ordered left to right by significance); the x-axis splits by treatment (<code>untreated</code> vs <code>treated</code>) and each point is one sample on a log-scale y-axis of normalized counts. What to look for: a clear, consistent shift in the median across all four cell lines — if any panel has one outlier sample dragging the effect, that gene deserves closer scrutiny before reporting it. For <code>airway</code>, the top hits should show tight, concordant up-regulation in all four treated replicates. A gene where two treated replicates are high and two are near the untreated level is a borderline call, regardless of the p-value.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2698,7 +2736,7 @@ It shows the <strong>per-sample</strong> values. A single outlier sample can dra
 <h2 class="anchored" data-anchor-id="a.10-sanity-check-by-transformation-pca">A.10 — Sanity check by transformation + PCA</h2>
 <p>Quality-control your samples <em>post-hoc</em> with a variance-stabilizing transform (<code>vst</code>) and a PCA:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>vsd <span class="ot">&lt;-</span> <span class="fu">vst</span>(dds, <span class="at">blind =</span> <span class="cn">FALSE</span>)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10" data-lst-cap="PCA of variance-stabilized airway samples, coloured by treatment and cell line."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>vsd <span class="ot">&lt;-</span> <span class="fu">vst</span>(dds, <span class="at">blind =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>p_pca <span class="ot">&lt;-</span> <span class="fu">plotPCA</span>(vsd, <span class="at">intgroup =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;cell&quot;</span>)) <span class="sc">+</span></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;airway: sample PCA on variance-stabilized counts&quot;</span>,</span>
@@ -2710,6 +2748,19 @@ It shows the <strong>per-sample</strong> values. A single outlier sample can dra
 <span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
 <span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C11_airway_vst_pca.png&quot;</span>), p_pca,</span>
 <span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each point is one of the eight samples; the axes are PC1 and PC2 from the variance-stabilized count matrix. Look for two things: (1) samples of the same treatment (<code>treated</code> vs <code>untreated</code>) should cluster together, ideally along the same PC; (2) the four cell lines should form paired clusters, with treated and untreated replicates from each line sitting near each other. In <code>airway</code>, PC1 typically captures the treatment effect and PC2 the cell-line differences — exactly the structure the <code>~ cell + dex</code> design exploits. If samples cluster purely by cell line with no treatment separation, the treatment effect is too small relative to the between-line variance to trust the DE calls.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -3006,7 +3057,7 @@ Click for answer
 <section id="b.6-inspect-the-top-hits" class="level2">
 <h2 class="anchored" data-anchor-id="b.6-inspect-the-top-hits">B.6 — Inspect the top hits</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>de_top <span class="ot">&lt;-</span> de_all <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18" data-lst-cap="Top 10 pseudobulk DE hits per cell type, ranked by padj."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>de_top <span class="ot">&lt;-</span> de_all <span class="sc">|&gt;</span></span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(celltype) <span class="sc">|&gt;</span></span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_min</span>(padj, <span class="at">n =</span> <span class="dv">10</span>) <span class="sc">|&gt;</span></span>
 <span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
@@ -3014,6 +3065,19 @@ Click for answer
 <span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: top 10 hits per cell type by padj --------------------------</span></span>
 <span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(de_top, <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C19_pseudobulk_de_top.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The printed tibble is grouped by <code>celltype</code>; within each group the rows are ordered by <code>padj</code> (smallest first). The <code>log2FoldChange</code> column uses apeglm-shrunken estimates: a value of 2 means the gene is four-fold higher in STIM than CTRL on average across donors. <code>baseMean</code> is the average normalized count across all pseudobulk samples for that gene — a very low <code>baseMean</code> with a large <code>log2FoldChange</code> is a warning sign (little evidence, large noise). The key sanity check: are the top rows dominated by well-known interferon-stimulated genes (<code>ISG15</code>, <code>MX1</code>, <code>OAS1</code>, <code>IFIT1</code>)? If so, the contrast is working exactly as expected.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -3045,7 +3109,7 @@ Click for answer
 <h2 class="anchored" data-anchor-id="b.7-visualize">B.7 — Visualize</h2>
 <p>A simple per-cell-type volcano plot:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pick the 3 cell types with the most significant genes — data-driven, so it works</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19" data-lst-cap="Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pick the 3 cell types with the most significant genes — data-driven, so it works</span></span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co"># whatever your cell-type labels are (the muscData ifnb uses &quot;CD14+ Monocytes&quot;,</span></span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="co"># &quot;CD4 T cells&quot;, &quot;B cells&quot;, ... — not the older &quot;CD14 Mono&quot;/&quot;B&quot; names).</span></span>
 <span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>plot_types <span class="ot">&lt;-</span> de_all <span class="sc">|&gt;</span></span>
@@ -3072,6 +3136,19 @@ Click for answer
 <span id="cb19-25"><a href="#cb19-25" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
 <span id="cb19-26"><a href="#cb19-26" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C20_pseudobulk_volcano.png&quot;</span>), p_volcano,</span>
 <span id="cb19-27"><a href="#cb19-27" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each panel is one cell type; each point is one gene. The x-axis is the apeglm-shrunken <code>log2FoldChange</code> (positive = higher in STIM), and the y-axis is <code>-log10(padj)</code> — so genes in the upper-right corner are strongly induced in STIM with high statistical confidence. The horizontal dashed line marks <code>padj = 0.05</code>; the vertical dotted lines mark <code>|log2FC| = 1</code> (twofold change). For <code>ifnb</code>, you should see a dense cloud of significant points in the upper-right of monocyte panels (strong ISG response) and a sparser, flatter cloud in T and B cell panels. Points that are statistically significant but close to the x-axis origin have large sample sizes and small effects — biologically real but possibly not the most actionable hits. An enrichment tool (Tutorial 07) will help you interpret them collectively.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

@@ -2443,9 +2443,9 @@ Note
 <div class="callout-body-container callout-body">
 <p><strong><code>library(muscData)</code> errors with “there is no package called ‘muscData’”</strong> — it should already be installed from the <a href="Tutorial_00_Setup_RStudio_Packages.html">Tutorial 00 setup</a>; if it’s missing, re-run that setup block.</p>
 <p><strong><code>scDblFinder</code> returns a different result than the workshop</strong> — <code>scDblFinder</code> is stochastic. The workshop uses <code>set.seed(2026)</code> <em>immediately before</em> calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.</p>
-<p><strong>SoupX errors with “no raw matrix found”</strong> (or <code>subscript out of bounds</code> from <code>load10X</code>) — this is correct behaviour. The <code>Kang18_8vs8()</code> download only ships the <em>filtered</em> counts. SoupX needs both. The Step 5 block is an <strong>illustrative template</strong> for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger <code>raw_feature_bc_matrix/</code> folder.</p>
+<p><strong>SoupX errors with “no raw matrix found”</strong> (or <code>subscript out of bounds</code> from <code>load10X</code>) — this is correct behaviour. The <code>Kang18_8vs8()</code> download only ships the <em>filtered</em> counts. SoupX needs both. The SoupX block (<strong>?@lst-M1-soupx</strong>) is an <strong>illustrative template</strong> for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger <code>raw_feature_bc_matrix/</code> folder.</p>
 <p><strong>Warnings (not errors) during doublet detection</strong> — when Step 6 runs you’ll see <code>Layer &#39;data&#39;/&#39;scale.data&#39; is empty</code> and <code>&#39;normalizeCounts&#39;/&#39;librarySizeFactors&#39; is deprecated</code>. Both are harmless: doublet detection runs on <strong>raw counts before normalization</strong> (so those layers are legitimately empty), and the deprecation notes come from <code>scran</code>/<code>scuttle</code> <em>inside</em> <code>scDblFinder</code>, not your code. As long as you see <code>Creating … artificial doublets</code>, it’s working.</p>
-<p><strong>Plotting warnings before normalization (harmless)</strong> — Steps 4 and 6 plot per-cell QC <em>metadata</em> (<code>nFeature_RNA</code>, <code>nCount_RNA</code>, …) before normalization, so Seurat prints <code>Default search for &quot;data&quot; layer … utilizing &quot;counts&quot; layer instead</code>. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot (Step 9) uses a log10 axis and prints <code>log-10 transformation introduced infinite values</code> for genes with zero mean expression (they’re not variable features). The tutorial wraps these plots in <code>suppressWarnings()</code> so you shouldn’t see them, but they’re safe either way.</p>
+<p><strong>Plotting warnings before normalization (harmless)</strong> — the QC plots (<strong>?@lst-M1-qc_plots</strong>) and doublet plots (<strong>?@lst-M1-dbl</strong>) draw per-cell QC <em>metadata</em> (<code>nFeature_RNA</code>, <code>nCount_RNA</code>, …) before normalization, so Seurat prints <code>Default search for &quot;data&quot; layer … utilizing &quot;counts&quot; layer instead</code>. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot (<strong>?@lst-M1-hvgs</strong>) uses a log10 axis and prints <code>log-10 transformation introduced infinite values</code> for genes with zero mean expression (they’re not variable features). The tutorial wraps these plots in <code>suppressWarnings()</code> so you shouldn’t see them, but they’re safe either way.</p>
 <p><strong>Gene names look like <code>SYMBOL_ENSG…</code> / <code>SYMBOL-ENSG…</code></strong> — <code>muscData</code>’s <code>Kang18_8vs8()</code> stores each feature as <code>SYMBOL_ENSEMBLID</code> (e.g. <code>ISG15_ENSG00000187608</code>). The loader strips the trailing Ensembl-ID suffix so only the gene symbol remains (<code>ISG15</code>), which is what canonical markers, Azimuth, and <code>org.Hs.eg.db</code> match on. It strips <em>only</em> the Ensembl suffix — not everything after the first dash — so real dashed symbols (<code>HLA-A</code>, <code>MT-CO1</code>) are preserved, and it reports how many names it simplified.</p>
 </div>
 </div>
@@ -2464,7 +2464,6 @@ Note
 <li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
 <li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_01_QC_Preprocessing.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
 </ul>
-<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
 </div>
 </div>
 </section>
@@ -2547,7 +2546,7 @@ Note
 <section id="step-1-load-the-ifnb-dataset" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-load-the-ifnb-dataset">Step 1 — Load the <code>ifnb</code> dataset</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fetch the Kang et al. 2017 PBMC dataset (CTRL + IFN-beta STIM) from</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3" data-lst-cap="Load Kang18_8vs8, keep annotated singlets, simplify gene names, build the Seurat object."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fetch the Kang et al. 2017 PBMC dataset (CTRL + IFN-beta STIM) from</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Bioconductor&#39;s ExperimentHub. The first call downloads ~25 MB and caches it;</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># every subsequent call is a no-op.</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">Kang18_8vs8</span>()</span>
@@ -2743,7 +2742,7 @@ Show answers
 <section id="step-4-visualize-qc-per-sample" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-visualize-qc-per-sample">Step 4 — Visualize QC, per sample</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Violin panel: four QC metrics, split by sample, fully labelled.</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6" data-lst-cap="Per-sample QC visualizations: violins of the four QC metrics and the UMI-vs-gene scatter."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Violin panel: four QC metrics, split by sample, fully labelled.</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># These features are per-cell QC METADATA plotted before normalization, so Seurat</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># warns that the &quot;data&quot; layer is empty and falls back to &quot;counts&quot;. That&#39;s</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># irrelevant here (metadata isn&#39;t read from an expression layer), so we silence</span></span>
@@ -2784,6 +2783,19 @@ Show answers
 <span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">12</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
 <span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C5_qc_scatter.png&quot;</span>),  p_qc_scatter,</span>
 <span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">6</span>,  <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Violin panel</strong> — one violin per sample (x-axis = <code>CTRL</code> vs <code>STIM</code>) for each of the four QC metrics; the width of a violin at a given height is how many cells sit at that value, so you’re reading the <em>shape</em> of each per-cell distribution. Healthy cells form the fat central body; the thin upper tail on <code>nFeature_RNA</code>/<code>nCount_RNA</code> is where doublets hide, and the upper tail on <code>percent.mt</code> is where dying cells sit. <strong>Scatter</strong> — each point is one cell: x = total UMIs (<code>nCount_RNA</code>), y = unique genes (<code>nFeature_RNA</code>). The two scale together along a tight curve; points far <em>below</em> the trend are low-complexity/dying cells, points far <em>above</em> at the top-right are doublet-like. The per-sample fit lines let you spot a sample with systematically different depth. (<code>scater::isOutlier()</code> is a data-driven alternative to eyeballing these thresholds.)</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2829,7 +2841,7 @@ Warning
 </div>
 <p><em>Optional reference pattern — left <code>#| eval: false</code> because it needs a raw Cell Ranger matrix (not shipped with <code>ifnb</code>). You don’t need to change anything here; use it on your own 10x data.</em></p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pattern for any 10x dataset where you have the raw Cell Ranger output.</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7" data-lst-cap="SoupX ambient-RNA correction — template for your own 10x data (not run on ifnb)."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pattern for any 10x dataset where you have the raw Cell Ranger output.</span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># This block does NOT run on ifnb (which ships only *filtered* counts) and will</span></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># NOT run as-is: edit CR_OUTS to point at a real Cell Ranger &#39;outs/&#39; directory</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># that contains BOTH raw_feature_bc_matrix/ and filtered_feature_bc_matrix/.</span></span>
@@ -2896,10 +2908,10 @@ Show answers
 </section>
 <section id="step-6-doublet-detection-with-scdblfinder" class="level2">
 <h2 class="anchored" data-anchor-id="step-6-doublet-detection-with-scdblfinder">Step 6 — Doublet detection with <code>scDblFinder</code></h2>
-<p>A <strong>doublet</strong> is one barcode’s worth of counts that came from two cells getting trapped in the same droplet. They show up as cells with anomalously high <code>nCount_RNA</code> and <code>nFeature_RNA</code> and a mixed expression profile (e.g. T-cell markers AND B-cell markers in the same cell). The simple <code>nFeature_RNA &lt; 2500</code> filter from Step 7 catches some, but doublets that pair two <em>different</em> cell types of similar size will pass that filter — you need a model.</p>
+<p>A <strong>doublet</strong> is one barcode’s worth of counts that came from two cells getting trapped in the same droplet. They show up as cells with anomalously high <code>nCount_RNA</code> and <code>nFeature_RNA</code> and a mixed expression profile (e.g. T-cell markers AND B-cell markers in the same cell). The simple <code>nFeature_RNA &lt; 2500</code> filter applied later (<strong>?@lst-M1-filter</strong>) catches some, but doublets that pair two <em>different</em> cell types of similar size will pass that filter — you need a model.</p>
 <p><code>scDblFinder</code> simulates artificial doublets, trains a classifier to distinguish them from singletons, and returns a per-cell score and class. Critically, <strong>doublets form within a sample, not across samples</strong>, so we run it per sample.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scDblFinder)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8" data-lst-cap="Per-sample doublet detection with scDblFinder, then JoinLayers to rejoin the split assay."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scDblFinder)</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -2954,6 +2966,19 @@ Show answers
 <span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C7_doublet_violins.png&quot;</span>), p_dbl,</span>
 <span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>table()</code> is a 2×2 of sample × class: the key number is the <strong>doublet fraction</strong> per sample (<code>doublet / (singlet + doublet)</code>), which should land around <strong>5–10%</strong> for a normal 10x run — much higher points to chip overloading. In the violins (x-axis = <code>singlet</code> vs <code>doublet</code>), the <code>doublet</code> group should sit visibly <strong>higher</strong> on both <code>nFeature_RNA</code> and <code>nCount_RNA</code>; that separation is the sanity check that the classifier keyed on the expected signal. <code>scDblFinder.score</code> (0–1) is the per-cell confidence if you want to threshold more or less aggressively than the default class call.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2985,7 +3010,7 @@ Click for answer
 <section id="step-7-filter-low-quality-cells" class="level2">
 <h2 class="anchored" data-anchor-id="step-7-filter-low-quality-cells">Step 7 — Filter low-quality cells</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">subset</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9" data-lst-cap="Filter low-quality cells on nFeature_RNA, percent.mt, and the doublet class."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">subset</span>(</span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  ifnb,</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">subset =</span> nFeature_RNA <span class="sc">&gt;</span> <span class="dv">200</span> <span class="sc">&amp;</span></span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>           nFeature_RNA <span class="sc">&lt;</span> <span class="dv">2500</span> <span class="sc">&amp;</span></span>
@@ -3069,7 +3094,7 @@ Show answers
 <section id="step-9-highly-variable-features" class="level2">
 <h2 class="anchored" data-anchor-id="step-9-highly-variable-features">Step 9 — Highly variable features</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">FindVariableFeatures</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11" data-lst-cap="Select 2,000 highly variable genes (vst) and plot the mean–variance relationship."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">FindVariableFeatures</span>(</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  ifnb,</span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">selection.method =</span> <span class="st">&quot;vst&quot;</span>,</span>
 <span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">nfeatures =</span> <span class="dv">2000</span></span>
@@ -3098,6 +3123,19 @@ Show answers
 <span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">rank =</span> <span class="fu">seq_along</span>(top10), <span class="at">gene =</span> top10) <span class="sc">|&gt;</span></span>
 <span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C10_top10_hvgs.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each dot is a gene: x-axis = <strong>average expression</strong> (log scale), y-axis = <strong>standardized variance</strong> (how much more variable the gene is than expected for its mean). The ~2,000 genes coloured/highlighted as variable are the ones that rise above the fitted mean–variance curve — these are the only genes PCA will use in Tutorial 02. The labelled top-10 are the most variable of all; in <code>ifnb</code> they’re dominated by <strong>interferon-stimulated genes</strong> (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT1</code>…) because the STIM half of the data switches them on and the CTRL half doesn’t. Seeing ISGs at the top here is your first preview of the batch-style split you’ll visualize in Tutorial 02 and correct in Tutorial 05.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

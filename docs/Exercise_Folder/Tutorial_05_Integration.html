@@ -2397,7 +2397,6 @@ Note
 <li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
 <li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_05_Integration.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
 </ul>
-<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
 </div>
 </div>
 </section>
@@ -2602,8 +2601,9 @@ Show answers
 </section>
 <section id="step-2-compare-unintegrated-harmony-and-seurat-anchor-umaps" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-compare-unintegrated-harmony-and-seurat-anchor-umaps">Step 2 — Compare unintegrated, Harmony, and Seurat-anchor UMAPs</h2>
+<p>The six-panel comparison (<strong>?@lst-M5-compare</strong>) shows each integration method colored by sample (top row) and by cell type (bottom row).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Unintegrated UMAP from Tut 02 (still inside the `ifnb` object)</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6" data-lst-cap="Six-panel UMAP comparison: unintegrated, Harmony, and Seurat-anchor embeddings coloured by sample and by cell type."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Unintegrated UMAP from Tut 02 (still inside the `ifnb` object)</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>p_un_sample   <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>) <span class="sc">+</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggtitle</span>(<span class="st">&quot;Unintegrated — by sample&quot;</span>) <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;UMAP 1&quot;</span>, <span class="at">y =</span> <span class="st">&quot;UMAP 2&quot;</span>, <span class="at">colour =</span> <span class="st">&quot;Sample&quot;</span>)</span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>p_un_cell     <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">group.by =</span> <span class="st">&quot;seurat_annotations&quot;</span>,</span>
@@ -2647,6 +2647,19 @@ Show answers
 <span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C6_compare_by_celltype.png&quot;</span>), p_compare_cell,</span>
 <span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">15</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Two three-panel figures appear side-by-side. The <strong>by-sample</strong> row (x = UMAP 1, y = UMAP 2, colour = CTRL/STIM) is your <strong>mixing diagnostic</strong>: in the unintegrated panel the two colours form parallel islands per cell type; after successful integration they should interleave within each cluster. The <strong>by-cell-type</strong> row uses labelled cluster colours — in the unintegrated panel each cell type is split into two sample-specific blobs; after integration each type should collapse into one. Comparing Harmony and Seurat-anchor columns lets you see whether the two methods differ in how aggressively they mix samples or how cleanly they separate rare populations.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2678,9 +2691,9 @@ Show answers
 </section>
 <section id="step-3-diagnose-over-correction" class="level2">
 <h2 class="anchored" data-anchor-id="step-3-diagnose-over-correction">Step 3 — Diagnose over-correction</h2>
-<p>The risk of integration is <strong>erasing real biology</strong>. The ISG response is real — STIM cells <em>should</em> differ from CTRL cells in every cell type — and integration should <strong>mix the cells in space</strong> without zeroing out their expression.</p>
+<p>The risk of integration is <strong>erasing real biology</strong>. The ISG response is real — STIM cells <em>should</em> differ from CTRL cells in every cell type — and integration should <strong>mix the cells in space</strong> without zeroing out their expression. The code in <strong>?@lst-M5-isg_score</strong> scores each cell on a nine-gene IFN-β module and checks that the STIM–CTRL gap survives integration.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>isg_set <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;ISG15&quot;</span>,<span class="st">&quot;IFI6&quot;</span>,<span class="st">&quot;IFIT1&quot;</span>,<span class="st">&quot;IFIT3&quot;</span>,<span class="st">&quot;ISG20&quot;</span>,<span class="st">&quot;MX1&quot;</span>,<span class="st">&quot;OAS1&quot;</span>,<span class="st">&quot;RSAD2&quot;</span>,<span class="st">&quot;IFIT2&quot;</span>)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7" data-lst-cap="Score each cell on the IFN-β gene module (RNA assay), plot on integrated UMAPs, and tabulate mean ISG score per cell type by condition."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>isg_set <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;ISG15&quot;</span>,<span class="st">&quot;IFI6&quot;</span>,<span class="st">&quot;IFIT1&quot;</span>,<span class="st">&quot;IFIT3&quot;</span>,<span class="st">&quot;ISG20&quot;</span>,<span class="st">&quot;MX1&quot;</span>,<span class="st">&quot;OAS1&quot;</span>,<span class="st">&quot;RSAD2&quot;</span>,<span class="st">&quot;IFIT2&quot;</span>)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Score each cell on its IFN-β response — using the original RNA assay</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(ifnb_h) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span>
@@ -2724,6 +2737,19 @@ Show answers
 <span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(isg_by_celltype,</span>
 <span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C7_isg_mean_by_celltype.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Two <strong>FeaturePlots</strong> appear side-by-side (Harmony left, Seurat-anchors right); each cell is coloured by its ISG module score (low = dark/cool, high = bright/warm). A successful integration shows cells of the same type co-localised on UMAP regardless of score, but STIM cells still carrying higher scores than their CTRL neighbours. The <strong><code>isg_by_celltype</code> table</strong> below prints the mean ISG score per cell-type × condition pair, sorted by STIM–CTRL gap; monocytes typically show the largest gap (&gt; 0.5 in module-score units) while T cells show a smaller but still positive gap. A gap of zero in any row is the key over-correction warning sign.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2753,8 +2779,9 @@ Show answers
 </section>
 <section id="step-4-re-find-markers-on-integrated-clusters" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-re-find-markers-on-integrated-clusters">Step 4 — Re-find markers on integrated clusters</h2>
+<p>The top markers per integrated cluster (<strong>?@lst-M5-integrated_markers</strong>) let you check whether cell-type signals are now cleaner than in the unintegrated Tutorial 03 results.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Switch back to the RNA assay for marker testing</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8" data-lst-cap="FindAllMarkers on Harmony-integrated clusters (RNA assay), then slice top 5 per cluster by average log2 FC."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Switch back to the RNA assay for marker testing</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(ifnb_h) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ifnb_h was built with merge() (in the Harmony step), and Seurat v5 merge leaves</span></span>
@@ -2783,6 +2810,19 @@ Show answers
 <span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C8_integrated_markers.csv&quot;</span>))</span>
 <span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(ifnb_h_top_markers,</span>
 <span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C8_integrated_top5_markers.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>ifnb_h_top_markers</code> prints as a tibble with columns <code>cluster</code>, <code>gene</code>, <code>avg_log2FC</code>, <code>pct.1</code>, <code>pct.2</code>, and <code>p_val_adj</code> — five rows per integrated cluster, sorted by highest average log2 fold change. A clean integration result shows canonical PBMC markers (<code>LYZ</code>/<code>CD14</code> for monocytes, <code>MS4A1</code> for B cells, <code>GNLY</code>/<code>NKG7</code> for NK, <code>CD8A</code> for cytotoxic T) at the top of their respective clusters, with ISGs (<code>ISG15</code>, <code>IFIT1</code>, …) absent or much lower ranked than they were in the unintegrated Tutorial 03 markers.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2852,7 +2892,7 @@ Tip
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>
 <ul>
-<li>Dataset: <code>ifnb</code> from <code>SeuratData</code> — Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em></li>
+<li>Dataset: <code>ifnb</code> via Bioconductor’s <code>muscData::Kang18_8vs8()</code> — Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em></li>
 <li>Methods: <a href="https://portals.broadinstitute.org/harmony/">Harmony</a> (Korsunsky <em>et al.</em> 2019, <em>Nat Methods</em>); Seurat anchors (Stuart, Butler <em>et al.</em> 2019, <em>Cell</em>)</li>
 <li>Reference vignette: <a href="https://satijalab.org/seurat/articles/integration_introduction.html">Seurat integration tutorial</a></li>
 <li>Inspiration: <a href="https://integrativebioinformatics.github.io/scNotebooks/">scNotebooks</a></li>

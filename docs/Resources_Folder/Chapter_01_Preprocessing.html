@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 1 — Preprocessing: From a Counts Matrix to a Filtered, Normalized Object – Single Cell RNA-seq Workshop</title>
+<title>Chapter 1 — Preprocessing: From a Counts Matrix to a Filtered, Normalized Object – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4341,7 +4341,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4533,6 +4533,7 @@ Tip
 <p>This is just the sum of the cell’s column in the counts matrix: how many distinct RNA molecules (UMIs, not reads — see <a href="Appendix_A_SC_Biology_Refresher.html">Appendix A §4</a>) were captured for this barcode. It serves as a rough proxy for “how deeply was this cell sequenced?”</p>
 <p>The distribution across cells is typically log-normal-shaped, with a peak at 5,000–15,000 UMIs for a healthy 10x 3’ v3 run. Cells in the <strong>left tail</strong> are either undersequenced, lysed, or empty; cells in the <strong>right tail</strong> are either particularly transcriptionally active <em>or</em> are doublets (two cells contributing UMIs to one barcode).</p>
 <p>Numerical signpost: a healthy cell has at least ~1,000 UMIs; below 500 is almost always noise. The exact lower threshold depends on the tissue (some cell types — neutrophils, plasma cells — are biologically transcriptionally lower than lymphocytes). The distinction between <strong>UMIs</strong> and <strong>reads</strong> matters here: UMI counting collapses PCR duplicates so that each counted molecule is (ideally) a real captured transcript, which is what makes <code>nCount_RNA</code> a meaningful biological quantity rather than a sequencing artefact. The UMI deduplication that produces these counts is itself a non-trivial step (<a href="Chapter_11_CellRanger.html">Chapter 11</a>).</p>
+<p><strong>Reading the UMI-vs-gene scatter.</strong> Plotting <code>nCount_RNA</code> on x against <code>nFeature_RNA</code> on y produces one of the most informative single QC plots. Healthy cells fall on a tight, near-linear trend. Points far <em>below</em> the trend (many UMIs but few unique genes) are low-complexity — over-amplifying a small repertoire; common in degraded libraries or red-blood-cell contamination. Points far <em>above</em> the trend in the upper-right corner have both high UMI counts and many unique genes — the classic doublet signature (two cells’ worth of RNA in one barcode). Coloring the scatter by <code>percent.mt</code> overlays the dying-cell signal: points that sit low on the trend <em>and</em> show high mitochondrial fraction are apoptotic cells, not droplets to keep.</p>
 </section>
 <section id="nfeature_rna-number-of-unique-genes-detected" class="level3">
 <h3 class="anchored" data-anchor-id="nfeature_rna-number-of-unique-genes-detected">1.3.2 <code>nFeature_RNA</code> — number of unique genes detected</h3>
@@ -4682,7 +4683,8 @@ Tip
 <li><code>VariableFeatures(seu)</code> — vector of ~2,000 HVG names</li>
 <li><code>@meta.data</code> — per-cell metadata (sample, QC metrics, doublet calls)</li>
 </ul>
-<p>In Seurat v5 the assay is <strong>layered</strong> — after <code>merge()</code> you may see <code>counts.CTRL</code>/<code>counts.STIM</code> layers that must be recombined with <code>JoinLayers()</code> before single-matrix tools (e.g. <code>FindMarkers</code>) will work; the tutorial does this explicitly. The next chapter (<a href="Chapter_02_DimReduction.html">Chapter 2 — Dimensionality Reduction &amp; Clustering</a>) takes the scaled HVG matrix and turns it into clusters and a UMAP.</p>
+<p><strong>Typical cell counts for the workshop <code>ifnb</code> dataset.</strong> Starting from <code>muscData::Kang18_8vs8()</code> and keeping only annotated singlets yields ~24,500 cells across both conditions (~12,000 CTRL + ~12,000 STIM). After the QC filter (<code>nFeature_RNA &gt; 200 &amp; &lt; 2500</code>, <code>percent.mt &lt; 5</code>, <code>scDblFinder.class == &quot;singlet&quot;</code>), the retained count is approximately <strong>~23,000 cells</strong>. These post-QC cells are what every downstream module in the workshop uses.</p>
+<p>In Seurat v5 the assay is <strong>layered</strong> — after <code>merge()</code> you may see <code>counts.CTRL</code>/<code>counts.STIM</code> layers that must be recombined with <code>JoinLayers()</code> before single-matrix tools (e.g. <code>FindMarkers</code>, <code>FindVariableFeatures</code>, <code>AddModuleScore</code>) will work; the tutorial does this explicitly after the per-sample doublet-detection merge. If you skip <code>JoinLayers()</code>, downstream calls will either error with “data layers are not joined” or silently skip every gene and return an empty table. The next chapter (<a href="Chapter_02_DimReduction.html">Chapter 2 — Dimensionality Reduction &amp; Clustering</a>) takes the scaled HVG matrix and turns it into clusters and a UMAP.</p>
 </section>
 <section id="common-errors-and-what-they-mean" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors-and-what-they-mean">1.12 Common errors and what they mean</h2>

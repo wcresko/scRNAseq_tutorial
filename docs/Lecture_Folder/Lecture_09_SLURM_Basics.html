@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 09 — SLURM Basics on Talapas</title>
+  <title>Single Cell RNA-seq Analysis Workshop – Lecture 09 — SLURM Basics on Talapas</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1412,12 +1412,44 @@ Bill Cresko
 <li class="fragment"><strong>Back up anything you care about</strong> — RACS does not back up Talapas.</li>
 </ul>
 </section>
+<section id="slurm_account-set-it-once" class="slide level2">
+<h2><code>SLURM_ACCOUNT</code> — set it once</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="bu">echo</span> <span class="st">&#39;export SLURM_ACCOUNT=&lt;myPIRG&gt;&#39;</span>  <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
+<span id="cb7-2"><a></a><span class="bu">echo</span> <span class="st">&#39;export SBATCH_ACCOUNT=&lt;myPIRG&gt;&#39;</span> <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
+<span id="cb7-3"><a></a><span class="bu">source</span> ~/.bash_profile</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">Once set, you can omit <code>--account=</code> from every command</li>
+<li class="fragment">Your PIRG name appears in the output of <code>groups</code> after you log in</li>
+</ul>
+</section>
 <section id="whats-next-module-10" class="slide level2">
 <h2>What’s next — Module 10</h2>
 <ul>
 <li class="fragment">You can now request resources and submit jobs — the <em>mechanics</em>.</li>
 <li class="fragment"><strong>Module 10</strong> uses these to run the <strong>real scRNA-seq pipeline</strong> on Talapas: the numbered <code>01</code>–<code>08</code> scripts, chained through <code>.rds</code> hand-offs.</li>
 <li class="fragment">Read the <a href="../Resources_Folder/Chapter_09_SLURM_Basics.html">companion chapter</a> for the conceptual deep-dive on schedulers and fair-share.</li>
+</ul>
+</section>
+<section id="monitoring-a-running-job" class="slide level2">
+<h2>Monitoring a running job</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="co"># Live log tail (follow output as it writes)</span></span>
+<span id="cb8-2"><a></a><span class="fu">tail</span> <span class="at">-f</span> logs/seurat_qc_<span class="pp">*</span>.out</span>
+<span id="cb8-3"><a></a></span>
+<span id="cb8-4"><a></a><span class="co"># Friendly resource summary after completion</span></span>
+<span id="cb8-5"><a></a><span class="ex">seff</span> 123456</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment"><code>tail -f</code> lets you watch progress without opening an interactive session</li>
+<li class="fragment">After each step confirms <code>State: COMPLETED</code> (not <code>OUT_OF_MEMORY</code>/<code>TIMEOUT</code>), move to the next</li>
+<li class="fragment">A job killed mid-write leaves a <strong>corrupt <code>.rds</code></strong> — always confirm before chaining</li>
+</ul>
+</section>
+<section id="design-considerations" class="slide level2">
+<h2>Design considerations</h2>
+<ul>
+<li class="fragment"><strong>Interactive vs batch</strong>: prototype interactively; always use batch for anything you’ll run to completion or repeat.</li>
+<li class="fragment"><strong>Right-size honestly</strong>: over-requesting delays your job and hurts others; under-requesting kills the job. Run once high, trim with <code>seff</code>.</li>
+<li class="fragment"><strong><code>set -euo pipefail</code></strong> at the top of every batch script — exits immediately on any command failure, preventing silent partial runs.</li>
+<li class="fragment"><strong><code>/scratch</code> is not backed up</strong> and purges after 90 days — keep only intermediates there; archive results to <code>/projects</code>.</li>
 </ul>
 </section>
 <section id="key-takeaways" class="slide level2">

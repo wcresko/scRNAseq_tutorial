@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 17 — FAIR Principles &amp; Data Sharing – Single Cell RNA-seq Workshop</title>
+<title>Chapter 17 — FAIR Principles &amp; Data Sharing – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4202,7 +4202,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4268,6 +4268,7 @@ z-index: 1;
   <li><a href="#the-metadata-is-most-of-the-work" id="toc-the-metadata-is-most-of-the-work" class="nav-link" data-scroll-target="#the-metadata-is-most-of-the-work">17.4 The metadata is most of the work</a></li>
   <li><a href="#file-formats-and-what-to-deposit" id="toc-file-formats-and-what-to-deposit" class="nav-link" data-scroll-target="#file-formats-and-what-to-deposit">17.5 File formats and what to deposit</a></li>
   <li><a href="#plan-submission-at-experimental-design-time" id="toc-plan-submission-at-experimental-design-time" class="nav-link" data-scroll-target="#plan-submission-at-experimental-design-time">17.6 Plan submission at experimental design time</a></li>
+  <li><a href="#b-design-consideration-one-canonical-sheet-as-the-single-source-of-truth" id="toc-b-design-consideration-one-canonical-sheet-as-the-single-source-of-truth" class="nav-link" data-scroll-target="#b-design-consideration-one-canonical-sheet-as-the-single-source-of-truth">17.6b Design consideration: one canonical sheet as the single source of truth</a></li>
   <li><a href="#the-end-to-end-submission-workflow" id="toc-the-end-to-end-submission-workflow" class="nav-link" data-scroll-target="#the-end-to-end-submission-workflow">17.7 The end-to-end submission workflow</a></li>
   <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">17.8 Common errors</a></li>
   <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">17.9 Where this material is also discussed</a></li>
@@ -4436,7 +4437,14 @@ Note
 <h2 class="anchored" data-anchor-id="the-metadata-is-most-of-the-work">17.4 The metadata is most of the work</h2>
 <p>You can’t reuse a counts matrix you can’t interpret. “Sample 1, Sample 2, Sample 3” is <em>not metadata</em>. At minimum, your metadata answers: who is the donor, what’s the tissue, what’s the condition, what’s the protocol, who processed it, when, with what library prep, on what machine, with what software version.</p>
 <p>For human samples: also consent type, age range (often binned for de-identification), self-reported sex / gender, and ancestry.</p>
-<p>The CELLxGENE schema<span class="citation" data-cites="czi2025cellxgene"><sup><a href="#ref-czi2025cellxgene" role="doc-biblioref">3</a></sup></span> is the most demanding of the major repositories and also the most reusable. Its insistence on ontology-typed fields is exactly what makes cross-dataset atlases possible<span class="citation" data-cites="osumisutherland2021cell"><sup><a href="#ref-osumisutherland2021cell" role="doc-biblioref">5</a></sup></span>. Meeting CELLxGENE’s bar gets you GEO + HCA “for free”. Required fields:</p>
+<p>The CELLxGENE schema<span class="citation" data-cites="czi2025cellxgene"><sup><a href="#ref-czi2025cellxgene" role="doc-biblioref">3</a></sup></span> is the most demanding of the major repositories and also the most reusable. Its insistence on ontology-typed fields is exactly what makes cross-dataset atlases possible<span class="citation" data-cites="osumisutherland2021cell"><sup><a href="#ref-osumisutherland2021cell" role="doc-biblioref">5</a></sup></span>. Meeting CELLxGENE’s bar gets you GEO + HCA “for free”.</p>
+<p>Three fields deserve a brief explanation that is easy to get wrong:</p>
+<ul>
+<li><strong><code>disease_ontology_term_id</code></strong> encodes the <em>clinical disease state</em> of the donor, not the experimental treatment. For an <em>in vitro</em> perturbation (IFN-β stimulation, a CRISPR knock-out), both the stimulated and unstimulated cells are biologically normal (<code>PATO:0000461</code>). The perturbation goes in a free-text <code>treatment</code> column alongside the required schema fields. Encoding an experimental treatment as a disease term breaks atlas integration.</li>
+<li><strong><code>is_primary_data</code></strong> is a Boolean flag: <code>TRUE</code> for data deposited by the generating lab for the first time; <code>FALSE</code> for a re-analysis of someone else’s data. This flag is how atlases avoid double-counting the same cells.</li>
+<li><strong><code>suspension_type</code></strong> distinguishes <code>cell</code> (dissociated whole cells, the usual case) from <code>nucleus</code> (single-nucleus RNA-seq / snRNA-seq). This field matters for atlas integration because snRNA-seq counts are systematically lower than scRNA-seq counts for the same cell type.</li>
+</ul>
+<p>Required fields:</p>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 50%">
@@ -4569,6 +4577,11 @@ Warning
 </ul>
 <p><strong>Do this instead:</strong> at experimental design time, build the <strong>canonical sample sheet</strong> (<a href="../Exercise_Folder/Tutorial_17_FAIR_Metadata.html">Tutorial 17</a> ships a template). Include every field you’ll need at deposition. Version-control it alongside your code. As samples come in, update the sheet. At the end of the project, the sheet <em>is</em> your BioSample / SRA / GEO upload.</p>
 <p>This single discipline will save you a week of frantic data archeology at submission time.</p>
+</section>
+<section id="b-design-consideration-one-canonical-sheet-as-the-single-source-of-truth" class="level2">
+<h2 class="anchored" data-anchor-id="b-design-consideration-one-canonical-sheet-as-the-single-source-of-truth">17.6b Design consideration: one canonical sheet as the single source of truth</h2>
+<p>The three NCBI upload templates (BioSample, SRA, and GEO) all use <code>sample_id</code> as the join key that links records across portals. NCBI’s accession-linking is case-sensitive and literal: “donor1_CTRL” and “Donor1_CTRL” will not link. Manual transcription of sample names across three spreadsheets is the single most common cause of broken cross-links in a submission.</p>
+<p>The solution is to maintain <strong>one canonical sample sheet</strong> in version control and programmatically derive all upload templates from it with <code>transmute()</code> or equivalent. Every name, date, and ontology ID appears in one place; all three submissions are generated from the same object. Inconsistencies must be fixed in the sheet — they then propagate correctly to all outputs. Tutorial 17 demonstrates this pattern end-to-end.</p>
 </section>
 <section id="the-end-to-end-submission-workflow" class="level2">
 <h2 class="anchored" data-anchor-id="the-end-to-end-submission-workflow">17.7 The end-to-end submission workflow</h2>

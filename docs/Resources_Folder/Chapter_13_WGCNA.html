@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 13 — WGCNA: Weighted Gene Co-expression Network Analysis – Single Cell RNA-seq Workshop</title>
+<title>Chapter 13 — WGCNA: Weighted Gene Co-expression Network Analysis – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4376,7 +4376,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4433,13 +4433,17 @@ z-index: 1;
    
   <ul>
   <li><a href="#the-big-idea" id="toc-the-big-idea" class="nav-link active" data-scroll-target="#the-big-idea">13.1 The big idea</a></li>
+  <li><a href="#b-pre-processing-steps-before-network-construction" id="toc-b-pre-processing-steps-before-network-construction" class="nav-link" data-scroll-target="#b-pre-processing-steps-before-network-construction">13.1b Pre-processing steps before network construction</a></li>
   <li><a href="#the-network-construction" id="toc-the-network-construction" class="nav-link" data-scroll-target="#the-network-construction">13.2 The network construction</a>
   <ul class="collapse">
   <li><a href="#pairwise-correlations" id="toc-pairwise-correlations" class="nav-link" data-scroll-target="#pairwise-correlations">13.2.1 Pairwise correlations</a></li>
   <li><a href="#power-transform-the-weighted-in-wgcna" id="toc-power-transform-the-weighted-in-wgcna" class="nav-link" data-scroll-target="#power-transform-the-weighted-in-wgcna">13.2.2 Power transform — the “weighted” in WGCNA</a></li>
   <li><a href="#topological-overlap" id="toc-topological-overlap" class="nav-link" data-scroll-target="#topological-overlap">13.2.3 Topological overlap</a></li>
   </ul></li>
-  <li><a href="#module-detection-hierarchical-clustering-with-dynamic-cutting" id="toc-module-detection-hierarchical-clustering-with-dynamic-cutting" class="nav-link" data-scroll-target="#module-detection-hierarchical-clustering-with-dynamic-cutting">13.3 Module detection — hierarchical clustering with dynamic cutting</a></li>
+  <li><a href="#module-detection-hierarchical-clustering-with-dynamic-cutting" id="toc-module-detection-hierarchical-clustering-with-dynamic-cutting" class="nav-link" data-scroll-target="#module-detection-hierarchical-clustering-with-dynamic-cutting">13.3 Module detection — hierarchical clustering with dynamic cutting</a>
+  <ul class="collapse">
+  <li><a href="#b-reading-the-gene-dendrogram" id="toc-b-reading-the-gene-dendrogram" class="nav-link" data-scroll-target="#b-reading-the-gene-dendrogram">13.3b Reading the gene dendrogram</a></li>
+  </ul></li>
   <li><a href="#module-eigengenes-the-per-module-summary" id="toc-module-eigengenes-the-per-module-summary" class="nav-link" data-scroll-target="#module-eigengenes-the-per-module-summary">13.4 Module eigengenes — the per-module summary</a></li>
   <li><a href="#picking-a-soft-threshold-power-beta" id="toc-picking-a-soft-threshold-power-beta" class="nav-link" data-scroll-target="#picking-a-soft-threshold-power-beta">13.5 Picking a soft-threshold power <span class="math inline">\(\beta\)</span></a></li>
   <li><a href="#wgcna-on-single-cell-data-why-classic-wgcna-struggles" id="toc-wgcna-on-single-cell-data-why-classic-wgcna-struggles" class="nav-link" data-scroll-target="#wgcna-on-single-cell-data-why-classic-wgcna-struggles">13.6 WGCNA on single-cell data — why classic WGCNA struggles</a></li>
@@ -4504,6 +4508,16 @@ Note
 <p>Genes that consistently rise and fall together across samples are likely <strong>functionally related</strong> — they participate in the same pathway, are co-regulated by the same TF, or are responding to the same upstream signal. This “guilt by association” premise is the basis of all co-expression analysis<span class="citation" data-cites="vandam2018gene"><sup><a href="#ref-vandam2018gene" role="doc-biblioref">1</a></sup></span>. WGCNA<span class="citation" data-cites="zhang2005general langfelder2008wgcna"><sup><a href="#ref-zhang2005general" role="doc-biblioref">2</a>,<a href="#ref-langfelder2008wgcna" role="doc-biblioref">3</a></sup></span> finds groups of such co-expressed genes (called <strong>modules</strong>) and connects each module to phenotypes via correlation with sample traits.</p>
 <p>This is a <strong>systems-level</strong> analytical lens, complementary to per-gene DE. A module of 200 genes co-expressed and correlated with disease severity is often more informative than a list of 200 individually-significant DE genes.</p>
 </section>
+<section id="b-pre-processing-steps-before-network-construction" class="level2">
+<h2 class="anchored" data-anchor-id="b-pre-processing-steps-before-network-construction">13.1b Pre-processing steps before network construction</h2>
+<p>Three pre-processing steps precede network building and each has a non-obvious choice:</p>
+<ol type="1">
+<li><p><strong>Outlier removal</strong> with <code>goodSamplesGenes()</code>, then visual confirmation via hierarchical clustering and sample-level PCA. Remove samples that sit far from the main cluster <em>before</em> normalization, because outlier samples bias the variance-stabilizing transform.</p></li>
+<li><p><strong>Variance-stabilizing transformation (VST)</strong> via DESeq2. WGCNA’s correlation is Pearson-based and assumes roughly homoscedastic data; raw counts violate this assumption because variance scales with mean. VST removes the mean–variance trend. Use <code>design = ~ 1</code> (intercept only) for the DESeq2 object: WGCNA is an <em>unsupervised</em> method, and encoding the trait of interest in the design formula would mean the normalization step sees that variable, making the later module–trait correlation partially circular (“double dipping”).</p></li>
+<li><p><strong>Gene filtering</strong> before running <code>pickSoftThreshold</code>. The tutorial retains genes with at least 15 counts in three-quarters of the samples (<code>rowSums(counts(dds) &gt;= 15) &gt;= 24</code>). Lowly expressed genes contribute noise to pairwise correlations; filtering improves scale-free network fit and reduces the size of the TOM matrix.</p></li>
+</ol>
+<p>Note that WGCNA expects the expression matrix as <strong>samples × genes</strong> (rows = samples, columns = genes) — the transpose of the standard RNA-seq convention of genes × samples. This is the most common orientation error and the tutorial transposes explicitly before passing to <code>pickSoftThreshold</code>.</p>
+</section>
 <section id="the-network-construction" class="level2">
 <h2 class="anchored" data-anchor-id="the-network-construction">13.2 The network construction</h2>
 <p>Three steps build the gene co-expression network:</p>
@@ -4535,6 +4549,16 @@ Note
 <li><code>deepSplit = 2</code> — moderate sensitivity; higher values give more, smaller modules</li>
 </ul>
 <p>The output is a colored <strong>module assignment</strong> per gene: each module gets a color label (turquoise, blue, brown, …) and the un-grouped genes get grey.</p>
+<section id="b-reading-the-gene-dendrogram" class="level3">
+<h3 class="anchored" data-anchor-id="b-reading-the-gene-dendrogram">13.3b Reading the gene dendrogram</h3>
+<p><code>blockwiseModules</code> (or <code>cutreeDynamic</code>) produces a dendrogram with two colour bars below it: the top bar shows <strong>unmerged</strong> module assignments (many fine-grained modules as found by <code>cutreeDynamic</code>) and the bottom bar shows the <strong>merged</strong> assignments after modules with similar eigengenes are fused by <code>mergeCutHeight</code>. Reading the figure:</p>
+<ul>
+<li>Genes on nearby leaves are highly co-expressed (close in TOM dissimilarity).</li>
+<li>A clean result shows 5–20 distinct coloured branches in the merged bar; many more suggests <code>mergeCutHeight</code> could be raised to reduce redundant modules.</li>
+<li>A single giant turquoise module with no further structure usually means the soft-threshold power is too low — the network is not sparse enough to resolve sub-modules.</li>
+<li>Grey genes at the base of the tree were not assigned to any module (<code>minModuleSize</code> too small to form a module or below the connectivity threshold). If many genes are grey, consider lowering <code>minModuleSize</code>.</li>
+</ul>
+</section>
 </section>
 <section id="module-eigengenes-the-per-module-summary" class="level2">
 <h2 class="anchored" data-anchor-id="module-eigengenes-the-per-module-summary">13.4 Module eigengenes — the per-module summary</h2>
@@ -4587,10 +4611,33 @@ Note
 </section>
 <section id="hub-genes-and-module-export" class="level2">
 <h2 class="anchored" data-anchor-id="hub-genes-and-module-export">13.8 Hub genes and module export</h2>
-<p>Each module has hub genes — those most-connected within the module:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>intramodConn <span class="ot">&lt;-</span> <span class="fu">intramodularConnectivity</span>(adjacency, moduleColors)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>hubs <span class="ot">&lt;-</span> intramodConn <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(kWithin)) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Each module has hub genes — those most-connected within the module. Two complementary measures identify them:</p>
+<ul>
+<li><strong>Intramodular connectivity (kWithin)</strong>: total adjacency weight of a gene to all others in the same module. High kWithin = topologically central in the TOM network.</li>
+<li><strong>Module membership / kME</strong>: the Pearson correlation of each gene’s expression profile with the module eigengene. kME close to 1.0 means the gene tracks the module’s average activity almost perfectly. This is the preferred hub metric in the tutorial because it is simple to compute and directly interpretable.</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co"># kME approach (as in the tutorial)</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>mm <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">cor</span>(norm.counts, module_eigengenes, <span class="at">use =</span> <span class="st">&quot;p&quot;</span>))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Rank by kME for the module of interest (e.g. turquoise):</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>mm <span class="sc">|&gt;</span> <span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(MEturquoise)) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">15</span>)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Intramodular connectivity (requires the adjacency matrix explicitly):</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>intramodConn <span class="ot">&lt;-</span> <span class="fu">intramodularConnectivity</span>(adjacency, moduleColors)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>hubs <span class="ot">&lt;-</span> intramodConn <span class="sc">|&gt;</span> <span class="fu">arrange</span>(<span class="fu">desc</span>(kWithin)) <span class="sc">|&gt;</span> <span class="fu">head</span>(<span class="dv">10</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Hub genes are biologically interesting candidates: a module’s hub is often the TF or upstream regulator coordinating the rest. Cross-reference hub genes against TF databases for hypothesis generation.</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong><code>cor</code> shadowing.</strong> The WGCNA package replaces base R’s <code>cor()</code> function in the global environment when it is loaded. Code run after <code>library(WGCNA)</code> will silently use WGCNA’s <code>cor()</code> rather than <code>base::cor()</code>, which can produce surprising results in unrelated downstream code. The tutorial pattern saves base <code>cor</code> before calling <code>blockwiseModules</code> and restores it afterward: <code>temp_cor &lt;- cor; cor &lt;- WGCNA::cor; ...; cor &lt;- temp_cor</code>.</p>
+</div>
+</div>
 <p>For downstream functional analysis, export the module gene list and run <a href="Chapter_07_FunctionalAnalysis.html">Chapter 7’s</a> ORA / GSEA pipeline on it. WGCNA modules are gene sets — they enrich for biology like any other gene set.</p>
 </section>
 <section id="common-errors" class="level2">

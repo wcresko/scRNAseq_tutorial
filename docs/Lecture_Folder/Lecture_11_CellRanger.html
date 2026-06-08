@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 11 — Cell Ranger: Raw Reads to Counts</title>
+  <title>Single Cell RNA-seq Analysis Workshop – Lecture 11 — Cell Ranger: Raw Reads to Counts</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1183,15 +1183,7 @@ Bill Cresko
 <li class="fragment">Most participants <em>start</em> from a counts matrix; this lecture explains where that matrix comes from</li>
 <li class="fragment">You arrive here when <strong>you</strong> have raw 10x data and must turn it into counts yourself</li>
 <li class="fragment">The hand-off target is <strong>Module 01</strong> — the QC/preprocessing step that loads <code>filtered_feature_bc_matrix/</code></li>
-</ul>
-</section>
-<section id="companion-materials" class="slide level2">
-<h2>Companion materials</h2>
-<ul>
-<li><strong>Reading:</strong> <a href="../Resources_Folder/Chapter_11_CellRanger.html">Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix</a></li>
-<li><strong>Tutorial:</strong> <a href="../Exercise_Folder/Tutorial_11_CellRanger_RawData.html">Tutorial 11 — Raw Data + Cell Ranger <code>count</code></a></li>
-<li><strong>scATAC companion:</strong> <a href="Lecture_12_scATAC_CellRanger.html">Lecture 12 — Raw scATAC-seq with cellranger-atac</a></li>
-<li><strong>Downstream:</strong> <a href="Lecture_01_Preprocessing.html">Module 01 — QC &amp; Preprocessing</a></li>
+<li class="fragment"><strong>Reading:</strong> <a href="../Resources_Folder/Chapter_11_CellRanger.html">Chapter 11</a> · <strong>Tutorial:</strong> <a href="../Exercise_Folder/Tutorial_11_CellRanger_RawData.html">Tutorial 11</a> · <strong>ATAC companion:</strong> <a href="Lecture_12_scATAC_CellRanger.html">Lecture 12</a></li>
 </ul>
 </section>
 <section id="goals-of-this-lecture" class="slide level2">
@@ -1245,6 +1237,21 @@ Bill Cresko
 <li class="fragment">So the step <strong>you</strong> own is almost always <code>cellranger count</code></li>
 <li class="fragment">This lecture focuses there, but you should recognize the whole chain when something upstream breaks</li>
 </ul>
+</section>
+<section id="installation-on-talapas" class="slide level2">
+<h2>Installation on Talapas</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="co"># Check the cluster module first</span></span>
+<span id="cb2-2"><a></a><span class="ex">module</span> avail cellranger      <span class="co"># e.g.  cellranger/9.0.0</span></span>
+<span id="cb2-3"><a></a></span>
+<span id="cb2-4"><a></a><span class="co"># If not provided, install manually into /projects (NOT $HOME)</span></span>
+<span id="cb2-5"><a></a><span class="bu">cd</span> /projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/software</span>
+<span id="cb2-6"><a></a><span class="fu">wget</span> <span class="at">-O</span> cellranger-9.0.0.tar.gz <span class="st">&quot;https://cf.10xgenomics.com/releases/cell-exp/cellranger-9.0.0.tar.gz?&lt;token&gt;&quot;</span></span>
+<span id="cb2-7"><a></a><span class="fu">tar</span> <span class="at">-xzf</span> cellranger-9.0.0.tar.gz</span>
+<span id="cb2-8"><a></a><span class="bu">export</span> <span class="va">PATH</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/software/cellranger-9.0.0:<span class="va">$PATH</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">Always check <code>module avail cellranger</code> first — saves 3 GB of manual install</li>
+<li class="fragment">If installing manually, add the <code>export PATH=</code> line to <code>~/.bashrc</code> so batch jobs find it</li>
+</ul>
 </section></section>
 <section>
 <section id="part-2-mkfastq-vs-count" class="title-slide slide level1 center" data-background-color="#2c3e50">
@@ -1296,10 +1303,10 @@ Bill Cresko
 </section>
 <section id="where-it-lives-and-why-it-matters" class="slide level2">
 <h2>Where it lives — and why it matters</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="co"># Human GRCh38 reference (~12 GB compressed, ~30 GB extracted)</span></span>
-<span id="cb2-2"><a></a><span class="bu">cd</span> /projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs</span>
-<span id="cb2-3"><a></a><span class="fu">wget</span> https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz</span>
-<span id="cb2-4"><a></a><span class="fu">tar</span> <span class="at">-xzf</span> refdata-gex-GRCh38-2024-A.tar.gz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="co"># Human GRCh38 reference (~12 GB compressed, ~30 GB extracted)</span></span>
+<span id="cb3-2"><a></a><span class="bu">cd</span> /projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs</span>
+<span id="cb3-3"><a></a><span class="fu">wget</span> https://cf.10xgenomics.com/supp/cell-exp/refdata-gex-GRCh38-2024-A.tar.gz</span>
+<span id="cb3-4"><a></a><span class="fu">tar</span> <span class="at">-xzf</span> refdata-gex-GRCh38-2024-A.tar.gz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment"><strong>Never</strong> in <code>$HOME</code> — small per-user quota on Talapas</li>
 <li class="fragment">Keep <strong>one canonical copy per group</strong> in <code>/projects/&lt;PIRG&gt;/...</code>; everyone shares it</li>
@@ -1313,14 +1320,14 @@ Bill Cresko
 </section>
 <section id="the-core-invocation" class="slide level2">
 <h2>The core invocation</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="ex">cellranger</span> count <span class="dt">\</span></span>
-<span id="cb3-2"><a></a>  <span class="at">--id</span><span class="op">=</span>pbmc_1k_v3 <span class="dt">\</span></span>
-<span id="cb3-3"><a></a>  <span class="at">--transcriptome</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs/refdata-gex-GRCh38-2024-A <span class="dt">\</span></span>
-<span id="cb3-4"><a></a>  <span class="at">--fastqs</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/test_data/pbmc_1k_v3_fastqs <span class="dt">\</span></span>
-<span id="cb3-5"><a></a>  <span class="at">--sample</span><span class="op">=</span>pbmc_1k_v3 <span class="dt">\</span></span>
-<span id="cb3-6"><a></a>  <span class="at">--create-bam</span><span class="op">=</span>true <span class="dt">\</span></span>
-<span id="cb3-7"><a></a>  <span class="at">--localcores</span><span class="op">=</span>16 <span class="dt">\</span></span>
-<span id="cb3-8"><a></a>  <span class="at">--localmem</span><span class="op">=</span>120</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="ex">cellranger</span> count <span class="dt">\</span></span>
+<span id="cb4-2"><a></a>  <span class="at">--id</span><span class="op">=</span>pbmc_1k_v3 <span class="dt">\</span></span>
+<span id="cb4-3"><a></a>  <span class="at">--transcriptome</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs/refdata-gex-GRCh38-2024-A <span class="dt">\</span></span>
+<span id="cb4-4"><a></a>  <span class="at">--fastqs</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/test_data/pbmc_1k_v3_fastqs <span class="dt">\</span></span>
+<span id="cb4-5"><a></a>  <span class="at">--sample</span><span class="op">=</span>pbmc_1k_v3 <span class="dt">\</span></span>
+<span id="cb4-6"><a></a>  <span class="at">--create-bam</span><span class="op">=</span>true <span class="dt">\</span></span>
+<span id="cb4-7"><a></a>  <span class="at">--localcores</span><span class="op">=</span>16 <span class="dt">\</span></span>
+<span id="cb4-8"><a></a>  <span class="at">--localmem</span><span class="op">=</span>120</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="parameter-by-parameter" class="slide level2">
 <h2>Parameter by parameter</h2>
@@ -1421,23 +1428,22 @@ Bill Cresko
 </section>
 <section id="the-one-directory-that-matters-downstream" class="slide level2">
 <h2>The one directory that matters downstream</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="ex">outs/filtered_feature_bc_matrix/</span></span>
-<span id="cb4-2"><a></a>  <span class="ex">├──</span> barcodes.tsv.gz</span>
-<span id="cb4-3"><a></a>  <span class="ex">├──</span> features.tsv.gz</span>
-<span id="cb4-4"><a></a>  <span class="ex">└──</span> matrix.mtx.gz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a></a><span class="ex">outs/filtered_feature_bc_matrix/</span></span>
+<span id="cb5-2"><a></a>  <span class="ex">├──</span> barcodes.tsv.gz</span>
+<span id="cb5-3"><a></a>  <span class="ex">├──</span> features.tsv.gz</span>
+<span id="cb5-4"><a></a>  <span class="ex">└──</span> matrix.mtx.gz</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
-<li class="fragment">This is exactly what <code>Read10X()</code> loads in Module 01</li>
+<li class="fragment">This is exactly what <code>Read10X()</code> loads in Module 01:</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a></a><span class="fu">library</span>(Seurat)</span>
+<span id="cb6-2"><a></a>counts <span class="ot">&lt;-</span> <span class="fu">Read10X</span>(<span class="st">&quot;data/filtered_feature_bc_matrix/&quot;</span>)</span>
+<span id="cb6-3"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(counts, <span class="at">project =</span> <span class="st">&quot;pbmc_1k_v3&quot;</span>,</span>
+<span id="cb6-4"><a></a>                          <span class="at">min.cells =</span> <span class="dv">3</span>, <span class="at">min.features =</span> <span class="dv">200</span>)</span>
+<span id="cb6-5"><a></a><span class="co"># … continue at Module 01 (QC metrics)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
 <li class="fragment"><code>raw_feature_bc_matrix/</code> (all barcodes, pre-calling) is what <strong>SoupX</strong> needs</li>
 <li class="fragment">Everything downstream in the workshop begins from these three files</li>
 </ul>
-</section>
-<section id="into-the-core-pipeline" class="slide level2">
-<h2>Into the core pipeline</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a></a><span class="fu">library</span>(Seurat)</span>
-<span id="cb5-2"><a></a>counts <span class="ot">&lt;-</span> <span class="fu">Read10X</span>(<span class="st">&quot;data/filtered_feature_bc_matrix/&quot;</span>)</span>
-<span id="cb5-3"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">CreateSeuratObject</span>(counts, <span class="at">project =</span> <span class="st">&quot;pbmc_1k_v3&quot;</span>,</span>
-<span id="cb5-4"><a></a>                          <span class="at">min.cells =</span> <span class="dv">3</span>, <span class="at">min.features =</span> <span class="dv">200</span>)</span>
-<span id="cb5-5"><a></a><span class="co"># … continue at Module 01 (QC metrics)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section></section>
 <section>
 <section id="part-7-scaling-up" class="title-slide slide level1 center" data-background-color="#2c3e50">
@@ -1446,17 +1452,17 @@ Bill Cresko
 </section>
 <section id="dont-write-n-scripts-use-a-slurm-array" class="slide level2">
 <h2>Don’t write N scripts — use a SLURM array</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="co">#SBATCH --array=1-8        # one sub-job per sample</span></span>
-<span id="cb6-2"><a></a></span>
-<span id="cb6-3"><a></a><span class="co"># samples.txt: one sample ID per line</span></span>
-<span id="cb6-4"><a></a><span class="va">SAMPLE</span><span class="op">=</span><span class="va">$(</span><span class="fu">sed</span> <span class="at">-n</span> <span class="st">&quot;</span><span class="va">${SLURM_ARRAY_TASK_ID}</span><span class="st">p&quot;</span> samples.txt<span class="va">)</span></span>
-<span id="cb6-5"><a></a></span>
-<span id="cb6-6"><a></a><span class="ex">cellranger</span> count <span class="dt">\</span></span>
-<span id="cb6-7"><a></a>  <span class="at">--id</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$SAMPLE</span><span class="st">&quot;</span> <span class="dt">\</span></span>
-<span id="cb6-8"><a></a>  <span class="at">--transcriptome</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs/refdata-gex-GRCh38-2024-A <span class="dt">\</span></span>
-<span id="cb6-9"><a></a>  <span class="at">--fastqs</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/raw_fastqs/<span class="st">&quot;</span><span class="va">$SAMPLE</span><span class="st">&quot;</span> <span class="dt">\</span></span>
-<span id="cb6-10"><a></a>  <span class="at">--sample</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$SAMPLE</span><span class="st">&quot;</span> <span class="dt">\</span></span>
-<span id="cb6-11"><a></a>  <span class="at">--create-bam</span><span class="op">=</span>true <span class="at">--localcores</span><span class="op">=</span>16 <span class="at">--localmem</span><span class="op">=</span>120</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="co">#SBATCH --array=1-8        # one sub-job per sample</span></span>
+<span id="cb7-2"><a></a></span>
+<span id="cb7-3"><a></a><span class="co"># samples.txt: one sample ID per line</span></span>
+<span id="cb7-4"><a></a><span class="va">SAMPLE</span><span class="op">=</span><span class="va">$(</span><span class="fu">sed</span> <span class="at">-n</span> <span class="st">&quot;</span><span class="va">${SLURM_ARRAY_TASK_ID}</span><span class="st">p&quot;</span> samples.txt<span class="va">)</span></span>
+<span id="cb7-5"><a></a></span>
+<span id="cb7-6"><a></a><span class="ex">cellranger</span> count <span class="dt">\</span></span>
+<span id="cb7-7"><a></a>  <span class="at">--id</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$SAMPLE</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb7-8"><a></a>  <span class="at">--transcriptome</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/refs/refdata-gex-GRCh38-2024-A <span class="dt">\</span></span>
+<span id="cb7-9"><a></a>  <span class="at">--fastqs</span><span class="op">=</span>/projects/<span class="op">&lt;</span>PIRG<span class="op">&gt;</span>/<span class="op">&lt;</span>user<span class="op">&gt;</span>/raw_fastqs/<span class="st">&quot;</span><span class="va">$SAMPLE</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb7-10"><a></a>  <span class="at">--sample</span><span class="op">=</span><span class="st">&quot;</span><span class="va">$SAMPLE</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb7-11"><a></a>  <span class="at">--create-bam</span><span class="op">=</span>true <span class="at">--localcores</span><span class="op">=</span>16 <span class="at">--localmem</span><span class="op">=</span>120</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment">One row in <code>samples.txt</code> per sample; SLURM fans them out in parallel</li>
 <li class="fragment">Same script, scales from 1 to dozens of samples</li>
@@ -1476,6 +1482,15 @@ Bill Cresko
 <section id="summary" class="title-slide slide level1 center" data-background-color="#2c3e50">
 <h1>Summary</h1>
 
+</section>
+<section id="design-considerations" class="slide level2">
+<h2>Design considerations</h2>
+<ul>
+<li class="fragment"><strong>Reference genome version matters</strong> — re-run with a newer GTF/genome if your annotation is out of date; old references reduce detected genes.</li>
+<li class="fragment"><strong><code>cellranger aggr</code> vs Seurat merge</strong> — <code>aggr</code> depth-normalizes before combining; Seurat <code>merge()</code> + integration gives finer control for most workshop-style analyses. Prefer the Seurat path unless you specifically need <code>aggr</code>’s normalization.</li>
+<li class="fragment"><strong>FASTQ naming is non-negotiable</strong> — the <code>&lt;SAMPLE&gt;_S&lt;n&gt;_L&lt;lane&gt;_&lt;R/I&gt;_001.fastq.gz</code> pattern is parsed by <code>count</code>; symlink if your core handed you renamed files.</li>
+<li class="fragment"><strong><code>raw_feature_bc_matrix/</code></strong> is what ambient-RNA tools like SoupX need; keep it alongside <code>filtered_</code>.</li>
+</ul>
 </section>
 <section id="what-to-take-away" class="slide level2">
 <h2>What to take away</h2>
