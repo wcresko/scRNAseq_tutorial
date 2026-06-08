@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ## About this tutorial
 
 The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~14,000 cells, ~25 MB on disk, no 10x click-through.
@@ -92,7 +101,7 @@ By the end of this tutorial you will be able to:
 
 
 ::: {.callout-warning title="Common errors / things that bite"}
-**`library(muscData)` errors with "there is no package called 'muscData'"** — `muscData` is a Bioconductor experiment-data package, not on CRAN. Install with `BiocManager::install("muscData")` (which itself needs `install.packages("BiocManager")` first).
+**`library(muscData)` errors with "there is no package called 'muscData'"** — it should already be installed from the [Tutorial 00 setup](Tutorial_00_Setup_RStudio_Packages.html); if it's missing, re-run that setup block.
 
 **`scDblFinder` returns a different result than the workshop** — `scDblFinder` is stochastic. The workshop uses `set.seed(2026)` *immediately before* calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.
 
@@ -114,10 +123,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ```{r}
 #| label: setup
 
-# One-time install (skip if already installed):
-# install.packages(c("Seurat", "tidyverse", "BiocManager"))
-# BiocManager::install(c("muscData", "SingleCellExperiment"))
-
+# Packages are installed once in Tutorial 00 (Setup) — here we just load them.
 library(Seurat)
 library(muscData)
 library(SingleCellExperiment)
@@ -137,7 +143,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 ```
 
 ::: callout-note
-`muscData` is a **Bioconductor** experiment-data package (not on CRAN), so it has to go through `BiocManager::install()`. The first call to `Kang18_8vs8()` downloads \~25 MB through `ExperimentHub` into your local cache; subsequent calls are instant.
+`muscData` (installed in the [Tutorial 00 setup](Tutorial_00_Setup_RStudio_Packages.html)) ships the data through Bioconductor's `ExperimentHub`: the first call to `Kang18_8vs8()` downloads \~25 MB into your local cache, and subsequent calls are instant.
 :::
 
 ------------------------------------------------------------------------
@@ -345,35 +351,35 @@ In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambi
 **SoupX needs both the raw and filtered Cell Ranger matrices** (`raw_feature_bc_matrix/` and `filtered_feature_bc_matrix/`) because it learns the soup profile from empty droplets. `Kang18_8vs8()` only ships the **filtered** counts, so you cannot run SoupX on `ifnb` directly. The code below is the canonical pattern — use it on **your own** 10x data, or in the optional [Full Talapas run from raw FASTQs](../Resources_Folder/Talapas_FullRun_FromFASTQs.html), where the raw matrix is available.
 :::
 
+*Optional reference pattern — left `#| eval: false` because it needs a raw Cell Ranger matrix (not shipped with `ifnb`). You don't need to change anything here; use it on your own 10x data.*
+
 ```{r}
 #| label: soupx
 #| eval: false
 
-# Pattern for any 10x dataset where you have the raw Cell Ranger output:
-# library(SoupX)
-# library(DropletUtils)
-#
-# # 1. Point at the Cell Ranger 'outs/' directory (containing raw_feature_bc_matrix/
-# #    and filtered_feature_bc_matrix/)
-# sc <- load10X("path/to/cellranger/outs")
-#
-# # 2. (Recommended) provide preliminary clusters so SoupX can refine the soup
-# #    profile per cluster. Compute these with a quick Seurat workflow on the
-# #    filtered matrix first, then attach:
-# # sc <- setClusters(sc, setNames(seu$seurat_clusters, colnames(seu)))
-# # sc <- setDR(sc, Embeddings(seu, "umap"))
-#
-# # 3. Estimate the ambient contamination fraction
-# sc <- autoEstCont(sc)
-# rho <- sc$fit$rhoEst
-# message("Estimated ambient fraction: ", round(rho, 3))
-#
-# # 4. Adjust the counts (round to integers so downstream UMI tools are happy)
-# adj <- adjustCounts(sc, roundToInt = TRUE)
-#
-# # 5. Use `adj` (a sparse matrix) as the input to CreateSeuratObject() in Step 1
-# #    instead of the raw filtered matrix. Everything else in this tutorial then
-# #    runs on the cleaned counts.
+# Pattern for any 10x dataset where you have the raw Cell Ranger output.
+library(SoupX)
+library(DropletUtils)
+
+# 1. Point at the Cell Ranger 'outs/' directory (containing raw_feature_bc_matrix/
+#    and filtered_feature_bc_matrix/)
+sc <- load10X("path/to/cellranger/outs")
+
+# 2. (Recommended) provide preliminary clusters so SoupX can refine the soup
+#    profile per cluster — compute them with a quick Seurat workflow first:
+# sc <- setClusters(sc, setNames(seu$seurat_clusters, colnames(seu)))
+# sc <- setDR(sc, Embeddings(seu, "umap"))
+
+# 3. Estimate the ambient contamination fraction
+sc  <- autoEstCont(sc)
+rho <- sc$fit$rhoEst
+message("Estimated ambient fraction: ", round(rho, 3))
+
+# 4. Adjust the counts (round to integers so downstream UMI tools are happy)
+adj <- adjustCounts(sc, roundToInt = TRUE)
+
+# 5. Use `adj` as the input to CreateSeuratObject() in Step 1 instead of the raw
+#    filtered matrix; everything else in this tutorial then runs on the cleaned counts.
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -399,8 +405,6 @@ A **doublet** is one barcode's worth of counts that came from two cells getting 
 ```{r}
 #| label: dbl
 
-# install if needed:
-# BiocManager::install("scDblFinder")
 library(scDblFinder)
 
 set.seed(2026)
