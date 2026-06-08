@@ -99,16 +99,27 @@ After running an automatic method, you have:
 - Manual labels (`celltype_manual` from Chapter 3, or the author-curated `seurat_annotations` ground truth)
 - Azimuth labels (`predicted.celltype.l2`)
 
-A workable reconciliation rule: **keep the manual label where the automatic call agrees, flag the rest**:
+A workable reconciliation rule: **keep the manual label where the automatic call agrees, flag the rest** — but first, a critical gotcha:
+
+::: callout-warning
+**Different methods speak different vocabularies.** Manual/ground-truth labels and Azimuth labels rarely use identical strings, and they sit at different granularities — `CD14+ Monocytes` (a `muscData` ground-truth label) vs `CD14 Mono` (Azimuth level 2) vs `Mono` (Azimuth level 1); `B cells` vs `B naive`. A raw `==` comparison would mark *every* cell as a disagreement. **Harmonize to a common coarse vocabulary first**, then compare at the granularity the two sides share — usually Azimuth **level 1** (`predicted.celltype.l1`).
+:::
 
 ```r
-seu$celltype_final <- with(seu@meta.data, dplyr::case_when(
-  celltype_manual == predicted.celltype.l2    ~ celltype_manual,
-  TRUE                                         ~ paste0("REVIEW:", celltype_manual)
-))
+# Map both sides to a common coarse vocabulary, then compare at level 1.
+to_coarse <- function(x) dplyr::recode(as.character(x),
+  "B cells" = "B", "CD4 T cells" = "CD4 T", "CD8 T cells" = "CD8 T",
+  "NK cells" = "NK", "Dendritic cells" = "DC",
+  "CD14+ Monocytes" = "Mono", "FCGR3A+ Monocytes" = "Mono",
+  "Megakaryocytes" = "Mk", .default = NA_character_)
+
+manual_coarse <- to_coarse(seu$seurat_annotations)
+agree <- !is.na(manual_coarse) & manual_coarse == as.character(seu$predicted.celltype.l1)
+seu$celltype_final <- ifelse(agree, as.character(seu$seurat_annotations),
+                             paste0("REVIEW:", as.character(seu$seurat_annotations)))
 ```
 
-Cells where the automatic method agrees with manual get the manual label; the rest get a `REVIEW:` prefix and you investigate manually. (If you also ran a second method such as SingleR, add a clause so a cell that agrees with *either* method is accepted.)
+Cells where the calls agree at level 1 keep the ground-truth label; the rest get a `REVIEW:` prefix and you investigate manually. (If you also ran a second method, add a clause so a cell that agrees with *either* is accepted.)
 
 For the `ifnb` workflow this typically agrees on 92%+ of cells — the disagreements concentrate in:
 

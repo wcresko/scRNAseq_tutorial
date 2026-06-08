@@ -17,6 +17,19 @@ dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)  # input datasets l
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 # Step 1 — Peek at the raw fragment file
 frag.file <- read.delim(file.path(DATA_DIR, "atac_v1_pbmc_10k_fragments.tsv.gz"),
                         header = FALSE, nrows = 10)
@@ -63,7 +76,7 @@ p_qc_density <- (a1 | a2) +
     title    = "scATAC-seq QC density scatters — PBMC 10k v1",
     subtitle = "Good cells: sufficient depth, high TSS enrichment, low nucleosome signal",
     caption  = "Module 15 · scATAC-seq with Signac")
-ggsave(file.path(OUT_DIR, "Mod15_C6_qc_density_scatter.png"), p_qc_density,
+save_fig(file.path(OUT_DIR, "Mod15_C6_qc_density_scatter.png"), p_qc_density,
        width = 10, height = 5, dpi = 300)
 
 p_qc_vln <- VlnPlot(pbmc,
@@ -76,7 +89,7 @@ p_qc_vln <- p_qc_vln +
     title    = "Per-cell ATAC QC metric distributions — PBMC 10k v1",
     subtitle = "Depth, complexity, TSS enrichment, nucleosome signal, blacklist ratio and peak-read fraction",
     caption  = "Module 15 · scATAC-seq with Signac")
-ggsave(file.path(OUT_DIR, "Mod15_C6_qc_violins.png"), p_qc_vln,
+save_fig(file.path(OUT_DIR, "Mod15_C6_qc_violins.png"), p_qc_vln,
        width = 14, height = 4, dpi = 300)
 
 # Step 6 — Filter (Signac PBMC vignette thresholds; tune per dataset)
@@ -95,7 +108,7 @@ p_depthcor <- DepthCor(pbmc) +
        subtitle = "Component 1 typically tracks depth, not biology — exclude it downstream",
        x        = "LSI component",
        y        = "Correlation with depth")
-ggsave(file.path(OUT_DIR, "Mod15_C8_depthcor.png"), p_depthcor,
+save_fig(file.path(OUT_DIR, "Mod15_C8_depthcor.png"), p_depthcor,
        width = 7, height = 4, dpi = 300)
 
 # Step 8 — UMAP + clustering on LSI dims 2:30 (drop depth-correlated component 1)
@@ -110,7 +123,7 @@ p_umap <- DimPlot(pbmc, label = TRUE) +
        subtitle = "UMAP on LSI components 2:30, clustered with SLM (algorithm 3)",
        x        = "UMAP 1",
        y        = "UMAP 2")
-ggsave(file.path(OUT_DIR, "Mod15_C9_umap_clusters.png"), p_umap,
+save_fig(file.path(OUT_DIR, "Mod15_C9_umap_clusters.png"), p_umap,
        width = 7, height = 6, dpi = 300)
 
 saveRDS(pbmc, file.path(DATA_DIR, "pbmc_atac_clustered.rds"))

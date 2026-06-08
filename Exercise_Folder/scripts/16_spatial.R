@@ -16,6 +16,19 @@ dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 # Step 1 — Load both sections (run SeuratData::InstallData("stxBrain") once first)
 ant  <- LoadData("stxBrain", type = "anterior1")
 post <- LoadData("stxBrain", type = "posterior1")
@@ -39,7 +52,7 @@ p_qc_vln <- p_qc_vln + plot_annotation(
   title    = "Per-spot QC metrics — stxBrain anterior section",
   subtitle = "UMIs/spot, genes/spot and mitochondrial % distributions",
   caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C3_qc_violins.png"), p_qc_vln, width = 10, height = 4, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C3_qc_violins.png"), p_qc_vln, width = 10, height = 4, dpi = 300)
 
 # Figure out: spatial QC overlay on the tissue (Mod16_C3)
 p_qc_spatial <- SpatialFeaturePlot(ant, features = c("nCount_Spatial", "percent.mt"),
@@ -48,7 +61,7 @@ p_qc_spatial <- p_qc_spatial + plot_annotation(
   title    = "Spatial QC overlay — stxBrain anterior section",
   subtitle = "UMIs/spot and mitochondrial % on the histology image",
   caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C3_qc_spatial.png"), p_qc_spatial, width = 10, height = 5, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C3_qc_spatial.png"), p_qc_spatial, width = 10, height = 5, dpi = 300)
 
 # Step 3 — SCTransform normalization (recommended for Visium's wider dynamic range)
 ant  <- SCTransform(ant,  assay = "Spatial", verbose = FALSE)
@@ -61,7 +74,7 @@ p_markers_ant <- SpatialFeaturePlot(ant, features = c("Hpca", "Plp1", "Sst"),
     title    = "Anatomical markers on tissue — anterior section",
     subtitle = "Hpca (hippocampus), Plp1 (white matter), Sst (interneurons)",
     caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C5_markers_anterior.png"), p_markers_ant, width = 12, height = 4, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C5_markers_anterior.png"), p_markers_ant, width = 12, height = 4, dpi = 300)
 
 p_markers_post <- SpatialFeaturePlot(post, features = c("Hpca", "Plp1", "Pcp4"),
                                      ncol = 3, alpha = c(0.1, 1)) +
@@ -69,7 +82,7 @@ p_markers_post <- SpatialFeaturePlot(post, features = c("Hpca", "Plp1", "Pcp4"),
     title    = "Anatomical markers on tissue — posterior section",
     subtitle = "Hpca (hippocampus), Plp1 (white matter), Pcp4 (cerebellum)",
     caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C5_markers_posterior.png"), p_markers_post, width = 12, height = 4, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C5_markers_posterior.png"), p_markers_post, width = 12, height = 4, dpi = 300)
 
 # Step 5 — Cluster spots on the anterior section (notebook Mod16_C6); also needed so the
 # spatially variable features below run on a clustered object as in the notebook.
@@ -88,7 +101,7 @@ p_cluster <- (p_umap + p_tis) + plot_annotation(
   title    = "Spot clustering — stxBrain anterior section",
   subtitle = "SNN clusters on the SCT assay, in UMAP space and on the histology image",
   caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C6_anterior_clusters.png"), p_cluster, width = 12, height = 5, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C6_anterior_clusters.png"), p_cluster, width = 12, height = 5, dpi = 300)
 
 # Step 6 — Spatially variable features on the anterior section (Moran's I)
 ant <- FindSpatiallyVariableFeatures(ant, assay = "SCT",
@@ -103,7 +116,7 @@ p_svf <- SpatialFeaturePlot(ant, features = top_sv, ncol = 3, alpha = c(0.1, 1))
     title    = "Top spatially variable features (Moran's I) — anterior section",
     subtitle = "Genes whose expression has the strongest spatial structure",
     caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C7_spatially_variable_features.png"), p_svf, width = 12, height = 7, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C7_spatially_variable_features.png"), p_svf, width = 12, height = 7, dpi = 300)
 
 # Step 7 — Merge anterior + posterior and joint-cluster (SCT integration)
 ant$slice <- "anterior"; post$slice <- "posterior"
@@ -123,7 +136,7 @@ p_int_umap <- DimPlot(brain, group.by = c("slice", "seurat_clusters")) +
     title    = "Integrated UMAP — anterior + posterior sections",
     subtitle = "Coloured by section of origin and by joint cluster",
     caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C8_integrated_umap.png"), p_int_umap, width = 12, height = 5, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C8_integrated_umap.png"), p_int_umap, width = 12, height = 5, dpi = 300)
 
 # Figure out: joint clusters mapped back onto each section (Mod16_C8)
 p_int_spatial <- SpatialDimPlot(brain, label = TRUE) +
@@ -131,7 +144,7 @@ p_int_spatial <- SpatialDimPlot(brain, label = TRUE) +
     title    = "Integrated clusters on tissue — both sections",
     subtitle = "Joint cluster assignments mapped back onto each section",
     caption  = "Module 16 · Spatial Transcriptomics")
-ggsave(file.path(OUT_DIR, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial, width = 10, height = 5, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial, width = 10, height = 5, dpi = 300)
 
 saveRDS(brain, file.path(DATA_DIR, "brain_spatial_integrated.rds"))
 cat("Wrote", file.path(DATA_DIR, "brain_spatial_integrated.rds"), "with", ncol(brain), "spots\n")

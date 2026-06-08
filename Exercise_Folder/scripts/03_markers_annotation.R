@@ -12,6 +12,19 @@ OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod3") # figures/tables, named to ma
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 seu <- readRDS(file.path(DATA_DIR, "ifnb_clustered.rds"))
 
 # Step 2 — Markers for every cluster (top 5 per cluster written for inspection)
@@ -33,7 +46,7 @@ p_vln <- p_vln + plot_annotation(
   title    = "Canonical PBMC marker expression by cluster",
   subtitle = "Monocyte (CD14/LYZ), B (MS4A1/CD79A), CD8 T (CD8A) and NK (GNLY) markers",
   caption  = "Module 3 · Markers & Annotation (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod3_C5_marker_violins.png"), p_vln, width = 10, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C5_marker_violins.png"), p_vln, width = 10, height = 6, dpi = 300)
 
 p_feature <- FeaturePlot(seu, features = c("CD14", "MS4A1", "CD8A", "GNLY"), ncol = 2) &
   xlab("UMAP 1") & ylab("UMAP 2") & theme(plot.title = element_text(size = 11))
@@ -41,7 +54,7 @@ p_feature <- p_feature + plot_annotation(
   title    = "Marker expression overlaid on the UMAP",
   subtitle = "CD14 (monocytes), MS4A1 (B), CD8A (CD8 T), GNLY (NK)",
   caption  = "Module 3 · Markers & Annotation (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod3_C6_marker_featureplots.png"), p_feature, width = 9, height = 8, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C6_marker_featureplots.png"), p_feature, width = 9, height = 8, dpi = 300)
 
 # Heatmap: re-scale the top-marker genes so non-HVG markers also appear (Tutorial 01 scaled HVGs only)
 top10 <- markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10) |> ungroup()
@@ -50,7 +63,7 @@ p_heatmap <- DoHeatmap(seu, features = top10$gene) + NoLegend() +
   labs(title    = "Top-10 markers per cluster — scaled expression heatmap",
        subtitle = "Each column is a cell, grouped by cluster; rows are marker genes",
        caption  = "Module 3 · Markers & Annotation (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod3_C7_marker_heatmap.png"), p_heatmap, width = 12, height = 10, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C7_marker_heatmap.png"), p_heatmap, width = 12, height = 10, dpi = 300)
 
 canonical_panel <- c("CD14", "LYZ", "FCGR3A", "MS4A7", "FCER1A", "CST3",
                      "IL7R", "CCR7", "S100A4", "CD8A", "GZMK", "GNLY",
@@ -60,7 +73,7 @@ p_dot <- DotPlot(seu, features = canonical_panel) + RotatedAxis() +
        subtitle = "Dot size = % of cells expressing; colour = scaled average expression",
        x = "Marker gene", y = "Cluster (RNA_snn_res.0.5)",
        colour = "Avg. expression", size = "Percent expressed")
-ggsave(file.path(OUT_DIR, "Mod3_C8_marker_dotplot.png"), p_dot, width = 10, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C8_marker_dotplot.png"), p_dot, width = 10, height = 6, dpi = 300)
 
 # Step 4 — Manual annotation by canonical PBMC markers (edit after inspecting the CSV)
 canonical <- list(
@@ -90,9 +103,9 @@ p_validate <- (p_manual | p_truth) + plot_annotation(
   title    = "Manual annotation vs author ground truth on the same embedding",
   subtitle = "Cells should land in matching positions if your manual labels agree with the authors'",
   caption  = "Module 3 · Markers & Annotation (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod3_C10_umap_manual.png"),          p_manual,   width = 7,  height = 6, dpi = 300)
-ggsave(file.path(OUT_DIR, "Mod3_C10_umap_ground_truth.png"),    p_truth,    width = 7,  height = 6, dpi = 300)
-ggsave(file.path(OUT_DIR, "Mod3_C10_umap_manual_vs_truth.png"), p_validate, width = 13, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C10_umap_manual.png"),          p_manual,   width = 7,  height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C10_umap_ground_truth.png"),    p_truth,    width = 7,  height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod3_C10_umap_manual_vs_truth.png"), p_validate, width = 13, height = 6, dpi = 300)
 
 # Table out: cross-tab of manual labels vs ground-truth labels (Mod3_C10)
 as.data.frame(table(manual = seu$celltype_manual, truth = seu$seurat_annotations)) |>

@@ -12,6 +12,19 @@ OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod2") # figures/tables, named to ma
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 seu <- readRDS(file.path(DATA_DIR, "ifnb_preprocessed.rds"))
 
 # Step 1 — PCA
@@ -37,14 +50,14 @@ p_pca_heatmap <- wrap_elements(p_pca_heatmap) + plot_annotation(
   title    = "PCA diagnostic — PC1 gene-loading heatmap",
   subtitle = "Cells ordered by PC1 score; expect interferon-stimulated genes to dominate",
   caption  = "Module 2 · Dimensionality Reduction & Clustering (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap, width = 7, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap, width = 7, height = 6, dpi = 300)
 
 # Figure out: elbow plot — variance per PC (Mod2_C4)
 p_elbow <- ElbowPlot(seu, ndims = 40) +
   labs(title    = "PCA elbow plot — variance captured per principal component",
        subtitle = "The elbow (~PC15–20) marks where additional PCs stop adding signal",
        x = "Principal component", y = "Standard deviation")
-ggsave(file.path(OUT_DIR, "Mod2_C4_elbow.png"), p_elbow, width = 7, height = 5, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod2_C4_elbow.png"), p_elbow, width = 7, height = 5, dpi = 300)
 
 # Step 2 — Choose PCs (inspect ElbowPlot interactively). Kept in sync with the
 # laptop notebook (Tutorial_02): the elbow on ifnb flattens by ~PC 20.
@@ -68,7 +81,7 @@ p_umap_clusters <- DimPlot(seu, reduction = "umap", label = TRUE) +
   labs(title    = "Unintegrated UMAP — graph clusters (res = 0.5)",
        subtitle = "Clusters computed on the joint CTRL + STIM matrix without integration",
        x = "UMAP 1", y = "UMAP 2", colour = "Cluster")
-ggsave(file.path(OUT_DIR, "Mod2_C8_umap_clusters.png"), p_umap_clusters, width = 7, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod2_C8_umap_clusters.png"), p_umap_clusters, width = 7, height = 6, dpi = 300)
 
 # Step 6 — Diagnose the batch effect: colour the SAME UMAP by sample and by cell type
 p_by_sample <- DimPlot(seu, reduction = "umap", group.by = "stim") +
@@ -84,9 +97,9 @@ p_batch <- (p_by_sample | p_by_celltype) + plot_annotation(
   title    = "Batch-effect diagnostic — sample vs cell-type on the same embedding",
   subtitle = "If cell types co-clustered, the two panels would overlay; here they don't",
   caption  = "Module 2 · Dimensionality Reduction & Clustering (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod2_C9_umap_by_sample.png"),   p_by_sample,   width = 7,  height = 6, dpi = 300)
-ggsave(file.path(OUT_DIR, "Mod2_C9_umap_by_celltype.png"), p_by_celltype, width = 7,  height = 6, dpi = 300)
-ggsave(file.path(OUT_DIR, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,  width = 13, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod2_C9_umap_by_sample.png"),   p_by_sample,   width = 7,  height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod2_C9_umap_by_celltype.png"), p_by_celltype, width = 7,  height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,  width = 13, height = 6, dpi = 300)
 
 # Tables out: cluster composition by sample and by cell type (Mod2_C10)
 as.data.frame(round(prop.table(

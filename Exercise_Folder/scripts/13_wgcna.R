@@ -18,6 +18,28 @@ dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)  # input datasets l
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+# save_base_fig() does the same for BASE-graphics figures (plot()/heatmap()/etc.):
+# pass a no-argument function that draws the figure; it is rendered to .png and .svg.
+save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
+  grDevices::png(filename, width = width, height = height, units = "in", res = res)
+  draw(); grDevices::dev.off()
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch({ grDevices::svg(svg_path, width = width, height = height); draw(); grDevices::dev.off() },
+           error = function(e) message("  (could not write ", basename(svg_path), ")"))
+}
+
 # Step 1 — Load counts + GEO metadata, reshape to a counts matrix
 data <- read.delim(file.path(DATA_DIR, "GSE152418_p20047_Study1_RawCounts.txt"), header = TRUE)
 gse  <- getGEO("GSE152418", GSEMatrix = TRUE)
@@ -57,13 +79,12 @@ data <- data[gsg$goodGenes == TRUE, ]
 
 # Figure out (base graphics): sample dendrogram for outlier detection (Mod13_C6)
 htree <- hclust(dist(t(data)), method = "average")
-png(file.path(OUT_DIR, "Mod13_C6_sample_dendrogram.png"),
-    width = 10, height = 6, units = "in", res = 300)
-plot(htree,
-     main = "Sample clustering for outlier detection — GSE152418 PBMCs",
-     sub  = "Average linkage, Euclidean distance on samples",
-     xlab = "Sample")
-dev.off()
+save_base_fig(file.path(OUT_DIR, "Mod13_C6_sample_dendrogram.png"), width = 10, height = 6, draw = function() {
+  plot(htree,
+       main = "Sample clustering for outlier detection — GSE152418 PBMCs",
+       sub  = "Average linkage, Euclidean distance on samples",
+       xlab = "Sample")
+})
 
 # Figure out: sample-level PCA (PC1 vs PC2) for outlier detection (Mod13_C7)
 pca       <- prcomp(t(data))
@@ -79,7 +100,7 @@ p_pca <- ggplot(as.data.frame(pca.dat), aes(PC1, PC2)) +
        y = paste0("PC2: ", pca.var.p[2], "%"),
        caption  = "Module 13 · WGCNA") +
   theme_minimal()
-ggsave(file.path(OUT_DIR, "Mod13_C7_sample_pca.png"), p_pca, width = 7, height = 6, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod13_C7_sample_pca.png"), p_pca, width = 7, height = 6, dpi = 300)
 
 samples.to.exclude <- c("GSM4614993", "GSM4614994", "GSM4614995")
 data.subset <- data[, !(colnames(data) %in% samples.to.exclude)]
@@ -115,7 +136,7 @@ p_sft <- (a1 / a2) +
     title    = "Soft-thresholding power selection — GSE152418 PBMCs",
     subtitle = "Smallest power crossing signed R² ≈ 0.8 with reasonable connectivity",
     caption  = "Module 13 · WGCNA")
-ggsave(file.path(OUT_DIR, "Mod13_C10_soft_threshold.png"), p_sft, width = 7, height = 8, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod13_C10_soft_threshold.png"), p_sft, width = 7, height = 8, dpi = 300)
 
 # Step 5 — Build the network (beta = 18 from Patel's example for this dataset)
 soft_power <- 18
@@ -126,17 +147,16 @@ bwnet <- blockwiseModules(norm.counts, maxBlockSize = 14000, TOMType = "signed",
 cor <- temp_cor                              # restore base::cor
 
 # Figure out (base graphics): gene dendrogram + module colours (Mod13_C12)
-png(file.path(OUT_DIR, "Mod13_C12_module_dendrogram.png"),
-    width = 10, height = 6, units = "in", res = 300)
-plotDendroAndColors(bwnet$dendrograms[[1]],
-                    cbind(bwnet$unmergedColors, bwnet$colors),
-                    c("unmerged", "merged"),
-                    dendroLabels = FALSE,
-                    addGuide     = TRUE,
-                    hang         = 0.03,
-                    guideHang    = 0.05,
-                    main         = "Gene clustering dendrogram & module colours")
-dev.off()
+save_base_fig(file.path(OUT_DIR, "Mod13_C12_module_dendrogram.png"), width = 10, height = 6, draw = function() {
+  plotDendroAndColors(bwnet$dendrograms[[1]],
+                      cbind(bwnet$unmergedColors, bwnet$colors),
+                      c("unmerged", "merged"),
+                      dendroLabels = FALSE,
+                      addGuide     = TRUE,
+                      hang         = 0.03,
+                      guideHang    = 0.05,
+                      main         = "Gene clustering dendrogram & module colours")
+})
 
 # Step 6 — Module eigengenes + module-trait correlation
 module_eigengenes <- bwnet$MEs
@@ -168,14 +188,13 @@ module.trait.corr.p <- corPvalueStudent(module.trait.corr, nSamples)
 # Figure out (base graphics): module-trait correlation heatmap (Mod13_C15)
 heatmap.data <- merge(module_eigengenes, traits, by = "row.names")
 heatmap.data <- column_to_rownames(heatmap.data, var = "Row.names")
-png(file.path(OUT_DIR, "Mod13_C15_module_trait_heatmap.png"),
-    width = 8, height = 8, units = "in", res = 300)
-CorLevelPlot(heatmap.data,
-             x    = names(traits),
-             y    = names(module_eigengenes),
-             col  = c("blue1", "skyblue", "white", "pink", "red"),
-             main = "Module-trait correlations — GSE152418 severity")
-dev.off()
+save_base_fig(file.path(OUT_DIR, "Mod13_C15_module_trait_heatmap.png"), width = 8, height = 8, draw = function() {
+  CorLevelPlot(heatmap.data,
+               x    = names(traits),
+               y    = names(module_eigengenes),
+               col  = c("blue1", "skyblue", "white", "pink", "red"),
+               main = "Module-trait correlations — GSE152418 severity")
+})
 
 # Tables out: module-trait correlations + p-values (Mod13_C15)
 as.data.frame(module.trait.corr) |>

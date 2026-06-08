@@ -72,7 +72,9 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 ::: {.callout-warning title="Common errors / things that bite"}
 **`FindAllMarkers` takes 5+ minutes** — `presto` (installed in the [Tutorial 00 setup](Tutorial_00_Setup_RStudio_Packages.html)) makes it \~10× faster; Seurat detects it automatically.
 
-**Markers list is dominated by ISGs (`ISG15`, `IFI6`, `IFIT3`, `MX1`)** — that's expected on the *unintegrated* `ifnb` data because clusters here are partly driven by `stim`. Tutorial 05 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.
+**ISGs (`ISG15`, `IFI6`, `IFIT3`, `MX1`) top *some* clusters' marker lists** — expected on the *unintegrated* `ifnb` data: the cell types with the strongest interferon response (monocytes especially) split into CTRL vs STIM clusters, so those clusters' top markers are condition genes rather than cell-type genes. Most clusters are still topped by cell-type markers. Tutorial 05 (Integration) collapses the condition split.
+
+**`names(new.cluster.ids) <- levels(ifnb)` errors with "'names' attribute [N] must be the same length as the vector [M]"** — your clustering produced more clusters than the template's label list. **This is real biology, not a bug.** You're clustering the *unintegrated* data, where the interferon-β response is a strong, genome-wide transcriptional signal — so the cell types that respond most (monocytes above all) separate into *two* clusters, a CTRL one and a STIM one, instead of one. That's the very same condition/batch split you visualized on the UMAP in Tutorial 02, now showing up as extra clusters: you commonly end up with ~15–20 clusters for ~13 cell types, often with two clusters of the same type. It's expected, and Tutorial 05's integration aligns CTRL and STIM so each cell type collapses back to a single cluster. Practically: the Step 4 template no longer uses that brittle line — it maps labels by cluster id and applies only the ids that exist, so it works for any cluster count. Run `levels(ifnb)` to see how many you have, and label each (giving the CTRL and STIM copies of a type the same label is fine).
 
 **`Idents()` is set to the wrong column** — clusters at multiple resolutions all live in `meta.data` (`RNA_snn_res.0.1`, `_0.3`, etc.) but only one is the "active" identity. `Idents(seu) <- "RNA_snn_res.0.5"` switches; `levels(Idents(seu))` confirms.
 
@@ -110,6 +112,19 @@ out_dir <- "../output/Mod3"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 ```
 
 ```{r}
@@ -181,14 +196,14 @@ readr::write_csv(top_markers,  file.path(out_dir, "Mod3_C4_top5_markers_per_clus
 ```
 
 ::: {.callout-important title="Think about it"}
-1.  Many of the top markers will be **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT3`, `MX1`). Are those *cell-type* markers, or are they marking something else?
+1.  Most of the top per-cluster markers are **cell-type** genes (e.g. `LYZ`/`S100A8` for monocytes, `MS4A1`/`CD79A` for B cells, `GNLY`/`NKG7` for NK). But for *some* clusters — especially the **monocytes** — you'll also see **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT3`, `MX1`) near the top. If those ISGs aren't cell-type markers, what are they marking?
 2.  For condition-level DE (STIM vs CTRL), is `FindAllMarkers` the right tool?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Those are **condition markers** — they distinguish IFN-β–stimulated cells from control cells, *not* cell types. They top the list because cluster identities at this stage are partly driven by `stim`. Tutorial 05 will integrate the data so cluster identities track biology, not condition.
+1.  Those ISGs are **condition markers** — they distinguish IFN-β–stimulated cells from control cells, *not* cell types. They surface because, on the **unintegrated** data, the cell types with the strongest interferon response (monocytes most of all) split into separate CTRL and STIM clusters — so a "STIM monocyte" cluster's top markers are ISGs. Most clusters are still driven by cell-type identity, which is why cell-type markers dominate the lists overall. Tutorial 05 integrates CTRL and STIM so clusters track biology, not condition, and the ISGs drop out of the per-cluster marker lists.
 2.  No. `FindAllMarkers` / `FindMarkers` treat each cell as an independent observation, which is **anti-conservative** for condition-level comparisons across biological samples. For STIM vs CTRL within a cell type, use **pseudobulk** + DESeq2/edgeR/limma — that's exactly what Tutorial 06 covers, on this dataset.
 
 </details>
@@ -234,7 +249,7 @@ p_vln <- p_vln +
 p_vln
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod3_C5_marker_violins.png"), p_vln,
+save_fig(file.path(out_dir, "Mod3_C5_marker_violins.png"), p_vln,
        width = 10, height = 6, dpi = 300)
 ```
 
@@ -259,7 +274,7 @@ p_feature <- p_feature +
 p_feature
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod3_C6_marker_featureplots.png"), p_feature,
+save_fig(file.path(out_dir, "Mod3_C6_marker_featureplots.png"), p_feature,
        width = 9, height = 8, dpi = 300)
 ```
 
@@ -285,7 +300,7 @@ p_heatmap <- DoHeatmap(ifnb, features = top10$gene) +
 p_heatmap
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod3_C7_marker_heatmap.png"), p_heatmap,
+save_fig(file.path(out_dir, "Mod3_C7_marker_heatmap.png"), p_heatmap,
        width = 12, height = 10, dpi = 300)
 ```
 
@@ -311,7 +326,7 @@ p_dot <- DotPlot(ifnb, features = canonical_markers) +
 p_dot
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
+save_fig(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
        width = 10, height = 6, dpi = 300)
 ```
 
@@ -333,16 +348,24 @@ ggsave(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
 
 ## Step 4 — Manual annotation
 
-Use the canonical marker table above and the dot plot to assign labels. Your cluster numbering will depend on the random seed and Seurat version, so **do not copy these labels blindly** — pick from the table that matches *your* dot plot.
+Use the canonical marker table above and the dot plot to assign labels. Your cluster **count and numbering** depend on the random seed, Seurat version, and the fact that this is *unintegrated* data — so you'll often have **more clusters than cell types** (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). **Do not copy these labels blindly** — run `levels(ifnb)` to see your clusters, then label each one from the table that matches *your* dot plot (it's fine to give two clusters the same label).
 
 ```{r}
 #| label: rename
 #| eval: false
 
-# TEMPLATE — edit the labels to match YOUR clusters (the order must match
-# levels(Idents(ifnb)) at this point). This chunk is left `eval: false` because
-# the labels below are placeholders; once they match your dot plot, change it to
-# `eval: true` (or just run the chunk) to apply them.
+# First, see how many clusters you actually have, and their ids:
+levels(ifnb)
+# On the UNINTEGRATED data, cell types often split by CONDITION (e.g. CTRL vs
+# STIM monocytes), so you'll usually get MORE clusters than cell types — often
+# ~15-20, sometimes two clusters of the same type. That's expected here;
+# Tutorial 05 integrates the samples and collapses these.
+
+# TEMPLATE — give each cluster id a label. Edit this named vector so the names on
+# the LEFT (cluster ids, in quotes) cover YOUR clusters from the dot plot. The
+# left side is the cluster id, the right side is the label you assign. You can
+# reuse a label (e.g. two monocyte clusters both "CD14 Mono"). It's fine to label
+# only some clusters while you iterate — unlisted ones keep their number.
 new.cluster.ids <- c(
   "0"  = "CD14 Mono",
   "1"  = "CD4 Naive T",
@@ -357,9 +380,13 @@ new.cluster.ids <- c(
   "10" = "B activated",
   "11" = "pDC",
   "12" = "Eryth"
+  # ... add entries for any remaining cluster ids your run produced (13, 14, ...)
 )
 
-names(new.cluster.ids) <- levels(ifnb)
+# Apply only the labels whose cluster id actually exists. This keys on the vector
+# NAMES (cluster ids), so it works for any number of clusters and never throws the
+# "'names' attribute [N] must be the same length as the vector [M]" error.
+new.cluster.ids <- new.cluster.ids[names(new.cluster.ids) %in% levels(ifnb)]
 ifnb <- RenameIdents(ifnb, new.cluster.ids)
 ifnb$celltype_manual <- Idents(ifnb)
 
@@ -421,11 +448,11 @@ manual_vs_truth <- table(manual = Idents(ifnb), truth = ifnb$seurat_annotations)
 manual_vs_truth
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod3_C10_umap_manual.png"),         p_manual,
+save_fig(file.path(out_dir, "Mod3_C10_umap_manual.png"),         p_manual,
        width = 7,  height = 6, dpi = 300)
-ggsave(file.path(out_dir, "Mod3_C10_umap_ground_truth.png"),   p_truth,
+save_fig(file.path(out_dir, "Mod3_C10_umap_ground_truth.png"),   p_truth,
        width = 7,  height = 6, dpi = 300)
-ggsave(file.path(out_dir, "Mod3_C10_umap_manual_vs_truth.png"), p_validate,
+save_fig(file.path(out_dir, "Mod3_C10_umap_manual_vs_truth.png"), p_validate,
        width = 13, height = 6, dpi = 300)
 
 # --- Table out: cross-tab of manual labels vs ground-truth labels ----------

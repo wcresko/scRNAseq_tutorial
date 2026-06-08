@@ -55,7 +55,9 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 
 
 ::: {.callout-warning title="Common errors / things that bite"}
-**`RunAzimuth` errors during reference download** — the PBMC reference is \~1 GB and downloads on first call. Confirm internet, sufficient disk, and no `tar` corruption. If it fails midway, delete the partial cache directory (`~/.cache/Azimuth/` or similar) and retry.
+**`RunAzimuth` errors during reference download** — on first call it installs the `pbmcref.SeuratData` package (~75 MB) from the SeuratData repo. Confirm internet and disk. If it fails midway, retry; you can also install it directly with `SeuratData::InstallData("pbmcref")`.
+
+**Lots of warnings while `RunAzimuth` runs (all expected)** — a successful run is *noisy*. You'll see `944 features … not present … Continuing with remaining 4056` (normal — your data has 4056 of the reference's model genes, which is plenty), `Feature names cannot have underscores … replacing with dashes` (from Azimuth's **own** internal assays, not your data), plus `refUMAP`/`integrated_dr_` key and `RunUMAP method changed` notices. None are errors. The tell that it worked: `detected … HUMAN with id type Gene.name` for **both** query and reference, `Found … anchors`, and new `predicted.celltype.l1/l2/l3` + `mapping.score` columns in `ifnb@meta.data`.
 
 **STIM cells get lower mapping scores than CTRL** — that's expected, not a bug: the interferon-β response shifts cells off the resting-PBMC reference manifold even though their *cell-type* identity is unchanged. Read it as a confidence flag, not a wrong label.
 
@@ -94,6 +96,19 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 ifnb <- readRDS("../data/ifnb_annotated.rds")
 DefaultAssay(ifnb) <- "RNA"
 
@@ -108,7 +123,7 @@ p_setup_umap <- DimPlot(ifnb, group.by = "seurat_annotations", reduction = "umap
   )
 p_setup_umap
 
-ggsave(file.path(out_dir, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap,
+save_fig(file.path(out_dir, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -121,7 +136,7 @@ Azimuth wraps Seurat's anchor-based reference mapping with curated atlases, and 
 #| fig-cap: "Azimuth (pbmcref) level-2 predicted cell types projected onto the unintegrated UMAP."
 library(Azimuth)
 
-# Will download the PBMC reference on first use (~1 GB)
+# Installs the pbmcref.SeuratData reference package on first use (~75 MB download)
 ifnb <- RunAzimuth(ifnb, reference = "pbmcref")
 
 # New columns: predicted.celltype.l1 / l2 / l3 + scores
@@ -143,7 +158,7 @@ p_azimuth_umap <- DimPlot(ifnb, group.by = "predicted.celltype.l2", reduction = 
   )
 p_azimuth_umap
 
-ggsave(file.path(out_dir, "Mod4_C2_azimuth_labels_umap.png"), p_azimuth_umap,
+save_fig(file.path(out_dir, "Mod4_C2_azimuth_labels_umap.png"), p_azimuth_umap,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -162,7 +177,7 @@ p_mapping <- FeaturePlot(ifnb, features = "mapping.score", reduction = "umap") +
   )
 p_mapping
 
-ggsave(file.path(out_dir, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
+save_fig(file.path(out_dir, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -219,7 +234,7 @@ p_compare_heatmap <- ann |>
        fill = "Cells")
 p_compare_heatmap
 
-ggsave(file.path(out_dir, "Mod4_C5_truth_vs_azimuth_heatmap.png"), p_compare_heatmap,
+save_fig(file.path(out_dir, "Mod4_C5_truth_vs_azimuth_heatmap.png"), p_compare_heatmap,
        width = 8, height = 6, dpi = 300)
 ```
 
@@ -227,14 +242,41 @@ ggsave(file.path(out_dir, "Mod4_C5_truth_vs_azimuth_heatmap.png"), p_compare_hea
 
 A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review.
 
+::: callout-important
+**You can't compare the labels as raw strings.** The author ground truth (`seurat_annotations`, from `muscData`) and Azimuth use **different vocabularies and granularities** — e.g. `CD14+ Monocytes` (truth) vs `CD14 Mono` (Azimuth l2) vs `Mono` (Azimuth l1); `B cells` vs `B naive`/`B memory`. A direct `==` would flag *everything* as a disagreement even when the calls actually agree. So we **harmonize both to a common coarse vocabulary** and reconcile at Azimuth **level 1** (`predicted.celltype.l1`), the granularity that matches the coarse ground truth.
+:::
+
 ```{r}
 #| label: reconcile
 
-ifnb$celltype_final <- with(ifnb@meta.data, dplyr::case_when(
-  as.character(seurat_annotations) == predicted.celltype.l2    ~ as.character(seurat_annotations),
-  TRUE                                                         ~ paste0("REVIEW:", seurat_annotations)
-))
+# Map the author ground-truth labels onto Azimuth's coarse level-1 vocabulary
+# (B, CD4 T, CD8 T, NK, DC, Mono). Anything without a clean level-1 counterpart
+# (e.g. Megakaryocytes — platelets aren't a level-1 class) maps to NA and is left
+# for review. Adjust this crosswalk if your reference/labels differ.
+to_coarse <- function(x) dplyr::recode(as.character(x),
+  "B cells"           = "B",
+  "CD4 T cells"       = "CD4 T",
+  "CD8 T cells"       = "CD8 T",
+  "NK cells"          = "NK",
+  "Dendritic cells"   = "DC",
+  "CD14+ Monocytes"   = "Mono",
+  "FCGR3A+ Monocytes" = "Mono",
+  "Megakaryocytes"    = "Mk",
+  .default            = NA_character_)
 
+truth_coarse <- to_coarse(ifnb$seurat_annotations)
+agree <- !is.na(truth_coarse) &
+         truth_coarse == as.character(ifnb$predicted.celltype.l1)
+
+ifnb$celltype_final <- ifelse(
+  agree,
+  as.character(ifnb$seurat_annotations),
+  paste0("REVIEW:", as.character(ifnb$seurat_annotations))
+)
+
+# Fraction of cells where the coarse calls agree (expect high — this is a clean
+# PBMC dataset against a PBMC reference), then the final call counts.
+round(mean(agree), 3)
 table(ifnb$celltype_final)
 
 # --- Table out: final reconciled cell-type call counts ---------------------

@@ -18,6 +18,19 @@ dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 # Step 1 — Load ifnb from Bioconductor's ExperimentHub (cached after the first
 # download). Keep singlets that have an author-assigned cell-type label, and mirror
 # the metadata names the rest of the series expects:
@@ -56,17 +69,18 @@ enframe(table(seu$stim), name = "sample", value = "n_cells") |>
 seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
 seu[["percent.rb"]] <- PercentageFeatureSet(seu, pattern = "^RP[SL]")
 
-# Figure out: per-sample QC violins (Mod1_C5)
-p_qc_vln <- VlnPlot(seu,
+# Figure out: per-sample QC violins (Mod1_C5). Plotted pre-normalization on QC
+# metadata, so wrap to silence the expected "data layer empty, using counts" note.
+p_qc_vln <- suppressWarnings(VlnPlot(seu,
         features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
         group.by = "stim", ncol = 4, pt.size = 0) &
   xlab("Sample (stim condition)") &
-  theme(plot.title = element_text(size = 11))
+  theme(plot.title = element_text(size = 11)))
 p_qc_vln <- p_qc_vln + plot_annotation(
   title    = "Per-cell QC metrics by sample — ifnb (CTRL vs IFN-beta STIM)",
   subtitle = "Genes/cell, UMIs/cell, mitochondrial % and ribosomal % distributions",
   caption  = "Module 1 · QC & Preprocessing (Talapas pipeline)")
-ggsave(file.path(OUT_DIR, "Mod1_C5_qc_violins.png"), p_qc_vln, width = 12, height = 4, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod1_C5_qc_violins.png"), p_qc_vln, width = 12, height = 4, dpi = 300)
 
 # Table out: per-sample QC summary (Mod1_C4)
 seu@meta.data |>
@@ -100,7 +114,7 @@ p_hvg <- LabelPoints(plot = VariableFeaturePlot(seu), points = top10, repel = TR
        subtitle = "Top 10 most variable genes labelled (many are interferon-stimulated genes)",
        x = "Average expression (log scale)", y = "Standardized variance",
        colour = "Selected as HVG")
-ggsave(file.path(OUT_DIR, "Mod1_C10_variable_features.png"), p_hvg, width = 7, height = 5, dpi = 300)
+save_fig(file.path(OUT_DIR, "Mod1_C10_variable_features.png"), p_hvg, width = 7, height = 5, dpi = 300)
 tibble(rank = seq_along(top10), gene = top10) |>
   write_csv(file.path(OUT_DIR, "Mod1_C10_top10_hvgs.csv"))
 
