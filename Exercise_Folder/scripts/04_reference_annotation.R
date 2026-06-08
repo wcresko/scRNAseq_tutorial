@@ -58,16 +58,30 @@ ggsave(file.path(OUT_DIR, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
        width = 7, height = 6, dpi = 300)
 
 # Reconcile: keep the manual/ground-truth label where Azimuth agrees, else flag.
-# Script 03 writes the manual label to `celltype_manual`.
+# The manual labels (script 03 `celltype_manual`, or the muscData ground-truth
+# `seurat_annotations`) use a DIFFERENT vocabulary/granularity than Azimuth, so
+# we harmonize both to Azimuth's coarse level-1 vocabulary and reconcile there.
 manual_col <- intersect(c("celltype_manual","celltype","seurat_annotations"),
                         colnames(seu@meta.data))[1]
 if (is.na(manual_col))
   stop("No manual-label column found (expected 'celltype_manual' from script 03).")
-agree <- as.character(seu[[manual_col]][, 1]) == as.character(seu$predicted.celltype.l2)
+to_coarse <- function(x) dplyr::recode(as.character(x),
+  # muscData ground-truth labels
+  "B cells"="B","CD4 T cells"="CD4 T","CD8 T cells"="CD8 T","NK cells"="NK",
+  "Dendritic cells"="DC","CD14+ Monocytes"="Mono","FCGR3A+ Monocytes"="Mono",
+  "Megakaryocytes"="Mk",
+  # script-03 auto-annotation labels
+  "CD14+ Mono"="Mono","CD16+ Mono"="Mono","DC"="DC","pDC"="DC","NK"="NK",
+  "B"="B","CD4 T"="CD4 T","CD8 T"="CD8 T","Mk"="Mk",
+  .default = NA_character_)
+manual_coarse <- to_coarse(seu[[manual_col]][, 1])
+agree <- !is.na(manual_coarse) &
+         manual_coarse == as.character(seu$predicted.celltype.l1)
 seu$celltype_final  <- ifelse(agree, as.character(seu[[manual_col]][, 1]),
                               paste0("REVIEW:", as.character(seu[[manual_col]][, 1])))
 seu$celltype_method <- ifelse(agree, "consensus", "manual")
-print(table(manual = seu[[manual_col]][, 1], azimuth = seu$predicted.celltype.l2))
+cat("Coarse-level agreement with Azimuth (l1):", round(mean(agree), 3), "\n")
+print(table(manual = seu[[manual_col]][, 1], azimuth_l1 = seu$predicted.celltype.l1))
 
 # Table out: author ground-truth vs Azimuth cross-tabulation (Mod4_C4)
 as.data.frame(

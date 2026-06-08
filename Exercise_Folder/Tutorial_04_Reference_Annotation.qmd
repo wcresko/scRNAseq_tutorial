@@ -229,14 +229,41 @@ ggsave(file.path(out_dir, "Mod4_C5_truth_vs_azimuth_heatmap.png"), p_compare_hea
 
 A simple "agree-or-flag" rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review.
 
+::: callout-important
+**You can't compare the labels as raw strings.** The author ground truth (`seurat_annotations`, from `muscData`) and Azimuth use **different vocabularies and granularities** — e.g. `CD14+ Monocytes` (truth) vs `CD14 Mono` (Azimuth l2) vs `Mono` (Azimuth l1); `B cells` vs `B naive`/`B memory`. A direct `==` would flag *everything* as a disagreement even when the calls actually agree. So we **harmonize both to a common coarse vocabulary** and reconcile at Azimuth **level 1** (`predicted.celltype.l1`), the granularity that matches the coarse ground truth.
+:::
+
 ```{r}
 #| label: reconcile
 
-ifnb$celltype_final <- with(ifnb@meta.data, dplyr::case_when(
-  as.character(seurat_annotations) == predicted.celltype.l2    ~ as.character(seurat_annotations),
-  TRUE                                                         ~ paste0("REVIEW:", seurat_annotations)
-))
+# Map the author ground-truth labels onto Azimuth's coarse level-1 vocabulary
+# (B, CD4 T, CD8 T, NK, DC, Mono). Anything without a clean level-1 counterpart
+# (e.g. Megakaryocytes — platelets aren't a level-1 class) maps to NA and is left
+# for review. Adjust this crosswalk if your reference/labels differ.
+to_coarse <- function(x) dplyr::recode(as.character(x),
+  "B cells"           = "B",
+  "CD4 T cells"       = "CD4 T",
+  "CD8 T cells"       = "CD8 T",
+  "NK cells"          = "NK",
+  "Dendritic cells"   = "DC",
+  "CD14+ Monocytes"   = "Mono",
+  "FCGR3A+ Monocytes" = "Mono",
+  "Megakaryocytes"    = "Mk",
+  .default            = NA_character_)
 
+truth_coarse <- to_coarse(ifnb$seurat_annotations)
+agree <- !is.na(truth_coarse) &
+         truth_coarse == as.character(ifnb$predicted.celltype.l1)
+
+ifnb$celltype_final <- ifelse(
+  agree,
+  as.character(ifnb$seurat_annotations),
+  paste0("REVIEW:", as.character(ifnb$seurat_annotations))
+)
+
+# Fraction of cells where the coarse calls agree (expect high — this is a clean
+# PBMC dataset against a PBMC reference), then the final call counts.
+round(mean(agree), 3)
 table(ifnb$celltype_final)
 
 # --- Table out: final reconciled cell-type call counts ---------------------
