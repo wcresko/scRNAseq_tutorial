@@ -88,7 +88,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ## Setup
 
 ```{r}
-#| label: setup
+#| label: M8-setup
 library(Seurat)
 library(SingleCellExperiment)
 library(scater)        # plotReducedDim() for the UMAP panel
@@ -141,7 +141,7 @@ ifnb
 Like Tutorial 06's pseudobulk DE, miloR needs **biological replicates within each condition**. The `muscData::Kang18_8vs8()` loader from [Tutorial 01](Tutorial_01_QC_Preprocessing.html) carries the real donor IDs in the `ind` column, so we use the **eight real donors** as replicates. A synthetic-donor fallback is kept only for objects that somehow arrive without donor metadata.
 
 ```{r}
-#| label: donor
+#| label: M8-donor
 
 # Real donors (column `ind`, from the muscData loader) are the biological
 # replicates. Fall back to synthetic pseudo-donors only if no donor column is
@@ -174,7 +174,7 @@ On the real `ind` donors — the default with the Tutorial 01 loader — the tes
 miloR is built on `SingleCellExperiment`, so we cast first:
 
 ```{r}
-#| label: milo-build
+#| label: M8-milo_build
 
 # Drop assay slots we don't need to keep memory low
 sce  <- as.SingleCellExperiment(ifnb)
@@ -190,7 +190,7 @@ reducedDimNames(milo)
 The kNN graph is built on the **integrated** reduction (`harmony`), so neighbourhoods reflect biological similarity *after* batch correction.
 
 ```{r}
-#| label: build-graph
+#| label: M8-build_graph
 #| fig-cap: "Distribution of neighbourhood sizes after refined sampling (target peak 50-200 cells)."
 
 # Build the kNN graph on the harmony reduction.
@@ -236,7 +236,7 @@ The histogram shows how many cells each sampled neighbourhood contains. If the p
 ## Step 4 — Count cells per neighbourhood per sample
 
 ```{r}
-#| label: count-cells
+#| label: M8-count_cells
 
 milo <- countCells(milo,
                    meta.data = data.frame(colData(milo)),
@@ -249,7 +249,7 @@ head(nhoodCounts(milo))
 ## Step 5 — Build the design matrix and test
 
 ```{r}
-#| label: design
+#| label: M8-design
 
 # One row per sample, with stim/donor metadata
 milo_design <- data.frame(colData(milo)) |>
@@ -282,7 +282,7 @@ The **SpatialFDR** column is miloR's analogue of `padj` — it controls the fals
 ## Step 6 — Annotate neighbourhoods with cell-type labels
 
 ```{r}
-#| label: annotate
+#| label: M8-annotate
 
 # For each neighbourhood, take the most common cell type among its cells
 da_results <- annotateNhoods(milo,
@@ -320,7 +320,7 @@ Pseudobulk DE answers "**within** cells annotated as cell type X, which genes sh
 The signature miloR plot. Each node is a neighbourhood, sized by the number of cells in it, coloured by log-fold-change (red = enriched in STIM, blue = enriched in CTRL):
 
 ```{r}
-#| label: plot-graph
+#| label: M8-plot_graph
 #| fig-cap: "Cell-type UMAP (left) alongside the DA neighbourhood graph (right); red = enriched in STIM, blue = enriched in CTRL."
 
 milo <- buildNhoodGraph(milo)
@@ -359,7 +359,7 @@ If `plotReducedDim` complains that `UMAP_HARMONY` doesn't exist, the harmony UMA
 A clean summary that strips out the spatial graph and asks "which annotated cell type is enriched / depleted on average?":
 
 ```{r}
-#| label: beeswarm
+#| label: M8-beeswarm
 #| fig-cap: "Beeswarm of per-neighbourhood log-fold change grouped by annotated cell type (STIM vs CTRL)."
 
 p_beeswarm <- plotDAbeeswarm(da_results, group.by = "seurat_annotations") +
@@ -392,7 +392,7 @@ Within-cell-type heterogeneity: a *subset* of that cell type is expanding while 
 ## Step 9 — Save the DA result
 
 ```{r}
-#| label: save
+#| label: M8-save
 
 # Pipeline hand-off: keep the data/ copies so downstream tutorials and the
 # Talapas pipeline can pick the DA result and Milo object up unchanged.

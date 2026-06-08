@@ -88,6 +88,7 @@ For most users, the sequencing core runs `cellranger mkfastq` and hands you the 
 ## Step 1 — Install Cell Ranger on Talapas
 
 ```{bash}
+#| label: M11-projects_directory_not_home
 #| eval: false
 # In your projects directory (NOT in $HOME — Cell Ranger is ~3 GB)
 cd /projects/<PIRG>/<your-username>
@@ -113,6 +114,7 @@ On Talapas, `cellranger` may already be available as a module — check with `mo
 ## Step 2 — Download the reference genome
 
 ```{bash}
+#| label: M11-human_grch38_current_release
 #| eval: false
 cd /projects/<PIRG>/<your-username>/refs
 
@@ -143,6 +145,7 @@ The reference is \~12 GB compressed and \~30 GB extracted. Why would you NOT put
 10x Genomics ships small public datasets for exactly this — test-running the pipeline. The smallest is **PBMC 1k v3** (\~5 GB FASTQ, runs in \~30 minutes):
 
 ```{bash}
+#| label: M11-pbmc_1k_v3_s1
 #| eval: false
 cd /projects/<PIRG>/<your-username>/test_data
 
@@ -162,6 +165,7 @@ The naming is **strict**. Cell Ranger uses the pattern `<SAMPLE>_S<num>_L<lane>_
 Create `run_cellranger_count.sbatch`:
 
 ```{bash}
+#| label: M11-bin_bash
 #| eval: false
 #!/bin/bash
 #SBATCH --job-name=cellranger_count_pbmc1k
@@ -196,6 +200,7 @@ cellranger count \
 Submit it:
 
 ```{bash}
+#| label: M11-watch_job
 #| eval: false
 mkdir -p logs
 sbatch run_cellranger_count.sbatch
@@ -224,6 +229,7 @@ tail -f logs/cellranger_*.out
 When the job finishes (\~30–60 min for PBMC 1k):
 
 ```{bash}
+#| label: M11-web_summary_html_open
 #| eval: false
 cd /projects/<PIRG>/<your-username>/cellranger_runs/pbmc_1k_v3/outs
 ls -la
@@ -258,6 +264,7 @@ The `web_summary.html` from a run is the **single most informative QC document**
 Copy the `filtered_feature_bc_matrix/` directory into a place the laptop tutorials can find it:
 
 ```{bash}
+#| label: M11-local_machine
 #| eval: false
 # From your local machine:
 scp -r <username>@login.talapas.uoregon.edu:/projects/<PIRG>/<your-username>/cellranger_runs/pbmc_1k_v3/outs/filtered_feature_bc_matrix \
@@ -267,6 +274,7 @@ scp -r <username>@login.talapas.uoregon.edu:/projects/<PIRG>/<your-username>/cel
 Now from R:
 
 ```{r}
+#| label: M11-pick_up_core_pipeline
 #| eval: false
 library(Seurat)
 counts <- Read10X("~/Documents/scrnaseq_workshop/data/filtered_feature_bc_matrix/")
@@ -280,6 +288,7 @@ seu    <- CreateSeuratObject(counts, project = "pbmc_1k_v3",
 When you have N samples (one FASTQ folder per sample), don't write N scripts. Use a **SLURM array job**:
 
 ```{bash}
+#| label: M11-bin_bash_2
 #| eval: false
 #!/bin/bash
 #SBATCH --job-name=cellranger_count_array
@@ -325,6 +334,7 @@ Submit with `sbatch run_cellranger_count_array.sbatch`. SLURM runs all 8 sub-job
 If you have multiple Cell Ranger runs from the same library prep that need to be **count-matrix-merged** (not the same as Seurat's downstream merge), use `cellranger aggr`:
 
 ```{bash}
+#| label: M11-aggr_csv_csv
 #| eval: false
 # aggr_csv.csv:
 # library_id,molecule_h5

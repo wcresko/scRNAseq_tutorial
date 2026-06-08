@@ -84,7 +84,7 @@ There's no separate download — the counts and metadata ride along with the pac
 ## A.1 — Setup
 
 ```{r}
-#| label: setup-airway
+#| label: M6-setup_airway
 library(DESeq2)
 library(airway)
 library(tidyverse)
@@ -128,7 +128,7 @@ save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
 ## A.2 — Load the data and pull out counts + metadata
 
 ```{r}
-#| label: load-airway
+#| label: M6-load_airway
 data(airway)
 airway
 
@@ -171,7 +171,7 @@ as.data.frame(counts_data) |>
 DESeq2 fails fast and unhelpfully if `colData` rows don't line up with `countData` columns. Always check.
 
 ```{r}
-#| label: sanity-airway
+#| label: M6-sanity_airway
 all(colnames(counts_data) %in% rownames(colData))
 all(colnames(counts_data) == rownames(colData))
 ```
@@ -183,7 +183,7 @@ Both should return `TRUE`. If the second is `FALSE`, **reorder `colData`** to ma
 ## A.4 — Build the `DESeqDataSet`
 
 ```{r}
-#| label: build-dds-airway
+#| label: M6-build_dds_airway
 dds <- DESeqDataSetFromMatrix(
   countData = counts_data,
   colData   = colData,
@@ -205,7 +205,7 @@ The eight samples come from **four different cell lines**. Each cell line is a p
 ## A.5 — Pre-filter low-count genes
 
 ```{r}
-#| label: prefilter-airway
+#| label: M6-prefilter_airway
 keep <- rowSums(counts(dds)) >= 10
 dds  <- dds[keep, ]
 nrow(dds)
@@ -218,7 +218,7 @@ nrow(dds)
 ## A.6 — Set the reference level
 
 ```{r}
-#| label: relevel-airway
+#| label: M6-relevel_airway
 dds$dex <- relevel(dds$dex, ref = "untreated")
 ```
 
@@ -229,7 +229,7 @@ dds$dex <- relevel(dds$dex, ref = "untreated")
 ## A.7 — Run `DESeq()` and pull results
 
 ```{r}
-#| label: run-deseq-airway
+#| label: M6-run_deseq_airway
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("dex", "treated", "untreated"))
 summary(res)
@@ -254,7 +254,7 @@ as.data.frame(res) |>
 ## A.8 — Shrink the LFCs before ranking / plotting
 
 ```{r}
-#| label: lfcshrink-airway
+#| label: M6-lfcshrink_airway
 #| fig-cap: "MA plot of apeglm-shrunken log2 fold changes (treated vs untreated) for the airway dataset."
 res_shrunk <- lfcShrink(dds,
                         coef = "dex_treated_vs_untreated",
@@ -280,7 +280,7 @@ save_base_fig(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"), width = 7, heigh
 ## A.9 — Inspect a top hit
 
 ```{r}
-#| label: top-hit-airway
+#| label: M6-top_hit_airway
 #| fig-cap: "Per-sample normalized counts for the top 5 airway hits (by padj), each panel labelled with its gene, split by treatment."
 top_genes <- as.data.frame(res_shrunk) |>
   rownames_to_column("gene") |>
@@ -335,7 +335,7 @@ It shows the **per-sample** values. A single outlier sample can drag the model i
 Quality-control your samples *post-hoc* with a variance-stabilizing transform (`vst`) and a PCA:
 
 ```{r}
-#| label: vst-pca-airway
+#| label: M6-vst_pca_airway
 #| fig-cap: "PCA of variance-stabilized airway samples, coloured by treatment and cell line."
 vsd <- vst(dds, blind = FALSE)
 p_pca <- plotPCA(vsd, intgroup = c("dex", "cell")) +
@@ -414,7 +414,7 @@ Pseudobulk DE needs **biological replicates within each condition**, and here we
 ## B.1 — Setup
 
 ```{r}
-#| label: setup-pb
+#| label: M6-setup_pb
 
 library(Seurat)
 library(DESeq2)
@@ -429,7 +429,7 @@ ifnb
 ```
 
 ```{r}
-#| label: peek-meta
+#| label: M6-peek_meta
 
 # Look for a real donor column
 candidate_cols <- intersect(c("donor_id","donor","ind"), colnames(ifnb@meta.data))
@@ -439,7 +439,7 @@ candidate_cols
 ## B.2 — Define donor (real or synthetic) and condition
 
 ```{r}
-#| label: donor
+#| label: M6-donor
 
 if (length(candidate_cols) > 0) {
   # Prefix with a letter: the ifnb donor IDs (`ind`) are numbers (101, 107, ...),
@@ -486,7 +486,7 @@ For a thorough demonstration of how badly per-cell DE fails on this dataset spec
 ## B.3 — Aggregate to pseudobulk
 
 ```{r}
-#| label: aggregate
+#| label: M6-aggregate
 
 pb <- AggregateExpression(
   ifnb,
@@ -503,7 +503,7 @@ head(colnames(pb), 6)
 The column names look like `<donor>_<condition>_<celltype>`. Build the matching `colData`:
 
 ```{r}
-#| label: colData
+#| label: M6-colData
 
 # Seurat's AggregateExpression replaces "_" with "-" by default in some versions.
 # Be defensive and parse from the metadata directly instead.
@@ -531,7 +531,7 @@ readr::write_csv(meta_pb, file.path(out_dir, "Mod6_C16_pseudobulk_coldata.csv"))
 A pseudobulk column built from very few cells is noise. Drop them.
 
 ```{r}
-#| label: filter-pb
+#| label: M6-filter_pb
 
 # NOTE: use dplyr::count explicitly — loading DESeq2/SummarizedExperiment attaches
 # matrixStats, whose count() masks dplyr::count() (you'd get "Argument 'x' is not
@@ -571,7 +571,7 @@ The threshold balances signal against noise: pseudobulk built from 1–2 cells i
 ## B.5 — Run DESeq2 per cell type
 
 ```{r}
-#| label: run-deseq-pb
+#| label: M6-run_deseq_pb
 
 run_de <- function(ct) {
   keep <- meta_pb$celltype == ct
@@ -610,7 +610,7 @@ readr::write_csv(de_all, file.path(out_dir, "Mod6_C18_pseudobulk_de_all.csv"))
 ## B.6 — Inspect the top hits
 
 ```{r}
-#| label: top-hits-pb
+#| label: M6-top_hits_pb
 
 de_top <- de_all |>
   group_by(celltype) |>
@@ -641,7 +641,7 @@ readr::write_csv(de_top, file.path(out_dir, "Mod6_C19_pseudobulk_de_top.csv"))
 A simple per-cell-type volcano plot:
 
 ```{r}
-#| label: volcano
+#| label: M6-volcano
 #| fig-cap: "Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."
 
 # Pick the 3 cell types with the most significant genes — data-driven, so it works
@@ -694,7 +694,7 @@ Always inspect `n_cells` per group and the dispersion plot before reporting "X g
 ## B.8 — Save results
 
 ```{r}
-#| label: save-de
+#| label: M6-save_de
 
 # Pipeline hand-off: Tutorial 07 reads these from data/ — keep them there.
 write_csv(de_all,  "../data/ifnb_pseudobulk_de.csv")

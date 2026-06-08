@@ -103,7 +103,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ## Setup
 
 ```{r}
-#| label: setup
+#| label: M2-setup
 
 library(Seurat)
 library(tidyverse)
@@ -136,7 +136,7 @@ save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
 ```
 
 ```{r}
-#| label: resume
+#| label: M2-resume
 
 ifnb <- readRDS("../data/ifnb_preprocessed.rds")
 ifnb
@@ -147,7 +147,7 @@ ifnb
 ## Step 1 — Linear dimensionality reduction (PCA)
 
 ```{r}
-#| label: pca
+#| label: M2-pca
 #| fig-cap: "PC1 gene-loading heatmap on 500 cells — the axis is dominated by interferon-stimulated genes (the batch/condition signal)."
 
 ifnb <- RunPCA(
@@ -207,7 +207,7 @@ save_fig(file.path(out_dir, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap,
 ## Step 2 — Choose how many PCs to keep
 
 ```{r}
-#| label: elbow
+#| label: M2-elbow
 #| fig-cap: "Elbow plot of per-PC standard deviation — used to pick a defensible number of PCs (the elbow sits around PC15–20)."
 
 p_elbow <- ElbowPlot(ifnb, ndims = 40) +
@@ -239,7 +239,7 @@ save_fig(file.path(out_dir, "Mod2_C4_elbow.png"), p_elbow,
 :::
 
 ```{r}
-#| label: n-pcs
+#| label: M2-n_pcs
 
 n_pcs <- 20
 ```
@@ -247,7 +247,7 @@ n_pcs <- 20
 ## Step 3 — Build the neighbor graph
 
 ```{r}
-#| label: neighbors
+#| label: M2-neighbors
 
 ifnb <- FindNeighbors(ifnb, dims = 1:n_pcs)
 ```
@@ -269,7 +269,7 @@ ifnb <- FindNeighbors(ifnb, dims = 1:n_pcs)
 ## Step 4 — Cluster at several resolutions
 
 ```{r}
-#| label: cluster
+#| label: M2-cluster
 
 ifnb <- FindClusters(
   ifnb,
@@ -300,7 +300,7 @@ head(ifnb@meta.data)
 ## Step 5 — UMAP
 
 ```{r}
-#| label: umap
+#| label: M2-umap
 #| fig-cap: "UMAP of the unintegrated ifnb cells coloured by graph cluster (resolution 0.5)."
 
 ifnb <- RunUMAP(ifnb, dims = 1:n_pcs)
@@ -326,7 +326,7 @@ save_fig(file.path(out_dir, "Mod2_C8_umap_clusters.png"), p_umap_clusters,
 This is the key exercise. The UMAP above is colored by cluster. Now color the *same UMAP* by **sample** and by **author cell-type label** and compare.
 
 ```{r}
-#| label: batch-diagnostic
+#| label: M2-batch_diagnostic
 #| fig-cap: "The same unintegrated UMAP coloured by sample (left/top) and by author cell-type label — revealing per-sample islands driven by the batch effect."
 
 p_by_sample <- DimPlot(ifnb, reduction = "umap", group.by = "stim") +
@@ -389,7 +389,7 @@ save_fig(file.path(out_dir, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,
 ## Step 7 — Cross-tab clusters vs cell types vs samples
 
 ```{r}
-#| label: crosstab
+#| label: M2-crosstab
 
 # Clusters × samples — how mixed is each cluster across CTRL / STIM?
 cluster_by_sample <- prop.table(
@@ -427,7 +427,7 @@ as.data.frame(cluster_by_celltype) |>
 ## Save and continue to Tutorial 03
 
 ```{r}
-#| label: save
+#| label: M2-save
 
 saveRDS(ifnb, file = "../data/ifnb_clustered.rds")
 ```
