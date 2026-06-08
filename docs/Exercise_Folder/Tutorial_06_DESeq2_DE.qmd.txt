@@ -404,6 +404,10 @@ Pseudobulk DE needs **biological replicates within each condition**, and here we
 
 **`count(...)` errors with "Argument 'x' is not a vector: list"** — loading `DESeq2`/`SummarizedExperiment` attaches `matrixStats`, whose `count()` **masks** `dplyr::count()` (along with `desc`, `slice`, `rename`, `first` from S4Vectors/IRanges). Call the dplyr ones explicitly, e.g. `dplyr::count(...)`. Watch the package-startup messages for the list of masked names.
 
+**Volcano plot errors with "Faceting variables must have at least one value"** — the cell types you asked to plot don't exist in `de_all$celltype`. The `muscData` labels are `CD14+ Monocytes`, `CD4 T cells`, `B cells`, … — not the older `CD14 Mono`/`B`. The tutorial now selects the cell types **data-driven** (the 3 with the most significant genes), so it adapts to your labels; if you hardcode names, match them to `unique(de_all$celltype)`.
+
+**Benign warnings during the per-cell-type loop** — `converting counts to integer mode` (pseudobulk sums stored as doubles; the loop now `round()`s them), `some variables in design formula are characters, converting to factors` (silenced by making `condition` an explicit factor), and `nbinomGLM … line search routine failed` (an `apeglm` optimizer note on a few noisy genes — harmless, not fixable by factor coercion). The DE table is correct regardless.
+
 **Synthetic pseudo-donors are a fallback, not the default** — objects loaded the way this series does (`muscData::Kang18_8vs8()`, Tutorial 01) carry real donor IDs in `ind`, so you'll take the real-donor path automatically. The synthetic `set.seed(2026)` 4-pseudo-donor split only triggers if no donor column is present (e.g. an older SeuratData `ifnb`); it's a teaching device whose p-values are not biologically meaningful — say so in any writeup.
 :::
 
@@ -573,9 +577,15 @@ run_de <- function(ct) {
   keep <- meta_pb$celltype == ct
   if (sum(keep) < 4 || length(unique(meta_pb$condition[keep])) < 2) return(NULL)
 
+  cd <- as.data.frame(meta_pb[keep, ])
+  # Make condition an explicit factor with CTRL as the reference. This silences
+  # DESeq2's "variables in design formula are characters, converting to factors"
+  # note and guarantees the STIM-vs-CTRL direction.
+  cd$condition <- factor(cd$condition, levels = c("CTRL", "STIM"))
+
   dds <- DESeqDataSetFromMatrix(
-    countData = pb[, keep],
-    colData   = as.data.frame(meta_pb[keep, ]),
+    countData = round(pb[, keep]),   # round() avoids the "converting counts to integer mode" note
+    colData   = cd,
     design    = ~ condition
   )
   dds <- DESeq(dds, quiet = TRUE)
@@ -634,9 +644,15 @@ A simple per-cell-type volcano plot:
 #| label: volcano
 #| fig-cap: "Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."
 
-# Pick three cell types to plot; adjust to whichever yours has
-plot_types <- c("CD14 Mono", "CD4 Naive T", "B")
-plot_types <- intersect(plot_types, unique(de_all$celltype))
+# Pick the 3 cell types with the most significant genes — data-driven, so it works
+# whatever your cell-type labels are (the muscData ifnb uses "CD14+ Monocytes",
+# "CD4 T cells", "B cells", ... — not the older "CD14 Mono"/"B" names).
+plot_types <- de_all |>
+  dplyr::filter(padj < 0.05) |>
+  dplyr::count(celltype, sort = TRUE) |>
+  head(3) |>
+  dplyr::pull(celltype)
+if (length(plot_types) == 0) plot_types <- head(unique(de_all$celltype), 3)
 
 p_volcano <- de_all |>
   filter(celltype %in% plot_types) |>

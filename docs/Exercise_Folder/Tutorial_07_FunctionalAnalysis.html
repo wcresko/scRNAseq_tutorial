@@ -2356,6 +2356,10 @@ Note
 <p><strong>Many gene symbols don’t map via <code>bitr</code></strong> — gene-symbol-to-ENTREZ-ID mapping is incomplete (deprecated symbols, lncRNAs, pseudogenes). A 5–10% unmapped rate is normal. Check the unmapped list with <code>setdiff(unique(de$gene), de_mapped$symbol)</code> — if it’s mostly pseudogenes / lncRNAs, ignore. If it’s all gene symbols, your <code>org.Hs.eg.db</code> annotation may simply be out of date (update it through Bioconductor when you next refresh your packages).</p>
 <p><strong><code>enrichGO</code> returns 0 enriched terms</strong> — most often you forgot the <code>universe = uni</code> argument and <code>enrichGO</code> is using “all annotated genes in the genome” as the background. That over-inflates the p-value of common terms and makes everything non-significant. Always pass the genes you actually tested.</p>
 <p><strong>GSEA produces “ties detected” warning</strong> — <code>log2FoldChange</code> ties from multiple genes with identical effect sizes break the rank-based test. <code>arrange(desc(log2FoldChange))</code> followed by <code>distinct(ENTREZID, .keep_all = TRUE)</code> handles it. The tutorial does this in the helper.</p>
+<p><strong><code>object &#39;.&#39; not found</code> inside a <code>bitr(...)</code> / pipe</strong> — the <strong>native pipe</strong> <code>|&gt;</code> has no <code>.</code> placeholder (that’s magrittr <code>%&gt;%</code>). Refer to the data frame by name (e.g. <code>unique(de$gene)</code>) instead of <code>.$symbol</code>.</p>
+<p><strong><code>object &#39;de_mapped&#39; not found</code> (or similar) further down</strong> — that’s a <em>consequence</em> of an earlier chunk failing (e.g. the <code>bitr</code> step), so the object was never created. Fix the first error and re-run from there; don’t debug the downstream chunk.</p>
+<p><strong>Bare <code>select</code>/<code>filter</code>/<code>desc</code> misbehave</strong> — <code>org.Hs.eg.db</code>/<code>clusterProfiler</code> (and their <code>AnnotationDbi</code>/<code>IRanges</code> deps) mask those dplyr verbs. The setup chunk re-binds them to dplyr (<code>select &lt;- dplyr::select</code>, …) so the pipelines work; keep that block if you adapt the tutorial.</p>
+<p><strong>The GSEA highlight figure (Mod7_C6) is missing</strong> — it’s only drawn for one cell type. The tutorial picks it data-driven (a monocyte type if present, else the first with GSEA results); hardcoding a name that isn’t in <code>names(gse_list)</code> silently skips the plot.</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
@@ -2434,16 +2438,18 @@ Note
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>de_mapped <span class="ot">&lt;-</span> de <span class="sc">|&gt;</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">symbol =</span> gene) <span class="sc">|&gt;</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bitr</span>(<span class="fu">unique</span>(.<span class="sc">$</span>symbol),</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">fromType =</span> <span class="st">&quot;SYMBOL&quot;</span>,</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">toType   =</span> <span class="st">&quot;ENTREZID&quot;</span>,</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">OrgDb    =</span> org.Hs.eg.db),</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;symbol&quot;</span> <span class="ot">=</span> <span class="st">&quot;SYMBOL&quot;</span>)</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># How many genes failed to map?</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Mapped:   &quot;</span>, <span class="fu">n_distinct</span>(de_mapped<span class="sc">$</span>symbol),   <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Unmapped: &quot;</span>, <span class="fu">n_distinct</span>(de<span class="sc">$</span>gene) <span class="sc">-</span> <span class="fu">n_distinct</span>(de_mapped<span class="sc">$</span>symbol), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># NB: the native pipe |&gt; has no `.` placeholder (that&#39;s magrittr %&gt;%), so refer</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="co"># to `de` directly here rather than `.$symbol`.</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">bitr</span>(<span class="fu">unique</span>(de<span class="sc">$</span>gene),</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>         <span class="at">fromType =</span> <span class="st">&quot;SYMBOL&quot;</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">toType   =</span> <span class="st">&quot;ENTREZID&quot;</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">OrgDb    =</span> org.Hs.eg.db),</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;symbol&quot;</span> <span class="ot">=</span> <span class="st">&quot;SYMBOL&quot;</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># How many genes failed to map?</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Mapped:   &quot;</span>, <span class="fu">n_distinct</span>(de_mapped<span class="sc">$</span>symbol),   <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">&quot;Unmapped: &quot;</span>, <span class="fu">n_distinct</span>(de<span class="sc">$</span>gene) <span class="sc">-</span> <span class="fu">n_distinct</span>(de_mapped<span class="sc">$</span>symbol), <span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2635,18 +2641,21 @@ Show answers
 </div>
 <p>A classic GSEA “running enrichment” plot for a single term in a single cell type:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pick a cell type and a known interesting term</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>ct_pick <span class="ot">&lt;-</span> <span class="st">&quot;CD14 Mono&quot;</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(gse_list[[ct_pick]])) {</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  p_gsea <span class="ot">&lt;-</span> <span class="fu">gseaplot2</span>(gse_list[[ct_pick]],</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">geneSetID =</span> <span class="fu">head</span>(gse_list[[ct_pick]]<span class="sc">@</span>result<span class="sc">$</span>ID, <span class="dv">3</span>),</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">title     =</span> <span class="fu">paste0</span>(ct_pick, <span class="st">&quot; — top 3 BP enrichments&quot;</span>))</span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p_gsea)</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># --- Figure out ----------------------------------------------------------</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod7_C6_gsea_running_enrichment.png&quot;</span>), p_gsea,</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Pick a cell type to highlight — data-driven so it matches your labels: prefer a</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># monocyte type (strongest IFN response), else the first with GSEA results. (The</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># muscData ifnb labels are &quot;CD14+ Monocytes&quot; etc., not &quot;CD14 Mono&quot;.)</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>ct_pick <span class="ot">&lt;-</span> <span class="fu">grep</span>(<span class="st">&quot;Mono&quot;</span>, <span class="fu">names</span>(gse_list), <span class="at">value =</span> <span class="cn">TRUE</span>)[<span class="dv">1</span>]</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">is.na</span>(ct_pick)) ct_pick <span class="ot">&lt;-</span> <span class="cf">if</span> (<span class="fu">length</span>(gse_list)) <span class="fu">names</span>(gse_list)[<span class="dv">1</span>] <span class="cf">else</span> <span class="cn">NA_character_</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.na</span>(ct_pick) <span class="sc">&amp;&amp;</span> <span class="fu">nrow</span>(gse_list[[ct_pick]]<span class="sc">@</span>result) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  p_gsea <span class="ot">&lt;-</span> <span class="fu">gseaplot2</span>(gse_list[[ct_pick]],</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>            <span class="at">geneSetID =</span> <span class="fu">head</span>(gse_list[[ct_pick]]<span class="sc">@</span>result<span class="sc">$</span>ID, <span class="dv">3</span>),</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>            <span class="at">title     =</span> <span class="fu">paste0</span>(ct_pick, <span class="st">&quot; — top 3 BP enrichments&quot;</span>))</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(p_gsea)</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># --- Figure out ----------------------------------------------------------</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod7_C6_gsea_running_enrichment.png&quot;</span>), p_gsea,</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="step-5-reactome-pathways-cleaner-than-go-for-signaling-biology" class="level2">
