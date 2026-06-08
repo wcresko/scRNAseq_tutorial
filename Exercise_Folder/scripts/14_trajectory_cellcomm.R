@@ -1,5 +1,6 @@
 #!/usr/bin/env Rscript
-# Talapas analysis pipeline 12 — parallels laptop Tutorial 12 (Trajectory & Cell-Cell Comm).
+# Talapas analysis pipeline 14 — parallels laptop Tutorial 14 (Trajectory & Cell-Cell Comm).
+# RNA velocity (scVelo) is Python — see the companion script 14_rna_velocity_scvelo.py.
 # Learning notebook: Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.qmd
 # Runs on the annotated ifnb object (the same dataset as the laptop notebook).
 # Run:  sbatch --job-name=traj --mem=64G run_rscript.sbatch 14_trajectory_cellcomm.R
@@ -49,9 +50,9 @@ dev.off()
 cat("Wrote Slingshot pseudotime for", ncol(sce), "cells (root =", root, ")\n")
 cat("Wrote Mod14 figures/tables to", OUT_DIR, "\n")
 
-# Part B — RNA velocity (scVelo) needs spliced/unspliced layers from velocyto/kb, NOT the
-# filtered counts matrix. Python sketch — see the notebook:
-#   scv.pp.filter_and_normalize(adata); scv.tl.velocity(adata, mode="dynamical"); ...
+# Part B — RNA velocity (scVelo) is a Python analysis. Run the companion script
+# 14_rna_velocity_scvelo.py (it needs spliced/unspliced layers from velocyto/kb,
+# NOT the Cell Ranger filtered matrix).
 
 # Part C — Cell-cell communication with CellChat (uncomment once CellChat is installed):
 # library(CellChat)
