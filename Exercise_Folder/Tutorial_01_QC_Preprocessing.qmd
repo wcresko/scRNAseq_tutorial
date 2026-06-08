@@ -109,6 +109,8 @@ By the end of this tutorial you will be able to:
 
 **Warnings (not errors) during doublet detection** — when Step 6 runs you'll see `Layer 'data'/'scale.data' is empty` and `'normalizeCounts'/'librarySizeFactors' is deprecated`. Both are harmless: doublet detection runs on **raw counts before normalization** (so those layers are legitimately empty), and the deprecation notes come from `scran`/`scuttle` *inside* `scDblFinder`, not your code. As long as you see `Creating … artificial doublets`, it's working.
 
+**Plotting warnings before normalization (harmless)** — Steps 4 and 6 plot per-cell QC *metadata* (`nFeature_RNA`, `nCount_RNA`, …) before normalization, so Seurat prints `Default search for "data" layer … utilizing "counts" layer instead`. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot (Step 9) uses a log10 axis and prints `log-10 transformation introduced infinite values` for genes with zero mean expression (they're not variable features). The tutorial wraps these plots in `suppressWarnings()` so you shouldn't see them, but they're safe either way.
+
 **Gene names look like `SYMBOL_ENSG…` / `SYMBOL-ENSG…`** — `muscData`'s `Kang18_8vs8()` stores each feature as `SYMBOL_ENSEMBLID` (e.g. `ISG15_ENSG00000187608`). The loader strips the trailing Ensembl-ID suffix so only the gene symbol remains (`ISG15`), which is what canonical markers, Azimuth, and `org.Hs.eg.db` match on. It strips *only* the Ensembl suffix — not everything after the first dash — so real dashed symbols (`HLA-A`, `MT-CO1`) are preserved, and it reports how many names it simplified.
 :::
 
@@ -337,14 +339,19 @@ The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-c
 #| label: qc-plots
 #| fig-cap: "Per-sample QC distributions (violins) and the UMI–gene relationship (scatter) for the ifnb dataset."
 
-# Violin panel: four QC metrics, split by sample, fully labelled
-p_qc_vln <- VlnPlot(ifnb,
+# Violin panel: four QC metrics, split by sample, fully labelled.
+# These features are per-cell QC METADATA plotted before normalization, so Seurat
+# warns that the "data" layer is empty and falls back to "counts". That's
+# irrelevant here (metadata isn't read from an expression layer), so we silence
+# the expected note.
+p_qc_vln <- suppressWarnings(
+  VlnPlot(ifnb,
         features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
         group.by = "stim",
         ncol = 4,
         pt.size = 0) &
   xlab("Sample (stim condition)") &
-  theme(plot.title = element_text(size = 11))
+  theme(plot.title = element_text(size = 11)))
 p_qc_vln <- p_qc_vln +
   patchwork::plot_annotation(
     title    = "Per-cell QC metrics by sample — ifnb (CTRL vs IFN-β STIM)",
@@ -354,10 +361,10 @@ p_qc_vln <- p_qc_vln +
 p_qc_vln
 
 # Scatter: UMIs vs unique genes, coloured by sample, with a linear trend
-p_qc_scatter <- FeatureScatter(ifnb,
+p_qc_scatter <- suppressWarnings(FeatureScatter(ifnb,
                feature1 = "nCount_RNA",
                feature2 = "nFeature_RNA",
-               group.by = "stim") +
+               group.by = "stim")) +
   geom_smooth(method = "lm") +
   labs(
     title    = "Sequencing depth vs library complexity",
@@ -500,12 +507,15 @@ table(sample = ifnb$stim, class = ifnb$scDblFinder.class)
 as.data.frame(table(sample = ifnb$stim, class = ifnb$scDblFinder.class)) |>
   readr::write_csv(file.path(out_dir, "Mod1_C7_doublet_counts.csv"))
 
-# Inspect: doublets should sit at the high end of nCount/nFeature
-p_dbl <- VlnPlot(ifnb,
+# Inspect: doublets should sit at the high end of nCount/nFeature.
+# (Same pre-normalization metadata plot as Step 4 — silence the expected
+# "data layer empty, using counts" note.)
+p_dbl <- suppressWarnings(
+  VlnPlot(ifnb,
         features = c("nFeature_RNA", "nCount_RNA"),
         group.by = "scDblFinder.class", pt.size = 0) &
   xlab("scDblFinder class") &
-  theme(plot.title = element_text(size = 11))
+  theme(plot.title = element_text(size = 11)))
 p_dbl <- p_dbl +
   patchwork::plot_annotation(
     title    = "Library size and complexity for called singlets vs doublets",
@@ -623,11 +633,16 @@ p_hvg <- LabelPoints(plot = plot1, points = top10, repel = TRUE) +
     y        = "Standardized variance",
     colour   = "Selected as HVG"
   )
-p_hvg
+# VariableFeaturePlot draws mean expression on a log10 x-axis. Genes with zero
+# mean (undetected across all retained cells) become -Inf and ggplot drops them
+# with "log-10 transformation introduced infinite values" — harmless, since those
+# genes are not variable features. Silence it at draw and save time.
+suppressWarnings(print(p_hvg))
 
 # --- Outputs: HVG plot + the labelled top-10 genes as a table --------------
-ggsave(file.path(out_dir, "Mod1_C10_variable_features.png"), p_hvg,
-       width = 7, height = 5, dpi = 300)
+suppressWarnings(
+  ggsave(file.path(out_dir, "Mod1_C10_variable_features.png"), p_hvg,
+         width = 7, height = 5, dpi = 300))
 
 tibble::tibble(rank = seq_along(top10), gene = top10) |>
   readr::write_csv(file.path(out_dir, "Mod1_C10_top10_hvgs.csv"))
