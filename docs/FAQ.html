@@ -4334,14 +4334,17 @@ z-index: 1;
 </section>
 <section id="celldex-alabaster.base-had-non-zero-exit-status" class="level3">
 <h3 class="anchored" data-anchor-id="celldex-alabaster.base-had-non-zero-exit-status"><code>celldex</code> / <code>alabaster.base</code> “had non-zero exit status”</h3>
-<p><code>celldex</code> (the SingleR reference loader, Module 04) sits on Bioconductor’s <strong>alabaster/gypsum</strong> stack, so a failed <code>alabaster.base</code> build takes <code>celldex</code> down with it. Two fixes, in order:</p>
-<ol type="1">
-<li><p>Make sure your compiler toolchain is set up (<a href="./Software_Setup.html">Software Setup §3</a>) — <code>alabaster.base</code> builds C++ from source.</p></li>
-<li><p>Re-install with dependency updates allowed (the usual cause is a stale dependency from an older install):</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>BiocManager<span class="sc">::</span><span class="fu">install</span>(<span class="st">&quot;celldex&quot;</span>, <span class="at">update =</span> <span class="cn">TRUE</span>, <span class="at">ask =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>BiocManager<span class="sc">::</span><span class="fu">valid</span>()   <span class="co"># lists anything still out of sync</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div></li>
-</ol>
-<p>It’s only needed for Module 04, so you can keep going and come back to it.</p>
+<p><code>celldex</code> (the SingleR reference loader, Module 04) sits on Bioconductor’s <strong>alabaster/gypsum</strong> stack, so a failed <code>alabaster.base</code> build takes <code>celldex</code> down with it (<code>dependency &#39;alabaster.base&#39; is not available for package &#39;celldex&#39;</code>). <strong>Scroll up in the log to see <em>why</em> <code>alabaster.base</code> failed</strong> — there are two common causes:</p>
+<p><strong>Cause A — R is compiling everything from source because there’s no prebuilt binary.</strong> Repeated <code>HTTP status was &#39;404 Not Found&#39;</code> lines for <code>.../bin/macosx/sonoma-arm64/contrib/4.6/PACKAGES</code> mean Bioconductor doesn’t yet ship Mac/arm64 binaries for your R version. A just-released R (e.g. R 4.6 / Bioconductor 3.23) often has none for weeks. <strong>Switch to a released R</strong> — install <strong>R 4.5.x (Bioconductor 3.21)</strong> from <a href="https://cran.r-project.org">CRAN</a>, point RStudio at it (<em>Tools ▸ Global Options ▸ General</em>), and re-run; with binaries available it installs in minutes, no compiler needed. (<code>type = &quot;binary&quot;</code> won’t help — there’s no binary to fetch.)</p>
+<p><strong>Cause B — the source build fails at the link step:</strong> <code>ld: library &#39;ssl&#39; not found</code> / <code>clang++: error: linker command failed</code>. OpenSSL isn’t on the linker path. On macOS:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">brew</span> install openssl@3</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">mkdir</span> <span class="at">-p</span> ~/.R</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span> <span class="op">&gt;&gt;</span> ~/.R/Makevars <span class="op">&lt;&lt;&#39;EOF&#39;</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="st">LDFLAGS += -L/opt/homebrew/opt/openssl@3/lib</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="st">CPPFLAGS += -I/opt/homebrew/opt/openssl@3/include</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="op">EOF</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Restart R and re-run <code>BiocManager::install(&quot;celldex&quot;, update = TRUE, ask = FALSE)</code>. (Intel Macs: <code>/usr/local/opt/openssl@3</code>.) <code>BiocManager::valid()</code> lists anything still out of sync.</p>
+<p>Either way, <code>celldex</code> is only needed for Module 04’s <strong>SingleR</strong> path — the <strong>Azimuth</strong> path needs no <code>celldex</code> — so you can keep going and come back to it.</p>
 </section>
 </section>
 <section id="datasets" class="level2">
