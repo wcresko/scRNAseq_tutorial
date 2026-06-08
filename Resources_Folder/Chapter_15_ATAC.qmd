@@ -124,6 +124,10 @@ Gene-activity scores are not as good as actual RNA expression — they're an app
 
 The window used by `GeneActivity()` matters: the default ±2 kb from the TSS captures the proximal promoter and a bit of the gene body. For genes regulated primarily by distal enhancers (common in immune genes), accessibility at the TSS may be low even when the gene is actively transcribed. Widening the window to ±5 kb or including a separate enhancer set can improve gene activity scores for such genes, though at the cost of noisier scores from overlap between adjacent gene windows. Always check that known markers for your expected cell types show appropriately elevated gene activity scores after computing them.
 
+::: {.callout-note .key-concept title="🔑 Key concept — TF-IDF and LSI replace log-normalization and PCA for ATAC data"}
+The dimensionality-reduction pipeline for scATAC-seq uses TF-IDF normalization followed by latent semantic indexing (LSI, implemented as SVD) rather than the log-normalization + PCA pipeline used for RNA. The reason is the nature of the data: ATAC peak counts are near-binary (each peak is either accessible or not in a given cell), severely sparse (>95% zeros), and lack the continuous count distribution that makes Poisson-based methods appropriate. TF-IDF (term frequency × inverse document frequency) is a normalization from information retrieval that weighs features (peaks) by their rarity across cells: a peak accessible in only 2% of cells (high IDF) is upweighted relative to a ubiquitously open promoter (low IDF). LSI / SVD then finds the major axes of variance in this TF-IDF–normalized binary matrix, analogous to how PCA operates on a scaled RNA matrix. The resulting "LSI components" play the same conceptual role as PCs and are used for UMAP, clustering, and label transfer. The practical warning is that LSI component 1 almost always captures sequencing depth rather than biology — it must be discarded before downstream analysis.
+:::
+
 ## 15.6 Peak calling vs pre-called peaks
 
 The scATAC workflow assumes you have peaks. There are two ways:
