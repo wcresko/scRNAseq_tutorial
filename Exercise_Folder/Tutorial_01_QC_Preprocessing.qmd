@@ -105,11 +105,11 @@ By the end of this tutorial you will be able to:
 
 **`scDblFinder` returns a different result than the workshop** — `scDblFinder` is stochastic. The workshop uses `set.seed(2026)` *immediately before* calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.
 
-**SoupX errors with "no raw matrix found"** (or `subscript out of bounds` from `load10X`) — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The SoupX block (@lst-M1-soupx) is an **illustrative template** for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
+**SoupX errors with "no raw matrix found"** (or `subscript out of bounds` from `load10X`) — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The SoupX block ([code](#lst-M1-soupx)) is an **illustrative template** for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
 
 **Warnings (not errors) during doublet detection** — when Step 6 runs you'll see `Layer 'data'/'scale.data' is empty` and `'normalizeCounts'/'librarySizeFactors' is deprecated`. Both are harmless: doublet detection runs on **raw counts before normalization** (so those layers are legitimately empty), and the deprecation notes come from `scran`/`scuttle` *inside* `scDblFinder`, not your code. As long as you see `Creating … artificial doublets`, it's working.
 
-**Plotting warnings before normalization (harmless)** — the QC plots (@lst-M1-qc_plots) and doublet plots (@lst-M1-dbl) draw per-cell QC *metadata* (`nFeature_RNA`, `nCount_RNA`, …) before normalization, so Seurat prints `Default search for "data" layer … utilizing "counts" layer instead`. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot (@lst-M1-hvgs) uses a log10 axis and prints `log-10 transformation introduced infinite values` for genes with zero mean expression (they're not variable features). The tutorial wraps these plots in `suppressWarnings()` so you shouldn't see them, but they're safe either way.
+**Plotting warnings before normalization (harmless)** — the QC plots ([code](#lst-M1-qc_plots)) and doublet plots ([code](#lst-M1-dbl)) draw per-cell QC *metadata* (`nFeature_RNA`, `nCount_RNA`, …) before normalization, so Seurat prints `Default search for "data" layer … utilizing "counts" layer instead`. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot ([code](#lst-M1-hvgs)) uses a log10 axis and prints `log-10 transformation introduced infinite values` for genes with zero mean expression (they're not variable features). The tutorial wraps these plots in `suppressWarnings()` so you shouldn't see them, but they're safe either way.
 
 **Gene names look like `SYMBOL_ENSG…` / `SYMBOL-ENSG…`** — `muscData`'s `Kang18_8vs8()` stores each feature as `SYMBOL_ENSEMBLID` (e.g. `ISG15_ENSG00000187608`). The loader strips the trailing Ensembl-ID suffix so only the gene symbol remains (`ISG15`), which is what canonical markers, Azimuth, and `org.Hs.eg.db` match on. It strips *only* the Ensembl suffix — not everything after the first dash — so real dashed symbols (`HLA-A`, `MT-CO1`) are preserved, and it reports how many names it simplified.
 :::
@@ -186,8 +186,7 @@ message("This module writes its figures & tables to: ", normalizePath(out_dir))
 ## Step 1 — Load the `ifnb` dataset
 
 ```{r}
-#| label: lst-M1-load
-#| lst-cap: "Load Kang18_8vs8, keep annotated singlets, simplify gene names, build the Seurat object."
+#| label: M1-load
 
 # Fetch the Kang et al. 2017 PBMC dataset (CTRL + IFN-beta STIM) from
 # Bioconductor's ExperimentHub. The first call downloads ~25 MB and caches it;
@@ -347,9 +346,10 @@ The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-c
 
 ## Step 4 — Visualize QC, per sample
 
+[]{#lst-M1-qc_plots}
+
 ```{r}
-#| label: lst-M1-qc_plots
-#| lst-cap: "Per-sample QC visualizations: violins of the four QC metrics and the UMI-vs-gene scatter."
+#| label: M1-qc_plots
 
 # Violin panel: four QC metrics, split by sample, fully labelled.
 # These features are per-cell QC METADATA plotted before normalization, so Seurat
@@ -422,9 +422,10 @@ In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambi
 
 *Optional reference pattern — left `#| eval: false` because it needs a raw Cell Ranger matrix (not shipped with `ifnb`). You don't need to change anything here; use it on your own 10x data.*
 
+[]{#lst-M1-soupx}
+
 ```{r}
-#| label: lst-M1-soupx
-#| lst-cap: "SoupX ambient-RNA correction — template for your own 10x data (not run on ifnb)."
+#| label: M1-soupx
 #| eval: false
 
 # Pattern for any 10x dataset where you have the raw Cell Ranger output.
@@ -483,13 +484,14 @@ adj <- adjustCounts(sc, roundToInt = TRUE)
 
 ## Step 6 — Doublet detection with `scDblFinder`
 
-A **doublet** is one barcode's worth of counts that came from two cells getting trapped in the same droplet. They show up as cells with anomalously high `nCount_RNA` and `nFeature_RNA` and a mixed expression profile (e.g. T-cell markers AND B-cell markers in the same cell). The simple `nFeature_RNA < 2500` filter applied later (@lst-M1-filter) catches some, but doublets that pair two *different* cell types of similar size will pass that filter — you need a model.
+A **doublet** is one barcode's worth of counts that came from two cells getting trapped in the same droplet. They show up as cells with anomalously high `nCount_RNA` and `nFeature_RNA` and a mixed expression profile (e.g. T-cell markers AND B-cell markers in the same cell). The simple `nFeature_RNA < 2500` filter applied later ([code](#lst-M1-filter)) catches some, but doublets that pair two *different* cell types of similar size will pass that filter — you need a model.
 
 `scDblFinder` simulates artificial doublets, trains a classifier to distinguish them from singletons, and returns a per-cell score and class. Critically, **doublets form within a sample, not across samples**, so we run it per sample.
 
+[]{#lst-M1-dbl}
+
 ```{r}
-#| label: lst-M1-dbl
-#| lst-cap: "Per-sample doublet detection with scDblFinder, then JoinLayers to rejoin the split assay."
+#| label: M1-dbl
 
 library(scDblFinder)
 
@@ -569,9 +571,10 @@ The `table()` is a 2×2 of sample × class: the key number is the **doublet frac
 
 ## Step 7 — Filter low-quality cells
 
+[]{#lst-M1-filter}
+
 ```{r}
-#| label: lst-M1-filter
-#| lst-cap: "Filter low-quality cells on nFeature_RNA, percent.mt, and the doublet class."
+#| label: M1-filter
 
 ifnb <- subset(
   ifnb,
@@ -636,9 +639,10 @@ dim_after_normalize <- dim(ifnb)
 
 ## Step 9 — Highly variable features
 
+[]{#lst-M1-hvgs}
+
 ```{r}
-#| label: lst-M1-hvgs
-#| lst-cap: "Select 2,000 highly variable genes (vst) and plot the mean–variance relationship."
+#| label: M1-hvgs
 
 ifnb <- FindVariableFeatures(
   ifnb,

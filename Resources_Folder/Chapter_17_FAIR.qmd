@@ -38,7 +38,7 @@ The cost of doing FAIR is paid up-front during the project. The payoff is paid b
 
 ## 17.2 The FAIR principles
 
-Wilkinson et al. [@wilkinson2016fair] proposed four guiding principles for data management:
+Wilkinson et al. [@wilkinson2016fair] proposed four guiding principles for data management, summarized in @tbl-ch17-fair.
 
 | Principle | One-line definition |
 |---|---|
@@ -47,9 +47,17 @@ Wilkinson et al. [@wilkinson2016fair] proposed four guiding principles for data 
 | **I**nteroperable | Data uses shared vocabularies so different datasets combine cleanly |
 | **R**eusable | Provenance + clear licence + sufficient metadata for reanalysis |
 
+: The four FAIR principles [@wilkinson2016fair]. FAIR is not synonymous with "open" — FAIR data can be access-controlled while still satisfying all four criteria. {#tbl-ch17-fair}
+
 FAIR is not "open" — FAIR data can be access-controlled (e.g. patient genomes in a controlled-access archive). The "A" requires that the *protocol* for access is open and standardized, not that the data itself is.
 
 Every line in your data-deposition workflow should map back to one of these four. The most common failure is "I"; the most common omission is "F" (people deposit data without a stable identifier or without indexing it where searchers will look).
+
+::: {.callout-note .key-concept title="🔑 Key concept — the four FAIR principles in one idea"}
+FAIR is a framework for making data reusable, not just accessible. **Findable** means giving data a stable, searchable identifier (a GEO accession, a DOI) so other researchers can discover it without already knowing it exists. **Accessible** means providing an open, documented protocol to retrieve the data — which can still require authentication for sensitive human data. **Interoperable** means using controlled vocabularies (Cell Ontology for cell types, Uberon for tissues, MONDO for diseases, EFO for assay types) so your dataset's metadata can be joined to other datasets' metadata without manual curation. **Reusable** means providing enough provenance — methods, software versions, sample metadata, a clear license — that an independent researcher could reproduce your analysis from your raw data. The "I" criterion is the one that most datasets fail: saying "B cells" in a free-text field rather than `CL:0000236` means every downstream data integration requires a human to manually reconcile the term against every other study's vocabulary. Ontology terms are what make computational atlases possible [@osumisutherland2021cell].
+:::
+
+**FAIR in practice for scRNA-seq.** The table above maps cleanly to specific choices in data deposition. For **Findability**: obtain a stable accession (GEO GSE, SRA PRJNA, or CELLxGENE slug) and register your dataset in at least one indexed repository — not just a lab website that may go offline. For **Accessibility**: make sure that not only the data but also the per-cell metadata is downloadable via standard protocols (HTTPS/FTP), and that the data remains accessible under controlled access if human-sensitive. For **Interoperability**: the CELLxGENE schema [@czi2025cellxgene] is the highest bar and most demanding interpreter of this criterion — its required ontology fields are the reason CELLxGENE can build an integrated atlas of millions of cells across thousands of studies. For **Reusability**: deposit analysis code to Zenodo or GitHub (with a DOI for archival), provide a methods section that specifies exact software versions, and include the canonical sample sheet that links every cell to its biological sample.
 
 ## 17.3 The repository ecosystem
 
@@ -66,7 +74,7 @@ For scRNA-seq, you create all four. The [Appendix E](Appendix_E_Databases_FileFo
 
 ### Single-cell-aware repositories
 
-Beyond the generic raw archive, deposit in a scRNA-seq–native repository so the data is *queryable as scRNA-seq*:
+Beyond the generic raw archive, deposit in a scRNA-seq–native repository so the data is *queryable as scRNA-seq*. @tbl-ch17-repos summarizes the major options.
 
 | Repository | Run by | What it accepts | Strengths |
 |---|---|---|---|
@@ -74,6 +82,8 @@ Beyond the generic raw archive, deposit in a scRNA-seq–native repository so th
 | **Human Cell Atlas Data Portal** [@regev2017hca] | HCA Consortium | Raw + processed, full provenance graph | Strict QC, integrated atlas |
 | **Single Cell Expression Atlas** | EBI | Counts + author annotations | Curated, queryable per-gene across studies |
 | **Single Cell Portal** | Broad Institute | Loose; raw + processed | Easy upload, less curation |
+
+: Single-cell-aware repositories for scRNA-seq data deposition. The recommended workflow is triple-deposit: raw FASTQs to SRA, processed data to GEO, and AnnData to CELLxGENE. {#tbl-ch17-repos}
 
 The recommended workflow in 2026: **raw FASTQs to SRA + BioProject; processed data to GEO; AnnData with cell-type metadata to CELLxGENE**. The triple-deposit is not redundant — each repository serves a different audience (raw-data reanalyzers, traditional bench biologists, single-cell-tool users).
 
@@ -83,7 +93,7 @@ You can't reuse a counts matrix you can't interpret. "Sample 1, Sample 2, Sample
 
 For human samples: also consent type, age range (often binned for de-identification), self-reported sex / gender, and ancestry.
 
-The CELLxGENE schema [@czi2025cellxgene] is the most demanding of the major repositories and also the most reusable. Its insistence on ontology-typed fields is exactly what makes cross-dataset atlases possible [@osumisutherland2021cell]. Meeting CELLxGENE's bar gets you GEO + HCA "for free".
+The CELLxGENE schema [@czi2025cellxgene] is the most demanding of the major repositories and also the most reusable. Its insistence on ontology-typed fields is exactly what makes cross-dataset atlases possible [@osumisutherland2021cell]. The required fields are listed in @tbl-ch17-cellxgene; meeting this bar gets you GEO + HCA compatibility for free.
 
 Three fields deserve a brief explanation that is easy to get wrong:
 
@@ -91,7 +101,11 @@ Three fields deserve a brief explanation that is easy to get wrong:
 - **`is_primary_data`** is a Boolean flag: `TRUE` for data deposited by the generating lab for the first time; `FALSE` for a re-analysis of someone else's data. This flag is how atlases avoid double-counting the same cells.
 - **`suspension_type`** distinguishes `cell` (dissociated whole cells, the usual case) from `nucleus` (single-nucleus RNA-seq / snRNA-seq). This field matters for atlas integration because snRNA-seq counts are systematically lower than scRNA-seq counts for the same cell type.
 
-Required fields:
+**Why ontology terms matter for interoperability.** When two independent labs deposit "B cells" in free-text fields, a computational tool cannot know whether both mean the same thing without human curation. But when both use `CL:0000236`, they are guaranteed to be using the same controlled definition from the Cell Ontology, which is maintained with a formal taxonomy. The ontology also carries hierarchical relationships: `CL:0000236` (B cell) is a child of `CL:0000945` (lymphocyte), so a query for "all lymphocytes" will automatically include B cells without needing to know all the specific child terms. This hierarchical querying is what makes large-scale meta-analyses and cell atlases computationally tractable [@osumisutherland2021cell; @tabulasapiens2022]. The human Cell Ontology has ~2,500 cell types; most immune cell types have well-defined terms, while many tissue-specific or novel cell states require either choosing the closest parent term or working with the CL maintainers to add a new term.
+
+::: {.callout-note .key-concept title="🔑 Key concept — ontology terms make metadata machine-readable and atlas-compatible"}
+An ontology is a controlled vocabulary with formal definitions and hierarchical relationships. When you label a cell type as `CL:0000236` rather than "B cell," you are linking your data to a shared, versioned, internationally-maintained definition. Any downstream tool, database, or analysis pipeline that understands the Cell Ontology can automatically infer that `CL:0000236` is a lymphocyte, a blood cell, and a hematopoietic cell — and can join it with every other dataset that uses the same term. Free-text labels break this: "B-cell," "Bcell," "B_cell," "mature B lymphocyte," and "B cell" are all distinct strings to a computer but the same thing to a biologist. The CELLxGENE Discover schema requires ontology terms precisely because they are the technical prerequisite for building multi-million-cell integrated atlases.
+:::
 
 | Field | Vocabulary |
 |---|---|
@@ -107,9 +121,11 @@ Required fields:
 | `is_primary_data` | Boolean |
 | `suspension_type` | `cell` / `nucleus` |
 
-These ontology IDs are looked up at the [Ontology Lookup Service](https://www.ebi.ac.uk/ols4/). The mapping from "B cell" to `CL:0000236` is what makes your dataset interoperable with every other CELLxGENE-deposited dataset.
+: Required CELLxGENE schema fields [@czi2025cellxgene] and their controlled vocabularies. Ontology IDs are looked up at the [Ontology Lookup Service](https://www.ebi.ac.uk/ols4/). The mapping from "B cell" to `CL:0000236` is what makes your dataset interoperable with every other CELLxGENE-deposited dataset. {#tbl-ch17-cellxgene}
 
 ## 17.5 File formats and what to deposit
+
+@tbl-ch17-formats lists the file types you should deposit at each layer of the data lifecycle.
 
 | Layer | Format | Why |
 |---|---|---|
@@ -120,8 +136,20 @@ These ontology IDs are looked up at the [Ontology Lookup Service](https://www.eb
 | Metadata sheet | `.csv` / `.tsv` (also embedded in `.h5ad` via `.obs`) | Sample-level + per-cell |
 | Analysis code | git repo (Zenodo for archival) | Reproducibility |
 
+: Recommended file formats for each layer of an scRNA-seq data deposition. AnnData (`.h5ad`) is the preferred archival format for annotated objects; `.rds` files are Seurat-version-locked and are not future-proof. {#tbl-ch17-formats}
+
 ::: callout-warning
 **Seurat `.rds` files are not future-proof.** They lock the data to the Seurat version that wrote them. For long-term archival use **AnnData (`.h5ad`)** — versioned, language-agnostic, HDF5-based, readable by Scanpy / Seurat 5 / `anndata-rs`.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — AnnData .h5ad vs. Seurat .rds for archival"}
+Both `.h5ad` (AnnData) and `.rds` (Seurat) store an annotated single-cell object, but they have very different archival properties. **`.h5ad`** is an HDF5 file with a defined, versioned schema: the raw counts are in `adata.X` or `adata.raw.X`, normalized data in `adata.layers`, per-cell metadata in `adata.obs`, per-gene metadata in `adata.var`, and embeddings in `adata.obsm`. It can be read by Python (`anndata`), R (`anndata` package or Seurat 5's `ReadH5AD()`), Rust (`anndata-rs`), and the CELLxGENE browser — it is language-agnostic. **`.rds`** is an R binary serialization that includes the full Seurat object graph — but Seurat's internal structure has changed substantially between v4 and v5, so a `.rds` written by Seurat 4 may not load in Seurat 5 without conversion. For a dataset that should remain usable in 2030, `.h5ad` is the correct choice for archival. The conversion from Seurat to AnnData is done via `SeuratDisk::SaveH5Seurat()` + `SeuratDisk::Convert()`, or via Seurat 5's built-in `WriteH5AD()` if available.
+:::
+
+**The CELLxGENE schema validation step.** The CELLxGENE consortium provides a Python command-line validator (`cellxgene-schema validate <file.h5ad>`) that checks every required field, every ontology ID, and the overall structure of the `.h5ad` before submission. Running this validator is mandatory before attempting to submit to CELLxGENE Discover — the portal will reject non-conformant files. The validator is version-specific: the schema is updated periodically (v4, v5, ...) and an `.h5ad` that passed an older validator version may not pass the current one. Always run the current validator, not a cached version from months earlier. Common validation failures include: missing required fields (e.g., `suspension_type` not added to the `.obs` frame), deprecated ontology IDs (cell type or disease ontology terms that were retired in a recent ontology release), and incorrect data types (e.g., `is_primary_data` stored as a string `"TRUE"` rather than a Boolean `True`).
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — CELLxGENE schema / required fields and controlled vocabulary strictness"}
+The CELLxGENE Discover schema (currently v5+) requires a specific set of per-cell columns in `adata.obs`, and each must use the exact controlled vocabulary specified. **Required fields with no defaults**: `cell_type_ontology_term_id` (Cell Ontology `CL:` prefix), `tissue_ontology_term_id` (Uberon `UBERON:` prefix), `assay_ontology_term_id` (EFO `EFO:` prefix), `disease_ontology_term_id` (MONDO `MONDO:` or `PATO:0000461` for normal), `organism_ontology_term_id` (NCBITaxon), `sex_ontology_term_id` (PATO), `is_primary_data` (Boolean), and `suspension_type` (`"cell"` or `"nucleus"`). There is no fallback for missing or `NA` values — the validator will reject the file. Each ontology ID must be a currently valid, non-deprecated term in the appropriate ontology version used by the schema; IDs are versioned and can be deprecated in new ontology releases without notice. The practical workflow is: (1) look up current IDs at the EBI Ontology Lookup Service (https://www.ebi.ac.uk/ols4/); (2) add them to the per-cell metadata frame; (3) run `cellxgene-schema validate` locally before submission; (4) repeat until the validator passes cleanly.
 :::
 
 ## 17.6 Plan submission at experimental design time
@@ -159,6 +187,8 @@ Eight steps:
 
 ## 17.8 Common errors
 
+@tbl-ch17-errors collects the errors most commonly encountered during FAIR metadata preparation and submission, their causes, and the fix.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `SeuratDisk::SaveH5Seurat` fails | Seurat v5 Assay5 not supported by old SeuratDisk | Use the dev branch: `remotes::install_github("mojaveazure/seurat-disk")` |
@@ -166,6 +196,8 @@ Eight steps:
 | CELLxGENE validator: "ontology term not found" | Ontology IDs get updated periodically | Look up current IDs at ols4 |
 | Validator passes locally but submission portal rejects | Schema version updates faster than your local validator | Check current schema before submitting |
 | "Inconsistent sample names" between BioSample / SRA / GEO sheets | Manual transcription error | Always derive all sheets from a single canonical sheet programmatically |
+
+: Common FAIR data-deposition errors, their underlying causes, and fixes. {#tbl-ch17-errors}
 
 ## 17.9 Where this material is also discussed
 

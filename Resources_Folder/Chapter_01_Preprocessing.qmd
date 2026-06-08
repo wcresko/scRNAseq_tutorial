@@ -60,7 +60,16 @@ The Scanpy[@wolf2018scanpy] and Bioconductor `scran`+`scater` workflows[@amezqui
 
 ## 1.3 Quality-control metrics — what they measure and why
 
-Three numbers per cell carry most of the QC information, and a fourth (`percent.rb`) is often worth adding. The original systematic treatment of which features actually separate low-quality cells from good ones found that these library-complexity and mitochondrial metrics dominate[@ilicic2016classification].
+Three numbers per cell carry most of the QC information, and a fourth (`percent.rb`) is often worth adding. The original systematic treatment of which features actually separate low-quality cells from good ones found that these library-complexity and mitochondrial metrics dominate[@ilicic2016classification]. @tbl-qc-metrics summarizes the four metrics and how to read their tails; the subsections that follow explain each in turn.
+
+| Metric | What it measures | Healthy range (PBMC) | A high value means | A low value means |
+|---|---|---|---|---|
+| `nCount_RNA` | Total UMIs per cell (sequencing depth) | ~5,000–15,000 | Very active cell **or** a doublet | Empty, lysed, or undersequenced droplet |
+| `nFeature_RNA` | Unique genes detected | ~1,500–4,000 | Doublet (two cells' transcriptomes) | Low-complexity or dying cell |
+| `percent.mt` | Mitochondrial-UMI fraction | ~2–10% | Dying/damaged cell (membrane leaked) | Expected; near-zero is normal for snRNA-seq |
+| `percent.rb` | Ribosomal-protein fraction | tissue-dependent | High translational activity (state, not quality) | Translationally quiet cell state |
+
+: Per-cell QC metrics, their typical healthy ranges for PBMCs, and how to read each distribution's tails. Ranges are tissue- and chemistry-dependent — always set thresholds from your own per-sample distributions rather than from this table. {#tbl-qc-metrics}
 
 ### 1.3.1 `nCount_RNA` — total UMIs per cell
 
@@ -173,6 +182,10 @@ The workshop's `ifnb` filter — `nFeature_RNA > 200`, `nFeature_RNA < 2500`, `p
 
 After filtering, every cell still has a different `nCount_RNA` — its sequencing depth. Without correction, a deeper-sequenced cell has higher absolute counts for every gene, regardless of biology. **Normalization** removes this technical variance. This is the step where the count nature of the data — and its mean–variance relationship — matters most; the statistical background is in [Appendix B §§2–3](Appendix_B_Statistical_Foundations.html).
 
+::: {.callout-note .key-concept title="🔑 Key concept — why depth normalization comes first"}
+A cell's total UMI count reflects how deeply that droplet happened to be sequenced, not how much RNA the cell biologically contained. Until that technical depth is divided out, the "most variable" genes are simply those in the most deeply sequenced cells, and PC1 tracks library size instead of biology. Normalization is the hinge of the whole workflow: every later step — HVG selection, scaling, PCA, clustering, and differential expression — assumes it has already happened, which is also why you must never normalize the same object twice.
+:::
+
 ### 1.8.1 Log-normalization (the default)
 
 The standard transformation is **log-normalize**:
@@ -187,7 +200,15 @@ An alternative is **`SCTransform`**[@hafemeister2019sctransform], which fits a p
 
 ### 1.8.3 scran pooling and the broader benchmark
 
-For very heterogeneous data with many zeros, Bioconductor's **`scran`** computes size factors by **pooling** cells before deconvolving per-cell factors, which is more robust than a simple library-size factor when many genes are undetected[@lun2016pooling]. Which transformation is "best" has been benchmarked directly: a systematic comparison found that the simple log-normalization (sometimes called shifted-log or `log1p`) is a remarkably strong, hard-to-beat default, with the more elaborate methods offering modest, dataset-dependent gains[@ahlmanneltze2023comparison]. The practical takeaway: **consistency matters more than the choice** — pick one, apply it identically across all samples, and record it. Do not normalize the same object twice.
+For very heterogeneous data with many zeros, Bioconductor's **`scran`** computes size factors by **pooling** cells before deconvolving per-cell factors, which is more robust than a simple library-size factor when many genes are undetected[@lun2016pooling]. Which transformation is "best" has been benchmarked directly: a systematic comparison found that the simple log-normalization (sometimes called shifted-log or `log1p`) is a remarkably strong, hard-to-beat default, with the more elaborate methods offering modest, dataset-dependent gains[@ahlmanneltze2023comparison]. The three approaches are compared in @tbl-norm-methods. The practical takeaway: **consistency matters more than the choice** — pick one, apply it identically across all samples, and record it. Do not normalize the same object twice.
+
+| Method | Underlying model | Best suited to | Replaces the 3-step chain? |
+|---|---|---|---|
+| Log-normalize (`NormalizeData`) | $\log(\text{CP10k} + 1)$ scaling | General-purpose default; well-behaved 10x data | No — follow with `FindVariableFeatures` + `ScaleData` |
+| `SCTransform` | Regularized negative-binomial; Pearson residuals | Low-depth data and spatial (Visium) | Yes — single call replaces all three steps |
+| `scran` pooling | Pooled-then-deconvolved size factors | Very heterogeneous data with many zeros | No — produces size factors for normalization |
+
+: Normalization approaches in the Seurat/Bioconductor ecosystem. Benchmarks find the simple log-normalization a strong, hard-to-beat default [@ahlmanneltze2023comparison]; the elaborate methods help most for low-count or highly heterogeneous data. {#tbl-norm-methods}
 
 ## 1.9 Highly variable genes (HVGs)
 
@@ -207,6 +228,10 @@ The shortlist almost always includes recognizable cell-type markers (CD14, MS4A1
 - Above \~5,000: the list becomes diluted with low-information genes; PCA performance plateaus or degrades
 
 Going lower (e.g. 500 HVGs) is sometimes justified for atlas-scale data where speed matters more than fine resolution; going higher (3,000–5,000) helps for highly heterogeneous tissue with many subtle subtypes.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — nfeatures (number of HVGs)"}
+`FindVariableFeatures(nfeatures = 2000)` sets how many genes enter PCA. **Default: 2000.** Too few (≲1,000) and rare cell types vanish because their distinguishing genes never make the list; too many (≳5,000) and low-information genes dilute the signal so PCA plateaus or degrades. Raise it (3,000–5,000) for highly heterogeneous tissue with many subtle subtypes; lower it (≈500) only for atlas-scale data where speed outweighs fine resolution. Whatever you choose, select HVGs *after* normalization and — for multi-sample work — in a batch-aware way with `SelectIntegrationFeatures()` ([Chapter 5](Chapter_05_Integration.html)).
+:::
 
 **Design choices worth knowing:**
 
@@ -240,6 +265,8 @@ In Seurat v5 the assay is **layered** — after `merge()` you may see `counts.CT
 
 ## 1.12 Common errors and what they mean
 
+@tbl-preproc-errors collects the errors you are most likely to hit at this stage, what each one means, and the fix.
+
 | You see | What's wrong | What to do |
 |---|---|---|
 | `Read10X` returns a list, not a matrix | The Cell Ranger output has multiple feature types (RNA + ADT + CMO) | Pull out the slice you want: `counts$``Gene Expression`` ` |
@@ -248,6 +275,8 @@ In Seurat v5 the assay is **layered** — after `merge()` you may see `counts.CT
 | `scDblFinder` flags 30% of cells | Either you over-loaded the chip, or you ran it on a merged object | Run per sample; if rate is genuinely 30% then your run is poor quality |
 | HVG list is dominated by ribosomal genes | Your data had no strong biology, or QC was insufficient | Re-check QC; consider excluding `^RP[SL]` from HVGs; choose a tissue with cleaner heterogeneity |
 | `FindMarkers` errors after `merge()` | The v5 assay still has split layers | Run `JoinLayers(seu)` first |
+
+: Common preprocessing errors, their underlying cause, and the fix. {#tbl-preproc-errors}
 
 For a longer list of preprocessing pitfalls, see the **Common errors** callout at the top of [Tutorial 01](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html).
 

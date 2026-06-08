@@ -27,20 +27,34 @@ Pseudobulk DE produces a long list of significant genes per cell type. For `ifnb
 
 That's functional analysis. The output is the same: a ranked list of *terms* — Gene Ontology Biological Process terms [@ashburner2000go], Reactome pathways [@gillespie2022reactome], KEGG pathways [@kanehisa2000kegg], or MSigDB Hallmarks [@liberzon2015msigdb] — with associated p-values and effect sizes. The terms are interpretable in a way the gene list isn't. A decade-plus of methodology is reviewed in Khatri et al.'s "Ten years of pathway analysis," still the best orientation to the field's three generations of methods [@khatri2012ten].
 
+The three generations Khatri et al. describe are worth briefly naming. **First-generation methods** (ORA, hypergeometric test) take a binary significant/not gene list and ask whether any predefined set is over-represented — fast and interpretable but discards ranking and direction. **Second-generation methods** (GSEA and its relatives) use the full ranked list, capturing coordinated modest shifts that ORA misses but requiring a valid ranking metric (more on this below). **Third-generation methods** model the actual network topology of pathways, propagating signals through known protein-protein interactions — powerful in principle but computationally expensive and highly sensitive to incomplete network annotations. The workshop covers the first two generations, which together handle the great majority of real scRNA-seq functional questions.
+
+::: {.callout-note .key-concept title="🔑 Key concept — over-representation vs enrichment"}
+Over-Representation Analysis (ORA) and Gene-Set Enrichment Analysis (GSEA) answer related but distinct questions. ORA asks whether a predefined gene set appears *more often than expected by chance* among the genes you declared significant — a simple count-based test that treats each gene as either in or out. GSEA asks whether the genes of a predefined set are *preferentially concentrated at the top or bottom of a ranked list* of all tested genes, where rank is determined by the magnitude and direction of the fold-change. The key practical difference is that ORA requires you to choose a significance threshold (and is sensitive to that choice), while GSEA uses the full ranked list and detects coordinated, modest changes across a whole pathway even when no single gene clears a significance cutoff. In practice, a pathway of 60 genes all slightly up-regulated (LFC ≈ 0.5) produces a very high GSEA normalized enrichment score but shows no ORA signal because few individual genes are significant. Both analyses belong in a thorough functional report.
+:::
+
 ## 7.2 Two methods, two questions
 
 **Over-Representation Analysis (ORA)** asks: among my **significant gene set**, are any predefined gene sets enriched relative to a background? Input: a binary set of "significant" genes plus a "universe" of all tested genes. Test: hypergeometric / Fisher's exact per gene set.
 
 **Gene-Set Enrichment Analysis (GSEA)** [@subramanian2005gsea] asks: when my genes are **ranked** by direction-and-strength of change, do any predefined sets cluster at the top or bottom of the ranking? Input: a ranked vector of all tested genes (typically by signed log-fold-change). Test: a permutation test on the running enrichment statistic.
 
-Both answer the question "which biological themes are over-represented in my DE result?" but with different sensitivities:
+Both answer the question "which biological themes are over-represented in my DE result?" but with different sensitivities. @tbl-ch07-methods summarizes their differences; the subsections below explain each method in detail.
 
-::: incremental
-- **ORA** is fast, easy to read, intuitive. Best when you have a clear cutoff (e.g. `padj < 0.05 & |log2FC| > 1`) and a moderate-sized gene list.
-- **GSEA** uses the *full* ranking and is more sensitive when the effect is broad-but-modest — e.g. an entire ISG family slightly up rather than a few super-significant hits.
-:::
+| Attribute | ORA | GSEA |
+|---|---|---|
+| Input | Binary significant/not list + universe | All tested genes ranked by signed LFC |
+| Test | Hypergeometric / Fisher's exact | Permutation test on running enrichment score |
+| Threshold required? | Yes — must choose `padj` and `|LFC|` cutoffs | No — uses the complete ranking |
+| Direction-aware? | Only if run separately on up- and down-regulated lists | Yes — positive NES = up, negative NES = down |
+| Sensitive to | Discrete, strong hits | Coordinated, modest changes across a pathway |
+| Implementation | `clusterProfiler::enrichGO/enrichKEGG` [@wu2021clusterprofiler] | `clusterProfiler::gseGO/gseKEGG` via `fgsea` [@korotkevich2021fgsea] |
+| Speed | Fast | Slower (permutation iterations) |
+| Best used when | Clear threshold; moderate gene list | Effect is broad; all genes have reliable LFC estimates |
 
-In practice, run both. If they agree on the top themes, you have a robust finding. If they disagree, GSEA is usually closer to the truth (it doesn't depend on a threshold choice).
+: Comparison of Over-Representation Analysis (ORA) and Gene-Set Enrichment Analysis (GSEA). In practice, run both; cross-method agreement on the top terms is the strongest evidence of real biology. A benchmark against a curated gold standard confirmed that well-implemented versions of both methods recover known biology reliably [@geistlinger2021toward]. {#tbl-ch07-methods}
+
+In practice, run both. If they agree on the top themes, you have a robust finding. If they disagree, GSEA is usually closer to the truth because it does not depend on an arbitrary threshold choice — the full ranked gene list preserves information that a binary significant/not split discards.
 
 ## 7.3 The hypergeometric test (ORA in detail)
 
@@ -58,6 +72,16 @@ $$P(X \ge k) = \sum_{j=k}^{\min(K, n)} \frac{\binom{n}{j}\binom{N-n}{K-j}}{\bino
 Apply BH correction across all gene sets tested. Filter on `q < 0.05`.
 
 The key parameter is the **universe**. The default is "all genes annotated for the organism", but the **correct universe** is "all genes you tested in DESeq2" — which after filtering and per-cell-type subsetting is much smaller. Using the default inflates the apparent enrichment of common terms (housekeeping pathways), making everything look significant. Always pass `universe = uni` explicitly.
+
+**Reading the enrichGO output table.** The `@result` slot of an `enrichGO` object contains several columns worth understanding: `ID` is the GO accession (e.g. GO:0034340); `Description` is the human-readable term name; `GeneRatio` is `k/K` — the fraction of your significant genes that fall in this term; `BgRatio` is `n/N` — the fraction of universe genes that fall in this term; `pvalue` is the raw hypergeometric p-value; `p.adjust` is the BH-corrected value (use this); `Count` is $k$ (the raw overlap count). A `GeneRatio` much higher than `BgRatio` signals a genuine enrichment — the term's genes are more concentrated in your significant list than in the background. A high `Count` with a small `GeneRatio` means the term's gene set is very large (e.g. "metabolic process") and almost any significant list will overlap it by chance — large, generic terms are typically less informative than smaller, specific ones at the same significance level.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — enrichGO / gseGO pvalueCutoff and qvalueCutoff"}
+`enrichGO(pvalueCutoff = 0.05, qvalueCutoff = 0.10)` sets the significance thresholds for reported terms. **Default: `pvalueCutoff = 0.05`, `qvalueCutoff = 0.20`.** The `qvalueCutoff` controls BH-adjusted p-value retention. With GO's 30,000 terms, the default cutoffs often return hundreds of terms per cell type — more than can be interpreted. Tightening to `pvalueCutoff = 0.01, qvalueCutoff = 0.05` reduces the list to the most confident hits and cuts redundancy substantially. For the `compareCluster` cross-cell-type plot, starting with these tighter cutoffs usually produces a cleaner, more interpretable figure. Loosening cutoffs is occasionally justified when a dataset has very few DE genes (short gene list → low ORA power) but should be accompanied by explicit acknowledgment in the methods.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — enrichGO / gseGO pAdjustMethod"}
+`enrichGO(pAdjustMethod = "BH")` sets the multiple-testing correction. **Default: `"BH"` (Benjamini–Hochberg FDR).** Other options include `"bonferroni"` (very conservative; rarely useful with 30,000 gene sets), `"fdr"` (identical to `"BH"` in this context), and `"none"`. Changing this from `"BH"` to `"none"` is common in exploratory analyses to see the raw p-value ranking, but results must never be reported without correction applied. The `p.adjust` column in the output is the corrected value; the `pvalue` column is the raw hypergeometric p-value — always report `p.adjust`.
+:::
 
 ## 7.4 GSEA in detail
 
@@ -84,21 +108,35 @@ Weaknesses:
 
 For the workshop's `ifnb` STIM-vs-CTRL contrast, GSEA reliably finds the IFN response pathways (Reactome's "Interferon Signaling", MSigDB's "INTERFERON_ALPHA_RESPONSE", etc.) at very high NES.
 
+**Choosing the ranking metric.** The choice of what to rank genes by in GSEA is consequential and often under-discussed. Three common choices are:
+
+1. **Signed log-fold-change** (`log2FoldChange` from DESeq2): the most direct measure of direction and magnitude of change. Appropriate when you trust the LFC estimates (i.e. after `lfcShrink(type="apeglm")`). The apeglm-shrunken LFC is preferable because it prevents low-count genes with noisy raw LFCs from dominating the extremes of the ranking.
+2. **Signed -log10(p-value) × sign(LFC)**: a "signal-to-noise" statistic that combines magnitude and confidence. Genes significant in both dimension rank highest. Can produce cleaner GSEA results when the LFC distribution is noisy.
+3. **Wald statistic** (`stat` column from DESeq2): similar to signed p-value-based ranking; already accounts for the LFC's standard error and is a natural ranking metric. Some GSEA implementations use this directly.
+
+Avoid ranking by raw unshrunk `log2FoldChange` — this puts noisy low-count genes at the extreme ranks and inflates the apparent enrichment score of gene sets that happen to contain those genes. Always use shrunken LFCs or a statistic that naturally accounts for uncertainty.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — gseGO / gseKEGG minGSSize and maxGSSize"}
+`gseGO(minGSSize = 10, maxGSSize = 500)` controls which gene sets enter the GSEA test by their size. **Default: `minGSSize = 10`, `maxGSSize = 500`.** Gene sets with fewer than 10 genes have too little statistical power (the running enrichment score cannot peak significantly with only 5–8 genes scattered in 15,000); sets with more than 500 genes are so broad that even a uniform distribution of their members across the ranking produces a detectable enrichment by chance — these "giant" GO terms like "metabolic process" or "biological process" are nearly always significant and nearly always uninformative. Tightening `maxGSSize` to 200 or even 100 eliminates the most redundant and uninformative terms, producing a results table dominated by specific pathways. For KEGG and Reactome (where most pathways have 20–200 genes), the defaults are usually appropriate.
+:::
+
 ## 7.5 Picking a database
 
-The big-five gene-set databases:
+The major gene-set databases are compared in @tbl-ch07-databases. Run **multiple** databases and look for **consensus** terms. The same biology will appear in different forms across databases — "type I interferon signaling pathway" (GO BP [@ashburner2000go]), "Interferon Signaling" (Reactome [@gillespie2022reactome]), "INTERFERON_ALPHA_RESPONSE" (Hallmark [@liberzon2015msigdb]) — and cross-database agreement is the strongest evidence that a finding is real biology rather than a database-specific artifact.
 
-| Database | Strength | When to start here |
-|---|---|---|
-| **GO Biological Process** | Comprehensive, hierarchical | Always run as a baseline |
-| **GO Molecular Function** | Function & catalysis | When BP is dominated by generic terms |
-| **GO Cellular Component** | Subcellular localization | Probing trafficking / structural biology |
-| **Reactome** | Curated signaling pathways | Immune / signaling biology — accessed via `ReactomePA::enrichPathway()` in R |
-| **KEGG** | Classic metabolic pathways | Metabolism; legacy comparison |
-| **MSigDB Hallmark** | 50 well-known broad biological states | Headline figures, low-noise summaries |
-| **WikiPathways** | Community-curated, fast updates | Niche pathways missing elsewhere |
+**A practical database selection workflow.** Start with MSigDB Hallmark for your headline figure: 50 well-curated, non-redundant gene sets capture the major known biological states, the results are immediately interpretable to any biologist, and reviewer objections to specific GO-term redundancy do not apply. Then run GO Biological Process and Reactome as supplementary analyses to identify the specific molecular mechanisms within each Hallmark category. If the Hallmark analysis returns nothing significant (which can happen for subtle or novel biology not captured by the 50 canonical states), escalate to GO BP with a moderate `maxGSSize` cutoff. For immune cell types and signaling biology specifically, Reactome is often more informative than KEGG because Reactome has more extensively curated human immune pathway content and is updated far more frequently. Use KEGG primarily when you need metabolic pathway analysis or when comparing to older literature that used KEGG exclusively.
 
-Run **multiple** databases and look for **consensus** terms. The same biology will appear in different forms across databases — "type I interferon signaling pathway" (GO BP [@ashburner2000go]), "Interferon Signaling" (Reactome [@gillespie2022reactome]), "INTERFERON_ALPHA_RESPONSE" (Hallmark [@liberzon2015msigdb]) — and cross-database agreement is the strongest evidence that a finding is real biology rather than a database-specific artifact. Which enrichment *method* to trust has itself been benchmarked against a curated gold standard, with the encouraging conclusion that well-implemented ORA and GSEA recover known biology reliably when run correctly [@geistlinger2021toward].
+| Database | Coverage | Strength | When to start here |
+|---|---|---|---|
+| **GO Biological Process** [@ashburner2000go] | ~30,000 terms | Comprehensive, hierarchical | Always run as a baseline |
+| **GO Molecular Function** [@ashburner2000go] | ~10,000 terms | Function & catalysis | When BP is dominated by generic terms |
+| **GO Cellular Component** [@ashburner2000go] | ~4,000 terms | Subcellular localization | Probing trafficking / structural biology |
+| **Reactome** [@gillespie2022reactome] | ~2,600 pathways | Curated signaling pathways | Immune / signaling biology — via `ReactomePA::enrichPathway()` |
+| **KEGG** [@kanehisa2000kegg] | ~550 pathways | Classic metabolic pathways | Metabolism; legacy comparison |
+| **MSigDB Hallmark** [@liberzon2015msigdb] | 50 gene sets | Well-known broad biological states | Headline figures; low-redundancy summaries |
+| **WikiPathways** | Community-variable | Community-curated, fast updates | Niche pathways missing elsewhere |
+
+: Major gene-set databases for functional enrichment analysis, their scope, and recommended use cases. Cross-database agreement on the same biological theme is the strongest evidence that a result reflects real biology. {#tbl-ch07-databases}
 
 ## 7.6 The redundancy problem
 
@@ -106,12 +144,10 @@ GO BP has \~30,000 terms with heavy parent–child overlap. After ORA you may se
 
 > *response to virus / type I interferon signaling pathway / cellular response to type I interferon / regulation of type I interferon signaling pathway / response to interferon-beta / ...*
 
-These are the same biology described eight ways. Three fixes:
+These are the same biology described eight ways. Three practical fixes address this. First, **lead with a smaller curated database**: MSigDB Hallmark has only 50 sets and was specifically designed to minimize within-database redundancy — a paper headline built on Hallmarks is immediately interpretable. Second, **cluster similar terms** using `enrichplot::pairwise_termsim()` + `treeplot()`, which builds a semantic similarity tree so you can collapse related branches before reporting. Third, **apply tighter cutoffs** (`pvalueCutoff = 0.01`, `qvalueCutoff = 0.05`) so the top five displayed terms aren't simply the most-specific sub-children of a single parent node. Using all three practices together — Hallmarks for the main figure, a clustered GO treeplot as a supplement, and strict cutoffs throughout — produces clean, reviewer-friendly results.
 
-::: incremental
-1. **Use a smaller curated database for the headline.** MSigDB Hallmark has only 50 sets. Lead with that.
-2. **Cluster similar terms.** `enrichplot::pairwise_termsim()` + `treeplot()` builds a similarity tree, lets you collapse branches.
-3. **Tighter cutoffs.** `pvalueCutoff = 0.01`, `qvalueCutoff = 0.05` so the top 5 terms aren't 50 redundant ones.
+::: {.callout-note .key-concept title="🔑 Key concept — what the NES measures in GSEA"}
+The Normalized Enrichment Score (NES) in GSEA is a standardized measure of how much a gene set's members are concentrated at the extreme ends of a ranked gene list. A raw Enrichment Score (ES) is computed by walking from the most up-regulated to the most down-regulated gene, incrementing a running statistic when a gene from the set is encountered and decrementing otherwise — the peak of this running statistic is the ES. The NES divides the ES by the mean ES obtained from permuting gene labels many times, correcting for differences in gene-set size and list length. A positive NES means the gene set is enriched at the top (genes up-regulated in the numerator condition); a negative NES means enriched at the bottom (down-regulated genes). NES values above ±1.5 with `p.adjust < 0.05` are conventionally considered strong hits. Unlike ORA p-values, NES values can be meaningfully compared across gene sets of different sizes and across different experiments, making them useful for quantitative comparison of pathway activity.
 :::
 
 ## 7.7 The `compareCluster` plot
@@ -148,7 +184,7 @@ Most enrichment tools work in ENTREZ-ID space because that's how `OrgDb` package
 de_mapped <- de |>
   mutate(symbol = gene) |>
   inner_join(
-    bitr(unique(.$symbol),
+    bitr(unique(de$gene),
          fromType = "SYMBOL",
          toType   = "ENTREZID",
          OrgDb    = org.Hs.eg.db),
@@ -157,6 +193,10 @@ de_mapped <- de |>
 ```
 
 Some symbols won't map — deprecated symbols, lncRNAs without ENTREZ entries, pseudogenes. A 5–10% unmapped rate is normal; check the unmapped list. If it's mostly gene symbols (not pseudogenes), update `org.Hs.eg.db`.
+
+**Why ENTREZ IDs and not gene symbols?** `OrgDb` annotation packages like `org.Hs.eg.db` organize all their annotations — GO terms, pathway memberships, cross-references — around ENTREZ integer IDs as the primary key. Gene symbols are secondary keys that can be ambiguous (the same symbol used in different organisms, or symbols that change when the HGNC renames a gene), while ENTREZ IDs are stable, unambiguous integers assigned by NCBI. When you run `bitr(fromType = "SYMBOL", toType = "ENTREZID")`, you are converting from the naming convention your DESeq2 results use (gene symbols from the 10x reference genome) to the integer primary key that GO and pathway databases use internally. Note that the `inner_join` after `bitr` means you lose genes that did not map — it is therefore critical to build both your significant gene list *and* your universe from the *same post-mapping table*, so the denominator of the hypergeometric test counts only genes that successfully mapped, not the full pre-mapping set.
+
+**For mouse data.** Replace `org.Hs.eg.db` with `org.Mm.eg.db` (mouse) throughout. Gene symbol capitalization follows mouse convention (`Cd3d` rather than `CD3D`), which `bitr` handles correctly, but double-check that your DE table's gene symbols match the mouse convention before mapping.
 
 ## 7.8b Reading the GSEA running-enrichment plot
 
@@ -170,15 +210,23 @@ A borderline NES (close to ±1) with a `p.adjust` just under 0.05 and diffuse ru
 
 ## 7.9 Pitfalls
 
-::: incremental
-1. **Wrong universe.** ORA with the default genome-wide universe inflates "common term" p-values. Always use the tested-gene universe.
-2. **All terms are technical artifacts.** GO is full of terms like "translation" and "ribosomal subunit assembly". If those top your list, your QC was insufficient — re-check before claiming biology.
-3. **No multiple-testing across databases.** Running ORA against 4 databases × 30,000 terms is 120,000 tests. BH per database; report the database with the result.
-4. **Reporting raw p-values.** Always report `p.adjust` (BH) or `q-value`.
-5. **ORA on the all-DE list.** ORA on "any DE gene" can't distinguish up- from down-regulated. Run separately on each side, or use GSEA which handles direction natively.
+Five pitfalls account for the majority of functional-analysis errors in published scRNA-seq papers. The most consequential is **wrong universe**: ORA with the default genome-wide universe inflates "common-term" p-values because it treats every unannotated gene as a possible negative, not just the genes you actually tested. Always pass `universe = uni` where `uni` is the vector of genes present in your DESeq2 output table *after ENTREZ mapping* — not the raw gene list before mapping, because unmapped genes are implicitly excluded from the test.
+
+A close second is **technical artifact inflation**: GO contains terms like "translation" and "ribosomal subunit assembly" that appear significant whenever ribosomal genes are present in a DE list — which happens routinely after insufficient QC filtering. If those terms top your result, revisit QC before claiming biology. Similarly, terms related to "regulation of apoptotic process" or "response to oxidative stress" frequently appear in low-quality datasets where damaged cells contribute noisy DE signal. The expert sanity check is to read the top 10 term names aloud and ask whether they match the biology of your experimental contrast: for `ifnb` STIM vs CTRL, interferon-related terms are the expected answer; if your top terms are "ribosome biogenesis" and "mitochondrial fission," something is wrong.
+
+The third pitfall is **ignoring the multiple-testing burden across databases**. Running ORA against four databases each with ~30,000 terms generates roughly 120,000 hypothesis tests. BH correction applied per-database does not account for the database-selection step. Report the database, state it was pre-specified, and treat concordance across databases as the primary evidence of reliability rather than p-value magnitude within a single database.
+
+Fourth: **always report `p.adjust` (BH) or `q-value`**, never raw p-values. A raw p-value of 0.001 from a test of 30,000 gene sets is expected by chance alone. The adjusted value is the scientifically relevant quantity.
+
+Fifth: **ORA on the combined up-and-down DE list cannot distinguish direction**. A pathway with half its genes up and half down will score poorly against a pathway where all genes move together. Run ORA separately on up-regulated and down-regulated gene lists, or use GSEA, which handles direction natively through the sign of the NES.
+
+::: {.callout-note .key-concept title="🔑 Key concept — why the universe matters for ORA"}
+The hypergeometric test in ORA asks whether a gene set is over-represented in your significant list *relative to the background*. The background (universe) defines the sampling pool from which your significant genes were drawn. If you use the whole human genome (~20,000 protein-coding genes) as the universe but you only actually tested 8,000 genes in your DESeq2 run (the rest were filtered out as low-count), then your denominator $N$ is wrong: it is 20,000 instead of 8,000. This makes every gene set appear as if its background frequency is lower than it really is, which inflates the apparent enrichment. The consequence is false positive GO terms: "housekeeping" pathways whose genes happen to include many commonly expressed genes will score as enriched not because they are biologically active in your experiment, but because the inflated denominator makes any overlap look improbable by chance. Passing `universe = uni` — where `uni` is the ENTREZ IDs of all genes in your DESeq2 table after ENTREZ mapping — directly corrects this. This is the single most important ORA parameter to set correctly.
 :::
 
 ## 7.10 Common errors
+
+@tbl-ch07-errors collects the errors most frequently encountered when running functional analysis.
 
 | You see | What's wrong | What to do |
 |---|---|---|
@@ -187,6 +235,9 @@ A borderline NES (close to ±1) with a `p.adjust` just under 0.05 and diffuse ru
 | GSEA "ties detected" warning | Multiple genes with identical LFC | `arrange(desc(log2FoldChange)) |> distinct(ENTREZID, .keep_all = TRUE)` |
 | Top GO terms are all generic ("metabolic process") | The database has too many shared parents | Switch to Reactome or Hallmark for headline; use treeplot for redundancy |
 | Different runs give different top terms | Random seed differences in GSEA permutation test | `set.seed(2026)` before `gseGO` |
+| ORA returns hundreds of significant terms | Default genome-wide universe inflating enrichment | Pass `universe = uni` (all genes in your DESeq2 table) |
+
+: Common functional analysis errors, their causes, and fixes. The universe error and symbol-mapping errors together account for the majority of incorrect null results and false positives in published analyses. {#tbl-ch07-errors}
 
 ## 7.11 Where this material is also discussed
 

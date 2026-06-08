@@ -226,9 +226,10 @@ dds$dex <- relevel(dds$dex, ref = "untreated")
 
 ## A.7 — Run `DESeq()` and pull results
 
+[]{#lst-M6-run_deseq_airway}
+
 ```{r}
-#| label: lst-M6-run_deseq_airway
-#| lst-cap: "Run DESeq2 on the airway dataset and print the results summary (treated vs untreated)."
+#| label: M6-run_deseq_airway
 dds <- DESeq(dds)
 res <- results(dds, contrast = c("dex", "treated", "untreated"))
 summary(res)
@@ -240,7 +241,7 @@ as.data.frame(res) |>
 ```
 
 ::: {.callout-tip title="Reading the output"}
-The `summary(res)` printout (@lst-M6-run_deseq_airway) reports the total number of genes tested and how many have `LFC > 0` (up) or `LFC < 0` (down) at the chosen `alpha` threshold (default 0.1). The "outliers" and "low counts" lines tell you how many genes were **removed from testing** before FDR adjustment: outliers have a Cook's-distance flag (one sample is wildly different) and are set to `padj = NA`; low-count genes fail DESeq2's independent filtering step because they lack statistical power at the chosen FDR. A healthy summary shows a handful of outliers (often 0–50), a moderate low-count fraction, and a biologically plausible number of significant genes — for `airway` treated vs untreated, expect several hundred significant genes.
+The `summary(res)` printout ([code](#lst-M6-run_deseq_airway)) reports the total number of genes tested and how many have `LFC > 0` (up) or `LFC < 0` (down) at the chosen `alpha` threshold (default 0.1). The "outliers" and "low counts" lines tell you how many genes were **removed from testing** before FDR adjustment: outliers have a Cook's-distance flag (one sample is wildly different) and are set to `padj = NA`; low-count genes fail DESeq2's independent filtering step because they lack statistical power at the chosen FDR. A healthy summary shows a handful of outliers (often 0–50), a moderate low-count fraction, and a biologically plausible number of significant genes — for `airway` treated vs untreated, expect several hundred significant genes.
 :::
 
 ::: {.callout-important title="Think about it"}
@@ -257,8 +258,7 @@ The `summary(res)` printout (@lst-M6-run_deseq_airway) reports the total number 
 ## A.8 — Shrink the LFCs before ranking / plotting
 
 ```{r}
-#| label: lst-M6-lfcshrink_airway
-#| lst-cap: "MA plot of apeglm-shrunken log2 fold changes (treated vs untreated) for the airway dataset."
+#| label: M6-lfcshrink_airway
 res_shrunk <- lfcShrink(dds,
                         coef = "dex_treated_vs_untreated",
                         type = "apeglm")
@@ -286,9 +286,10 @@ The x-axis is average normalized expression (`baseMean`); the y-axis is the apeg
 
 ## A.9 — Inspect a top hit
 
+[]{#lst-M6-top_hit_airway}
+
 ```{r}
-#| label: lst-M6-top_hit_airway
-#| lst-cap: "Per-sample normalized counts for the top 5 airway DE hits (by padj), faceted by gene."
+#| label: M6-top_hit_airway
 #| fig-cap: "Per-sample normalized counts for the top 5 airway hits (by padj), each panel labelled with its gene, split by treatment."
 top_genes <- as.data.frame(res_shrunk) |>
   rownames_to_column("gene") |>
@@ -329,7 +330,7 @@ save_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), p_top,
 ```
 
 ::: {.callout-tip title="Reading the output"}
-Each panel (@lst-M6-top_hit_airway) shows one gene (ordered left to right by significance); the x-axis splits by treatment (`untreated` vs `treated`) and each point is one sample on a log-scale y-axis of normalized counts. What to look for: a clear, consistent shift in the median across all four cell lines — if any panel has one outlier sample dragging the effect, that gene deserves closer scrutiny before reporting it. For `airway`, the top hits should show tight, concordant up-regulation in all four treated replicates. A gene where two treated replicates are high and two are near the untreated level is a borderline call, regardless of the p-value.
+Each panel ([code](#lst-M6-top_hit_airway)) shows one gene (ordered left to right by significance); the x-axis splits by treatment (`untreated` vs `treated`) and each point is one sample on a log-scale y-axis of normalized counts. What to look for: a clear, consistent shift in the median across all four cell lines — if any panel has one outlier sample dragging the effect, that gene deserves closer scrutiny before reporting it. For `airway`, the top hits should show tight, concordant up-regulation in all four treated replicates. A gene where two treated replicates are high and two are near the untreated level is a borderline call, regardless of the p-value.
 :::
 
 ::: {.callout-important title="Think about it"}
@@ -347,8 +348,7 @@ It shows the **per-sample** values. A single outlier sample can drag the model i
 Quality-control your samples *post-hoc* with a variance-stabilizing transform (`vst`) and a PCA:
 
 ```{r}
-#| label: lst-M6-vst_pca_airway
-#| lst-cap: "PCA of variance-stabilized airway samples, coloured by treatment and cell line."
+#| label: M6-vst_pca_airway
 vsd <- vst(dds, blind = FALSE)
 p_pca <- plotPCA(vsd, intgroup = c("dex", "cell")) +
   labs(
@@ -626,8 +626,7 @@ readr::write_csv(de_all, file.path(out_dir, "Mod6_C18_pseudobulk_de_all.csv"))
 ## B.6 — Inspect the top hits
 
 ```{r}
-#| label: lst-M6-top_hits_pb
-#| lst-cap: "Top 10 pseudobulk DE hits per cell type, ranked by padj."
+#| label: M6-top_hits_pb
 
 de_top <- de_all |>
   group_by(celltype) |>
@@ -662,8 +661,7 @@ The printed tibble is grouped by `celltype`; within each group the rows are orde
 A simple per-cell-type volcano plot:
 
 ```{r}
-#| label: lst-M6-volcano
-#| lst-cap: "Per-cell-type pseudobulk volcano plots (STIM vs CTRL); points up-right are induced in STIM."
+#| label: M6-volcano
 
 # Pick the 3 cell types with the most significant genes — data-driven, so it works
 # whatever your cell-type labels are (the muscData ifnb uses "CD14+ Monocytes",

@@ -25,57 +25,167 @@ editor: visual
 
 The core workflow ends with discrete clusters carrying cell-type labels. Two common follow-up questions do not fit that discrete frame:
 
-1.  **How do cells move between states?** Differentiation, activation, and the cell cycle are *continuous* processes. Cutting them into clusters throws away the ordering. **Trajectory inference** models cells as points along one or more paths and assigns each a **pseudotime** — a position along the path, not a wall-clock time.
-2.  **Which cell types signal to which?** Tissues are coordinated by ligand–receptor signaling between cell types. **Cell–cell communication** inference predicts that wiring from expression.
+1. **How do cells move between states?** Differentiation, activation, and the cell cycle are *continuous* processes. Cutting them into clusters throws away the ordering. **Trajectory inference** models cells as points along one or more paths and assigns each a **pseudotime** — a position along the path, not a wall-clock time.
+2. **Which cell types signal to which?** Tissues are coordinated by ligand–receptor signaling between cell types. **Cell–cell communication** inference predicts that wiring from expression.
 
-Both build directly on the annotated, integrated object; neither replaces the clustering that produced it.
+Both build directly on the annotated, integrated object; neither replaces the clustering that produced it. Together, trajectory and communication analyses shift the question from *what are the states?* to *how do states arise and how do they talk to each other?*
 
 ## 14.2 Pseudotime and trajectory inference
 
 A trajectory method (i) embeds cells in a reduced space, (ii) fits a graph, tree, or smooth curve through them, (iii) picks a **root**, and (iv) measures distance along that structure as pseudotime. Genes whose expression varies smoothly along pseudotime are the candidate **drivers** of the process.
 
-Widely used tools:
+The foundational intuition is that if you sample enough cells during a continuous process — differentiation, the cell cycle, a time-course — then at any given moment you capture cells at all stages. Ordering them by transcriptome similarity therefore reconstructs the temporal sequence even though you never measured the same cell twice at different times. This idea was articulated in the original Monocle paper [@trapnell2014monocle] and is now the basis of dozens of methods. The benchmark of 45 trajectory methods [@saelens2019comparison] remains the single best guide for method selection and shows clearly that the method choice matters, that discrete data forced through trajectory tools produce confident nonsense, and that the user-supplied root is the most influential parameter of all.
 
--   **Slingshot** [@street2018slingshot] — fits smooth principal curves through the cluster structure; robust, needs a start cluster specified via `start.clus`. Returns a `pt` matrix with one column per inferred lineage; `NA` indicates a cell was not assigned to that lineage.
--   **Monocle3** [@trapnell2014monocle; @cao2019monocle3] — learns a principal *graph* and supports branch points; `learn_graph()` then `order_cells()`. Note: `order_cells()` is **interactive** — it opens a plot in which the user clicks the root node. This step cannot be automated in a batch script, which is why the Module 14 Talapas script keeps it as a commented sketch.
--   **PAGA** (scanpy) — builds an abstracted graph of cluster connectivity; the best first question is often *"is there even a continuum?"*, which PAGA answers well.
--   **Diffusion pseudotime** — random-walk distance from a root cell.
+::: {.callout-note .key-concept title="🔑 Key concept — pseudotime has no inherent direction"}
+Pseudotime is a number assigned to each cell representing its position along an inferred path in transcriptome space. It is computed from the graph structure and the distances between cells — it carries no information about which end is "early" and which is "late." The biological direction must be supplied by the analyst: you choose the root cluster (the start), typically based on known progenitor markers, CytoTRACE scores (less-differentiated cells express more genes), or RNA velocity arrows. Getting the root wrong reverses the entire narrative. A trajectory that runs from a mature cell type to a progenitor looks exactly as numerically valid as the correct direction, because the algorithm has no way to distinguish them. Report how you chose your root, and cross-validate with at least one independent line of evidence.
+:::
 
-The single most important user choice is the **root**: pseudotime has no inherent direction, so the biologist must declare which end is the start (usually from a known progenitor marker). A wrong root reverses the entire narrative. Three independent lines of evidence give the strongest justification for a root: (1) known progenitor markers expressed in the candidate start cluster; (2) CytoTRACE scores (less-differentiated cells express more genes, so the start cluster should have the highest scores); (3) agreement from RNA velocity arrows pointing *away from* the root.
+::: {.callout-note .key-concept title="🔑 Key concept — trajectory inference requires a biological prior, not just data"}
+The most common misuse of trajectory tools is applying them to data that does not contain a continuum. If your dataset is two unrelated cell populations that happen to overlap in UMAP, any trajectory method will fit a confident-looking pseudotime axis through them — but the axis is meaningless. Before running Slingshot or Monocle, ask: is there biological reason to expect a continuous process here? The PAGA connectivity graph (from Scanpy) is the best first-pass check: it quantifies how strongly clusters are transcriptionally connected, allowing you to ask "is there a continuum?" before committing to a full trajectory model. The Saelens benchmark [@saelens2019comparison] makes this failure mode explicit with controlled-data experiments.
+:::
 
-The deepest pitfall is more basic: **the algorithm will return a trajectory even when none exists.** The benchmark of 45 trajectory methods [@saelens2019comparison] shows method choice matters enormously and that discrete data forced through trajectory tools produce confident nonsense. Decide *a priori* whether a continuum is biologically plausible.
+### 14.2.1 Slingshot
+
+**Slingshot** [@street2018slingshot] is one of the two tools the workshop tutorial uses. Its approach is deliberately conservative: rather than learning a continuous graph from scratch, it fits **smooth principal curves** through the existing cluster structure that the user has already derived. This means Slingshot amplifies a good clustering and respects known biology, but it also means that a mis-annotated or over-merged clustering will produce a misleading trajectory.
+
+The key inputs are the dimensionality-reduction embedding (Slingshot works well on PCA or UMAP), the cluster labels, and a required `start.clus` argument that names the root cluster. From there `slingshot()` returns a `SingleCellExperiment` with a `reducedDim` slot called `"Slingshot"` that includes the pseudotime columns — one per inferred lineage, with `NA` for cells not assigned to that lineage. Slingshot supports branching by fitting multiple simultaneous curves; a progenitor cluster may feed two or more daughter lineages, each with its own pseudotime column.
+
+Practical notes: the curve fit is done on the cluster centroids first (the *cluster-level* graph), then the cell-level pseudotimes are derived by projecting each cell onto its nearest curve segment. This two-stage approach is computationally efficient and numerically stable for the moderate-N scRNA-seq datasets typical of a single study. For atlas-scale data with hundreds of thousands of cells, the projection step can be slow and it is worth filtering to the relevant cell types first.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — slingshot / start.clus (root cluster)"}
+`slingshot(sce, clusterLabels = ..., reducedDim = ..., start.clus = "ClusterName")` specifies the root cluster from which pseudotime is measured. **No default** — the argument is required and there is no meaningful fallback. If omitted, Slingshot attempts to infer a root automatically, but the result is unreliable without biological guidance. The root choice is the single most influential parameter in the analysis: swapping it to any other cluster reverses or restructures the entire trajectory. Justify the root with at least one of: known progenitor markers expressed in that cluster; CytoTRACE scores highest there; RNA velocity arrows pointing away from it. Optionally, `end.clus` can also be specified to constrain the terminal state. When multiple lineages are expected, omit `end.clus` and let Slingshot find branches from the common root.
+:::
+
+### 14.2.2 Monocle 3
+
+**Monocle 3** [@trapnell2014monocle; @cao2019monocle3] takes a different architectural approach: rather than fitting curves through an existing cluster structure, it learns a **principal graph** directly from the cell embedding using a reversed-graph embedding algorithm. A principal graph can have branch points, allowing Monocle 3 to model more complex topologies than a simple tree.
+
+The core workflow is: `new_cell_data_set()` → `preprocess_cds()` (PCA) → `reduce_dimension()` (UMAP) → `cluster_cells()` → `learn_graph()` → `order_cells()`. The last step, `order_cells()`, is **interactive** — it opens a plot in which the user clicks the root node of the graph. This cannot be automated in a batch script, which is why the Module 14 tutorial keeps it as a commented sketch rather than a runnable block. For reproducibility, record the root node ID or the root cluster name in your methods.
+
+Monocle 3 can also perform differential expression along pseudotime using a likelihood-ratio test that models gene expression as a smooth function of pseudotime via a principal-graph-dependent spline. Genes that vary significantly along the inferred path are the trajectory's molecular drivers. This is a powerful feature absent from Slingshot's core; however, Slingshot's pseudotimes can be plugged into `tradeSeq` [@vandenberge2020tradeseq] for a similar generalized additive model (GAM) approach to pseudotime-dependent DE.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — Monocle3 / order_cells root node (interactive)"}
+`order_cells(cds)` opens an interactive plot in which the user **clicks** the root node of the principal graph to define the pseudotime origin. **No automated default** — the function blocks until a root is clicked. This makes it impossible to batch-script reproducibly without capturing the root node ID. For reproducibility: (1) record the cluster whose centroid is nearest to your chosen root node, or (2) use `order_cells(cds, root_pr_nodes = <node_id>)` with a pre-identified node ID, or (3) use `order_cells(cds, root_cells = <barcode_vector>)` to specify root cells programmatically. Always report the root selection strategy in your methods section.
+:::
+
+**`tradeSeq` for pseudotime-dependent DE.** Once pseudotimes are estimated by Slingshot (or any other method), `tradeSeq` [@vandenberge2020tradeseq] fits a generalized additive model (GAM) to each gene using a penalized spline of pseudotime as the predictor. The GAM captures non-linear expression dynamics — a gene that peaks mid-trajectory and then declines will be detected even though its mean at start and end is similar. Key tests include `associationTest()` (does the gene vary along pseudotime at all?) and `startVsEndTest()` (is the gene significantly different between the root and the terminal state?). `tradeSeq` integrates naturally with Slingshot because it can take the `SlingshotDataSet` object directly and model branching lineages simultaneously.
+
+### 14.2.3 Choosing and validating a root
+
+The single most important user choice in trajectory inference is the **root**: pseudotime has no inherent direction, so the biologist must declare which end is the start — usually a known progenitor population. A wrong root reverses the entire narrative, making differentiation appear to run backward.
+
+Three independent lines of evidence give the strongest justification for a root: (1) known progenitor markers expressed at high levels in the candidate start cluster; (2) **CytoTRACE** scores — less-differentiated cells tend to express more genes, so the start cluster should show the highest average gene-detection breadth; (3) agreement from **RNA velocity** arrows pointing *away from* the root. When all three agree, the trajectory is credible. When they disagree, that disagreement is itself the result to report.
+
+The deepest pitfall is more fundamental: **the algorithm will return a trajectory even when none exists.** The Saelens benchmark [@saelens2019comparison] demonstrates that discrete data — for instance, two unrelated cell populations that happen to sit near each other in UMAP — forced through trajectory tools produces confident-looking pseudotime assignments with no biological meaning. Decide *a priori*, from biological knowledge, whether a continuum is plausible before running any trajectory method. A PAGA connectivity graph (from the Scanpy ecosystem) is often the best first question: it reveals whether there is meaningful continuous connectivity between clusters before committing to a pseudotime model.
+
+@tbl-ch14-trajectory-methods summarizes the major trajectory tools, their algorithmic approach, key strengths, and primary limitations.
+
+| Tool | Algorithmic approach | Key strength | Key limitation |
+|---|---|---|---|
+| **Slingshot** [@street2018slingshot] | Principal curves through cluster structure | Conservative; respects existing annotations; branching supported | Requires good clusters; root must be specified |
+| **Monocle 3** [@trapnell2014monocle; @cao2019monocle3] | Principal graph (reversed-graph embedding) | Learns complex topologies; integrated pseudotime DE | `order_cells()` is interactive; not batch-scriptable |
+| **PAGA** (Scanpy) | Abstracted cluster-connectivity graph | Best "is there a continuum?" diagnostic; lightweight | Does not produce cell-level pseudotime directly |
+| **Diffusion pseudotime** | Random-walk distance from root cell | Principled; handles sparse data well | Sensitive to root cell choice; slow on large N |
+| **tradeSeq** (pseudotime DE) | GAM on pseudotime from any upstream method | Powerful per-gene pseudotime DE; works with Slingshot output | Post-hoc only; needs well-estimated pseudotime |
+
+: Major trajectory inference tools, their algorithmic approaches, and trade-offs. Slingshot and Monocle 3 are the primary tools used in Tutorial 14. {#tbl-ch14-trajectory-methods}
 
 ## 14.3 RNA velocity — adding direction
 
-Pseudotime supplies an axis but not a direction. **RNA velocity** recovers the arrow by splitting reads into **unspliced** (intron-containing, newly transcribed) and **spliced** (mature) counts per gene. A high unspliced/spliced ratio means a gene is being induced, so the cell is heading toward a state with more of that transcript; the per-gene signals combine into a per-cell velocity vector that can be projected onto the embedding.
+Pseudotime supplies an ordering but not an arrow. **RNA velocity** recovers the direction of cellular movement by splitting reads into **unspliced** (intron-containing, newly transcribed) and **spliced** (mature, processed) counts per gene. A gene with a high unspliced-to-spliced ratio is being actively induced: the cell is producing more pre-mRNA than its current steady-state level predicts, meaning it is moving toward a higher-expression state for that gene. Conversely, a gene with a low unspliced-to-spliced ratio is being downregulated. The per-gene signals are combined into a per-cell velocity vector that can be projected onto the UMAP embedding as an arrow, giving each cell an estimated direction of travel.
 
-The original steady-state model is velocyto [@lamanno2018rnavelocity]; the dynamical model in **scVelo** [@bergen2020scvelo] is the current default. Velocity needs a spliced/unspliced count matrix produced by `velocyto` or `kallisto | bustools` — *not* the standard filtered matrix — and assumes near-steady-state kinetics, so it is unreliable for shallow capture or fast processes; these assumptions are increasingly understood to fail in many real datasets, so velocity arrows are best treated as a hypothesis, not ground truth.
+The original implementation is **velocyto** [@lamanno2018rnavelocity], which introduced the steady-state model: at steady state, the ratio of unspliced to spliced counts is constant per gene, so deviations from that ratio indicate induction or repression. The current default is the **scVelo** dynamical model [@bergen2020scvelo], which relaxes the steady-state assumption by estimating gene-specific kinetic parameters (transcription rate, splicing rate, degradation rate) directly from the data. The dynamical model is more accurate for genes undergoing rapid kinetic changes but is also more computationally demanding.
 
-**CytoTRACE** offers an assumption-light cross-check: less-differentiated cells tend to express *more* genes, so the breadth of detected genes is a proxy for differentiation potential. When Slingshot, RNA velocity, and CytoTRACE agree on the ordering and root, the trajectory is credible; when they disagree, that disagreement is the result to report.
+::: {.callout-note .key-parameter title="⚙️ Key parameter — scVelo / mode (velocity estimation model)"}
+`scv.tl.velocity(adata, mode = "dynamical")` selects the kinetic model used to estimate velocities. **Default: `"stochastic"`** in older scVelo versions; the recommended current default is `"dynamical"`. The `"stochastic"` mode uses the original steady-state model with an added noise term — faster but less accurate for genes with rapid kinetics. The `"dynamical"` mode estimates per-gene transcription, splicing, and degradation rates from the data — more accurate but requires `scv.tl.recover_dynamics(adata)` first and is computationally expensive. For standard trajectory validation use `"dynamical"`; for quick exploratory runs on large datasets use `"stochastic"`. The `"deterministic"` mode is the original velocyto steady-state model without a noise term — fastest but most assumption-bound.
+:::
 
-## 14.4 Cell–cell communication
+Velocity analysis requires a spliced/unspliced count matrix produced by `velocyto run` (command-line) or `kallisto | bustools` — *not* the standard filtered-feature-bc-matrix that most downstream analyses use. The spliced/unspliced counts are stored in a `loom` file or an AnnData object and must be aligned to the same barcode set as your RNA analysis.
 
-scRNA-seq cannot observe receptor binding, but it can ask whether a **ligand** is expressed in one cell type and its **receptor** in another. Combined with curated ligand–receptor databases, per-cluster expression yields a predicted signaling network [@armingol2021deciphering; @armingol2024diversifying]. Tools differ in emphasis:
+Important caveats: RNA velocity assumes near-steady-state kinetics for most genes, and this assumption increasingly fails in real datasets — particularly for genes at the extremes of expression, for cells undergoing rapid fate decisions, or in datasets with shallow sequencing depth. Recent benchmarks and theoretical analyses have shown that velocity arrows can be noisy, difficult to interpret, and sometimes misleading in isolation. The best practice is to treat velocity arrows as one piece of evidence in a triangle with Slingshot/Monocle pseudotime and CytoTRACE scores, not as ground truth.
 
--   **CellPhoneDB** (Python) — permutation test for significance; models multi-subunit complexes.
--   **CellChat** [@jin2021cellchat] (R) — aggregates pairs into signaling *pathways*; strong circle/chord visualizations. The standard workflow: `createCellChat()` → set DB → `identifyOverExpressedGenes()` → `computeCommunProb()` → `filterCommunication()` → `aggregateNet()`. Results are visualized with `netVisual_circle()` (aggregate network) or `netVisual_bubble()` (individual L–R pairs per pathway), and individual pathways drilled into with `netVisual_aggregate()`.
--   **NicheNet** (R) — links a ligand to the *downstream target genes* it should induce in the receiver.
--   **LIANA** [@dimitrov2022comparison] (R/Python) — runs many methods/databases and reports a *consensus*, after a systematic comparison found that method and resource choice substantially change the predicted interactions.
+## 14.4 CytoTRACE — an assumption-light differentiation proxy
 
-The universal caveat: **co-expression is not interaction.** These tools report that a ligand and receptor are expressed in the right places, not that signaling happens. They ignore spatial adjacency (pair with spatial data, Chapter 16), secretion and diffusion, and the gap between mRNA and active protein; the databases are curated for human and mouse and are sparse elsewhere. Treat the network as a **hypothesis generator** and validate top hits (spatial co-localization, perturbation) before claiming a circuit.
+**CytoTRACE** [@gulati2020cytotrace] offers a biologically motivated, computationally lightweight check on differentiation state that does not require a kinetics model. The central observation is that less-differentiated cells express a broader repertoire of genes — pluripotent stem cells detect thousands more distinct genes than their terminally differentiated progeny. CytoTRACE scores each cell by the breadth of its detected transcriptome (with a correction for library size) and normalizes this into a [0, 1] scale where 1 = least differentiated.
 
-## 14.5 A note on long reads and isoforms
+Because CytoTRACE requires only a standard counts matrix and no spliced/unspliced information, it runs directly on the Seurat or SingleCellExperiment object produced by the main workflow. High CytoTRACE scores in a candidate root cluster support the trajectory narrative; a cluster that Slingshot places at the end of a lineage but shows high CytoTRACE scores is a warning that the root choice is wrong.
 
-Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell which splice variant a cell uses. Pairing single-cell barcoding with **long-read** sequencing (PacBio Iso-Seq, ONT; e.g. scISO-seq) recovers full-length, isoform-resolved transcripts per cell. This connects back to the 3′ UTR annotation problem (Chapter 0 / Lecture 0): long reads both improve the annotations that short-read quantification depends on and enable per-cell isoform analysis — particularly valuable in non-model systems.
+CytoTRACE's simplicity is also its limitation: it measures transcriptional breadth, which is correlated with but not identical to differentiation potential. In highly specialized tissues where differentiated cells remain transcriptionally diverse (e.g. neurons), or in datasets where library-size differences between clusters are large and incompletely corrected, CytoTRACE can be misleading. Use it as a cross-check, not a primary result.
+
+## 14.5 Cell–cell communication
+
+scRNA-seq cannot observe receptor binding directly, but it can ask whether a **ligand** is expressed in one cell type and its cognate **receptor** in another. Combined with curated ligand–receptor databases, per-cluster expression yields a predicted signaling network [@armingol2021deciphering; @armingol2024diversifying]. The appeal is intuitive — if macrophages express a secreted cytokine and nearby T cells express its receptor, that is a candidate interaction worth investigating. The pitfall is equally intuitive: expression is not activity, and the databases are assembled from heterogeneous sources with variable experimental support.
+
+### 14.5.1 CellChat
+
+**CellChat** [@jin2021cellchat] is the standard R tool for cell–cell communication inference in the Seurat ecosystem. Its distinguishing feature is that it groups individual ligand–receptor pairs into biologically coherent **signaling pathways** (e.g. CXCL, MHC-II, TGF-β), making the output easier to interpret than a raw pair list. CellChat also models multi-subunit receptor complexes, requiring co-expression of all subunits rather than any one component.
+
+The standard CellChat workflow:
+
+```r
+cellchat <- createCellChat(object = seurat_obj, group.by = "cell_type")
+cellchat@DB <- CellChatDB.human  # or CellChatDB.mouse
+cellchat <- subsetData(cellchat)
+cellchat <- identifyOverExpressedGenes(cellchat)
+cellchat <- identifyOverExpressedInteractions(cellchat)
+cellchat <- computeCommunProb(cellchat, type = "triMean")
+cellchat <- filterCommunication(cellchat, min.cells = 10)
+cellchat <- computeCommunProbPathway(cellchat)
+cellchat <- aggregateNet(cellchat)
+```
+
+The key visualization functions are `netVisual_circle()` for the aggregate interaction network, `netVisual_bubble()` for per-pathway L–R pair rankings across sender–receiver combinations, and `netVisual_aggregate()` for drilling into a single pathway. The `compareInteractions()` family allows comparison of CellChat objects between conditions, revealing which communication circuits change between, e.g., control and stimulated samples.
+
+### 14.5.2 Other tools and the LIANA consensus
+
+Other widely used tools take different approaches. **CellPhoneDB** (Python) uses a permutation test against randomized cell labels to assess significance, and explicitly models multi-subunit complexes. **NicheNet** [@browaeys2020nichenet] (R) shifts the question from "are ligand and receptor co-expressed?" to "which secreted ligands can explain the differential gene expression observed in the receiver cell type?" — linking upstream signals to downstream transcriptional changes. **LIANA** [@dimitrov2022comparison] is not a single new method but a consensus framework that runs multiple methods and databases in parallel and reports a ranked consensus score. A systematic comparison by LIANA's authors showed that method choice and database choice each substantially affect which interactions are called, making a consensus approach safer than relying on a single tool.
+
+@tbl-ch14-lrctools summarizes the major cell–cell communication tools.
+
+| Tool | Language | Core approach | Key feature | Database |
+|---|---|---|---|---|
+| **CellChat** [@jin2021cellchat] | R | Over-expression + pathway grouping | Pathway-level aggregation; multi-subunit complexes | CellChat DB (literature-curated) |
+| **CellPhoneDB** | Python | Permutation significance test | Multi-subunit complexes; statistical rigor | CellPhoneDB (manually curated) |
+| **NicheNet** | R | Ligand–target gene linking | Explains receiver DE via upstream ligands | NicheNet prior network |
+| **LIANA** [@dimitrov2022comparison] | R/Python | Multi-method consensus | Reduces sensitivity to any single method/DB | Aggregates CellPhoneDB, CellChat, others |
+
+: Cell–cell communication inference tools and their principal approaches. LIANA provides a method-agnostic consensus; CellChat is the most common single-tool choice in R-based workflows. {#tbl-ch14-lrctools}
+
+::: {.callout-note .key-concept title="🔑 Key concept — cell–cell communication inference predicts potential, not activity"}
+Every cell–cell communication tool asks the same question: "is the ligand expressed in cell type A AND is the receptor expressed in cell type B?" A positive answer means co-expression, not a verified interaction. The mRNA for a secreted ligand must be translated, processed, and secreted before it can bind a receptor — and the receptor must be on the cell surface, unoccupied, and coupled to a downstream effector. None of these post-transcriptional steps are visible to scRNA-seq. Furthermore, if the two cell types are never spatially adjacent in the tissue, co-expression is moot regardless of how high the ligand or receptor expression is. Treat the output of any communication inference tool as a list of **testable hypotheses**, not a signaling atlas.
+:::
+
+### 14.5.3 Universal caveats
+
+**Co-expression is not interaction.** Every tool in this space reports that a ligand and receptor are expressed in the right cell types — not that signaling occurs. Key limitations to state explicitly when reporting results:
+
+- **Spatial adjacency is ignored.** A ligand expressed in one cluster and a receptor in another predicts a potential interaction only if those cells are ever physically adjacent. Pairing with spatial data ([Chapter 16](Chapter_16_Spatial.html)) substantially improves specificity; `LIANA+` extends the LIANA framework to spatial data.
+- **Secretion and diffusion are ignored.** Intracellular ligands, membrane-tethered ligands, and diffusible molecules have very different contact requirements, but most databases treat them equivalently.
+- **mRNA ≠ protein.** Post-transcriptional regulation, protein stability, and receptor internalization are invisible to transcriptomics.
+- **Database quality varies.** Databases are assembled primarily for human and mouse from heterogeneous literature sources with variable experimental support. Non-model organisms and recently characterized signaling axes are poorly covered.
+
+Treat the predicted communication network as a **hypothesis generator**. Validate top hits with spatial co-localization, receptor knockdown, or ligand perturbation before claiming a functional circuit.
+
+## 14.6 Ambient-RNA contamination and cell–cell communication
+
+One underappreciated confound in cell–cell communication is **ambient RNA contamination** ([Chapter 1, §1.5](Chapter_01_Preprocessing.html)). If a highly secreted ligand is abundantly expressed in one cell type, its mRNA will enter the ambient RNA pool during dissociation. Every cell in the dataset will then show low-level "expression" of that ligand, creating false positives for communication analysis: the tool sees the ligand in cell type A and the receptor in cell type B and calls an interaction, but the ligand signal in cell type A is purely ambient bleed from the dominant cell type expressing it.
+
+Ambient correction with SoupX, DecontX, or CellBender ([Chapter 1, §1.5](Chapter_01_Preprocessing.html)) is particularly important before cell–cell communication analysis. Any interaction where the ligand-expressing cluster is the dominant cell type in the sample deserves extra scrutiny.
+
+## 14.7 A note on long reads and isoforms
+
+Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell which splice variant a cell uses. Pairing single-cell barcoding with **long-read** sequencing (PacBio Iso-Seq, ONT; e.g. scISO-seq) recovers full-length, isoform-resolved transcripts per cell. This connects back to the 3′ UTR annotation problem (Chapter 0 / Lecture 0): long reads both improve the annotations that short-read quantification depends on and enable per-cell isoform analysis — particularly valuable in non-model systems where alternative splicing is less well characterized.
 
 ## Cross-references
 
--   **Lecture:** [Lecture 14 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)
--   **Tutorial:** [Tutorial 14 — Trajectory & Cell–Cell Communication](../Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.html)
--   **Prerequisites:** [Chapter 4 — Reference Annotation](Chapter_04_Reference_Annotation.html), [Chapter 5 — Integration](Chapter_05_Integration.html)
--   **Benchmark:** Saelens *et al.* 2019, *Nat Biotechnol* (trajectory methods); Armingol *et al.* 2021, *Nat Rev Genet* (cell–cell communication)
+- **Lecture:** [Lecture 14 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)
+- **Tutorial:** [Tutorial 14 — Trajectory & Cell–Cell Communication](../Exercise_Folder/Tutorial_14_Trajectory_CellCommunication.html)
+- **Prerequisites:** [Chapter 4 — Reference Annotation](Chapter_04_Reference_Annotation.html), [Chapter 5 — Integration](Chapter_05_Integration.html)
+- **Ambient RNA and its effect on communication:** [Chapter 1, §1.5](Chapter_01_Preprocessing.html)
+- **Spatial pairing for communication:** [Chapter 16 — Spatial Transcriptomics](Chapter_16_Spatial.html)
+- **Benchmark:** Saelens *et al.* 2019, *Nat Biotechnol* (trajectory methods); Armingol *et al.* 2021, *Nat Rev Genet* (cell–cell communication)
 
-## 14.6 Going further
+## 14.8 Going further
 
 **Trajectory:** the benchmark of 45 methods [@saelens2019comparison] is the place to start, then the two tools the tutorial uses — Slingshot [@street2018slingshot] and Monocle [@trapnell2014monocle; @cao2019monocle3] — and the RNA-velocity papers, velocyto [@lamanno2018rnavelocity] and scVelo [@bergen2020scvelo]. **Cell–cell communication:** the two review articles [@armingol2021deciphering; @armingol2024diversifying] frame the field, CellChat [@jin2021cellchat] is the common R tool, and LIANA [@dimitrov2022comparison] both compares methods and provides a consensus. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
 

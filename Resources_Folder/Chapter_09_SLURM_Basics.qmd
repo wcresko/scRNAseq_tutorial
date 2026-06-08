@@ -29,6 +29,10 @@ A cluster is not one big computer. It is a collection of many separate machines 
 
 Sharing a finite pool of hardware among many users who all want it at once is fundamentally a scheduling problem. If everyone simply logged in and launched whatever they wanted, two things would go wrong. First, popular nodes would be oversubscribed — twenty jobs fighting for the cores and memory of one machine, each running far slower than it should, some crashing when memory ran out. Second, there would be no fairness: whoever happened to start their job first, or who ran the most jobs, would crowd everyone else out. A **scheduler** exists to prevent exactly this.
 
+::: {.callout-note .key-concept title="🔑 Key concept — what a scheduler is and why you declare resources"}
+A scheduler is the software layer that translates your resource request (CPUs, memory, time, GPU) into an exclusive reservation on a specific compute node, ensuring no two jobs share hardware they did not agree to share. You do not *take* resources on a cluster — you *ask* for them by declaring what your job needs. The declaration is a contract: SLURM promises you that much exclusive capacity, and your job promises not to exceed it. Every SLURM skill in this chapter is really about understanding both sides of that contract.
+:::
+
 ## 9.2 What SLURM does
 
 **SLURM** — the Simple Linux Utility for Resource Management [@yoo2003slurm] — is the scheduler that runs Talapas. It is the dominant scheduler on academic and national-lab HPC systems worldwide, so the skills here transfer to almost any cluster you encounter. Its job is to decide *when*, *where*, and *with what resources* every job runs. The mental model is a request-and-grant transaction:
@@ -40,6 +44,10 @@ Sharing a finite pool of hardware among many users who all want it at once is fu
 :::
 
 The key idea, and the one most worth internalizing, is that you do not *take* resources on a cluster — you *ask* for them. The declaration is a contract: you promise SLURM how much you will use, and SLURM promises you exclusive access to that much. The rest of this chapter is really about understanding both halves of that contract.
+
+::: {.callout-note .key-concept title="🔑 Key concept — what a scheduler allocates and why the declaration is a contract"}
+When you submit a job, SLURM does not merely suggest a machine — it makes an exclusive reservation. No other job is permitted to use the CPUs, memory, or GPUs you declared for the duration your job runs. This is fundamentally different from a shared laptop where every process contends for the same RAM. The consequence is bidirectional: SLURM keeps its side (exclusive access), and your job must keep its side (not exceed the requested resources). Exceeding your declared memory (`--mem`) causes SLURM to terminate the job immediately with `OUT_OF_MEMORY`; exceeding your declared wall-clock time causes termination with `TIMEOUT`. Both are hard limits, not warnings. Understanding this is why the chapter repeatedly emphasizes sizing requests honestly — under-requesting kills jobs, over-requesting wastes shared capacity and delays your own start.
+:::
 
 Every job at UO must also name an **account** — your PIRG (Principal Investigator Research Group). This is how usage is tracked and how fair-share accounting (below) knows whose turn it is. If you do not know your PIRG, run `groups` after logging in; your research group will be listed alongside system groups you cannot charge to. You can set it once in your shell profile so you never have to type `--account=` again:
 
@@ -55,6 +63,10 @@ When you `ssh` into Talapas you land on a **login node** (`login.talapas.uoregon
 
 The actual computation happens on **compute nodes**, which you never touch directly. Instead, you ask SLURM for one, and SLURM hands you a slice of a compute node that matches your request. A useful metaphor: login nodes are the front desk of a workshop, and compute nodes are the workbenches in the back. You check in at the desk and you fill out a request slip, but you do your sawing and welding at a bench.
 
+::: {.callout-note .key-concept title="🔑 Key concept — login node vs compute node"}
+A login node is a small, shared gateway machine: every user on Talapas lands there when they SSH in, so it handles dozens of simultaneous sessions. Its purpose is navigation, editing, and job submission — not computation. A compute node is a large, dedicated machine that SLURM reserves exclusively for your job. Running a Seurat pipeline or any memory-hungry analysis on the login node does not just slow your own work; it degrades the experience for every other user trying to log in at that moment. Always route real computation through `srun`, `salloc`, or `sbatch`.
+:::
+
 ::: callout-important
 **Never run heavy computation on a login node.** Launching a Seurat pipeline, an integration, or any multi-hour analysis directly on the login node degrades the machine for *every* user trying to log in, edit, or submit. It is the single most common — and most disruptive — beginner mistake on a shared cluster. Always route real work through `srun`, `salloc`, or `sbatch`.
 :::
@@ -67,11 +79,15 @@ A naive scheduler might run jobs first-come, first-served. SLURM does something 
 
 Fair-share has a practical, almost counterintuitive implication for how you should size your jobs. Because SLURM also tries to fill small gaps in the schedule (a technique called *backfill*), a **small, well-sized job often starts sooner than a large one**, even if the large one was submitted first. If you ask for 4 cores and 16 GB for one hour, SLURM can slot you into a gap between bigger jobs. If you ask for a whole node for two days, it has to wait until a node-sized gap opens. The lesson is not to game the queue — you genuinely cannot — but to **size your jobs honestly to what they need**, which both gets you running sooner and leaves resources for everyone else.
 
+::: {.callout-note .key-concept title="🔑 Key concept — fair-share scheduling and backfill"}
+Fair-share is not first-come-first-served. SLURM tracks how much CPU time each PIRG has consumed in a recent window and uses that history to adjust job priorities: groups that have used a lot recently are deprioritized relative to those that have used little. This rebalances the cluster toward equal long-run access rather than rewarding whoever submits first. The backfill mechanism compounds this advantage for small jobs: SLURM actively looks for gaps in the forward schedule where a small, short request can fit without displacing any higher-priority job. A scRNA-seq QC step requesting 4 cores for 1 hour may start in minutes; a request for an entire node for 3 days waits for a node-sized window. Honest sizing is therefore not just ethical — it is pragmatically faster.
+:::
+
 **QOS** (quality of service) limits ride alongside fair-share. A QOS caps how much one user can hold at once — for example, a maximum number of simultaneously running jobs, or a ceiling on total cores. These limits are why you will sometimes see a job sit in the queue with a reason like `QOSMaxJobsPerUserLimit`: you have not done anything wrong, you have simply hit a per-user cap, and earlier jobs must finish before the next one starts.
 
 ## 9.5 Partitions: matching jobs to the right hardware
 
-Talapas's nodes are not identical. Some are ordinary CPU nodes, some carry GPUs, some have enormous amounts of RAM. SLURM groups nodes into **partitions** — queues that each map to a class of hardware and a maximum allowed wall-clock time. Every job must target a partition, and choosing the right one is how you ask for the right *kind* of machine.
+Talapas's nodes are not identical. Some are ordinary CPU nodes, some carry GPUs, some have enormous amounts of RAM. SLURM groups nodes into **partitions** — queues that each map to a class of hardware and a maximum allowed wall-clock time. Every job must target a partition, and choosing the right one is how you ask for the right *kind* of machine. The available partitions are summarized in @tbl-ch09-partitions.
 
 | Partition | What it is for | Max time |
 |-----------|----------------|----------|
@@ -82,7 +98,13 @@ Talapas's nodes are not identical. Some are ordinary CPU nodes, some carry GPUs,
 | `interactive` / `interactivegpu` | Short interactive sessions | 12 / 8 hours |
 | `preempt` | Any node, but the owner can bump your job off | Variable |
 
+: Talapas SLURM partitions. Choose `compute` for most scRNA-seq steps; use `memory` only when a step genuinely exceeds a standard node's RAM; use `interactive` or `interactivegpu` for short exploratory sessions. Run `sinfo` to see the live state of each partition. {#tbl-ch09-partitions}
+
+Reading @tbl-ch09-partitions: the most important column is "Max time" — it sets the upper bound you can request with `--time`. If you request a time longer than the partition allows, SLURM rejects the job immediately. For the `ifnb` workshop pipeline, all eight core analysis steps finish within 4 hours on a standard compute node; `compute` is the right choice throughout. The `memory` partition is for edge cases — atlas-scale integration, very large pseudobulk DE — not a general precaution; its nodes are few and in high demand. The `preempt` partition gives you access to any node (including those in other partitions), but the owner of that partition can evict your job at any time; use it only for checkpointed workloads that can survive being killed.
+
 Most of the core scRNA-seq pipeline runs comfortably on `compute`. You reach for `memory` only when a step genuinely needs more RAM than a standard node provides, for `gpu` when you run GPU-accelerated tools, and for `interactive` when you want a quick session that starts fast. Running `sinfo` shows you each partition and the live state of its nodes (idle, allocated, down) so you can see where capacity is currently free.
+
+A common beginner mistake is to use `memory` or `memorylong` as a precaution — "just in case" — rather than because a step genuinely needs it. The high-memory nodes are few and heavily contended; using them unnecessarily prevents other users' legitimate high-memory work from starting. Conversely, using `compute` for a step that truly needs 200 GB will result in an `OUT_OF_MEMORY` kill mid-run. The right calibration comes from empirical measurement: run the first instance of any new step with a modest over-estimate, then check `seff` afterward and right-size subsequent submissions (§9.8).
 
 ## 9.6 Interactive vs batch: two ways to use a compute node
 
@@ -143,9 +165,55 @@ The most useful `#SBATCH` flags map directly onto the resource contract:
 
 A related pair of flags controls behavior near maintenance windows: `--time-min=<HH:MM:SS>` tells SLURM the minimum time your job actually needs, allowing it to start the job in a shorter gap even if it cannot guarantee the full `--time`. This is the recommended fix for jobs sitting in the queue with reason `ReqNodeNotAvail, Reserved for maintenance`.
 
+One additional point on environment setup: every batch script should include `set -euo pipefail` as the first non-comment command. This trio of shell options makes the script exit immediately if any command fails (`-e`), treats unset variables as errors (`-u`), and propagates errors through pipes (`-o pipefail`). Without it, a script can silently continue past a failed step — writing a corrupt output, loading the wrong module, or producing nothing at all — with no indication anything went wrong until a confusing downstream error surfaces. For example: if `module load R/4.3.2` silently fails because the module name changed, and `set -euo pipefail` is absent, the script proceeds to run `Rscript ...` with no R loaded, producing a mysterious "command not found" or, worse, using a system R that has none of your packages. With `set -euo pipefail`, the failed `module load` terminates the script immediately and the `.err` log shows exactly where it stopped.
+
+@tbl-ch09-sbatch-directives summarizes the most-used `#SBATCH` directives in a quick-reference form.
+
+| Directive | Purpose | Example |
+|---|---|---|
+| `--account=` | PIRG to charge (required) | `--account=cresko` |
+| `--partition=` | Queue / hardware class | `--partition=compute` |
+| `--job-name=` | Human-readable label in `squeue` | `--job-name=seurat_qc` |
+| `--output=` | Stdout log path (`%j` → job ID) | `--output=logs/qc_%j.out` |
+| `--error=` | Stderr log path | `--error=logs/qc_%j.err` |
+| `--time=` | Wall-clock limit (`HH:MM:SS`); exceed → `TIMEOUT` kill | `--time=04:00:00` |
+| `--mem=` | Total memory for the job | `--mem=64G` |
+| `--mem-per-cpu=` | Memory per core (alternative to `--mem`) | `--mem-per-cpu=8G` |
+| `--cpus-per-task=` | Cores for a multi-threaded step | `--cpus-per-task=8` |
+| `--gpus=` | Number of GPUs | `--gpus=1` |
+| `--constraint=` | GPU memory tier | `--constraint=gpu-40gb` |
+| `--mail-type=` | Notification events | `--mail-type=END,FAIL` |
+| `--mail-user=` | Email for notifications | `--mail-user=you@uoregon.edu` |
+| `--array=` | Submit N independent sub-jobs; index is `$SLURM_ARRAY_TASK_ID` | `--array=1-8` |
+| `--time-min=` | Minimum acceptable wall-clock for backfill scheduling | `--time-min=01:00:00` |
+
+: `#SBATCH` directive quick reference. All directives must appear at the top of the script, before any commands. The `logs/` directory must exist before submission — SLURM does not create it. {#tbl-ch09-sbatch-directives}
+
+Reading @tbl-ch09-sbatch-directives as a decision checklist: every job must have `--account`, `--partition`, and `--time`; the first two are required, and the third has a partition-dependent default that is often too long for small jobs and too short for large ones. The `--output` and `--error` directives keep stdout and stderr in separate log files, which is essential for debugging — R's error messages go to stderr (the `.err` file), while any progress-printing the script does goes to stdout (the `.out` file). Using `%j` in the filename embeds the job ID, so logs from repeated runs of the same script do not overwrite each other. The `--array` directive (last row) is the secret weapon for multi-sample work and is described in depth in the key-parameter callout below.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--mem`"}
+**Default on Talapas: ~3.7 GB per core** (derived from the node's total memory divided by its cores). If you need more than one core's worth of RAM and do not specify `--mem` or `--mem-per-cpu`, your job receives only this default and will be killed with `OUT_OF_MEMORY` the moment it needs more. For most scRNA-seq steps, specify `--mem` explicitly — for example `--mem=64G` for integration or `--mem=96G` for pseudobulk DE. Setting it too high delays queue placement; setting it too low kills the job mid-run. After each first run, read `seff <jobid>` and note `MaxRSS`; trim your next request to that value plus a 15–20% safety margin.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--cpus-per-task`"}
+**Default: 1.** This is the number of CPU cores allocated to your job on a single node. For multi-threaded tools (Seurat's `FindAllMarkers`, STAR inside Cell Ranger, Harmony) you raise this — for example `--cpus-per-task=8`. The important distinction is between `--cpus-per-task` (threads within one process) and `--ntasks` (separate MPI processes). Most bioinformatics tools are multi-threaded, not MPI programs, so you almost always want `--cpus-per-task`, not `--ntasks`. Check what `seff` reports as `CPU Efficiency` after a run: if you asked for 8 cores but efficiency is 12%, the tool is not parallelizing and you should drop back to 1–2 cores.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--time`"}
+**Default: 24 hours on `compute`, 14 days on `computelong`.** When your job exceeds this wall-clock limit, SLURM kills it with `TIMEOUT`. The job is terminated at exactly that boundary — there is no grace period. For a new pipeline, run once with a generous time limit and note `Elapsed` from `seff`; set subsequent submissions to `Elapsed × 1.2`. Use the `--array` directive (§9.6) rather than requesting unrealistically long time for jobs that process many samples — arrays let each sub-job have its own fair time limit and restart independently if one fails.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--partition`"}
+**Default: none — required.** You must specify a partition for every job; SLURM will not accept a submission without one. For standard scRNA-seq steps that finish within a day, `--partition=compute` is the correct choice. Reach for `--partition=computelong` only when a step genuinely requires more than 24 hours (rare for the `ifnb` workflow). Use `--partition=memory` or `--partition=memorylong` only when a step truly exceeds a standard node's RAM — not as a precaution, because those nodes are scarce. The `--partition=interactive` is for short (≤12 hour) exploratory sessions that need to start quickly, not for production analysis.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — `--array`"}
+**Syntax: `--array=1-N` (or `1-N%M` to limit M simultaneously running sub-jobs).** A job array submits N independent sub-jobs from a single script, with each receiving a unique `$SLURM_ARRAY_TASK_ID` (1 through N). Inside the script you use that ID to select the sample to process — for example `SAMPLE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" samples.txt)`. This is the standard pattern for running Cell Ranger or any per-sample step on many samples without writing N separate scripts. The `%M` throttle is important when N is large: `--array=1-50%4` allows at most 4 sub-jobs to run simultaneously, so you don't monopolize the queue for everyone else.
+:::
+
 ## 9.7 Submitting, monitoring, and reading the result
 
-The lifecycle of a batch job is short to describe. You submit it, SLURM queues it, it runs, and it finishes — and a small set of commands lets you follow it the whole way.
+The lifecycle of a batch job is short to describe. You submit it, SLURM queues it, it runs, and it finishes — and a small set of commands lets you follow it the whole way. Understanding the difference between these commands matters: `squeue` shows the *current* state of a job while it is in the system; once a job finishes and leaves the queue, you must use `seff` or `sacct` to retrieve information about it. Many beginners check `squeue`, see nothing, and conclude the job never ran — when in fact it completed successfully and left the queue before they checked. Always pair `squeue` (for live monitoring) with `seff` (for post-mortem accounting).
 
 ``` bash
 sbatch hostname.sbatch        # -> Submitted batch job 123456
@@ -164,7 +232,24 @@ seff 123456
 sacct -j 123456 --format=JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode
 ```
 
-`seff` prints a friendly summary: CPU efficiency, peak memory, and wall time, plus the final state. `sacct` gives the same facts in tabular detail. The two numbers to watch are `MaxRSS` (the peak memory the job actually touched) and `Elapsed` (how long it actually ran). If you requested 64 GB and `MaxRSS` says you used 12 GB, your next submission can safely ask for far less — and will start sooner for it.
+`seff` prints a friendly summary: CPU efficiency, peak memory, and wall time, plus the final state. `sacct` gives the same facts in tabular detail. @tbl-ch09-monitoring describes the key fields from both commands. The two numbers to watch are `MaxRSS` (the peak memory the job actually touched) and `Elapsed` (how long it actually ran). If you requested 64 GB and `MaxRSS` says you used 12 GB, your next submission can safely ask for far less — and will start sooner for it.
+
+| Field / output line | Source | What it means | How to use it |
+|---|---|---|---|
+| `State` | `seff`, `sacct` | Final job status: `COMPLETED`, `FAILED`, `OUT_OF_MEMORY`, `TIMEOUT`, `CANCELLED` | Anything other than `COMPLETED` means the job did not finish cleanly |
+| `CPU Efficiency` | `seff` | Fraction of allocated CPU time that was actually used | Low efficiency on a single-threaded job is normal; low efficiency on a requested-8-core job means the code is not parallelizing |
+| `Memory Efficiency` | `seff` | Peak memory used / memory requested | If consistently < 50%, shrink `--mem` on the next run to improve queue priority |
+| `Job Wall-clock time` | `seff` | Actual elapsed time | Use with a 10–20% safety margin to set `--time` on repeated runs |
+| `MaxRSS` | `sacct` | Peak resident set size (memory high-water mark) | The definitive right-sizing number; convert MB to GB with ÷ 1024 |
+| `Elapsed` | `sacct` | Actual wall-clock time in `HH:MM:SS` | Same as `seff` wall-clock; more scriptable from `sacct` output |
+| `ExitCode` | `sacct` | Process exit code (format `code:signal`) | `0:0` = clean exit; any non-zero code indicates an error in the job itself |
+| `PD` | `squeue` State | Pending — queued but not yet running | Normal; check the Reason column for why |
+| `R` | `squeue` State | Running | Job is actively executing |
+| `CG` | `squeue` State | Completing — job finished, SLURM cleaning up | Transient; will disappear shortly |
+
+: Key fields from `seff`, `sacct`, and `squeue` and what each tells you about a job. Run `seff <jobid>` after every job as a habit; the Memory and CPU efficiency numbers are the foundation of right-sizing future submissions. {#tbl-ch09-monitoring}
+
+Reading @tbl-ch09-monitoring: the most immediately useful line from `seff` is `Memory Efficiency`. If it reads "19% of 64 GB," your next submission should ask for roughly 64 × 0.19 × 1.2 ≈ 15 GB — a substantial reduction that will move you up the queue. `CPU Efficiency` deserves a different interpretation depending on the job: low efficiency on a single-threaded step is expected, because `seff` computes efficiency relative to the *allocated* cores; low efficiency on a step you requested 8 cores for is a signal that the tool is not actually multithreading and you should reduce `--cpus-per-task`. The `ExitCode` field is the clearest binary: `0:0` is clean; anything else is a failure. A job with `State: COMPLETED` and `ExitCode: 1:0` means the job ran to the time limit but the R script inside it errored — you must look at the `.err` log to find the actual failure message.
 
 ## 9.8 Right-sizing: the central skill
 
@@ -174,35 +259,41 @@ On one side, **smaller requests run sooner**. SLURM's backfill scheduler slots s
 
 The practical resolution is empirical. The first time you run a new pipeline step, err *slightly* on the high side so it does not die. Then read `seff` to see what it really needed, and trim subsequent submissions toward that number with a modest safety margin. A couple of defaults are worth memorizing: the default memory per core is roughly **3.7 GB**, so if your step needs more you must say so explicitly; and the `compute` partition's default wall time is 24 hours, while `computelong` defaults to two weeks. In the scRNA-seq pipeline, most steps are comfortable on a standard node, but pseudobulk DE and differential abundance are memory-hungry and benefit from an explicit `--mem=96G`.
 
+The right-sizing workflow in practice is a two-submission loop. **First submission:** set generous but not absurd limits — for an unknown Seurat step, `--mem=64G --time=04:00:00 --cpus-per-task=4` is a reasonable starting point. Run `seff <jobid>` immediately after completion. **Second and later submissions:** set `--mem` to `MaxRSS × 1.2` (20% safety margin), `--time` to `Elapsed × 1.2`, and `--cpus-per-task` to whatever the tool actually uses (check `CPU Efficiency` from `seff`). A step that requested 64 GB but used only 12 GB has a `MaxRSS`-based new request of roughly 15 GB — a fourfold reduction that significantly improves its queue priority. Over the course of running the full `01`–`08` pipeline twice, you will have accurate resource profiles for all eight steps, and subsequent runs start promptly because each step requests only what it genuinely needs.
+
 ## 9.9 Why is my job stuck in `PD`?
 
-A job sitting in the pending state is normal far more often than it is broken. The reason SLURM gives (visible in `squeue`'s reason column or via `scontrol show job <id>`) tells you which it is:
+A job sitting in the pending state is normal far more often than it is broken. The reason SLURM gives (visible in `squeue`'s reason column or via `scontrol show job <id>`) tells you which it is; the most common reasons are collected in @tbl-ch09-pending-reasons.
 
-::: incremental
-- **`Priority` or `Resources`** — ordinary queueing. Either there are jobs ahead of you in the fair-share ordering, or the specific resources you asked for are not free yet. There is nothing to fix; you are simply waiting your turn.
-- **`QOSMaxJobsPerUserLimit`** — you have hit a per-user cap on simultaneous jobs. Let some of your earlier jobs finish and the next will start.
-- **`ReqNodeNotAvail, Reserved for maintenance`** — your requested `--time` would run past an upcoming quarterly maintenance window, so SLURM cannot guarantee the node will be free for the whole duration. Shorten `--time`, or add a `--time-min` so SLURM can start the job sooner with a reduced limit:
+**`Priority` or `Resources`** indicates ordinary queueing: either there are jobs ahead of you in the fair-share ordering, or the specific resources you asked for are not free yet. There is nothing to fix — you are simply waiting your turn. **`QOSMaxJobsPerUserLimit`** means you have hit a per-user cap on simultaneous jobs; let some earlier jobs finish and the next will start automatically. The most disruptive reason is **`ReqNodeNotAvail, Reserved for maintenance`**: your requested `--time` would run past an upcoming quarterly maintenance window, so SLURM cannot guarantee the node will be free for the whole duration. The fix is to shorten `--time`, or to add a `--time-min` so SLURM can start the job sooner in a shorter gap:
 
-  ``` bash
-  #SBATCH --time=0-08:00:00
-  #SBATCH --time-min=0-01:00:00
-  ```
-:::
+``` bash
+#SBATCH --time=0-08:00:00
+#SBATCH --time-min=0-01:00:00
+```
+
+| Pending reason | What it means | Action |
+|---|---|---|
+| `Priority` | Jobs with higher fair-share priority are ahead of you | Wait; nothing to fix |
+| `Resources` | The resources you requested are not currently free | Wait; consider reducing `--mem` or `--cpus-per-task` |
+| `QOSMaxJobsPerUserLimit` | You have hit the per-user simultaneous-job cap | Wait for earlier jobs to finish |
+| `ReqNodeNotAvail, Reserved for maintenance` | Your `--time` extends past a maintenance window | Add `--time-min` or shorten `--time` |
+| `AssocGrpCPUMinutesLimit` | Your PIRG account has exhausted its CPU-minute allocation | Contact RACS |
+| `Dependency` | The job was submitted with `--dependency=` and the upstream job has not yet completed | Normal in dependency chains; nothing to fix |
+
+: Common `squeue` pending reasons, their meaning, and the recommended action. The Reason column appears in `squeue -u $USER`; for more detail run `scontrol show job <id>`. {#tbl-ch09-pending-reasons}
+
+Reading @tbl-ch09-pending-reasons: the most important lesson is that most pending states require no action — they resolve when resources free up. The only reasons that require active intervention are `ReqNodeNotAvail, Reserved for maintenance` (shorten `--time` or add `--time-min`) and `AssocGrpCPUMinutesLimit` (contact RACS, because your PIRG has exhausted its allocation). Attempting to "fix" a `Priority`-pending job by cancelling it and resubmitting with shorter resource requests is logical in theory but rarely helps in practice: you move to the back of a queue whose front is also held up by the same resource contention. The most efficient response to `Priority` or `Resources` is to wait — and to note from `seff` on past runs whether your requests are larger than necessary.
 
 The official Knowledge Base FAQ, [*Why is my SLURM job not running?*](https://uoracs.github.io/talapas2-knowledge-base/docs/faqs/why_is_my_job_not_running/), catalogs the less common reasons.
 
 ## 9.10 Being a good cluster citizen
 
-Because Talapas is shared across the whole university, the etiquette of using it is not just politeness — it is what keeps the machine usable for everyone, including you. A short code of conduct:
+Because Talapas is shared across the whole university, the etiquette of using it is not just politeness — it is what keeps the machine usable for everyone, including you.
 
-::: incremental
-- **Never** run intensive work on login nodes. Always route it through `srun` or `sbatch`.
-- Do not leave idle interactive sessions open. `exit` the moment you are done so the node returns to the pool.
-- Do not request more CPUs, memory, or GPUs than you will actually use. Over-requesting wastes shared capacity and delays your own jobs.
-- Put large output — caches and intermediate files — in `/scratch/<PIRG>/`, not in `/home/`. Note that `/scratch` purges files not accessed in 90 days, so it is for working data, not archives.
-- **Back up anything you care about.** RACS does not back up Talapas; a disk failure or an accidental delete is final unless you have your own copy.
-- If you have a genuine deadline that needs special scheduling, email RACS rather than trying to outmaneuver the queue.
-:::
+Never run intensive work on login nodes; always route real computation through `srun` or `sbatch`. Do not leave idle interactive sessions open — type `exit` the moment you are done so the reserved node returns to the pool. Do not request more CPUs, memory, or GPUs than you will actually use: over-requesting wastes shared capacity and, counter-intuitively, delays your own jobs by making them harder for the backfill scheduler to place.
+
+Put large output — caches and intermediate files — in `/scratch/<PIRG>/`, not in `/home/`. The scratch filesystem has generous per-PIRG quotas that home directories lack, but note that `/scratch` purges files not accessed in 90 days, so it is for working data, not long-term archives. Back up anything you care about: RACS does not back up Talapas, and a disk failure or an accidental deletion is final without your own copy. If you have a genuine deadline that needs special scheduling, email RACS rather than trying to outmaneuver the queue.
 
 ## 9.10b Reading the output: what a finished batch job leaves behind
 
