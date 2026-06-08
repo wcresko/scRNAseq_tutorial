@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs</title>
+  <title>Single Cell RNA-seq Analysis Workshop – Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1471,6 +1471,19 @@ Bill Cresko
 </div>
 </div>
 </div>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Seurat v5 note.</strong> After <code>merge()</code> in Seurat v5, the RNA assay stores <em>split layers</em> (<code>counts.CTRL</code>, <code>counts.STIM</code>, …). Run <code>JoinLayers()</code> after merging the per-sample objects so that downstream steps (<code>FindMarkers</code>, normalization) see a single layer. The tutorial does this automatically after the doublet-detection merge.</p>
+</div>
+</div>
+</div>
 </section>
 <section id="what-a-doublet-score-distribution-looks-like" class="slide level2">
 <h2>What a doublet-score distribution looks like</h2>
@@ -1622,11 +1635,60 @@ Bill Cresko
 <li class="fragment">HVGs give you the gene-space PCA will operate on</li>
 </ul>
 </section>
+<section id="the-ifnb-dataset-what-youll-see" class="slide level2">
+<h2>The <code>ifnb</code> dataset — what you’ll see</h2>
+<p>The workshop dataset (<code>muscData::Kang18_8vs8()</code>) starts at <strong>~24,500 annotated singlets</strong> across CTRL and STIM. After the QC filters in Tutorial 01 (<code>nFeature_RNA &gt; 200 &amp; &lt; 2500</code>, <code>percent.mt &lt; 5</code>, <code>scDblFinder.class == &quot;singlet&quot;</code>) you should retain <strong>~23,000 cells</strong>.</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Stage</th>
+<th>Cells</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Loaded (<code>Kang18_8vs8</code>, annotated singlets)</td>
+<td>~24,500</td>
+</tr>
+<tr class="even">
+<td>After <code>subset()</code> QC filter</td>
+<td>~23,000</td>
+</tr>
+<tr class="odd">
+<td>After <code>NormalizeData</code> (no cell loss)</td>
+<td>~23,000</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>Doublet detection in this tutorial runs <em>per sample</em> (CTRL then STIM separately)</strong> with <code>scDblFinder</code>. The two per-sample objects are then merged back with <code>merge()</code> and <code>JoinLayers()</code> before the final filter. Running doublet detection on the merged object would treat cross-sample cell pairs as doublets — they are not.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="design-consideration-percent.rb-and-when-to-use-it" class="slide level2">
+<h2>Design consideration — <code>percent.rb</code> and when to use it</h2>
+<p>Tutorial 01 also computes <code>percent.rb</code> (ribosomal-protein fraction). It is <strong>not</strong> a standard QC filter; rather:</p>
+<ul>
+<li>A very high <code>percent.rb</code> (&gt;50%) in a cluster often signals a <em>metabolically active</em> or <em>activated</em> state, not a low-quality cell.</li>
+<li>Monitor it per sample: if one sample has dramatically higher <code>percent.rb</code>, check whether library prep differed.</li>
+<li>Do <strong>not</strong> filter on <code>percent.rb</code> by default — just note it.</li>
+</ul>
+</section>
 <section id="coming-up-next" class="slide level2">
 <h2>Coming up next</h2>
 <ul>
 <li><strong>Lec 02</strong> — <a href="Lecture_02_DimReduction_Clustering.html">Dim reduction, integration, clustering</a></li>
 <li><strong>Hands-on:</strong> <a href="../Exercise_Folder/Tutorial_01_QC_Preprocessing.html">Tutorial 01 — QC &amp; Preprocessing</a></li>
+<li><strong>Companion book chapter:</strong> <a href="../Resources_Folder/Chapter_01_Preprocessing.html">Chapter 1 — Preprocessing</a></li>
 </ul>
 
 

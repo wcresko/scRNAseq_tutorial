@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 5 — Multi-Sample Integration – Single Cell RNA-seq Workshop</title>
+<title>Chapter 5 — Multi-Sample Integration – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4341,7 +4341,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4549,6 +4549,7 @@ Note
 <li><strong>Conservative</strong> — preserves rare populations well</li>
 <li><strong>Single-tunable</strong>: <code>theta</code> (default 2) controls how aggressively to mix batches; rarely needs adjustment</li>
 </ul>
+<p><strong>Pre-processing for Harmony:</strong> before running Harmony, the typical workflow is: (1) split by sample, (2) normalize and select 2,000 HVGs <strong>per sample</strong>, (3) identify features that are variable across <em>most</em> samples with <code>SelectIntegrationFeatures(object.list = ...)</code> — this avoids letting one dominant sample dictate the feature set, (4) merge the per-sample objects back with <code>merge()</code> and call <code>JoinLayers()</code> (Seurat v5 <code>merge()</code> leaves per-sample split layers; <code>JoinLayers()</code> collapses them so <code>AddModuleScore</code> and <code>FindAllMarkers</code> work on the RNA assay later), (5) run PCA on the integration features, then (6) call <code>RunHarmony()</code>.</p>
 <p>Harmony’s weaknesses:</p>
 <ul>
 <li>Less effective on very heterogeneous batches (cell types absent in one but present in another); works best when most cell types are shared</li>
@@ -4627,6 +4628,7 @@ Note
 <li>Switch back to <code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> <em>after</em> clustering, <em>before</em> <code>FindMarkers</code>, <code>FindAllMarkers</code>, marker scoring, or any DE work</li>
 </ul>
 <p>This is one of the most-violated rules in scRNA-seq analysis. Always explicit.</p>
+<p><strong>Over-correction false positive.</strong> A subtle trap specific to the over-correction diagnostic: if you score cells on a biological signal (e.g. an ISG module score) <em>after</em> forgetting to switch back to the <code>RNA</code> assay, you will score on the integrated (batch-corrected) expression values. Since integration explicitly reduces the STIM–CTRL difference in the corrected space, the ISG score gap will appear to be zero or near-zero — falsely suggesting over-correction. The fix is <code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> immediately before <code>AddModuleScore</code>. The same applies to any <code>FeaturePlot</code> used to visualize a gene’s expression post-integration: always verify the active assay before drawing.</p>
 </section>
 <section id="common-errors" class="level2">
 <h2 class="anchored" data-anchor-id="common-errors">5.10 Common errors</h2>

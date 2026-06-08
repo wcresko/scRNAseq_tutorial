@@ -2394,7 +2394,6 @@ Note
 <li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
 <li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_03_Markers_Annotation.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
 </ul>
-<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
 </div>
 </div>
 </section>
@@ -2449,13 +2448,26 @@ Note
 <section id="step-1-find-markers-for-one-cluster" class="level2">
 <h2 class="anchored" data-anchor-id="step-1-find-markers-for-one-cluster">Step 1 — Find markers for one cluster</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>cluster1.markers <span class="ot">&lt;-</span> <span class="fu">FindMarkers</span>(ifnb, <span class="at">ident.1 =</span> <span class="dv">1</span>, <span class="at">min.pct =</span> <span class="fl">0.25</span>)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3" data-lst-cap="Find differentially expressed marker genes for cluster 1 (one-vs-rest Wilcoxon test) and print the top 10."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>cluster1.markers <span class="ot">&lt;-</span> <span class="fu">FindMarkers</span>(ifnb, <span class="at">ident.1 =</span> <span class="dv">1</span>, <span class="at">min.pct =</span> <span class="fl">0.25</span>)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(cluster1.markers, <span class="dv">10</span>)</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: top markers for cluster 1 (gene moved from rownames) -------</span></span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>cluster1.markers <span class="sc">|&gt;</span></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C3_cluster1_markers.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each row is a gene; the five columns are: <code>p_val</code> (raw Wilcoxon p-value), <code>avg_log2FC</code> (log₂ fold-change, cluster 1 vs all other cells), <code>pct.1</code> (fraction of cluster-1 cells expressing the gene), <code>pct.2</code> (fraction of all other cells expressing it), and <code>p_val_adj</code> (Bonferroni-corrected p-value). The best <em>specific</em> markers have high <code>avg_log2FC</code>, high <code>pct.1</code> (expressed in most of your cluster), and low <code>pct.2</code> (rare outside it) — genes with high <code>pct.2</code> may be significant but are not cluster-specific. Rows are sorted by p-value by default, not fold-change, so scroll or re-sort by <code>avg_log2FC</code> to find the strongest effect-size markers.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2486,7 +2498,7 @@ Show answers
 <section id="step-2-markers-for-every-cluster" class="level2">
 <h2 class="anchored" data-anchor-id="step-2-markers-for-every-cluster">Step 2 — Markers for every cluster</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>ifnb.markers <span class="ot">&lt;-</span> <span class="fu">FindAllMarkers</span>(</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4" data-lst-cap="Run FindAllMarkers (positive markers only) and extract the top 5 per cluster by log₂FC."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>ifnb.markers <span class="ot">&lt;-</span> <span class="fu">FindAllMarkers</span>(</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  ifnb,</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">only.pos        =</span> <span class="cn">TRUE</span>,</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.pct         =</span> <span class="fl">0.25</span>,</span>
@@ -2501,6 +2513,19 @@ Show answers
 <span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Tables out: all positive markers + the per-cluster top 5 --------------</span></span>
 <span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(ifnb.markers, <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C4_all_markers.csv&quot;</span>))</span>
 <span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(top_markers,  <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C4_top5_markers_per_cluster.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>top_markers</code> is a tibble grouped by <code>cluster</code>, showing the five genes with the highest <code>avg_log2FC</code> in each cluster. Scan the <code>gene</code> column cluster-by-cluster: most clusters will be topped by recognizable PBMC markers (<code>LYZ</code>/<code>S100A8</code> for monocytes, <code>MS4A1</code>/<code>CD79A</code> for B cells, <code>GNLY</code>/<code>NKG7</code> for NK, <code>IL7R</code>/<code>CCR7</code> for naive T). If a cluster’s top genes are interferon-stimulated genes (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>) rather than cell-type markers, that cluster is likely a condition-split copy of a cell type rather than a biologically distinct population — expected on unintegrated data and resolved in Tutorial 05.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2592,7 +2617,7 @@ Show answers
 <section id="a.-violin-plots-expression-distribution-per-cluster" class="level3">
 <h3 class="anchored" data-anchor-id="a.-violin-plots-expression-distribution-per-cluster">3a. Violin plots — expression distribution per cluster</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>p_vln <span class="ot">&lt;-</span> <span class="fu">VlnPlot</span>(ifnb,</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5" data-lst-cap="Violin plots of six canonical PBMC markers (CD14, LYZ, MS4A1, CD79A, CD8A, GNLY) across all clusters."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>p_vln <span class="ot">&lt;-</span> <span class="fu">VlnPlot</span>(ifnb,</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD79A&quot;</span>, <span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;GNLY&quot;</span>),</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">pt.size =</span> <span class="dv">0</span>, <span class="at">ncol =</span> <span class="dv">3</span>) <span class="sc">&amp;</span></span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">&quot;Cluster (RNA_snn_res.0.5)&quot;</span>) <span class="sc">&amp;</span></span>
@@ -2610,11 +2635,24 @@ Show answers
 <span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C5_marker_violins.png&quot;</span>), p_vln,</span>
 <span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each panel is one marker gene; x-axis = cluster number, y-axis = log-normalized expression. The width of a violin at a given height represents how many cells in that cluster have that expression level, so a tall, narrow spike means most cells in the cluster are consistently expressing the gene. Look for clusters with a violin that rises visibly higher than all others for a given marker — for example, one or two clusters dominating <code>CD14</code> identify the monocyte clusters, and one or two dominating <code>MS4A1</code>/<code>CD79A</code> identify B cells. Clusters with flat (near-zero) violins for all six markers are likely T cells or NK cells not covered by this panel — check <code>CD8A</code> and <code>GNLY</code> for those.</p>
+</div>
+</div>
 </section>
 <section id="b.-feature-plots-expression-on-umap" class="level3">
 <h3 class="anchored" data-anchor-id="b.-feature-plots-expression-on-umap">3b. Feature plots — expression on UMAP</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>p_feature <span class="ot">&lt;-</span> <span class="fu">FeaturePlot</span>(ifnb,</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6" data-lst-cap="UMAP feature plots overlaying expression of four canonical markers (CD14, MS4A1, CD8A, GNLY) on the embedding."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>p_feature <span class="ot">&lt;-</span> <span class="fu">FeaturePlot</span>(ifnb,</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>            <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;GNLY&quot;</span>),</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>            <span class="at">ncol =</span> <span class="dv">2</span>) <span class="sc">&amp;</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">&quot;UMAP 1&quot;</span>) <span class="sc">&amp;</span></span>
@@ -2632,11 +2670,24 @@ Show answers
 <span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C6_marker_featureplots.png&quot;</span>), p_feature,</span>
 <span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">9</span>, <span class="at">height =</span> <span class="dv">8</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each of the four panels places every cell at its UMAP coordinates, coloring it from light (low expression) to dark blue/purple (high expression). Healthy marker geography looks like a bright patch localized to one or a few islands — <code>CD14</code> should light up the monocyte region, <code>MS4A1</code> the B-cell island, <code>CD8A</code> the cytotoxic T region, and <code>GNLY</code> the NK region. Cells that appear bright in two non-adjacent islands may indicate doublets or a cross-reactive probe; diffuse high expression across the whole UMAP usually means the gene is broadly expressed and not a good discriminating marker for annotation.</p>
+</div>
+</div>
 </section>
 <section id="c.-heatmap-top-markers-across-clusters" class="level3">
 <h3 class="anchored" data-anchor-id="c.-heatmap-top-markers-across-clusters">3c. Heatmap — top markers across clusters</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>top10 <span class="ot">&lt;-</span> ifnb.markers <span class="sc">|&gt;</span> <span class="fu">group_by</span>(cluster) <span class="sc">|&gt;</span> <span class="fu">slice_max</span>(avg_log2FC, <span class="at">n =</span> <span class="dv">10</span>)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7" data-lst-cap="DoHeatmap of the top-10 markers per cluster (z-scored scaled expression), cells grouped by cluster."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>top10 <span class="ot">&lt;-</span> ifnb.markers <span class="sc">|&gt;</span> <span class="fu">group_by</span>(cluster) <span class="sc">|&gt;</span> <span class="fu">slice_max</span>(avg_log2FC, <span class="at">n =</span> <span class="dv">10</span>)</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Tutorial 01 only scaled the HVGs; re-scale the top-marker genes so any</span></span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="co"># non-HVG markers also appear in the heatmap rather than being dropped.</span></span>
@@ -2655,11 +2706,24 @@ Show answers
 <span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C7_marker_heatmap.png&quot;</span>), p_heatmap,</span>
 <span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">12</span>, <span class="at">height =</span> <span class="dv">10</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Columns are individual cells grouped by cluster (cluster boundaries are marked by thin colored bars on the x-axis); rows are the top-10 marker genes for each cluster. Color encodes z-scored expression: red = high relative expression, blue = low. A well-behaved marker block shows a bright red diagonal band — each set of marker rows lights up in exactly its own cluster and is blue elsewhere. Marker rows that stay red across many clusters are broadly expressed genes (less informative for annotation); rows that are consistently blue everywhere except one cluster are the most specific markers. Note that because columns represent cells rather than aggregated clusters, large clusters dominate the x-axis width, which can make small populations hard to see — the dot plot (<strong>?@lst-M3-viz_dot</strong>) normalizes for cluster size.</p>
+</div>
+</div>
 </section>
 <section id="d.-dot-plot-expressing-mean-expression" class="level3">
 <h3 class="anchored" data-anchor-id="d.-dot-plot-expressing-mean-expression">3d. Dot plot — % expressing × mean expression</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>canonical_markers <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;FCGR3A&quot;</span>, <span class="st">&quot;MS4A7&quot;</span>, <span class="st">&quot;FCER1A&quot;</span>, <span class="st">&quot;CST3&quot;</span>,</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8" data-lst-cap="DotPlot of a 16-gene canonical PBMC marker panel across clusters — dot size encodes percent expressing, color encodes scaled mean expression."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>canonical_markers <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;CD14&quot;</span>, <span class="st">&quot;LYZ&quot;</span>, <span class="st">&quot;FCGR3A&quot;</span>, <span class="st">&quot;MS4A7&quot;</span>, <span class="st">&quot;FCER1A&quot;</span>, <span class="st">&quot;CST3&quot;</span>,</span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>                       <span class="st">&quot;IL7R&quot;</span>, <span class="st">&quot;CCR7&quot;</span>, <span class="st">&quot;S100A4&quot;</span>, <span class="st">&quot;CD8A&quot;</span>, <span class="st">&quot;GZMK&quot;</span>, <span class="st">&quot;GNLY&quot;</span>,</span>
 <span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>                       <span class="st">&quot;NKG7&quot;</span>, <span class="st">&quot;MS4A1&quot;</span>, <span class="st">&quot;CD79A&quot;</span>, <span class="st">&quot;PPBP&quot;</span>)</span>
 <span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>p_dot <span class="ot">&lt;-</span> <span class="fu">DotPlot</span>(ifnb, <span class="at">features =</span> canonical_markers) <span class="sc">+</span></span>
@@ -2677,6 +2741,19 @@ Show answers
 <span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
 <span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C8_marker_dotplot.png&quot;</span>), p_dot,</span>
 <span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The grid has clusters on the y-axis and marker genes on the x-axis. Each dot encodes two things simultaneously: <strong>size</strong> = the fraction of cells in that cluster expressing the gene (larger = more cells expressing it), and <strong>color</strong> = the scaled average expression level (darker = higher). To identify a cluster, look for the column(s) where it shows large, dark dots — those are its marker genes. A cluster with a big dark dot on <code>CD14</code> and <code>LYZ</code> is a monocyte; one showing <code>MS4A1</code> and <code>CD79A</code> is a B cell. Clusters with no large dots across the whole panel need additional markers (check <code>IL7R</code>, <code>CD3D</code>, or <code>CD3E</code> for T cells, which aren’t in this panel). This is the primary visualization to use when deciding labels in <strong>?@lst-M3-rename</strong> below.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2709,9 +2786,9 @@ Show answers
 </section>
 <section id="step-4-manual-annotation" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-manual-annotation">Step 4 — Manual annotation</h2>
-<p>Use the canonical marker table above and the dot plot to assign labels. Your cluster <strong>count and numbering</strong> depend on the random seed, Seurat version, and the fact that this is <em>unintegrated</em> data — so you’ll often have <strong>more clusters than cell types</strong> (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). <strong>Do not copy these labels blindly</strong> — run <code>levels(ifnb)</code> to see your clusters, then label each one from the table that matches <em>your</em> dot plot (it’s fine to give two clusters the same label).</p>
+<p>Use the canonical marker table above and the dot plot (<strong>?@lst-M3-viz_dot</strong>) to assign labels. Your cluster <strong>count and numbering</strong> depend on the random seed, Seurat version, and the fact that this is <em>unintegrated</em> data — so you’ll often have <strong>more clusters than cell types</strong> (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). <strong>Do not copy these labels blindly</strong> — run <code>levels(ifnb)</code> to see your clusters, then label each one from the table that matches <em>your</em> dot plot (it’s fine to give two clusters the same label).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># First, see how many clusters you actually have, and their ids:</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9" data-lst-cap="Apply manual cell-type labels to each cluster using RenameIdents, then draw the annotated UMAP."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># First, see how many clusters you actually have, and their ids:</span></span>
 <span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">levels</span>(ifnb)</span>
 <span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># On the UNINTEGRATED data, cell types often split by CONDITION (e.g. CTRL vs</span></span>
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># STIM monocytes), so you&#39;ll usually get MORE clusters than cell types — often</span></span>
@@ -2749,6 +2826,19 @@ Show answers
 <span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The UMAP now shows your cell-type labels instead of cluster numbers — each island should carry a readable name. A well-annotated map has compact, non-overlapping label positions (aided by <code>repel = TRUE</code>) and each island dominated by a single biological category. If two neighboring islands share the same label, that is expected on unintegrated data (the same cell type split by condition); if a large island has a label that doesn’t feel right (e.g. “CD14 Mono” sitting next to the T-cell area), revisit the dot plot (<strong>?@lst-M3-viz_dot</strong>) and check whether a different marker combination fits better.</p>
+</div>
+</div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2779,7 +2869,7 @@ Show answers
 <h2 class="anchored" data-anchor-id="step-5-validate-against-the-ground-truth-labels">Step 5 — Validate against the ground-truth labels</h2>
 <p>The <code>ifnb</code> dataset ships with author-curated labels in <code>seurat_annotations</code>. This is rare in real life — but it makes a beautiful teaching moment to compare your manual labels to a published ground truth.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Side-by-side UMAPs</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10" data-lst-cap="Side-by-side UMAPs of manual annotation vs author ground-truth labels, plus a cross-tab confusion table."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Side-by-side UMAPs</span></span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>p_manual <span class="ot">&lt;-</span> <span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">NoLegend</span>() <span class="sc">+</span></span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
@@ -2822,6 +2912,19 @@ Show answers
 <span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: cross-tab of manual labels vs ground-truth labels ----------</span></span>
 <span id="cb10-42"><a href="#cb10-42" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(manual_vs_truth) <span class="sc">|&gt;</span></span>
 <span id="cb10-43"><a href="#cb10-43" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_manual_vs_truth.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The two UMAP panels side-by-side show your labels (left) and the author ground-truth (right) on the same embedding: identical islands in matching positions mean agreement; an island that carries a different name in each panel is a disagreement. The <code>manual_vs_truth</code> cross-tab printed below has your labels as rows and the author labels as columns — each cell is a count of cells assigned that label pair. A perfect annotator would see counts concentrated on a diagonal (each of your labels maps cleanly to one author label); off-diagonal counts identify the specific cell types where your calls and the authors’ disagree.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2871,7 +2974,7 @@ Show answers
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>
 <ul>
-<li>Dataset: <code>ifnb</code> from <code>SeuratData</code> — Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em></li>
+<li>Dataset: <code>ifnb</code> via Bioconductor’s <code>muscData::Kang18_8vs8()</code> — Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em></li>
 <li>PBMC canonical markers: <a href="https://satijalab.org/seurat/articles/pbmc3k_tutorial.html">Seurat PBMC 3k tutorial</a>, <a href="https://azimuth.hubmapconsortium.org/references/human_pbmc/">Azimuth PBMC reference</a>, <a href="https://panglaodb.se/">PanglaoDB</a></li>
 <li>Inspiration: <a href="https://integrativebioinformatics.github.io/scNotebooks/">scNotebooks</a></li>
 </ul>

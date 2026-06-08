@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 13 — WGCNA: Weighted Gene Co-expression Network Analysis</title>
+  <title>Single Cell RNA-seq Analysis Workshop – Lecture 13 — WGCNA: Weighted Gene Co-expression Network Analysis</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1179,7 +1179,7 @@ Bill Cresko
 <section id="where-this-lecture-fits" class="slide level2">
 <h2>Where this lecture fits</h2>
 <ul>
-<li>Previous: <a href="Lecture_15_ATACseq.html">Lec 15 — Bulk + scATAC-seq</a></li>
+<li><strong>Bonus track</strong> — self-paced after the core workshop; order is: Lec 15 → Lec 13 → Lec 16 → Lec 14 → Lec 17</li>
 <li><strong>You are here:</strong> Lec 13 — <em>finding co-expressed gene modules and tying them to phenotype</em></li>
 <li>Next: <a href="Lecture_16_Spatial.html">Lec 16 — Spatial Transcriptomics</a></li>
 <li><strong>Companion tutorial:</strong> <a href="../Exercise_Folder/Tutorial_13_WGCNA.html">Tutorial 13 — WGCNA on GSE152418</a></li>
@@ -1410,14 +1410,81 @@ Bill Cresko
 <h1>Part 5 — A workable WGCNA workflow</h1>
 
 </section>
+<section id="cor-shadowing-a-common-r-footgun" class="slide level2">
+<h2><code>cor</code> shadowing — a common R footgun</h2>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>WGCNA overwrites <code>base::cor</code>.</strong> Save and restore it around <code>blockwiseModules</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a></a>temp_cor <span class="ot">&lt;-</span> cor</span>
+<span id="cb6-2"><a></a>cor      <span class="ot">&lt;-</span> WGCNA<span class="sc">::</span>cor</span>
+<span id="cb6-3"><a></a>bwnet    <span class="ot">&lt;-</span> <span class="fu">blockwiseModules</span>(norm.counts, ...)</span>
+<span id="cb6-4"><a></a>cor      <span class="ot">&lt;-</span> temp_cor   <span class="co"># restore — otherwise unrelated downstream code breaks</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Forgetting this causes confusing failures in any code that calls <code>cor()</code> after WGCNA runs.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="step-0-data-orientation-gotcha" class="slide level2">
+<h2>Step 0 — Data orientation gotcha</h2>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p><strong>WGCNA expects samples-as-rows, genes-as-columns.</strong> Most RNA-seq count tables are genes-as-rows × samples-as-columns. Always transpose before calling <code>pickSoftThreshold</code> or <code>blockwiseModules</code>:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a></a>norm.counts <span class="ot">&lt;-</span> <span class="fu">assay</span>(dds_norm) <span class="sc">|&gt;</span> <span class="fu">t</span>()   <span class="co"># now: samples x genes</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Getting this backwards produces silently wrong results — no error, wrong modules.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="sample-level-outlier-detection" class="slide level2">
+<h2>Sample-level outlier detection</h2>
+<p>Before networking, look at your samples:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a></a><span class="co"># Hierarchical clustering of samples in raw-count space</span></span>
+<span id="cb8-2"><a></a>htree <span class="ot">&lt;-</span> <span class="fu">hclust</span>(<span class="fu">dist</span>(<span class="fu">t</span>(data)), <span class="at">method =</span> <span class="st">&quot;average&quot;</span>)</span>
+<span id="cb8-3"><a></a><span class="fu">plot</span>(htree)</span>
+<span id="cb8-4"><a></a></span>
+<span id="cb8-5"><a></a><span class="co"># PCA — more sensitive on small N</span></span>
+<span id="cb8-6"><a></a>pca <span class="ot">&lt;-</span> <span class="fu">prcomp</span>(<span class="fu">t</span>(data))</span>
+<span id="cb8-7"><a></a><span class="fu">plot</span>(pca<span class="sc">$</span>x[, <span class="dv">1</span><span class="sc">:</span><span class="dv">2</span>])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">The dendrogram’s <strong>y-axis is merge height</strong> (Euclidean distance). A sample merging at 2–3× the height of all others is an outlier candidate.</li>
+<li class="fragment"><strong>PCA is more sensitive on small N</strong> — a sample can look borderline in the dendrogram but clearly isolated on PC1/PC2. Trust the PCA.</li>
+<li class="fragment"><code>goodSamplesGenes()</code> additionally flags genes or samples with too many missing values.</li>
+<li class="fragment">Drop outliers <em>before</em> normalization — they bias VST dispersion estimates.</li>
+</ul>
+</section>
+<section id="reading-the-moduletrait-heatmap" class="slide level2">
+<h2>Reading the module–trait heatmap</h2>
+<ul>
+<li class="fragment">Each cell shows Pearson <strong>r</strong> between a module eigengene and a severity trait, with a p-value</li>
+<li class="fragment">Modules with |r| &gt; 0.5 and p &lt; 0.05 are candidates for follow-up</li>
+<li class="fragment"><strong>Hub genes</strong> = highest <strong>kME</strong> (gene–module correlation) within a strong module — these are your priority follow-ups</li>
+<li class="fragment">Always run GO/pathway enrichment on the full module gene list to give it a biological label</li>
+<li class="fragment">Multiple testing applies: prefer FDR-adjusted p-values, and check that hits survive permutation of trait labels</li>
+</ul>
+</section>
 <section id="checklist" class="slide level2">
 <h2>Checklist</h2>
 <ol type="1">
-<li class="fragment"><strong>QC</strong>: <code>goodSamplesGenes()</code>, drop sample/gene outliers</li>
-<li class="fragment"><strong>Normalize</strong>: VST (<code>DESeq2::vst</code>) for bulk; log-normalize per cell type for pseudobulk</li>
-<li class="fragment"><strong>Cluster samples</strong> (<code>hclust</code> on Euclidean distance) — drop visible outliers before networking</li>
-<li class="fragment"><strong>Pick power</strong>: <code>pickSoftThreshold</code> to scale-free <span class="math inline">\(R^2 \gtrsim 0.8\)</span></li>
-<li class="fragment"><strong>Build network</strong>: <code>blockwiseModules</code> (signed, TOMType = “signed”)</li>
+<li class="fragment"><strong>QC</strong>: <code>goodSamplesGenes()</code>, drop sample/gene outliers — before normalization (outliers bias VST)</li>
+<li class="fragment"><strong>Normalize</strong>: VST (<code>DESeq2::vst</code>, design <code>~ 1</code>) for bulk; log-normalize per cell type for pseudobulk</li>
+<li class="fragment"><strong>Cluster samples</strong> (<code>hclust</code> + PCA) — drop visible outliers; PCA is more sensitive on small N</li>
+<li class="fragment"><strong>Pick power</strong>: <code>pickSoftThreshold</code> to scale-free <span class="math inline">\(R^2 \gtrsim 0.8\)</span>; smallest β that crosses the line</li>
+<li class="fragment"><strong>Build network</strong>: <code>blockwiseModules</code> (signed, TOMType = “signed”, <code>randomSeed</code> set)</li>
+<li class="fragment"><strong>Restore <code>cor</code></strong> after <code>blockwiseModules</code> (see the cor-shadowing note)</li>
 <li class="fragment"><strong>Correlate</strong> module eigengenes with traits; flag |r| &gt; 0.5</li>
 <li class="fragment"><strong>Hub genes</strong> by <code>kME</code>; functional enrichment per module</li>
 <li class="fragment"><strong>Validate</strong> in an independent dataset before claiming biology</li>

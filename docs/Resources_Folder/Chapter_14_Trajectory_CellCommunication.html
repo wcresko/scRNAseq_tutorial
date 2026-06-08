@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 14 — Trajectory Inference &amp; Cell–Cell Communication – Single Cell RNA-seq Workshop</title>
+<title>Chapter 14 — Trajectory Inference &amp; Cell–Cell Communication – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4202,7 +4202,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4329,12 +4329,12 @@ Note
 <p>A trajectory method (i) embeds cells in a reduced space, (ii) fits a graph, tree, or smooth curve through them, (iii) picks a <strong>root</strong>, and (iv) measures distance along that structure as pseudotime. Genes whose expression varies smoothly along pseudotime are the candidate <strong>drivers</strong> of the process.</p>
 <p>Widely used tools:</p>
 <ul>
-<li><strong>Slingshot</strong><span class="citation" data-cites="street2018slingshot"><sup><a href="#ref-street2018slingshot" role="doc-biblioref">1</a></sup></span> — fits smooth principal curves through the cluster structure; robust, needs a start cluster.</li>
-<li><strong>Monocle3</strong><span class="citation" data-cites="trapnell2014monocle cao2019monocle3"><sup><a href="#ref-trapnell2014monocle" role="doc-biblioref">2</a>,<a href="#ref-cao2019monocle3" role="doc-biblioref">3</a></sup></span> — learns a principal <em>graph</em> and supports branch points; <code>learn_graph()</code> then <code>order_cells()</code>.</li>
+<li><strong>Slingshot</strong><span class="citation" data-cites="street2018slingshot"><sup><a href="#ref-street2018slingshot" role="doc-biblioref">1</a></sup></span> — fits smooth principal curves through the cluster structure; robust, needs a start cluster specified via <code>start.clus</code>. Returns a <code>pt</code> matrix with one column per inferred lineage; <code>NA</code> indicates a cell was not assigned to that lineage.</li>
+<li><strong>Monocle3</strong><span class="citation" data-cites="trapnell2014monocle cao2019monocle3"><sup><a href="#ref-trapnell2014monocle" role="doc-biblioref">2</a>,<a href="#ref-cao2019monocle3" role="doc-biblioref">3</a></sup></span> — learns a principal <em>graph</em> and supports branch points; <code>learn_graph()</code> then <code>order_cells()</code>. Note: <code>order_cells()</code> is <strong>interactive</strong> — it opens a plot in which the user clicks the root node. This step cannot be automated in a batch script, which is why the Module 14 Talapas script keeps it as a commented sketch.</li>
 <li><strong>PAGA</strong> (scanpy) — builds an abstracted graph of cluster connectivity; the best first question is often <em>“is there even a continuum?”</em>, which PAGA answers well.</li>
 <li><strong>Diffusion pseudotime</strong> — random-walk distance from a root cell.</li>
 </ul>
-<p>The single most important user choice is the <strong>root</strong>: pseudotime has no inherent direction, so the biologist must declare which end is the start (usually from a known progenitor marker). A wrong root reverses the entire narrative.</p>
+<p>The single most important user choice is the <strong>root</strong>: pseudotime has no inherent direction, so the biologist must declare which end is the start (usually from a known progenitor marker). A wrong root reverses the entire narrative. Three independent lines of evidence give the strongest justification for a root: (1) known progenitor markers expressed in the candidate start cluster; (2) CytoTRACE scores (less-differentiated cells express more genes, so the start cluster should have the highest scores); (3) agreement from RNA velocity arrows pointing <em>away from</em> the root.</p>
 <p>The deepest pitfall is more basic: <strong>the algorithm will return a trajectory even when none exists.</strong> The benchmark of 45 trajectory methods<span class="citation" data-cites="saelens2019comparison"><sup><a href="#ref-saelens2019comparison" role="doc-biblioref">4</a></sup></span> shows method choice matters enormously and that discrete data forced through trajectory tools produce confident nonsense. Decide <em>a priori</em> whether a continuum is biologically plausible.</p>
 </section>
 <section id="rna-velocity-adding-direction" class="level2">
@@ -4348,7 +4348,7 @@ Note
 <p>scRNA-seq cannot observe receptor binding, but it can ask whether a <strong>ligand</strong> is expressed in one cell type and its <strong>receptor</strong> in another. Combined with curated ligand–receptor databases, per-cluster expression yields a predicted signaling network<span class="citation" data-cites="armingol2021deciphering armingol2024diversifying"><sup><a href="#ref-armingol2021deciphering" role="doc-biblioref">7</a>,<a href="#ref-armingol2024diversifying" role="doc-biblioref">8</a></sup></span>. Tools differ in emphasis:</p>
 <ul>
 <li><strong>CellPhoneDB</strong> (Python) — permutation test for significance; models multi-subunit complexes.</li>
-<li><strong>CellChat</strong><span class="citation" data-cites="jin2021cellchat"><sup><a href="#ref-jin2021cellchat" role="doc-biblioref">9</a></sup></span> (R) — aggregates pairs into signaling <em>pathways</em>; strong circle/chord visualizations.</li>
+<li><strong>CellChat</strong><span class="citation" data-cites="jin2021cellchat"><sup><a href="#ref-jin2021cellchat" role="doc-biblioref">9</a></sup></span> (R) — aggregates pairs into signaling <em>pathways</em>; strong circle/chord visualizations. The standard workflow: <code>createCellChat()</code> → set DB → <code>identifyOverExpressedGenes()</code> → <code>computeCommunProb()</code> → <code>filterCommunication()</code> → <code>aggregateNet()</code>. Results are visualized with <code>netVisual_circle()</code> (aggregate network) or <code>netVisual_bubble()</code> (individual L–R pairs per pathway), and individual pathways drilled into with <code>netVisual_aggregate()</code>.</li>
 <li><strong>NicheNet</strong> (R) — links a ligand to the <em>downstream target genes</em> it should induce in the receiver.</li>
 <li><strong>LIANA</strong><span class="citation" data-cites="dimitrov2022comparison"><sup><a href="#ref-dimitrov2022comparison" role="doc-biblioref">10</a></sup></span> (R/Python) — runs many methods/databases and reports a <em>consensus</em>, after a systematic comparison found that method and resource choice substantially change the predicted interactions.</li>
 </ul>

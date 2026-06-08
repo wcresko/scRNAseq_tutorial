@@ -2338,7 +2338,7 @@ Note
 <h2 class="anchored" data-anchor-id="part-a-pseudotime-with-slingshot">Part A — Pseudotime with Slingshot</h2>
 <p><code>slingshot</code> fits smooth principal curves through your clusters in a reduced space. You give it a <strong>start cluster</strong> (the root) — here we <em>pretend</em> one cell type is the progenitor purely to demonstrate the mechanics.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(seu)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2" data-lst-cap="Run Slingshot pseudotime, inspect per-lineage pseudotime values, and overlay lineage curves on the UMAP."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">as.SingleCellExperiment</span>(seu)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">slingshot</span>(sce,</span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                 <span class="at">clusterLabels =</span> <span class="st">&quot;seurat_annotations&quot;</span>,</span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                 <span class="at">reducedDim    =</span> <span class="st">&quot;UMAP&quot;</span>,</span>
@@ -2352,6 +2352,19 @@ Note
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(grDevices)</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">reducedDims</span>(sce)<span class="sc">$</span>UMAP, <span class="at">pch =</span> <span class="dv">16</span>, <span class="at">cex =</span> <span class="fl">0.5</span>, <span class="at">col =</span> <span class="st">&quot;grey70&quot;</span>)</span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="fu">lines</span>(<span class="fu">SlingshotDataSet</span>(sce), <span class="at">lwd =</span> <span class="dv">2</span>, <span class="at">col =</span> <span class="st">&quot;black&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The scatter plot shows every cell in UMAP space (grey dots), with the inferred Slingshot lineage curves drawn over the top as black lines. Each curve is a separate trajectory branch; cells are ordered left-to-right (or whichever UMAP direction) by increasing pseudotime from the <code>start.clus</code> root. The <code>head(pt)</code> table above it shows raw pseudotime values: one column per lineage, <code>NA</code> for cells not assigned to that branch. Cells at the start of a lineage have values near 0; cells at the terminus have the highest values. Because <code>ifnb</code> is not a developmental dataset, treat these curves as a mechanics demo rather than meaningful biology — on a real differentiation dataset you would colour each cell by its pseudotime value to see the gradient.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2375,12 +2388,25 @@ You’d want an independent reason the start cells are the least-differentiated:
 <section id="monocle3-alternative" class="level3">
 <h3 class="anchored" data-anchor-id="monocle3-alternative">Monocle3 alternative</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(monocle3)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3" data-lst-cap="Monocle3 alternative: build a cell_data_set, learn the trajectory graph, order cells, and plot pseudotime UMAP."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(monocle3)</span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">as.cell_data_set</span>(seu)                 <span class="co"># SeuratWrappers</span></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">cluster_cells</span>(cds)</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">learn_graph</span>(cds)</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>cds <span class="ot">&lt;-</span> <span class="fu">order_cells</span>(cds)                       <span class="co"># interactive: pick the root node</span></span>
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_cells</span>(cds, <span class="at">color_cells_by =</span> <span class="st">&quot;pseudotime&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>plot_cells()</code> returns a UMAP where each cell is coloured by its Monocle3 pseudotime value: cells at the root (the node you interactively chose with <code>order_cells()</code>) are dark/purple and cells at the terminus are yellow/light. The trajectory graph (learned by <code>learn_graph()</code>) is drawn as a set of connected edges overlaid on the UMAP; branch points appear where lineages diverge. Unlike Slingshot, Monocle3 can handle tree-shaped trajectories with multiple branch points, making it better suited to complex developmental hierarchies. <code>UMAP</code> coordinates are inherited from the Seurat object, so the cell layout is the same as your standard Seurat UMAP.</p>
+</div>
 </div>
 </section>
 </section>
@@ -2401,13 +2427,26 @@ Note
 </div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scvelo <span class="im">as</span> scv, scanpy <span class="im">as</span> sc</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4" data-lst-cap="scVelo RNA velocity pipeline: read loom file, preprocess, compute dynamical velocity, and plot the embedding stream."><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> scvelo <span class="im">as</span> scv, scanpy <span class="im">as</span> sc</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>adata <span class="op">=</span> scv.read(<span class="st">&quot;ifnb_velocyto.loom&quot;</span>)        <span class="co"># spliced + unspliced layers</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>scv.pp.filter_and_normalize(adata, min_shared_counts<span class="op">=</span><span class="dv">20</span>, n_top_genes<span class="op">=</span><span class="dv">2000</span>)</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>scv.pp.moments(adata, n_pcs<span class="op">=</span><span class="dv">30</span>, n_neighbors<span class="op">=</span><span class="dv">30</span>)</span>
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>scv.tl.velocity(adata, mode<span class="op">=</span><span class="st">&quot;dynamical&quot;</span>)      <span class="co"># dynamical model (Bergen 2020)</span></span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>scv.tl.velocity_graph(adata)</span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>scv.pl.velocity_embedding_stream(adata, basis<span class="op">=</span><span class="st">&quot;umap&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>velocity_embedding_stream</code> overlays a streamline plot on the UMAP: each arrow or flow line points in the direction a cell is predicted to move in transcriptional state space, based on the ratio of unspliced to spliced RNA for each gene. Cells with many unspliced transcripts relative to spliced (i.e., genes that are being actively induced) have arrows pointing toward states that over-express those genes. Coherent arrow fields pointing consistently from one cluster to another support a directional trajectory; disorganized or circular arrows suggest the dataset lacks a clear velocity signal (common in steady-state or stimulation data like <code>ifnb</code>). A flat or near-zero field usually means the unspliced layer was too sparse or the dynamical model failed to converge.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-warning callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -2425,17 +2464,30 @@ Warning
 <section id="cytotrace-cross-check" class="level3">
 <h3 class="anchored" data-anchor-id="cytotrace-cross-check">CytoTRACE cross-check</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CytoTRACE)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5" data-lst-cap="Run CytoTRACE to score differentiation state per cell, then visualise the score on the UMAP."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CytoTRACE)</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>cyto <span class="ot">&lt;-</span> <span class="fu">CytoTRACE</span>(<span class="fu">as.matrix</span>(<span class="fu">GetAssayData</span>(seu, <span class="at">slot =</span> <span class="st">&quot;counts&quot;</span>)))</span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>cytotrace <span class="ot">&lt;-</span> cyto<span class="sc">$</span>CytoTRACE</span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">FeaturePlot</span>(seu, <span class="st">&quot;cytotrace&quot;</span>)   <span class="co"># higher = less differentiated (more genes detected)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>FeaturePlot</code> colours each cell in UMAP space by its CytoTRACE score (0–1): <strong>high scores (yellow/light) indicate less-differentiated cells</strong> that express a larger number of genes, while low scores (purple/dark) indicate terminally differentiated cells with a more restricted transcriptome. Use this as an independent cross-check on your Slingshot root: if CytoTRACE scores are highest in the cluster you chose as <code>start.clus</code>, the root is consistent with transcriptome breadth. A mismatch (CytoTRACE peaks in a different cluster) suggests the root assignment may need revisiting. Note that CytoTRACE is sensitive to sequencing depth; cells with systematically more reads will score higher regardless of biology.</p>
+</div>
 </div>
 </section>
 </section>
 <section id="part-c-cellcell-communication-with-cellchat" class="level2">
 <h2 class="anchored" data-anchor-id="part-c-cellcell-communication-with-cellchat">Part C — Cell–cell communication with CellChat</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CellChat)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6" data-lst-cap="Build a CellChat object, infer ligand–receptor communication probabilities, aggregate the network, and visualise with circle plots."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(CellChat)</span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>cc  <span class="ot">&lt;-</span> <span class="fu">createCellChat</span>(<span class="at">object =</span> seu, <span class="at">group.by =</span> <span class="st">&quot;seurat_annotations&quot;</span>)</span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>cc<span class="sc">@</span>DB <span class="ot">&lt;-</span> CellChatDB.human                       <span class="co"># human L–R database</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>cc <span class="ot">&lt;-</span> <span class="fu">subsetData</span>(cc)</span>
@@ -2451,6 +2503,19 @@ Warning
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Drill into one pathway</span></span>
 <span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">netVisual_aggregate</span>(cc, <span class="at">signaling =</span> <span class="st">&quot;MIF&quot;</span>, <span class="at">layout =</span> <span class="st">&quot;circle&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The first circle plot (from <code>netVisual_circle</code>) shows every cell type as a node around the ring; directed arcs between nodes represent predicted signaling, with arc width proportional to the aggregated interaction strength (number of interactions × probability). Thick arcs indicate strong predicted cross-talk; self-loops mean the cell type signals to itself (autocrine or juxtacrine). The second circle plot drills into a single pathway (here MIF), showing only the ligand–receptor pairs in that pathway. Because <code>ifnb</code> is a two-condition PBMC stimulation dataset rather than a tissue, any CellChat output here is a technical demonstration: real CellChat results should be interpreted alongside spatial transcriptomics or perturbation data to validate that the predicted sender and receiver cells are actually co-localised. <code>netVisual_bubble()</code> is an alternative that shows individual L–R pairs as bubbles sized by probability.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

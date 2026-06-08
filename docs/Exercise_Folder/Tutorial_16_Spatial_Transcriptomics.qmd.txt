@@ -92,8 +92,6 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
 - **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_16_Spatial_Transcriptomics.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
-
-If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
 
 ## Setup {#setup}
@@ -177,7 +175,8 @@ tibble::tibble(
 The same per-spot QC metrics as scRNA-seq apply: `nCount_Spatial`, `nFeature_Spatial`, percent mitochondrial. **But also visualize them spatially** — a localized QC outlier (e.g. one corner of the tissue with low UMI counts) is a tissue artefact (bubble, fold, edge cells), not random noise.
 
 ```{r}
-#| label: M16-qc
+#| label: lst-M16-qc
+#| lst-cap: "Per-spot QC violins and spatial overlay of nCount and percent.mt for the anterior section."
 #| fig-cap: "Per-spot QC for the anterior section: violin distributions and the same metrics overlaid on the tissue."
 
 ant[["percent.mt"]] <- PercentageFeatureSet(ant, pattern = "^mt-")
@@ -222,6 +221,10 @@ save_fig(file.path(out_dir, "Mod16_C3_qc_spatial.png"), p2,
 `pattern = "^mt-"` (lowercase) for mouse mitochondrial genes. For human use `"^MT-"`.
 :::
 
+::: {.callout-tip title="Reading the output"}
+The **violin panel** shows the distribution of `nCount_Spatial`, `nFeature_Spatial`, and `percent.mt` across all spots: a wide lower tail on UMI counts is normal for Visium (edge spots, white-matter spots) but a very high upper tail on `percent.mt` would flag tissue damage. The **spatial overlay** (`p2`) is the key diagnostic: each circle is a spot colored by its metric value, placed on the H&E image. Uniform color variation that matches anatomy — lower UMI counts over white matter, higher over the cortex — is expected and not a reason to filter. Isolated patches of very low counts in otherwise high-count tissue regions, or a single corner of the section with elevated `percent.mt`, are more likely artefacts (a bubble, a fold, a damaged area).
+:::
+
 ::: {.callout-important title="Think about it"}
 On the spatial `nCount_Spatial` overlay, regions of consistently low UMI counts often correspond to specific tissue features. What might they be?
 
@@ -259,8 +262,8 @@ Sanity-check that the data captures known anatomy. For the mouse brain:
 -   `Cck` — broadly cortical inhibitory neurons
 
 ```{r}
-#| label: M16-markers
-#| fig-cap: "Known anatomical marker genes overlaid on the anterior and posterior tissue sections."
+#| label: lst-M16-markers
+#| lst-cap: "SpatialFeaturePlot of known anatomical markers on the anterior and posterior sections."
 
 p_markers_ant <- SpatialFeaturePlot(ant, features = c("Hpca", "Plp1", "Sst"),
                    ncol = 3, alpha = c(0.1, 1)) +
@@ -288,6 +291,10 @@ save_fig(file.path(out_dir, "Mod16_C5_markers_posterior.png"), p_markers_post,
        width = 12, height = 4, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each panel is a spatial feature plot: every circle is one Visium spot placed on the H&E histology image, and the color gradient from light to dark encodes expression level (low → high). `Hpca` should light up in the medial hippocampus (more prominent on the posterior section), `Plp1` should trace white-matter tracts (corpus callosum, internal capsule), and `Sst`/`Pcp4` should mark specific cortical and cerebellar layers respectively. Spots that match the expected anatomy validate that normalization worked and that the tissue section is oriented correctly; unexpected expression patterns (e.g. `Plp1` smeared uniformly) can signal high ambient RNA or a failed normalization step.
+:::
+
 ::: {.callout-important title="Think about it"}
 `Hpca` should be highest in the hippocampus (a banana-shaped structure in the medial part of each section). Can you see the hippocampus light up? If not, you may have the section orientation flipped — SeuratData's `stxBrain` is stored with the cortical surface roughly **at the top** of the image.
 
@@ -305,8 +312,8 @@ If you don't recognize the hippocampus, open the [Allen Mouse Brain Atlas](https
 Same workflow as scRNA-seq, but on the SCT assay:
 
 ```{r}
-#| label: M16-cluster
-#| fig-cap: "Anterior-section spot clusters shown as a UMAP and overlaid on the tissue."
+#| label: lst-M16-cluster
+#| lst-cap: "PCA, SNN clustering, and UMAP on the anterior SCT assay; UMAP and tissue cluster overlay."
 
 ant <- ant |>
   RunPCA(assay = "SCT", verbose = FALSE) |>
@@ -334,6 +341,10 @@ save_fig(file.path(out_dir, "Mod16_C6_anterior_clusters.png"), p_cluster,
        width = 12, height = 5, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The left panel is the standard UMAP: each point is a spot, colored by cluster assignment; well-separated round islands indicate distinct transcriptional populations. The right panel is the spatial payoff — the same cluster colors mapped back onto the H&E image. Clusters that form **contiguous anatomical regions** (a continuous band matching the cortex, a distinct patch in the hippocampal area) support biological interpretation; clusters whose colored spots are scattered randomly across the tissue are more likely technical artifacts or low-frequency cell types. If a major brain region appears split across two or three clusters, try increasing `resolution`; if the entire tissue collapses to two or three coarse clusters, lower it.
+:::
+
 ::: {.callout-important title="Think about it"}
 A spatial cluster that occupies a single contiguous anatomical region (e.g. one cluster covers the entire hippocampus) is biologically meaningful. A cluster that's scattered randomly across the section in single spots is more likely a technical / mixed-cell artefact. Why?
 
@@ -351,8 +362,8 @@ Real cell types are spatially organized in tissue — neurons in cortex, oligode
 Some genes are variable *and* their variation has spatial structure (a clear pattern on the tissue), some are variable but spatially random. The first kind is what you usually want to study in a spatial dataset.
 
 ```{r}
-#| label: M16-svf
-#| fig-cap: "Top spatially variable genes (Moran's I) in the anterior section, overlaid on the tissue."
+#| label: lst-M16-svf
+#| lst-cap: "FindSpatiallyVariableFeatures (Moran's I) on the anterior section and spatial overlay of the top 6."
 
 ant <- FindSpatiallyVariableFeatures(
   ant,
@@ -381,6 +392,10 @@ save_fig(file.path(out_dir, "Mod16_C7_spatially_variable_features.png"), p_svf,
        width = 12, height = 7, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The console first prints `top_sv` — a character vector of the six genes with the highest Moran's I statistic, meaning their expression is most strongly autocorrelated across the tissue (neighboring spots tend to have similar values). The six-panel `SpatialFeaturePlot` then maps each gene onto the H&E: spots with high expression are dark, low expression is light. A good spatially variable gene looks like a **distinct patch or stripe** confined to a recognizable anatomical structure — not a uniform wash across the tissue. In the mouse brain anterior section you typically see white-matter genes (`Plp1`, `Mbp`) and hippocampal or cortical markers dominating the top six. A gene that tiles the tissue with no clear anatomy despite a high Moran's I may reflect a confounding gradient (slide edge effects, sequencing depth gradient) rather than real biology.
+:::
+
 ::: {.callout-important title="Think about it"}
 A gene with high variance but **low** Moran's I is variable spot-to-spot but with no spatial pattern — what does that suggest?
 
@@ -398,8 +413,8 @@ Either (a) genuine cell-cell heterogeneity within an anatomical region (rare cel
 The same two-sample integration logic as `ifnb`, but on Visium. We use `SCTransform` integration:
 
 ```{r}
-#| label: M16-merge_integrate
-#| fig-cap: "Joint embedding of both sections after SCT integration: UMAP coloured by section and cluster, plus per-section cluster maps on tissue."
+#| label: lst-M16-merge_integrate
+#| lst-cap: "SCT-anchor integration of anterior + posterior sections, joint UMAP, and per-section spatial cluster maps."
 
 # Each section is its own "batch"
 ant$slice  <- "anterior"
@@ -452,6 +467,10 @@ save_fig(file.path(out_dir, "Mod16_C8_integrated_umap.png"), p_int_umap,
 save_fig(file.path(out_dir, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial,
        width = 10, height = 5, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+`p_int_umap` shows two side-by-side UMAPs from the integrated object: the left is colored by `slice` (anterior vs. posterior) and the right by `seurat_clusters`. Before integration, coloring by slice would show two blobs; after successful integration, spots from both sections should **interleave** in the UMAP, meaning the same anatomical cell type from both sections lands in the same cluster regardless of which chip it came from. `p_int_spatial` maps those joint cluster assignments back onto each section's H&E — anatomically equivalent structures (e.g. cortex, hippocampus) in both anterior and posterior sections should receive the **same cluster color**, which is the validation that integration succeeded.
+:::
 
 ::: {.callout-important title="Think about it"}
 Why integrate sections from the same brain at all? The animal is one animal — what could differ?

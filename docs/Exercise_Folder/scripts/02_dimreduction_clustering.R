@@ -14,10 +14,7 @@ dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # --- Figure saving --------------------------------------------------------
-# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
-# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
-# .svg is written alongside with the same basename. (.svg uses the 'svglite'
-# package, installed in Tutorial 00.)
+# save_fig(): write each figure as .png + .svg (vector). See Tutorial_02_DimReduction_Clustering.qmd.
 save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
   ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
   svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
@@ -66,9 +63,7 @@ N_PCS <- 20
 # Step 3 — Neighbor graph
 seu <- FindNeighbors(seu, dims = 1:N_PCS, verbose = FALSE)
 
-# Step 4 — Cluster at several resolutions
-# FindClusters() uses the Louvain default (algorithm = 1); add algorithm = 4 for
-# Leiden (needs the leidenalg Python package via reticulate). See Lecture 02.
+# Step 4 — Cluster at several resolutions (Louvain default; see Tutorial_02.qmd for Leiden)
 for (res in c(0.1, 0.3, 0.5, 0.7, 1.0))
   seu <- FindClusters(seu, resolution = res, verbose = FALSE)
 Idents(seu) <- "RNA_snn_res.0.5"

@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix – Single Cell RNA-seq Workshop</title>
+<title>Chapter 11 — Cell Ranger: From Raw Reads to a Counts Matrix – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -4237,7 +4237,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4404,7 +4404,7 @@ Note
 </section>
 <section id="reading-web_summary.html" class="level2">
 <h2 class="anchored" data-anchor-id="reading-web_summary.html">11.7 Reading <code>web_summary.html</code></h2>
-<p>Every <code>count</code> run writes a <code>web_summary.html</code>. It is the single most informative QC document in the entire pipeline, and it should be the <em>first</em> thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in <code>metrics_summary.csv</code> for programmatic use. Save the <code>web_summary.html</code> alongside your raw data, because reviewers and collaborators will ask for it.</p>
+<p>Every <code>count</code> run writes a <code>web_summary.html</code>. It is the single most informative QC document in the entire pipeline, and it should be the <em>first</em> thing you open — before any R. It summarizes sequencing quality, mapping, cell calling, and the barcode-rank plot in one page; the same numbers are in <code>metrics_summary.csv</code> for programmatic use. Save the <code>web_summary.html</code> alongside your raw data, because reviewers and collaborators will ask for it. To inspect it on Talapas without downloading, use VS Code’s “Remote - SSH” extension and simply double-click the <code>.html</code> file in the explorer panel, or <code>scp</code> the file to your laptop.</p>
 <p>A short list of the numbers that most often reveal a problem:</p>
 <table class="caption-top table">
 <colgroup>
@@ -4471,8 +4471,10 @@ Note
 </section>
 <section id="scaling-beyond-one-sample-and-pitfalls" class="level2">
 <h2 class="anchored" data-anchor-id="scaling-beyond-one-sample-and-pitfalls">11.9 Scaling beyond one sample, and pitfalls</h2>
-<p>A single <code>count</code> run is a long, single-process, multi-threaded job. On a cluster it scales by <strong>cores within one task</strong> (<code>--cpus-per-task</code>), not by MPI tasks (<code>--ntasks</code>), because Cell Ranger is one Rust+Python process, not an MPI program. Give its <code>--localcores</code> the cores you allocated, and set its <code>--localmem</code> slightly <em>below</em> the scheduler’s memory ceiling so that I/O buffers and brief spikes do not push the job over the hard limit and trigger a silent kill. A “Killed” with no error message is, nine times out of ten, exactly this.</p>
-<p>For many samples, do not write many scripts. A scheduler <strong>array job</strong> runs one sub-job per sample from a single script, reading the sample name from a list file — the same script scaling from one sample to dozens. The tutorial walks through the SLURM specifics.</p>
+<p>A single <code>count</code> run is a long, single-process, multi-threaded job. On a cluster it scales by <strong>cores within one task</strong> (<code>--cpus-per-task</code>), not by MPI tasks (<code>--ntasks</code>), because Cell Ranger is one Rust+Python process, not an MPI program. Give its <code>--localcores</code> the cores you allocated, and set its <code>--localmem</code> slightly <em>below</em> the scheduler’s memory ceiling so that I/O buffers and brief spikes do not push the job over the hard limit and trigger a silent kill. A “Killed” with no error message is, nine times out of ten, exactly this. In practice a job requesting <code>--mem=128G</code> should pass <code>--localmem=120</code> to Cell Ranger.</p>
+<p>The <code>--create-bam=true</code> flag writes the aligned BAM file to <code>outs/possorted_genome_bam.bam</code>. This is optional (BAMs are large — 10–30 GB per sample) but required for re-alignment, splice-junction analysis, or any downstream tool that works on aligned reads rather than counts. For a fresh analysis where you only need the counts matrix, omit it to save disk. Once a run finishes, monitor its progress in real time with <code>tail -f logs/cellranger_&lt;jobid&gt;.out</code>; Cell Ranger prints stage names as it advances so you can tell how far along it is without cancelling the job.</p>
+<p>For many samples, do not write many scripts. A scheduler <strong>array job</strong> runs one sub-job per sample from a single script, reading the sample name from a list file indexed by <code>$SLURM_ARRAY_TASK_ID</code> — the same script scaling from one sample to dozens. The tutorial walks through the SLURM specifics.</p>
+<p><strong>Design consideration: <code>cellranger aggr</code> vs Seurat merge + integration.</strong> After generating multiple <code>count</code> outputs you have two paths to a combined matrix. <code>cellranger aggr</code> performs a count-normalized merge at the Cell Ranger level, producing one combined <code>filtered_feature_bc_matrix/</code> — fast and consistent, but it applies only a simple depth normalization and has no batch correction. The workshop path (Seurat <code>merge()</code> + Harmony/anchor integration in Module 05) keeps samples separate until the R analysis, where you can apply the full integration pipeline and retain per-sample metadata. Use <code>aggr</code> only for technical replicates of the same library that need combining before any analysis; for multiple biological samples from different conditions or donors, let Seurat handle the integration.</p>
 <p>A few recurring pitfalls are worth internalizing:</p>
 <ul>
 <li><strong>FASTQ filename mismatch.</strong> Keep the exact <code>_S_L_R_001</code> pattern; symlink rather than rename.</li>

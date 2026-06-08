@@ -5,8 +5,7 @@
 # In:   ../data/ifnb_integrated.rds   Out: ../data/ifnb_milo_da.csv, ../output/Mod8/
 # Figures/tables (match the Mod8 notebook filenames): ../output/Mod8/Mod8_C*_*
 #
-# ifnb has a real condition (IFN-beta STIM vs CTRL) and 8 real donors (`ind`),
-# so this is genuine differential-abundance testing across neighbourhoods.
+# ifnb: real STIM vs CTRL contrast, 8 donors → genuine differential-abundance testing.
 
 suppressPackageStartupMessages({
   library(Seurat); library(miloR); library(SingleCellExperiment)
@@ -19,20 +18,13 @@ dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
-# Prefer dplyr's verbs over identically-named functions from the Bioconductor
-# packages loaded above: S4Vectors/IRanges/AnnotationDbi/matrixStats (pulled in by
-# org.Hs.eg.db, DESeq2, miloR, SingleCellExperiment, ...) mask select, filter,
-# count, desc, slice, rename, first. Re-bind the ones used below so the dplyr
-# pipelines work regardless of package load order.
+# Re-bind dplyr verbs masked by Bioconductor packages (S4Vectors, matrixStats, etc.).
 select <- dplyr::select; filter <- dplyr::filter; count <- dplyr::count
 desc   <- dplyr::desc;   slice  <- dplyr::slice
 rename <- dplyr::rename; first  <- dplyr::first
 
 # --- Figure saving --------------------------------------------------------
-# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
-# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
-# .svg is written alongside with the same basename. (.svg uses the 'svglite'
-# package, installed in Tutorial 00.)
+# save_fig(): write each figure as .png + .svg (vector). See Tutorial_08_DifferentialAbundance.qmd.
 save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
   ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
   svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")

@@ -81,8 +81,6 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
 - **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_08_DifferentialAbundance.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
-
-If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
 
 ## Setup
@@ -190,7 +188,8 @@ reducedDimNames(milo)
 The kNN graph is built on the **integrated** reduction (`harmony`), so neighbourhoods reflect biological similarity *after* batch correction.
 
 ```{r}
-#| label: M8-build_graph
+#| label: lst-M8-build_graph
+#| lst-cap: "Build the kNN graph on the harmony reduction, sample neighbourhoods, and plot the neighbourhood-size histogram."
 #| fig-cap: "Distribution of neighbourhood sizes after refined sampling (target peak 50-200 cells)."
 
 # Build the kNN graph on the harmony reduction.
@@ -220,6 +219,10 @@ p_nhood_size
 save_fig(file.path(out_dir, "Mod8_C4_nhood_size_hist.png"), p_nhood_size,
        width = 6, height = 4, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+The neighbourhood-size histogram (@lst-M8-build_graph) shows the distribution of how many cells belong to each sampled neighbourhood. The x-axis is neighbourhood size (cells) and the y-axis is the count of neighbourhoods at that size. You want the peak to sit between **50 and 200 cells**: neighbourhoods smaller than ~30 have too few cells per sample for the negative-binomial GLM to estimate dispersion reliably, giving low power or `NA` p-values; very large neighbourhoods (>500) over-smooth the graph and reduce spatial resolution. For `ifnb` at ~23k cells, a peak around 100 with k = 30 is normal. If your histogram peaks at <30, increase `k` and re-run from `buildGraph`.
+:::
 
 ::: {.callout-important title="Think about it"}
 What does the neighbourhood-size histogram tell you, and what should you do if the peak is at \~10–20?
@@ -317,10 +320,11 @@ Pseudobulk DE answers "**within** cells annotated as cell type X, which genes sh
 
 ## Step 7 — Visualize: neighbourhood graph
 
-The signature miloR plot. Each node is a neighbourhood, sized by the number of cells in it, coloured by log-fold-change (red = enriched in STIM, blue = enriched in CTRL):
+The signature miloR plot (@lst-M8-plot_graph). Each node is a neighbourhood, sized by the number of cells in it, coloured by log-fold-change (red = enriched in STIM, blue = enriched in CTRL):
 
 ```{r}
-#| label: M8-plot_graph
+#| label: lst-M8-plot_graph
+#| lst-cap: "miloR neighbourhood graph: UMAP coloured by cell type (left) and DA log-fold-change (right)."
 #| fig-cap: "Cell-type UMAP (left) alongside the DA neighbourhood graph (right); red = enriched in STIM, blue = enriched in CTRL."
 
 milo <- buildNhoodGraph(milo)
@@ -354,12 +358,17 @@ save_fig(file.path(out_dir, "Mod8_C8_da_nhood_graph.png"), p_graph,
 If `plotReducedDim` complains that `UMAP_HARMONY` doesn't exist, the harmony UMAP didn't make it into the SCE conversion. Run `RunUMAP(ifnb, reduction = "harmony", dims = 1:20, reduction.name = "umap_harmony")` before `as.SingleCellExperiment()`, or pass any other 2-D embedding present in `reducedDimNames(milo)`.
 :::
 
+::: {.callout-tip title="Reading the output"}
+The two-panel plot (@lst-M8-plot_graph) shows the same harmony UMAP layout twice. Left: cells coloured by `seurat_annotations` — use this as the reference to orient yourself (where are the monocytes, T cells, B cells?). Right: the DA neighbourhood graph where each **node is a neighbourhood** (not an individual cell), node size reflects how many cells are in the neighbourhood, and node colour shows the log-fold change (red = enriched in STIM, blue = enriched in CTRL). Grey nodes are non-significant at `alpha = 0.1` (SpatialFDR). For `ifnb`, you should see clusters of red nodes in the monocyte region (expanded in STIM) and mostly grey nodes in the lymphocyte regions. A patchwork of adjacent red/blue nodes in the same cell-type region indicates within-type heterogeneity that the beeswarm plot (Step 8) will summarise more cleanly.
+:::
+
 ## Step 8 — Beeswarm: DA per cell type
 
-A clean summary that strips out the spatial graph and asks "which annotated cell type is enriched / depleted on average?":
+A clean summary (@lst-M8-beeswarm) that strips out the spatial graph and asks "which annotated cell type is enriched / depleted on average?":
 
 ```{r}
-#| label: M8-beeswarm
+#| label: lst-M8-beeswarm
+#| lst-cap: "Beeswarm plot of per-neighbourhood DA log-fold change grouped by annotated cell type."
 #| fig-cap: "Beeswarm of per-neighbourhood log-fold change grouped by annotated cell type (STIM vs CTRL)."
 
 p_beeswarm <- plotDAbeeswarm(da_results, group.by = "seurat_annotations") +
@@ -376,6 +385,10 @@ p_beeswarm
 save_fig(file.path(out_dir, "Mod8_C9_da_beeswarm.png"), p_beeswarm,
        width = 8, height = 6, dpi = 300)
 ```
+
+::: {.callout-tip title="Reading the output"}
+The beeswarm (@lst-M8-beeswarm) places each neighbourhood as a dot at its log-fold change (y-axis), grouped by the most common cell type in that neighbourhood (x-axis). Dot colour encodes SpatialFDR (darker = more significant). Cell types whose dots cluster tightly **above zero** are consistently enriched in STIM across the entire region; those **below zero** are depleted. An even spread of all dots across the zero line means no significant abundance shift for that type. Compare these results to your pseudobulk DE (Tutorial 06): monocytes typically show both strong DA (expanded in STIM) and strong DE (ISG induction), while other types may show DE without DA or vice versa. `propeller` (Phipson *et al.* 2022) is a lightweight alternative that tests cluster proportions with `limma` and can cross-validate your top miloR hits.
+:::
 
 ::: {.callout-important title="Think about it"}
 The beeswarm shows each neighbourhood as a dot at its log-fold-change. A cell type with most dots above zero is enriched in STIM; below zero, depleted. What would a cell type with dots scattered widely on **both** sides of zero suggest?

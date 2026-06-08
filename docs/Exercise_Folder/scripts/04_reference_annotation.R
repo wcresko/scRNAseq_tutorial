@@ -21,10 +21,7 @@ dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # --- Figure saving --------------------------------------------------------
-# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
-# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
-# .svg is written alongside with the same basename. (.svg uses the 'svglite'
-# package, installed in Tutorial 00.)
+# save_fig(): write each figure as .png + .svg (vector). See Tutorial_04_Reference_Annotation.qmd.
 save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
   ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
   svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
@@ -70,10 +67,8 @@ p_mapping <- FeaturePlot(seu, features = "mapping.score", reduction = "umap") +
 save_fig(file.path(OUT_DIR, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
        width = 7, height = 6, dpi = 300)
 
-# Reconcile: keep the manual/ground-truth label where Azimuth agrees, else flag.
-# The manual labels (script 03 `celltype_manual`, or the muscData ground-truth
-# `seurat_annotations`) use a DIFFERENT vocabulary/granularity than Azimuth, so
-# we harmonize both to Azimuth's coarse level-1 vocabulary and reconcile there.
+# Reconcile: harmonize manual labels and Azimuth to l1 vocabulary; flag disagreements.
+# See Tutorial_04_Reference_Annotation.qmd for vocabulary-mapping details.
 manual_col <- intersect(c("celltype_manual","celltype","seurat_annotations"),
                         colnames(seu@meta.data))[1]
 if (is.na(manual_col))

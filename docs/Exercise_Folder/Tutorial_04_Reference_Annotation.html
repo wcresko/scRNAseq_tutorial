@@ -2351,7 +2351,6 @@ Note
 <li><strong>For students:</strong> the same <code>.qmd</code> you downloaded already contains every solution inline — just expand the collapsed answers</li>
 <li><strong>For instructors:</strong> render with <code>quarto render --profile solutions</code> from the <code>Exercise_Folder/</code> directory. The fully-evaluated HTML is written to <code>docs/Exercise_Folder/_solutions/Tutorial_04_Reference_Annotation.html</code>. See <a href="https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml">Exercise_Folder/_quarto-solutions.yml</a> for the build profile</li>
 </ul>
-<p>If you’re running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it’s behind the same <code>_solutions/</code> path on the workshop’s deployed site.</p>
 </div>
 </div>
 </section>
@@ -2405,12 +2404,25 @@ Note
 <span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C1_manual_annotations_umap.png&quot;</span>), p_setup_umap,</span>
 <span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Each point is a cell, positioned by the unintegrated UMAP from Tutorial 02–03, and coloured/labelled by the author-curated <code>seurat_annotations</code>. You should see well-separated clusters for the major PBMC types — monocytes, T cells, B cells, NK cells, dendritic cells — each occupying its own region of the embedding. This is the baseline you’ll compare Azimuth’s automatic labels against in the next steps.</p>
+</div>
+</div>
 </section>
 <section id="azimuth-seurat-reference-mapping" class="level2">
 <h2 class="anchored" data-anchor-id="azimuth-seurat-reference-mapping">Azimuth — Seurat reference mapping</h2>
 <p>Azimuth wraps Seurat’s anchor-based reference mapping with curated atlases, and returns hierarchical labels (<code>predicted.celltype.l1</code> / <code>l2</code> / <code>l3</code>) plus a per-cell <strong>mapping score</strong>. The PBMC reference (<code>pbmcref</code>) is the most widely tested and is a perfect fit for <code>ifnb</code>.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2" data-lst-cap="Run Azimuth (pbmcref) to predict hierarchical cell-type labels, then plot level-2 calls on the UMAP."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(Azimuth)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Installs the pbmcref.SeuratData reference package on first use (~75 MB download)</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RunAzimuth</span>(ifnb, <span class="at">reference =</span> <span class="st">&quot;pbmcref&quot;</span>)</span>
@@ -2437,10 +2449,23 @@ Note
 <span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C2_azimuth_labels_umap.png&quot;</span>), p_azimuth_umap,</span>
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>head()</code> table shows each cell’s Azimuth predictions at three granularity levels (<code>predicted.celltype.l1/l2/l3</code>) and the per-cell <code>mapping.score</code> (0–1): higher means the cell’s neighborhood projects cleanly into the reference manifold. In the UMAP, each point is coloured by its <code>predicted.celltype.l2</code> label; for a clean PBMC dataset like <code>ifnb</code> you should see the major types (<code>CD14 Mono</code>, <code>CD4 T</code>, <code>CD8 T</code>, <code>B naive</code>, <code>NK</code>, <code>DC</code>) mapping onto the same clusters you labelled manually in Tutorial 03. Large discrepancies between the UMAP positions of Azimuth labels and your manual labels indicate either an off-manifold cell type or a granularity mismatch between <code>l1</code>/<code>l2</code>/<code>l3</code>.</p>
+</div>
+</div>
 <section id="reading-the-mapping-score-a-built-in-confidence-check" class="level3">
 <h3 class="anchored" data-anchor-id="reading-the-mapping-score-a-built-in-confidence-check">Reading the mapping score — a built-in confidence check</h3>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>p_mapping <span class="ot">&lt;-</span> <span class="fu">FeaturePlot</span>(ifnb, <span class="at">features =</span> <span class="st">&quot;mapping.score&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>) <span class="sc">+</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3" data-lst-cap="FeaturePlot of per-cell Azimuth mapping scores — cells that project poorly into the reference appear in dark/cool colours."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>p_mapping <span class="ot">&lt;-</span> <span class="fu">FeaturePlot</span>(ifnb, <span class="at">features =</span> <span class="st">&quot;mapping.score&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>) <span class="sc">+</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Azimuth mapping score per cell&quot;</span>,</span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;High (~0.7–1.0) = projects cleanly into the reference; low = off-manifold&quot;</span>,</span>
@@ -2451,6 +2476,19 @@ Note
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C3_azimuth_mapping_score.png&quot;</span>), p_mapping,</span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The colour scale runs from low (dark/cool) to high (bright/warm) mapping score, overlaid on the same UMAP positions as before. Most cells in a clean PBMC dataset should score ≥ 0.7; cells that fall below ~0.5 project poorly into the <code>pbmcref</code> manifold and their type labels deserve extra scrutiny. In <code>ifnb</code>, watch for IFN-β-stimulated STIM cells showing systematically lower scores than their CTRL counterparts — this is expected because the resting-PBMC reference doesn’t model the activated state, even though the cell-type identity is unchanged.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2477,7 +2515,7 @@ Click for answer
 <section id="compare-azimuth-against-the-manual-ground-truth-labels" class="level2">
 <h2 class="anchored" data-anchor-id="compare-azimuth-against-the-manual-ground-truth-labels">Compare Azimuth against the manual / ground-truth labels</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>ann <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4" data-lst-cap="Raw cross-tabulation of author ground-truth labels vs Azimuth level-2 predictions."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>ann <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(seurat_annotations,                  <span class="co"># ground truth (Kang authors)</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>         predicted.celltype.l2)               <span class="co"># Azimuth</span></span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a></span>
@@ -2491,9 +2529,22 @@ Click for answer
 <span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
 <span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C4_truth_vs_azimuth.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>A cleaner cross-tabulation as a heatmap:</p>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>table()</code> printout (<strong>?@lst-M4-compare</strong>) is a contingency matrix with ground-truth cell types on rows and Azimuth <code>predicted.celltype.l2</code> labels on columns; each cell value is the number of cells with that combination. For a clean PBMC dataset like <code>ifnb</code>, most cells should land in one off-diagonal cell per row — you want large numbers concentrated near the “correct” column. Zero rows or columns indicate a label present in one system but not the other. The heatmap below (<strong>?@lst-M4-compare_heatmap</strong>) makes patterns easier to read at a glance.</p>
+</div>
+</div>
+<p>A cleaner cross-tabulation as a heatmap (<strong>?@lst-M4-compare_heatmap</strong>):</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>p_compare_heatmap <span class="ot">&lt;-</span> ann <span class="sc">|&gt;</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5" data-lst-cap="Confusion heatmap of author ground-truth labels vs Azimuth level-2 predictions."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>p_compare_heatmap <span class="ot">&lt;-</span> ann <span class="sc">|&gt;</span></span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(seurat_annotations, predicted.celltype.l2) <span class="sc">|&gt;</span></span>
 <span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(predicted.celltype.l2, seurat_annotations, <span class="at">fill =</span> n)) <span class="sc">+</span></span>
 <span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>() <span class="sc">+</span></span>
@@ -2509,10 +2560,23 @@ Click for answer
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C5_truth_vs_azimuth_heatmap.png&quot;</span>), p_compare_heatmap,</span>
 <span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The rows are the author ground-truth labels (<code>seurat_annotations</code>) and the columns are Azimuth’s <code>predicted.celltype.l2</code> calls; tile colour encodes the number of cells with that combination. A well-behaved mapping shows <strong>bright tiles on or near the diagonal</strong>, meaning Azimuth agrees with the ground truth for most cells. Off-diagonal bright tiles mark genuine disagreements — common cases are coarse-vs-fine granularity mismatches (e.g. <code>B cells</code> vs <code>B naive</code>/<code>B memory</code>) rather than biological misclassification. Cells in rows with no single bright tile dominating are the ones most worth reviewing.</p>
+</div>
+</div>
 </section>
 <section id="reconcile-disagreements" class="level2">
 <h2 class="anchored" data-anchor-id="reconcile-disagreements">Reconcile disagreements</h2>
-<p>A simple “agree-or-flag” rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review.</p>
+<p>A simple “agree-or-flag” rule: keep the ground-truth label where Azimuth agrees; otherwise mark for review (<strong>?@lst-M4-reconcile</strong>).</p>
 <div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2527,7 +2591,7 @@ Important
 </div>
 </div>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Map the author ground-truth labels onto Azimuth&#39;s coarse level-1 vocabulary</span></span>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6" data-lst-cap="Harmonize ground-truth and Azimuth labels to a coarse vocabulary, flag disagreements, and tabulate the final calls."><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Map the author ground-truth labels onto Azimuth&#39;s coarse level-1 vocabulary</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># (B, CD4 T, CD8 T, NK, DC, Mono). Anything without a clean level-1 counterpart</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># (e.g. Megakaryocytes — platelets aren&#39;t a level-1 class) maps to NA and is left</span></span>
 <span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># for review. Adjust this crosswalk if your reference/labels differ.</span></span>
@@ -2563,6 +2627,19 @@ Important
 <span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">n_cells =</span> <span class="fu">as.integer</span>(n_cells)) <span class="sc">|&gt;</span></span>
 <span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(dplyr<span class="sc">::</span><span class="fu">desc</span>(n_cells)) <span class="sc">|&gt;</span></span>
 <span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod4_C6_celltype_final_counts.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Reading the output">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Reading the output
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The first printed value is the <strong>agreement fraction</strong> — the proportion of cells where the coarsened ground-truth label matches Azimuth’s level-1 call. For a clean PBMC dataset against the PBMC reference you should see ≥ 0.90; values below ~0.80 suggest vocabulary mismatches or genuine off-reference populations. The <code>table(ifnb$celltype_final)</code> below it shows how many cells kept their ground-truth label vs how many were prefixed with <code>REVIEW:</code> — the <code>REVIEW:</code> entries are your work queue for the next annotation check.</p>
+</div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

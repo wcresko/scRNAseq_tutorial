@@ -87,8 +87,6 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
 - **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_03_Markers_Annotation.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
-
-If you're running a graded course, link the rendered solutions page from your LMS (Canvas / Moodle / etc.) — it's behind the same `_solutions/` path on the workshop's deployed site.
 :::
 
 ## Setup
@@ -148,7 +146,8 @@ ifnb
 ## Step 1 — Find markers for one cluster
 
 ```{r}
-#| label: M3-markers_one
+#| label: lst-M3-markers_one
+#| lst-cap: "Find differentially expressed marker genes for cluster 1 (one-vs-rest Wilcoxon test) and print the top 10."
 
 cluster1.markers <- FindMarkers(ifnb, ident.1 = 1, min.pct = 0.25)
 head(cluster1.markers, 10)
@@ -158,6 +157,10 @@ cluster1.markers |>
   tibble::rownames_to_column("gene") |>
   readr::write_csv(file.path(out_dir, "Mod3_C3_cluster1_markers.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+Each row is a gene; the five columns are: `p_val` (raw Wilcoxon p-value), `avg_log2FC` (log₂ fold-change, cluster 1 vs all other cells), `pct.1` (fraction of cluster-1 cells expressing the gene), `pct.2` (fraction of all other cells expressing it), and `p_val_adj` (Bonferroni-corrected p-value). The best *specific* markers have high `avg_log2FC`, high `pct.1` (expressed in most of your cluster), and low `pct.2` (rare outside it) — genes with high `pct.2` may be significant but are not cluster-specific. Rows are sorted by p-value by default, not fold-change, so scroll or re-sort by `avg_log2FC` to find the strongest effect-size markers.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  What does `min.pct = 0.25` do, and why is that a useful default?
@@ -176,7 +179,8 @@ cluster1.markers |>
 ## Step 2 — Markers for every cluster
 
 ```{r}
-#| label: M3-markers_all
+#| label: lst-M3-markers_all
+#| lst-cap: "Run FindAllMarkers (positive markers only) and extract the top 5 per cluster by log₂FC."
 
 ifnb.markers <- FindAllMarkers(
   ifnb,
@@ -194,6 +198,10 @@ top_markers
 readr::write_csv(ifnb.markers, file.path(out_dir, "Mod3_C4_all_markers.csv"))
 readr::write_csv(top_markers,  file.path(out_dir, "Mod3_C4_top5_markers_per_cluster.csv"))
 ```
+
+::: {.callout-tip title="Reading the output"}
+`top_markers` is a tibble grouped by `cluster`, showing the five genes with the highest `avg_log2FC` in each cluster. Scan the `gene` column cluster-by-cluster: most clusters will be topped by recognizable PBMC markers (`LYZ`/`S100A8` for monocytes, `MS4A1`/`CD79A` for B cells, `GNLY`/`NKG7` for NK, `IL7R`/`CCR7` for naive T). If a cluster's top genes are interferon-stimulated genes (`ISG15`, `IFI6`, `IFIT3`, `MX1`) rather than cell-type markers, that cluster is likely a condition-split copy of a cell type rather than a biologically distinct population — expected on unintegrated data and resolved in Tutorial 05.
+:::
 
 ::: {.callout-important title="Think about it"}
 1.  Most of the top per-cluster markers are **cell-type** genes (e.g. `LYZ`/`S100A8` for monocytes, `MS4A1`/`CD79A` for B cells, `GNLY`/`NKG7` for NK). But for *some* clusters — especially the **monocytes** — you'll also see **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT3`, `MX1`) near the top. If those ISGs aren't cell-type markers, what are they marking?
@@ -231,7 +239,8 @@ PBMC canonical markers — useful to keep handy:
 ### 3a. Violin plots — expression distribution per cluster
 
 ```{r}
-#| label: M3-viz_vln
+#| label: lst-M3-viz_vln
+#| lst-cap: "Violin plots of six canonical PBMC markers (CD14, LYZ, MS4A1, CD79A, CD8A, GNLY) across all clusters."
 #| fig-cap: "Violin plots of six canonical PBMC marker genes across clusters (resolution 0.5)."
 
 p_vln <- VlnPlot(ifnb,
@@ -253,10 +262,15 @@ save_fig(file.path(out_dir, "Mod3_C5_marker_violins.png"), p_vln,
        width = 10, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each panel is one marker gene; x-axis = cluster number, y-axis = log-normalized expression. The width of a violin at a given height represents how many cells in that cluster have that expression level, so a tall, narrow spike means most cells in the cluster are consistently expressing the gene. Look for clusters with a violin that rises visibly higher than all others for a given marker — for example, one or two clusters dominating `CD14` identify the monocyte clusters, and one or two dominating `MS4A1`/`CD79A` identify B cells. Clusters with flat (near-zero) violins for all six markers are likely T cells or NK cells not covered by this panel — check `CD8A` and `GNLY` for those.
+:::
+
 ### 3b. Feature plots — expression on UMAP
 
 ```{r}
-#| label: M3-viz_feature
+#| label: lst-M3-viz_feature
+#| lst-cap: "UMAP feature plots overlaying expression of four canonical markers (CD14, MS4A1, CD8A, GNLY) on the embedding."
 #| fig-cap: "UMAP feature plots showing where four canonical markers (CD14, MS4A1, CD8A, GNLY) are expressed."
 
 p_feature <- FeaturePlot(ifnb,
@@ -278,10 +292,15 @@ save_fig(file.path(out_dir, "Mod3_C6_marker_featureplots.png"), p_feature,
        width = 9, height = 8, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Each of the four panels places every cell at its UMAP coordinates, coloring it from light (low expression) to dark blue/purple (high expression). Healthy marker geography looks like a bright patch localized to one or a few islands — `CD14` should light up the monocyte region, `MS4A1` the B-cell island, `CD8A` the cytotoxic T region, and `GNLY` the NK region. Cells that appear bright in two non-adjacent islands may indicate doublets or a cross-reactive probe; diffuse high expression across the whole UMAP usually means the gene is broadly expressed and not a good discriminating marker for annotation.
+:::
+
 ### 3c. Heatmap — top markers across clusters
 
 ```{r}
-#| label: M3-viz_heatmap
+#| label: lst-M3-viz_heatmap
+#| lst-cap: "DoHeatmap of the top-10 markers per cluster (z-scored scaled expression), cells grouped by cluster."
 #| fig-cap: "Heatmap of the top-10 markers per cluster (z-scored expression), cells grouped by cluster."
 
 top10 <- ifnb.markers |> group_by(cluster) |> slice_max(avg_log2FC, n = 10)
@@ -304,10 +323,15 @@ save_fig(file.path(out_dir, "Mod3_C7_marker_heatmap.png"), p_heatmap,
        width = 12, height = 10, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+Columns are individual cells grouped by cluster (cluster boundaries are marked by thin colored bars on the x-axis); rows are the top-10 marker genes for each cluster. Color encodes z-scored expression: red = high relative expression, blue = low. A well-behaved marker block shows a bright red diagonal band — each set of marker rows lights up in exactly its own cluster and is blue elsewhere. Marker rows that stay red across many clusters are broadly expressed genes (less informative for annotation); rows that are consistently blue everywhere except one cluster are the most specific markers. Note that because columns represent cells rather than aggregated clusters, large clusters dominate the x-axis width, which can make small populations hard to see — the dot plot (@lst-M3-viz_dot) normalizes for cluster size.
+:::
+
 ### 3d. Dot plot — % expressing × mean expression
 
 ```{r}
-#| label: M3-viz_dot
+#| label: lst-M3-viz_dot
+#| lst-cap: "DotPlot of a 16-gene canonical PBMC marker panel across clusters — dot size encodes percent expressing, color encodes scaled mean expression."
 #| fig-cap: "Dot plot of a 16-gene canonical marker panel across clusters — dot size is percent expressing, colour is scaled mean expression."
 
 canonical_markers <- c("CD14", "LYZ", "FCGR3A", "MS4A7", "FCER1A", "CST3",
@@ -330,6 +354,10 @@ save_fig(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
        width = 10, height = 6, dpi = 300)
 ```
 
+::: {.callout-tip title="Reading the output"}
+The grid has clusters on the y-axis and marker genes on the x-axis. Each dot encodes two things simultaneously: **size** = the fraction of cells in that cluster expressing the gene (larger = more cells expressing it), and **color** = the scaled average expression level (darker = higher). To identify a cluster, look for the column(s) where it shows large, dark dots — those are its marker genes. A cluster with a big dark dot on `CD14` and `LYZ` is a monocyte; one showing `MS4A1` and `CD79A` is a B cell. Clusters with no large dots across the whole panel need additional markers (check `IL7R`, `CD3D`, or `CD3E` for T cells, which aren't in this panel). This is the primary visualization to use when deciding labels in @lst-M3-rename below.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  Which plot is best for **showing a 16-gene marker panel across 12 clusters on one page**?
 2.  Which is best for **checking whether a single gene has spatial structure on the UMAP**?
@@ -348,10 +376,11 @@ save_fig(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
 
 ## Step 4 — Manual annotation
 
-Use the canonical marker table above and the dot plot to assign labels. Your cluster **count and numbering** depend on the random seed, Seurat version, and the fact that this is *unintegrated* data — so you'll often have **more clusters than cell types** (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). **Do not copy these labels blindly** — run `levels(ifnb)` to see your clusters, then label each one from the table that matches *your* dot plot (it's fine to give two clusters the same label).
+Use the canonical marker table above and the dot plot (@lst-M3-viz_dot) to assign labels. Your cluster **count and numbering** depend on the random seed, Seurat version, and the fact that this is *unintegrated* data — so you'll often have **more clusters than cell types** (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). **Do not copy these labels blindly** — run `levels(ifnb)` to see your clusters, then label each one from the table that matches *your* dot plot (it's fine to give two clusters the same label).
 
 ```{r}
-#| label: M3-rename
+#| label: lst-M3-rename
+#| lst-cap: "Apply manual cell-type labels to each cluster using RenameIdents, then draw the annotated UMAP."
 #| eval: false
 
 # First, see how many clusters you actually have, and their ids:
@@ -393,6 +422,10 @@ ifnb$celltype_manual <- Idents(ifnb)
 DimPlot(ifnb, reduction = "umap", label = TRUE, repel = TRUE) + NoLegend()
 ```
 
+::: {.callout-tip title="Reading the output"}
+The UMAP now shows your cell-type labels instead of cluster numbers — each island should carry a readable name. A well-annotated map has compact, non-overlapping label positions (aided by `repel = TRUE`) and each island dominated by a single biological category. If two neighboring islands share the same label, that is expected on unintegrated data (the same cell type split by condition); if a large island has a label that doesn't feel right (e.g. "CD14 Mono" sitting next to the T-cell area), revisit the dot plot (@lst-M3-viz_dot) and check whether a different marker combination fits better.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  Two clusters share `CD3D` / `CD3E` as top markers. Are they the same cell type?
 2.  What's the risk of assigning a label from a single marker gene?
@@ -412,7 +445,8 @@ DimPlot(ifnb, reduction = "umap", label = TRUE, repel = TRUE) + NoLegend()
 The `ifnb` dataset ships with author-curated labels in `seurat_annotations`. This is rare in real life — but it makes a beautiful teaching moment to compare your manual labels to a published ground truth.
 
 ```{r}
-#| label: M3-validate
+#| label: lst-M3-validate
+#| lst-cap: "Side-by-side UMAPs of manual annotation vs author ground-truth labels, plus a cross-tab confusion table."
 #| fig-cap: "Side-by-side UMAPs comparing your manual cluster annotation against the author-curated ground-truth labels that ship with ifnb."
 
 # Side-by-side UMAPs
@@ -460,6 +494,10 @@ as.data.frame(manual_vs_truth) |>
   readr::write_csv(file.path(out_dir, "Mod3_C10_manual_vs_truth.csv"))
 ```
 
+::: {.callout-tip title="Reading the output"}
+The two UMAP panels side-by-side show your labels (left) and the author ground-truth (right) on the same embedding: identical islands in matching positions mean agreement; an island that carries a different name in each panel is a disagreement. The `manual_vs_truth` cross-tab printed below has your labels as rows and the author labels as columns — each cell is a count of cells assigned that label pair. A perfect annotator would see counts concentrated on a diagonal (each of your labels maps cleanly to one author label); off-diagonal counts identify the specific cell types where your calls and the authors' disagree.
+:::
+
 ::: {.callout-important title="Think about it"}
 1.  Where do you and the authors **agree**? Where do you **disagree**?
 2.  Which cell type was easiest to call from markers alone? Hardest?
@@ -498,6 +536,6 @@ That integrated `.rds` is then the input to **pseudobulk DE** in Tutorial 06.
 
 ## Credits
 
--   Dataset: `ifnb` from `SeuratData` — Kang *et al.* (2017) *Nat Biotechnol*
+-   Dataset: `ifnb` via Bioconductor's `muscData::Kang18_8vs8()` — Kang *et al.* (2017) *Nat Biotechnol*
 -   PBMC canonical markers: [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html), [Azimuth PBMC reference](https://azimuth.hubmapconsortium.org/references/human_pbmc/), [PanglaoDB](https://panglaodb.se/)
 -   Inspiration: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/)

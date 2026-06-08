@@ -31,9 +31,7 @@ save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
 seu <- readRDS(file.path(DATA_DIR, "ifnb_annotated.rds"))
 DefaultAssay(seu) <- "RNA"
 
-# Part A — Pseudotime with Slingshot. The root flips the whole ordering, so you MUST
-# justify it (progenitor markers / CytoTRACE / velocity); the placeholder below is
-# only to demonstrate the mechanics.
+# Part A — Pseudotime with Slingshot (mechanics demo). Root choice flips the ordering; justify it — see Tutorial_14.qmd.
 sce  <- as.SingleCellExperiment(seu)
 root <- levels(factor(seu$celltype_manual))[1]   # <- replace with a justified progenitor
 sce  <- slingshot(sce, clusterLabels = "celltype_manual",
@@ -43,9 +41,7 @@ write_csv(pt_tbl, file.path(DATA_DIR, "ifnb_slingshot_pseudotime.csv"))
 # Table out: same pseudotime table mirrored into the module output dir
 write_csv(pt_tbl, file.path(OUT_DIR, "Mod14_slingshot_pseudotime.csv"))
 
-# Figure out: Slingshot lineage curves over the UMAP, spots coloured by cell type.
-# slingshot's curves live on the SingleCellExperiment already computed above, so this
-# is one cheap base-graphics call (no new analysis). PNG via the base device.
+# Figure out: Slingshot lineage curves over the UMAP, coloured by cell type (base graphics).
 umap <- reducedDims(sce)$UMAP
 ct   <- factor(seu$celltype_manual)
 pal  <- setNames(scales::hue_pal()(nlevels(ct)), levels(ct))
@@ -61,10 +57,7 @@ save_base_fig(file.path(OUT_DIR, "Mod14_slingshot_umap_lineages.png"), width = 8
 cat("Wrote Slingshot pseudotime for", ncol(sce), "cells (root =", root, ")\n")
 cat("Wrote Mod14 figures/tables to", OUT_DIR, "\n")
 
-# Part B — RNA velocity (scVelo) is a Python analysis. Run the companion script
-# 14_rna_velocity_scvelo.py (on Talapas: sbatch run_python.sbatch
-# 14_rna_velocity_scvelo.py). It needs spliced/unspliced layers from velocyto/kb,
-# NOT the Cell Ranger filtered matrix.
+# Part B — RNA velocity (scVelo) is Python; run 14_rna_velocity_scvelo.py (needs spliced/unspliced layers).
 
 # Part C — Cell-cell communication with CellChat (uncomment once CellChat is installed):
 # library(CellChat)

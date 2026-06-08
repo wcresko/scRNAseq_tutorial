@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Workshop – Lecture 15 — Bulk &amp; Single-Cell ATAC-seq</title>
+  <title>Single Cell RNA-seq Analysis Workshop – Lecture 15 — Bulk &amp; Single-Cell ATAC-seq</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1448,6 +1448,28 @@ Bill Cresko
 </div>
 </div>
 </section>
+<section id="tutorial-dataset-pbmc-10k-v1-hg19" class="slide level2">
+<h2>Tutorial dataset — PBMC 10k v1, hg19</h2>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>The tutorial (Module 15) uses the <strong>10x PBMC 10k scATAC v1</strong> dataset, which is mapped to <strong>hg19 / GRCh37</strong>. This requires:</p>
+<ul>
+<li><code>EnsDb.Hsapiens.v75</code> (last Ensembl annotation pinned to hg19)</li>
+<li>Chromosome names with <code>chr</code> prefix — add <code>seqlevels(annotations) &lt;- paste0(&quot;chr&quot;, seqlevels(annotations))</code></li>
+<li>The <strong>v1</strong> file prefix <code>atac_v1_pbmc_10k_*</code> (not the Next GEM <code>atac_v1_pbmc_10k_nextgem_*</code> which is hg38)</li>
+</ul>
+<p>Mixing build and annotation causes bizarre coordinate errors — always confirm the build before loading the <code>EnsDb</code>.</p>
+</div>
+</div>
+</div>
+</section>
 <section id="scatac-qc-metrics-what-to-look-at" class="slide level2">
 <h2>scATAC QC metrics — what to look at</h2>
 <table class="caption-top">
@@ -1583,7 +1605,7 @@ Bill Cresko
 <h2>Downstream you can reach for</h2>
 <ul>
 <li><strong>Differential accessibility</strong> — <code>FindMarkers(test.use = &quot;LR&quot;, latent.vars = &quot;nCount_peaks&quot;)</code></li>
-<li><strong>Motif enrichment</strong> — <code>Signac::FindMotifs</code> against <code>JASPAR2020</code></li>
+<li><strong>Motif enrichment</strong> — <code>Signac::FindMotifs</code> against <code>JASPAR2020</code>, or <strong>HOMER</strong> (<code>findMotifsGenome.pl</code>) from the command line</li>
 <li><strong>Per-cell TF activity</strong> — <code>chromVAR</code> deviations</li>
 <li><strong>Coverage plots</strong> — <code>CoveragePlot()</code> to visualize fragment pileups by cell type</li>
 </ul>
@@ -1600,6 +1622,15 @@ Bill Cresko
 </div>
 </div>
 </div>
+</section>
+<section id="design-considerations" class="slide level2">
+<h2>Design considerations</h2>
+<ul>
+<li class="fragment"><strong>QC thresholds are dataset-specific.</strong> The vignette thresholds (<code>nCount_ATAC &gt; 3000</code>, <code>TSS.enrichment &gt; 3</code>, etc.) are starting points — always inspect the violin plots and density scatters first before cutting.</li>
+<li class="fragment"><strong><code>min.cutoff = &quot;q0&quot;</code> vs <code>&quot;q5&quot;</code></strong> in <code>FindTopFeatures</code> — <code>&quot;q0&quot;</code> keeps all peaks; <code>&quot;q5&quot;</code> drops the lowest-frequency 5%. Use <code>&quot;q0&quot;</code> if you have few cells or rare cell types.</li>
+<li class="fragment"><strong>SLM (algorithm 3) vs Louvain/Leiden</strong> — SLM (algorithm 3) often gives more stable partitions on noisy scATAC graphs; Leiden (algorithm 4) is the modern default for RNA but either is fine.</li>
+<li class="fragment"><strong>Gene activity is a proxy</strong> — open chromatin near a gene loosely correlates with expression; a gene can be open without being transcribed (poised) or transcribed via a distal enhancer. Use gene activity for labelling, not expression quantification.</li>
+</ul>
 </section></section>
 <section>
 <section id="recap-whats-next" class="title-slide slide level1 center" data-background-color="#2c3e50">

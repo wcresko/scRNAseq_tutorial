@@ -5,9 +5,7 @@
 # In:   ../data/ifnb_integrated.rds
 # Out:  ../data/ifnb_pseudobulk_de.csv  +  ../output/Mod6 figures/tables (match Tutorial_06.qmd)
 #
-# ifnb has a REAL biological contrast (IFN-beta STIM vs CTRL) and REAL donors
-# (8 lupus patients, `ind`), so this is genuine pseudobulk DE — expect a strong
-# interferon-stimulated-gene (ISG) signature, not a null result.
+# ifnb: real STIM vs CTRL contrast, 8 donors → genuine pseudobulk DE; expect a strong ISG signature.
 
 suppressPackageStartupMessages({ library(Seurat); library(DESeq2); library(tidyverse); library(patchwork) })
 set.seed(2026)
@@ -18,10 +16,7 @@ dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # --- Figure saving --------------------------------------------------------
-# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
-# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
-# .svg is written alongside with the same basename. (.svg uses the 'svglite'
-# package, installed in Tutorial 00.)
+# save_fig(): write each figure as .png + .svg (vector). See Tutorial_06_DESeq2_DE.qmd.
 save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
   ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
   svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
@@ -52,8 +47,7 @@ group_meta <- seu@meta.data |>
 colnames(pb) <- fix_id(colnames(pb))
 meta_pb <- tibble(group_id = colnames(pb)) |> left_join(group_meta, by = "group_id")
 
-# Drop low-cell pseudobulk columns (< 10 cells). Use dplyr::count explicitly —
-# DESeq2/SummarizedExperiment attach matrixStats, whose count() masks dplyr::count.
+# Drop pseudobulk columns with < 10 cells; use dplyr::count explicitly (matrixStats masks it).
 cells_per_group <- seu@meta.data |>
   dplyr::count(donor, condition, celltype) |>
   mutate(group_id = fix_id(paste(donor, condition, celltype, sep = "_")))
@@ -81,9 +75,7 @@ cat("Wrote", file.path(DATA_DIR, "ifnb_pseudobulk_de.csv"), "with", nrow(de_all)
     "rows across", length(unique(de_all$celltype)), "cell types\n")
 
 # ===========================================================================
-# Mod6 figures/tables — reuse the Tutorial_06.qmd filenames (ifnb pseudobulk
-# section, chunks C16-C21). The qmd's airway teaching section (C3-C11) is not
-# part of this pipeline and is intentionally not reproduced here.
+# Mod6 figures/tables — Tutorial_06.qmd filenames, chunks C16-C21 (ifnb pseudobulk section).
 # ===========================================================================
 
 # --- Table: pseudobulk column metadata, surviving groups (Mod6_C16) --------

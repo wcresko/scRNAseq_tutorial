@@ -8,7 +8,7 @@
 
 <meta name="author" content="Single Cell RNA-seq Workshop">
 
-<title>Chapter 2 — Dimensionality Reduction &amp; Clustering – Single Cell RNA-seq Workshop</title>
+<title>Chapter 2 — Dimensionality Reduction &amp; Clustering – Single Cell RNA-seq Analysis Workshop</title>
 <style>
 
 code{white-space: pre-wrap;}
@@ -20,6 +20,41 @@ ul.task-list{list-style: none;}
 ul.task-list li input[type="checkbox"] {
 width: 0.8em;
 margin: 0 0.8em 0.2em -1em;  vertical-align: middle;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+}
+pre.numberSource { margin-left: 3em; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
 }
 
 div.csl-bib-body { }
@@ -4341,7 +4376,7 @@ z-index: 1;
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
     <a class="navbar-brand" href="../index.html">
-    <span class="navbar-title">Single Cell RNA-seq Workshop</span>
+    <span class="navbar-title">Single Cell RNA-seq Analysis Workshop</span>
     </a>
   </div>
             <div id="quarto-search" class title="Search"></div>
@@ -4412,10 +4447,12 @@ z-index: 1;
   <li><a href="#umap" id="toc-umap" class="nav-link" data-scroll-target="#umap">2.6.2 UMAP</a></li>
   </ul></li>
   <li><a href="#what-umaps-do-not-tell-you" id="toc-what-umaps-do-not-tell-you" class="nav-link" data-scroll-target="#what-umaps-do-not-tell-you">2.7 What UMAPs do <em>not</em> tell you</a></li>
-  <li><a href="#the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5" id="toc-the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5" class="nav-link" data-scroll-target="#the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5">2.8 The single-sample workflow ends here; multi-sample needs Chapter 5</a></li>
-  <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">2.9 Common errors</a></li>
-  <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">2.10 Where this material is also discussed</a></li>
-  <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">2.11 Going further</a></li>
+  <li><a href="#reading-the-pc-loadings-output" id="toc-reading-the-pc-loadings-output" class="nav-link" data-scroll-target="#reading-the-pc-loadings-output">2.8 Reading the PC loadings output</a></li>
+  <li><a href="#the-cross-tabulation-diagnostic" id="toc-the-cross-tabulation-diagnostic" class="nav-link" data-scroll-target="#the-cross-tabulation-diagnostic">2.9 The cross-tabulation diagnostic</a></li>
+  <li><a href="#the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5" id="toc-the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5" class="nav-link" data-scroll-target="#the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5">2.10 The single-sample workflow ends here; multi-sample needs Chapter 5</a></li>
+  <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">2.11 Common errors</a></li>
+  <li><a href="#where-this-material-is-also-discussed" id="toc-where-this-material-is-also-discussed" class="nav-link" data-scroll-target="#where-this-material-is-also-discussed">2.12 Where this material is also discussed</a></li>
+  <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">2.13 Going further</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
 </nav>
@@ -4604,14 +4641,30 @@ Tip
 </div>
 </div>
 </section>
+<section id="reading-the-pc-loadings-output" class="level2">
+<h2 class="anchored" data-anchor-id="reading-the-pc-loadings-output">2.8 Reading the PC loadings output</h2>
+<p>When you print PCA results with <code>print(seu[[&quot;pca&quot;]], dims = 1:5, nfeatures = 5)</code>, you see the top 5 positive and negative gene loadings for the first five PCs. These are the genes pushing cells to the high or low end of each PC axis. What to look for:</p>
+<ul>
+<li><strong>PC1 dominated by interferon-stimulated genes</strong> (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT1</code>, <code>MX1</code>, etc.) signals that a condition/batch effect is the dominant source of variance — the axis is separating STIM from CTRL, not cell types. This is the expected starting state for the unintegrated <code>ifnb</code> data.</li>
+<li><strong>Later PCs (2–5) showing cell-type markers</strong> (<code>LYZ</code>, <code>CD14</code> for monocytes; <code>MS4A1</code>, <code>CD79A</code> for B cells; <code>GNLY</code>, <code>NKG7</code> for NK) are reassuring — cell-type biology is still recoverable even when a condition effect dominates PC1.</li>
+<li><strong>A PC dominated by mitochondrial or ribosomal genes</strong> is a red flag for insufficient QC: those axes are tracking cell quality, not biology.</li>
+</ul>
+<p><code>DimHeatmap(seu, dims = 1, cells = 500, balanced = TRUE)</code> provides a complementary view: rows are genes (top positive and negative loadings), columns are the 500 cells with the most extreme PC1 scores. A clean two-block structure on PC1 is the visual signature of a strong batch or condition axis.</p>
+</section>
+<section id="the-cross-tabulation-diagnostic" class="level2">
+<h2 class="anchored" data-anchor-id="the-cross-tabulation-diagnostic">2.9 The cross-tabulation diagnostic</h2>
+<p>After clustering, <code>table(seu$cluster_col, seu$sample)</code> is one of the most informative two-line diagnostics in scRNA-seq. Computing the <strong>proportion</strong> form:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">prop.table</span>(<span class="fu">table</span>(<span class="at">cluster =</span> seu<span class="sc">$</span>RNA_snn_res.<span class="fl">0.5</span>, <span class="at">sample =</span> seu<span class="sc">$</span>stim), <span class="at">margin =</span> <span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>gives a clusters × samples table where each row sums to 1. On unintegrated data, many clusters will be &gt;80–95% one sample — a direct measure of how completely the batch effect has split the data. After integration, the same table should show most clusters at ~50% per sample (for a balanced design). Clusters that remain heavily skewed after integration are either genuine single-condition biology (e.g. an IFN-activated state present only in STIM) or residual under-correction — biological knowledge distinguishes the two.</p>
+</section>
 <section id="the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5" class="level2">
-<h2 class="anchored" data-anchor-id="the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5">2.8 The single-sample workflow ends here; multi-sample needs Chapter 5</h2>
+<h2 class="anchored" data-anchor-id="the-single-sample-workflow-ends-here-multi-sample-needs-chapter-5">2.10 The single-sample workflow ends here; multi-sample needs Chapter 5</h2>
 <p>Everything above is the <strong>single-sample</strong> workflow: one biological condition, one batch, no need to align across samples. If you have only one sample, you read off cell types from the clusters (Chapter 3) and you’re done.</p>
 <p>If you have <strong>two or more samples</strong> and the unintegrated UMAP shows them as separate islands — every cell type appearing twice or more, once per sample — you have a <strong>batch effect</strong> problem and need integration. That’s Chapter 5.</p>
 <p>The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it by sample. If samples interleave within clusters, you don’t need integration. If samples form parallel structures, you do.</p>
 </section>
 <section id="common-errors" class="level2">
-<h2 class="anchored" data-anchor-id="common-errors">2.9 Common errors</h2>
+<h2 class="anchored" data-anchor-id="common-errors">2.11 Common errors</h2>
 <table class="caption-top table">
 <colgroup>
 <col style="width: 33%">
@@ -4655,7 +4708,7 @@ Tip
 </table>
 </section>
 <section id="where-this-material-is-also-discussed" class="level2">
-<h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">2.10 Where this material is also discussed</h2>
+<h2 class="anchored" data-anchor-id="where-this-material-is-also-discussed">2.12 Where this material is also discussed</h2>
 <ul>
 <li><strong>Lecture:</strong> <a href="../Lecture_Folder/Lecture_02_DimReduction_Clustering.html">Lecture 02 — Dim Reduction &amp; Clustering</a></li>
 <li><strong>Tutorial:</strong> <a href="../Exercise_Folder/Tutorial_02_DimReduction_Clustering.html">Tutorial 02 — Dim Reduction &amp; Clustering</a></li>
@@ -4666,7 +4719,7 @@ Tip
 </ul>
 </section>
 <section id="going-further" class="level2">
-<h2 class="anchored" data-anchor-id="going-further">2.11 Going further</h2>
+<h2 class="anchored" data-anchor-id="going-further">2.13 Going further</h2>
 <p>For the embedding methods, go to the primary sources: the t-SNE<span class="citation" data-cites="vandermaaten2008tsne"><sup><a href="#ref-vandermaaten2008tsne" role="doc-biblioref">9</a></sup></span> and UMAP<span class="citation" data-cites="mcinnes2018umap"><sup><a href="#ref-mcinnes2018umap" role="doc-biblioref">11</a></sup></span> papers, UMAP’s single-cell debut<span class="citation" data-cites="becht2019umap"><sup><a href="#ref-becht2019umap" role="doc-biblioref">12</a></sup></span>, and the two essential “how to use them responsibly” papers<span class="citation" data-cites="kobak2019art kobak2021initialization"><sup><a href="#ref-kobak2019art" role="doc-biblioref">10</a>,<a href="#ref-kobak2021initialization" role="doc-biblioref">13</a></sup></span>. For clustering, the challenges review<span class="citation" data-cites="kiselev2019challenges"><sup><a href="#ref-kiselev2019challenges" role="doc-biblioref">4</a></sup></span> and two benchmarks — of clustering methods<span class="citation" data-cites="duo2018systematic"><sup><a href="#ref-duo2018systematic" role="doc-biblioref">8</a></sup></span> and of cell-number estimation<span class="citation" data-cites="yu2022benchmarking"><sup><a href="#ref-yu2022benchmarking" role="doc-biblioref">5</a></sup></span> — are the references to consult when choosing an algorithm and resolution. Hands-on intuition is best built with Google PAIR’s interactive <strong><a href="https://pair-code.github.io/understanding-umap/">Understanding UMAP</a></strong> and DataCamp’s written <strong><a href="https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction">guide to dimensionality reduction</a></strong>. Two further tools worth knowing: <strong><code>densMAP</code></strong>, a UMAP variant that also preserves cluster densities (addressing limitation 2 in §2.7), and <strong><code>openTSNE</code></strong>, a faster, more controllable t-SNE implementation. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
 </section>
 <section id="references" class="level2">
