@@ -30,7 +30,7 @@ Two paradigms:
 - **Manual annotation** (this chapter, [Lecture 03](../Lecture_Folder/Lecture_03_Markers_Annotation.html)): inspect canonical marker expression in each cluster and assign a name. Interpretable, but biased by the annotator's experience.
 - **Reference-based annotation** ([Chapter 4](Chapter_04_Reference_Annotation.html), [Lecture 04](../Lecture_Folder/Lecture_04_Reference_Annotation.html)): map cells against a labeled reference atlas using SingleR, Azimuth, or CellTypist. Reproducible, but biased by the reference's coverage.
 
-Best practice: **run both, reconcile disagreements, document choices.** Disagreements typically flag rare subtypes, transitional states, or biology your reference doesn't cover. They are usually informative, not errors.
+Best practice: **run both, reconcile disagreements, document choices.** Disagreements typically flag rare subtypes, transitional states, or biology your reference doesn't cover. They are usually informative, not errors. The community protocol for annotating single-cell maps lays out exactly this combined manual-plus-automated workflow and is the reference to follow [@clarke2021tutorial].
 
 ## 3.2 Finding markers — the statistical core
 
@@ -47,6 +47,8 @@ Best practice: **run both, reconcile disagreements, document choices.** Disagree
 | `p_val_adj` | Bonferroni-adjusted (Seurat's choice) |
 
 A "good" marker has high `pct.1`, low `pct.2`, and high `avg_log2FC`. The ranking by `avg_log2FC` (or a score like `pct.1 - pct.2`) gets you a top-N list per cluster.
+
+**Why the Wilcoxon test?** Seurat defaults to the non-parametric Wilcoxon rank-sum test, and the large benchmark of single-cell DE methods found that simple tests like Wilcoxon are surprisingly robust and competitive for marker detection — the more elaborate model-based methods do not consistently beat it [@soneson2018bias]. (`presto` provides a fast Wilcoxon implementation Seurat uses automatically when installed.) A crucial distinction from Chapter 6: marker detection here is a *descriptive, within-dataset* ranking used to name clusters, **not** a cross-condition inference about which genes change with treatment — that question requires pseudobulk and is the subject of Chapter 6 [@squair2021confronting].
 
 ::: callout-warning
 **`FindAllMarkers` finds genes *enriched* in a cluster, not necessarily canonical markers.** A gene can top the list of cluster $c$ either because it's a literature lineage marker (good) or because some technical / state effect happens to differentiate the cluster (e.g. ISGs in the unintegrated `ifnb` data). Cross-check the top hits against canonical panels before naming clusters from them.
@@ -117,7 +119,7 @@ For the workshop's `ifnb` PBMCs, the canonical panel is small and highly stereot
 | B | `MS4A1`, `CD79A`, `CD79B` |
 | Megakaryocyte | `PPBP`, `PF4` |
 
-For tumor / non-immune tissues, the panel is much larger and more disputed; consult tissue-specific atlases.
+These panels are not folklore — they are curated in searchable databases such as **PanglaoDB** [@franzen2019panglaodb] and **CellMarker 2.0** [@hu2023cellmarker2], which compile cell-type markers from thousands of single-cell studies. For tumor / non-immune tissues, the panel is much larger and more disputed; consult tissue-specific atlases.
 
 ## 3.6 Risks and how to avoid them
 
@@ -130,7 +132,7 @@ For tumor / non-immune tissues, the panel is much larger and more disputed; cons
 
 ## 3.7 The relationship to the Cell Ontology
 
-The **Cell Ontology (CL)** is a community-maintained hierarchy of ~2,400 cell-type terms, each with a stable identifier (e.g. `CL:0000236` = B cell). When you annotate, you should be assigning *to* an ontology term, not just typing a free-text label. Reasons:
+The **Cell Ontology (CL)** is a community-maintained hierarchy of ~2,400 cell-type terms, each with a stable identifier (e.g. `CL:0000236` = B cell). Ontologies are the backbone that lets atlas projects like the Human Cell Atlas combine annotations across thousands of datasets [@osumisutherland2021cell]. When you annotate, you should be assigning *to* an ontology term, not just typing a free-text label. Reasons:
 
 - **Interoperability.** Cell-type labels in different studies can only be combined if they reference the same ontology
 - **Submission requirement.** CELLxGENE Discover (the de-facto atlas browser) requires Cell Ontology IDs, not free-text labels
@@ -158,13 +160,9 @@ The mapping from Seurat label to CL ID is a manual step. The [Ontology Lookup Se
 
 ## 3.10 Going further
 
-::: incremental
-- **CellMarker 2.0** ([http://117.50.127.228/CellMarker/](http://117.50.127.228/CellMarker/)) — searchable curated marker database
-- **PanglaoDB** ([https://panglaodb.se/](https://panglaodb.se/)) — single-cell-derived marker compendium
-- **Azimuth web tool** ([https://azimuth.hubmapconsortium.org/](https://azimuth.hubmapconsortium.org/)) — automated annotation against curated atlases
-- **scNotebooks Module 04** ([scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html)) — parallel walkthrough of manual + automated annotation
-- **Clarke et al. 2021, *Nat Protocols*** — step-by-step guidelines for annotating cell types, [doi:10.1038/s41596-021-00534-0](https://doi.org/10.1038/s41596-021-00534-0)
-- **Soneson & Robinson 2018, *Nat Methods*** — benchmark of 36 DE methods used for marker detection, [doi:10.1038/nmeth.4612](https://doi.org/10.1038/nmeth.4612)
-- **Luecken & Theis 2019, *Mol Syst Biol*** — best-practices tutorial covering clustering + marker annotation, [doi:10.15252/msb.20188746](https://doi.org/10.15252/msb.20188746)
-- **Full curated reading list:** [Key Papers, Reviews & Benchmarks](../Key_Papers.html)
+The community protocol for cell-type annotation [@clarke2021tutorial] is the single best next read; pair it with the DE-method benchmark that justifies the Wilcoxon default [@soneson2018bias] and the best-practices tutorial's clustering-and-annotation chapter [@luecken2019bestpractices]. For marker panels, the curated databases — **CellMarker 2.0** [@hu2023cellmarker2] and **PanglaoDB** [@franzen2019panglaodb] — are searchable by tissue and cell type. The **[Azimuth web tool](https://azimuth.hubmapconsortium.org/)** automates annotation against curated atlases (the subject of [Chapter 4](Chapter_04_Reference_Annotation.html)), and **scNotebooks [Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html)** is a parallel walkthrough of manual plus automated annotation. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
+
+## References
+
+::: {#refs}
 :::

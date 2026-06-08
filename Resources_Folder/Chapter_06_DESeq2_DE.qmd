@@ -27,7 +27,7 @@ editor: visual
 
 Pseudobulk differential expression for scRNA-seq (Part B of this chapter) is exactly bulk DESeq2 applied to per-cell-type aggregated counts. So we learn the bulk model in isolation here, on the canonical bulk dataset (`airway` from Bioconductor — 8 samples of dexamethasone-treated airway smooth muscle cells), and then in Part B we apply it almost mechanically to the single-cell aggregation.
 
-This is the most heavily used statistical model in functional genomics. Earning a working understanding of it is worth several lectures.
+This is the most heavily used statistical model in functional genomics [@love2014deseq2]. Its closest relatives — edgeR [@robinson2010edger] and limma-voom [@law2014voom; @ritchie2015limma] — share the same negative-binomial-or-linear-model framing and routinely agree; benchmarks of bulk DE methods find that with adequate replication these established tools all perform well, and that **adding biological replicates buys far more than adding sequencing depth** [@rapaport2013comprehensive]. Earning a working understanding of this model is worth several lectures.
 
 ## 6.2 The negative-binomial GLM
 
@@ -133,7 +133,7 @@ For both tests, the output table from `results(dds)` has columns:
 | `lfcSE` | standard error of LFC |
 | `stat` | Wald statistic (or LRT statistic) |
 | `pvalue` | raw test p-value |
-| `padj` | BH-adjusted (the FDR you should filter on) |
+| `padj` | Benjamini–Hochberg-adjusted [@benjamini1995controlling] (the FDR you should filter on) |
 
 ## 6.7 LFC shrinkage — never skip
 
@@ -146,7 +146,7 @@ res_shrunk <- lfcShrink(dds, coef = "condition_treated_vs_untreated",
                         type = "apeglm")
 ```
 
-`apeglm` (Zhu, Ibrahim & Love 2019) is the recommended estimator. It pulls noisy LFCs toward zero, weighted by their uncertainty. High-confidence genes barely change; low-count noisy genes shrink dramatically.
+`apeglm` [@zhu2019apeglm] is the recommended estimator. It pulls noisy LFCs toward zero, weighted by their uncertainty. High-confidence genes barely change; low-count noisy genes shrink dramatically.
 
 Always shrink before:
 
@@ -222,7 +222,7 @@ The single most-violated rule in scRNA-seq:
 
 Per-cell differential expression (`Seurat::FindMarkers` between conditions) treats every cell as an independent observation. With 5,000 cells per condition, the effective N becomes huge, and the variance estimates collapse to almost zero. The result is **anti-conservative** p-values — thousands of "significant" genes that wouldn't replicate in a new cohort.
 
-This is documented empirically: Squair et al. 2021 (*Nat Commun*) showed that per-cell DE methods report 5–20× more "significant" genes than honest pseudobulk methods on the same data, with no corresponding increase in real signal. Most of those extra hits are technical artifacts inflated by pseudo-replication.
+This is documented empirically: Squair et al. showed that per-cell DE methods report many more "significant" genes than honest pseudobulk methods on the same data, with no corresponding increase in real signal — most of the extra hits are artifacts of treating cells as replicates [@squair2021confronting]. The statistical root cause — **pseudoreplication** — and the donor-level aggregation that fixes it have been laid out independently as well [@zimmerman2021practical], and the original single-cell DE benchmark already flagged that bulk-style methods on aggregated data behave better than naive per-cell tests [@soneson2018bias].
 
 **Pseudobulk DE** fixes this. The fix is conceptually simple: aggregate per-cell counts to one observation per *(donor, condition, cell type)*, then run a standard bulk DESeq2 model (Part A) on the aggregated matrix. The unit of test is now the donor, not the cell, and inferences are honest.
 
@@ -234,7 +234,7 @@ For each (donor × cell type) combination, sum the UMI counts across all cells. 
 - Columns: (donor × cell type) **pseudobulk samples** — typically dozens, not thousands
 - Values: integer total UMI counts
 
-In Seurat:
+This donor-level aggregation is the heart of the `muscat` framework for multi-sample, multi-condition single-cell DE [@crowell2020muscat], which formalizes pseudobulk and provides convenience wrappers around it. In Seurat:
 
 ```r
 pb <- AggregateExpression(seu,
@@ -379,17 +379,9 @@ For your own data with real donor IDs, the workflow gives valid inferences witho
 
 ## 6.21 Going further
 
-::: incremental
-- **Love, Huber & Anders 2014** — DESeq2 paper, [doi:10.1186/s13059-014-0550-8](https://doi.org/10.1186/s13059-014-0550-8)
-- **Zhu, Ibrahim & Love 2019** — `apeglm`, [doi:10.1093/bioinformatics/bty895](https://doi.org/10.1093/bioinformatics/bty895)
-- **edgeR** (Robinson, McCarthy & Smyth 2010) — alternative NB GLM with quasi-likelihood
-- **limma-voom** (Law et al. 2014) — log-CPM linear modeling; faster, sometimes cleaner for very large designs
-- **Squair et al. 2021** — *Confronting false discoveries in single-cell differential expression*, [doi:10.1038/s41467-021-25960-2](https://doi.org/10.1038/s41467-021-25960-2)
-- **Crowell et al. 2020** — `muscat` package, [doi:10.1038/s41467-020-19894-4](https://doi.org/10.1038/s41467-020-19894-4)
-- **Zimmerman et al. 2021** — independent benchmarking, [doi:10.1038/s41467-021-21038-1](https://doi.org/10.1038/s41467-021-21038-1)
-- **Robinson et al. 2010, *Bioinformatics*** — edgeR negative-binomial GLM, [doi:10.1093/bioinformatics/btp616](https://doi.org/10.1093/bioinformatics/btp616)
-- **Law et al. 2014, *Genome Biology*** — limma-voom precision weights, [doi:10.1186/gb-2014-15-2-r29](https://doi.org/10.1186/gb-2014-15-2-r29)
-- **Soneson & Robinson 2018, *Nat Methods*** — single-cell DE benchmark motivating per-cell vs pseudobulk, [doi:10.1038/nmeth.4612](https://doi.org/10.1038/nmeth.4612)
-- **Rapaport et al. 2013, *Genome Biology*** — bulk DE-method benchmark (replicates beat depth), [doi:10.1186/gb-2013-14-9-r95](https://doi.org/10.1186/gb-2013-14-9-r95)
-- **Full curated reading list:** [Key Papers, Reviews & Benchmarks](../Key_Papers.html)
+The model paper is DESeq2 [@love2014deseq2], with `apeglm` for LFC shrinkage [@zhu2019apeglm]; its alternatives are edgeR [@robinson2010edger] and limma-voom [@law2014voom; @ritchie2015limma], and the bulk benchmark showing replicates beat depth is essential design reading [@rapaport2013comprehensive]. For the single-cell side, the must-reads are the pseudoreplication papers [@squair2021confronting; @zimmerman2021practical], the DE benchmark [@soneson2018bias], and the `muscat` pseudobulk framework [@crowell2020muscat]. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
+
+## References
+
+::: {#refs}
 :::

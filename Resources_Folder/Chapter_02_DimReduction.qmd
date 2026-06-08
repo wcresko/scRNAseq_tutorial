@@ -55,7 +55,7 @@ Why PCA *first*? Three reasons:
 3. **Decorrelation.** PCs are orthogonal by construction, so Euclidean distance in PC space behaves the way intuition expects (which it does *not* in raw HVG space).
 :::
 
-UMAP and clustering operate on PCs, not raw expression, exactly because of (3). Skip PCA and try to UMAP the scaled HVG matrix and you'll get visibly worse embeddings, slower runtime, and unstable cluster solutions.
+UMAP and clustering operate on PCs, not raw expression, exactly because of (3). Skip PCA and try to UMAP the scaled HVG matrix and you'll get visibly worse embeddings, slower runtime, and unstable cluster solutions. In practice the SVD is computed by a **randomized / truncated** solver (`irlba` in Seurat, `scanpy`'s `arpack`/randomized backends), which returns only the top ~50 components and scales to atlas-sized matrices where a full eigendecomposition would be intractable [@amezquita2020orchestrating]. The choice of PCA as the linear backbone of the single-cell workflow is shared across Seurat, Scanpy, and Bioconductor [@satija2015spatial; @wolf2018scanpy; @amezquita2020orchestrating].
 
 ## 2.3 Choosing how many PCs to keep
 
@@ -67,6 +67,8 @@ Rules of thumb:
 - Lean **high** rather than low: going from 20 to 30 PCs rarely hurts; going from 30 to 50 mostly costs runtime
 - A more principled alternative is the **JackStraw** permutation test (`Seurat::JackStraw`), which compares each PC's variance to a null distribution; slow on large datasets
 - For atlas-scale (>100k cells), 50 PCs is typical
+
+The number of PCs is one of two knobs (the other is clustering resolution) that jointly determine how many cell types you recover, and the choice is genuinely consequential — benchmarks of clustering pipelines show that the number of estimated cell types is sensitive to both [@kiselev2019challenges; @yu2022benchmarking]. Leaning slightly high on PCs is the safer error, since dropping a real low-variance subtype is harder to detect than carrying a few noise dimensions.
 
 A PC dominated by mitochondrial or ribosomal genes is a **red flag**: it's tracking cell quality, not biology. If PC1 looks like that, your QC was too lax — go back to filtering.
 
@@ -91,7 +93,7 @@ Seurat's `FindNeighbors(seu, dims = 1:30)` builds both. The SNN graph stored in 
 
 ## 2.5 Graph-based community detection (Louvain & Leiden)
 
-Both algorithms optimize **modularity** — a measure of how much denser within-community edges are than the random expectation. **Louvain** is Seurat's default and is what the **workshop tutorials run** (`FindClusters(seu, resolution = 0.5)`, i.e. `algorithm = 1`), because it has no extra dependencies. **Leiden** (Traag, Waltman, van Eck 2019) is the modern preferred refinement — it improves on Louvain by guaranteeing well-connected communities — but it needs the `leidenalg` Python package via `reticulate`, so we present it as the one-line upgrade rather than the default.
+Both algorithms optimize **modularity** — a measure of how much denser within-community edges are than the random expectation. **Louvain** [@blondel2008louvain] is Seurat's default and is what the **workshop tutorials run** (`FindClusters(seu, resolution = 0.5)`, i.e. `algorithm = 1`), because it has no extra dependencies. **Leiden** [@traag2019leiden] is the modern preferred refinement — it fixes a real defect in Louvain, which can produce internally **disconnected** communities, by guaranteeing well-connected communities — but it needs the `leidenalg` Python package via `reticulate`, so we present it as the one-line upgrade rather than the default.
 
 Leiden iterates (Louvain follows the same first and third steps, without the refinement guarantee):
 
@@ -107,7 +109,7 @@ The **resolution parameter** controls granularity:
 - Medium (0.5–0.7) → typical PBMC-scale dataset, 8–15 clusters
 - High (1.0+) → many small clusters; subdivides cell states
 
-There is **no single "right" resolution.** The right one is the one that matches your biological question. Run several and inspect with [`clustree`](https://cran.r-project.org/package=clustree) to see how clusters split as resolution increases. Resolutions where the clustree topology is **stable** (clusters don't shuffle membership across nearby resolutions) are defensible.
+There is **no single "right" resolution.** The right one is the one that matches your biological question. Run several and inspect with [`clustree`](https://cran.r-project.org/package=clustree) to see how clusters split as resolution increases. Resolutions where the clustree topology is **stable** (clusters don't shuffle membership across nearby resolutions) are defensible. Modularity optimization has a known **resolution limit** — it can fail to detect communities smaller than a scale set by the total graph size — which is part of why a single global resolution rarely resolves both abundant and rare populations well, and why iterative subclustering of a coarse partition is often more effective than pushing one global resolution very high. Unsupervised clustering remains one of the harder, less-settled steps of the pipeline; systematic comparisons find that no method dominates across datasets and that the recovered cluster count is method- and parameter-dependent [@kiselev2019challenges; @duo2018systematic; @yu2022benchmarking].
 
 ## 2.6 t-SNE and UMAP: visualization, not analysis
 
@@ -115,17 +117,17 @@ Once you have clusters defined on the SNN graph, you want a 2-D picture of them.
 
 ### 2.6.1 t-SNE
 
-Models pairwise distances in high-D as a probability distribution (Gaussian, with bandwidth set per-cell to match a target perplexity), and tries to find a 2-D arrangement whose distance distribution (Student's $t$ in low-D, hence "t" in t-SNE) has minimal Kullback–Leibler divergence to the original.
+Models pairwise distances in high-D as a probability distribution (Gaussian, with bandwidth set per-cell to match a target perplexity), and tries to find a 2-D arrangement whose distance distribution (Student's $t$ in low-D, hence "t" in t-SNE) has minimal Kullback–Leibler divergence to the original [@vandermaaten2008tsne]. The heavy-tailed Student's $t$ in the low-D space is what solves the "crowding problem" of the original SNE — it gives moderately distant points room to spread out in 2-D.
 
 The KL loss is **asymmetric**: it heavily penalizes putting true neighbors far apart but only weakly penalizes putting unrelated cells nearby. This is why t-SNE preserves **local neighborhoods** beautifully and why **cluster-to-cluster distances on a t-SNE plot are not meaningful**.
 
-The **perplexity** parameter (default 30) is roughly "how many neighbors does each cell consider". Low perplexity (5–15) emphasizes very local structure; high (50+) smooths over fine subtypes. Worth running at multiple perplexities and looking for stable structure across them.
+The **perplexity** parameter (default 30) is roughly "how many neighbors does each cell consider". Low perplexity (5–15) emphasizes very local structure; high (50+) smooths over fine subtypes. Worth running at multiple perplexities and looking for stable structure across them; Kobak & Berens give practical, single-cell-specific guidance on perplexity, learning rate, and initialization [@kobak2019art].
 
 ### 2.6.2 UMAP
 
 Builds a fuzzy weighted graph of local neighborhoods (per-cell normalization makes points in dense and sparse regions both still see their own local neighbors) and finds a 2-D embedding by stochastic gradient descent on a cross-entropy objective.
 
-The cross-entropy is **symmetric** in its penalty structure (both "wrong-far" and "wrong-close" errors are penalized), so UMAP preserves more global topology than t-SNE — *not perfectly*, but enough that cluster *positions* are roughly meaningful (still don't measure pseudotime in UMAP coordinates).
+The cross-entropy is **symmetric** in its penalty structure (both "wrong-far" and "wrong-close" errors are penalized), so UMAP preserves more global topology than t-SNE — *not perfectly*, but enough that cluster *positions* are roughly meaningful (still don't measure pseudotime in UMAP coordinates) [@mcinnes2018umap; @becht2019umap]. An important caveat from the methods literature: much of the *global* structure that t-SNE and UMAP appear to preserve actually comes from the **initialization** (PCA-based initialization preserves global layout; random initialization does not), rather than from the algorithms themselves — so the common claim that "UMAP preserves global structure better than t-SNE" is largely an artifact of their default initializations [@kobak2021initialization].
 
 UMAP is the workshop default. Two parameters:
 
@@ -181,18 +183,9 @@ The diagnostic is direct: compute the unintegrated UMAP (this chapter), color it
 
 ## 2.11 Going further
 
-::: incremental
-- **Interactive — [Understanding UMAP](https://pair-code.github.io/understanding-umap/)** (Google PAIR) — turn the `n.neighbors`/`min.dist` knobs and see exactly what UMAP does and does not preserve; start here if embeddings feel like a black box
-- **Tutorial — [Understanding UMAP: a guide to dimensionality reduction](https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction)** (DataCamp) — a written, step-by-step walkthrough
-- **`harmony` and `liger`** — alternative integrations that work on PCs (next chapter)
-- **`densMAP`** — a UMAP variant that preserves cluster densities, addressing one of the limitations in §2.7
-- **Linderman et al. 2019** — `openTSNE` paper; faster, more controllable t-SNE
-- **McInnes et al. 2018** — UMAP paper; the foundational reference
-- **Becht et al. 2019, *Nat Biotechnol*** — UMAP for single-cell visualization, [doi:10.1038/nbt.4314](https://doi.org/10.1038/nbt.4314)
-- **Kobak & Berens 2019, *Nat Commun*** — "The art of using t-SNE", practical guidance, [doi:10.1038/s41467-019-13056-x](https://doi.org/10.1038/s41467-019-13056-x)
-- **Kobak & Linderman 2021, *Nat Biotechnol*** — why initialization (not the algorithm) drives global structure, [doi:10.1038/s41587-020-00809-z](https://doi.org/10.1038/s41587-020-00809-z)
-- **Kiselev et al. 2019, *Nat Rev Genet*** — challenges in unsupervised clustering of scRNA-seq, [doi:10.1038/s41576-018-0088-9](https://doi.org/10.1038/s41576-018-0088-9)
-- **Duò et al. 2018, *F1000Research*** — performance benchmark of 14 clustering methods, [doi:10.12688/f1000research.15666.3](https://doi.org/10.12688/f1000research.15666.3)
-- **Yu et al. 2022, *Genome Biology*** — benchmark: estimating the number of cell types, [doi:10.1186/s13059-022-02622-0](https://doi.org/10.1186/s13059-022-02622-0)
-- **Full curated reading list:** [Key Papers, Reviews & Benchmarks](../Key_Papers.html)
+For the embedding methods, go to the primary sources: the t-SNE [@vandermaaten2008tsne] and UMAP [@mcinnes2018umap] papers, UMAP's single-cell debut [@becht2019umap], and the two essential "how to use them responsibly" papers [@kobak2019art; @kobak2021initialization]. For clustering, the challenges review [@kiselev2019challenges] and two benchmarks — of clustering methods [@duo2018systematic] and of cell-number estimation [@yu2022benchmarking] — are the references to consult when choosing an algorithm and resolution. Hands-on intuition is best built with Google PAIR's interactive **[Understanding UMAP](https://pair-code.github.io/understanding-umap/)** and DataCamp's written **[guide to dimensionality reduction](https://www.datacamp.com/tutorial/understanding-umap-guide-to-dimensionality-reduction)**. Two further tools worth knowing: **`densMAP`**, a UMAP variant that also preserves cluster densities (addressing limitation 2 in §2.7), and **`openTSNE`**, a faster, more controllable t-SNE implementation. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
+
+## References
+
+::: {#refs}
 :::

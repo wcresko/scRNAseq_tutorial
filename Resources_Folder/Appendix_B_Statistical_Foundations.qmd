@@ -99,7 +99,7 @@ Two helpful intuitions:
 :::
 
 ::: callout-tip
-**The single most important fact about scRNA-seq distributions.** UMI counts are over-dispersed. Always. Tools that assume Poisson (very few do; Naïve t-tests definitely don't even assume that) underestimate the variance and produce **anti-conservative p-values** — false positives. The negative binomial is the right default.
+**The single most important fact about scRNA-seq distributions.** UMI counts are over-dispersed. Always. Tools that assume Poisson (very few do; Naïve t-tests definitely don't even assume that) underestimate the variance and produce **anti-conservative p-values** — false positives. The negative binomial is the right default — it underpins both DESeq2 [@love2014deseq2] and edgeR [@robinson2010edger].
 :::
 
 # 2. Mean-variance relationships
@@ -152,7 +152,7 @@ For each cell $j$, compute a **size factor** $s_j$ that scales away differences 
 
 $$\tilde y_{ij} = \frac{y_{ij}}{s_j}$$
 
-DESeq2's "median of ratios" estimator is the standard. The crucial property: it's **robust** — a few highly-expressed genes don't dominate the size factor.
+DESeq2's "median of ratios" estimator [@love2014deseq2] is the standard (edgeR's TMM is the close analogue [@robinson2010edger]). The crucial property: it's **robust** — a few highly-expressed genes don't dominate the size factor. For very sparse single-cell data, `scran`'s pooled deconvolution size factors are more stable when many genes are undetected [@lun2016pooling].
 
 ## Log-normalization (Seurat default)
 
@@ -164,10 +164,10 @@ where $C_j$ is the cell's total UMI count. This is "log of CPM-like" — and the
 
 ## SCTransform — variance-stabilizing transform
 
-`SCTransform()` fits a per-gene NB regression on the raw counts as a function of cell depth, then uses the **Pearson residuals** as the normalized values. The residuals have approximately constant variance across the mean-expression range, which makes downstream PCA / clustering more stable.
+`SCTransform()` fits a per-gene regularized NB regression on the raw counts as a function of cell depth, then uses the **Pearson residuals** as the normalized values [@hafemeister2019sctransform]. The residuals have approximately constant variance across the mean-expression range, which makes downstream PCA / clustering more stable.
 
 ::: callout-tip
-**Which normalization to use?** Seurat's `NormalizeData` is the default for tutorials and works fine. `SCTransform` is the recommended for low-count datasets and for spatial (Visium spots span 1–10 cells, larger dynamic range). DESeq2's size-factor normalization is what you use for **pseudobulk DE** (Tutorial 06). All three are different choices for different stages.
+**Which normalization to use?** Seurat's `NormalizeData` is the default for tutorials and works fine. `SCTransform` is the recommended for low-count datasets and for spatial (Visium spots span 1–10 cells, larger dynamic range). DESeq2's size-factor normalization is what you use for **pseudobulk DE** (Tutorial 06). All three are different choices for different stages — and a systematic comparison found the simple shifted-log normalization is a remarkably strong default, with the elaborate methods offering modest, dataset-dependent gains [@ahlmanneltze2023comparison].
 :::
 
 # 4. The design matrix and linear models
@@ -231,7 +231,7 @@ The fix is **multiple-testing correction**. The two main approaches:
 | Method | Controls | Strictness |
 |---|---|---|
 | **Bonferroni** | Family-wise error rate (FWER) — probability of *any* false positive across all tests | Very strict — divide $\alpha$ by the number of tests |
-| **Benjamini-Hochberg (BH)** | False discovery rate (FDR) — expected fraction of "significant" hits that are false positives | Less strict — controls the *proportion* of false positives among rejections |
+| **Benjamini-Hochberg (BH)** [@benjamini1995controlling] | False discovery rate (FDR) — expected fraction of "significant" hits that are false positives | Less strict — controls the *proportion* of false positives among rejections |
 
 DESeq2's `padj` column is the BH-corrected p-value. **Filter on `padj < 0.05` to control FDR at 5%**, meaning you accept that \~5% of your hits will be false positives.
 
@@ -282,7 +282,7 @@ ggplot(dat, aes(mean_expr, lfc)) +
 Key tools:
 
 ::: incremental
-- **`apeglm`** — DESeq2's recommended shrinkage estimator (Zhu *et al.* 2019). The default for `lfcShrink()`
+- **`apeglm`** — DESeq2's recommended shrinkage estimator [@zhu2019apeglm]. The default for `lfcShrink()`
 - **`ashr`** — adaptive shrinkage. Also good. Sometimes more shrinkage on weak signals
 - **`normal`** — DESeq2's older shrinkage. Don't use unless the others fail
 :::
@@ -304,7 +304,7 @@ The setup: you have 4 donors per condition (treated vs control), each contributi
 **Right:** sum the per-cell counts to get a (donor × condition) **pseudobulk** matrix — 8 columns, one per donor. Run DESeq2 on the pseudobulk with `~ condition`. With $N = 8$, the test is honest.
 
 ::: callout-important
-**Per-cell tests are fine for *exploratory marker discovery*** (e.g. "what's a marker for cluster 7?") because you're not making a condition claim — you're just listing genes that distinguish a cluster. They are **not** valid for condition contrasts, period. See Squair *et al.* 2021 for the empirical demonstration.
+**Per-cell tests are fine for *exploratory marker discovery*** (e.g. "what's a marker for cluster 7?") because you're not making a condition claim — you're just listing genes that distinguish a cluster. They are **not** valid for condition contrasts, period. See Squair *et al.* [@squair2021confronting] and Zimmerman *et al.* [@zimmerman2021practical] for the empirical demonstration and the pseudoreplication statistics.
 :::
 
 # 9. Variance partitioning — what does "explained" mean?
@@ -317,7 +317,7 @@ $$\text{Var(total)} = \text{Var(biological)} + \text{Var(technical)} + \text{Var
 
 Each PC explains some fraction of the total. The **scree plot** shows what fraction each PC explains. The **elbow** is where additional PCs stop explaining biology and start explaining noise.
 
-For integration: a "good" integrated reduction has biological variance preserved (cells of the same type cluster) and technical variance removed (cells from the same donor *don't* cluster). LISI / k-BET / silhouette scores quantify this trade-off.
+For integration: a "good" integrated reduction has biological variance preserved (cells of the same type cluster) and technical variance removed (cells from the same donor *don't* cluster). LISI / k-BET / silhouette scores quantify this trade-off, and the atlas-integration benchmark formalizes the batch-removal-vs-biology-conservation balance [@luecken2022benchmarking].
 
 # 10. The Bayesian shadow on shrinkage
 
@@ -354,8 +354,12 @@ If any of these are foggy, re-read the section and the answer becomes obvious.
 - **Holmes & Huber** — *Modern Statistics for Modern Biology* — free online at <https://www.huber.embl.de/msmb/>. Chapters 3 (NB / Poisson), 6 (testing), 9 (clustering) are directly relevant
 - **Gelman, Hill, Vehtari** — *Regression and Other Stories* — for the regression / GLM mindset
 - **Wilks** — *Statistical Methods in the Atmospheric Sciences* — surprisingly good chapters on hypothesis testing for non-statisticians (chapter 5)
-- **Squair et al. 2021** — the canonical paper on why per-cell DE goes wrong, [doi:10.1038/s41467-021-25960-2](https://doi.org/10.1038/s41467-021-25960-2)
-- **Love, Huber & Anders 2014** — DESeq2 paper, [doi:10.1186/s13059-014-0550-8](https://doi.org/10.1186/s13059-014-0550-8)
+- For the single-cell DE statistics, the key papers are Squair *et al.* [@squair2021confronting] and Zimmerman *et al.* [@zimmerman2021practical]; the model itself is DESeq2 [@love2014deseq2] with `apeglm` shrinkage [@zhu2019apeglm], and the FDR procedure is Benjamini–Hochberg [@benjamini1995controlling].
+
+## References
+
+::: {#refs}
+:::
 
 ## See also
 

@@ -16,10 +16,11 @@ Get your laptop ready before Day 1. Plan **30–60 minutes** the day before — 
 **What you'll have at the end:**
 
 1. R and RStudio installed and working
-2. VS Code installed
-3. The command-line build tools your operating system needs to compile R packages
+2. VS Code and Quarto installed
+3. A working terminal (a POSIX shell)
+4. The command-line build tools your operating system needs to compile R packages
 
-That's all you need to do on this page. **Installing the R / Bioconductor packages** happens in the Tuesday **P2** module — see *Refresh your skills* (§3) below.
+That's all you need to do on this page. **Installing the R / Bioconductor packages** happens in the Tuesday **P2** module — see *Refresh your skills* (§4) below.
 :::
 
 ## 1. Required tools
@@ -27,12 +28,60 @@ That's all you need to do on this page. **Installing the R / Bioconductor packag
 - **R ≥ 4.4** — [download](https://www.r-project.org)
 - **RStudio Desktop** (current release) — [download](https://posit.co/download/rstudio-desktop/)
 - **VS Code** (current release) — [download](https://code.visualstudio.com/download)
+- **Quarto** (current release) — [download](https://quarto.org/docs/get-started/) (the workshop tutorials are Quarto `.qmd` notebooks; RStudio bundles a copy, but install the standalone release too so VS Code and the command line can render)
+- **LaTeX** — install the lightweight **TinyTeX** distribution by running `quarto install tinytex` in a terminal once Quarto is installed (needed only if you render notebooks to **PDF**; HTML output needs no LaTeX)
 
-## 2. Install command-line tools
+::: callout-note
+**What each of these actually is.** It helps to know which tool does what:
 
-Several R / Bioconductor packages **compile from source** the first time you install them, which needs a working command-line **compiler toolchain**; the command-line portions of the workshop also assume a POSIX shell. Set this up once, for your operating system. The command line itself — navigating, pipes, `grep` — is covered in the [P2 reading (R & the Command Line)](Resources_Folder/Chapter_P2_R_and_CommandLine.html) and [Appendix C](Resources_Folder/Appendix_C_GREP_Regex_Shell.html), and the optional [Day 0](Schedule.qmd) session walks through it; if a package later fails to build, the [FAQ](FAQ.qmd) lists the usual fixes.
+- **R** and **LaTeX** are **scripting/markup languages** — you *write code in them* and a program executes it. R turns data-analysis code into results and figures; LaTeX turns markup into a typeset document (it's what produces PDF output).
+- **Quarto** is a **formatting and publishing system** — it weaves your prose together with the code chunks (run through R) and renders the result into a finished HTML page, slide deck, or PDF. It is the layer that turns a `.qmd` notebook into the pages on this site.
+- **RStudio** and **VS Code** are **Integrated Development Environments (IDEs)** — the workbenches you actually sit in. They give you an editor, a place to run code and see output, and tools to manage projects. VS Code additionally connects over SSH to **remote clusters such as Talapas**, so you can edit and run code on the cluster as if it were local (see [P1 — Computer System Fundamentals](Resources_Folder/Chapter_P1_Computer_Systems.html)).
 
-**macOS** — open the built-in **Terminal** (Applications → Utilities), or install [iTerm2](https://iterm2.com/) for a nicer one, then install Apple's Xcode command-line tools:
+In short: R and LaTeX are languages, Quarto stitches and publishes them, and RStudio / VS Code are where you do the work — locally or on Talapas.
+:::
+
+## 2. Find or install a terminal
+
+The command-line portions of the workshop assume a **POSIX (Unix-style) shell**. macOS and Linux ship one; Windows does not, so Windows users install one. Set this up once for your operating system. The command line itself — navigating, pipes, `grep` — is covered in the [P2 reading (R & the Command Line)](Resources_Folder/Chapter_P2_R_and_CommandLine.html) and [Appendix C](Resources_Folder/Appendix_C_GREP_Regex_Shell.html), and the optional [Day 0](Schedule.qmd) session walks through it.
+
+**macOS** — you already have one. Open the built-in **Terminal** app (Applications → Utilities → Terminal, or press ⌘-Space and type "Terminal"). It runs `zsh`, a standard POSIX shell — nothing to install. If you'd like a nicer one, [iTerm2](https://iterm2.com/) is a popular free upgrade, but the built-in Terminal is all you need.
+
+**Windows** — Windows' built-in Command Prompt and PowerShell are **not** POSIX shells, so you install a small Linux environment with **WSL2** (Windows Subsystem for Linux) and run a real Linux terminal inside it. Two ideas to keep separate:
+
+- **WSL2 is the machinery.** It's a lightweight Linux virtual machine built into Windows. You don't interact with WSL2 directly — it's the engine that runs a Linux distribution for you.
+- **Ubuntu is the Linux you actually use.** When you install WSL2 you also install a distribution (we use **Ubuntu**), and *Ubuntu* is what gives you the terminal, the `bash` shell, and Linux commands.
+
+To install both at once:
+
+1. Open **PowerShell as Administrator** (right-click the Start button → *Terminal (Admin)* or *Windows PowerShell (Admin)*).
+2. Run `wsl --install -d Ubuntu` and press Enter. This turns on WSL2 *and* downloads Ubuntu. **Restart** when prompted.
+3. After the restart, launch **Ubuntu** from the Start menu (search "Ubuntu"). The first launch finishes the install and asks you to choose a Linux **username** and **password** — these are separate from your Windows login. The window you're now in **is your terminal** for the rest of the workshop.
+4. Update the Ubuntu packages once: `sudo apt update && sudo apt upgrade -y` (it will ask for the password you just set).
+
+From then on, **opening "Ubuntu" from the Start menu is how you open the terminal.** Full Microsoft guide: <https://learn.microsoft.com/en-us/windows/wsl/install>.
+
+::: {.callout-tip title="Seeing your Windows files from the Ubuntu terminal"}
+WSL2 and Windows share files, so you don't need two copies of anything.
+
+- **Your Windows drives are mounted under `/mnt/`.** Inside the Ubuntu terminal, your `C:` drive is `/mnt/c`, so your Desktop is `/mnt/c/Users/<YourWindowsName>/Desktop` and Downloads is `/mnt/c/Users/<YourWindowsName>/Downloads`. For example:
+
+  ``` bash
+  cd /mnt/c/Users/<YourWindowsName>/Desktop
+  ls
+  ```
+
+- **Going the other way:** your Linux files appear in Windows File Explorer under the **Linux** entry in the left sidebar (or by typing `\\wsl$` in the address bar), so you can open them with Windows apps too.
+- **Where to keep workshop files:** working *inside* the Linux home directory (`~`, i.e. `/home/<your-ubuntu-name>`) is noticeably faster than working under `/mnt/c`. A good habit is to keep the project in your Linux home and reach over to `/mnt/c` only when you need a file that lives on the Windows side.
+:::
+
+**Linux** — you already have one. Open your distribution's built-in **Terminal** application; it runs `bash` (or a similar POSIX shell). Nothing to install.
+
+## 3. Install tools for compiling
+
+Several R / Bioconductor packages **compile from source** the first time you install them, which needs a working **compiler toolchain**. Install it once for your operating system; if a package later fails to build, the [FAQ](FAQ.qmd) lists the usual fixes.
+
+**macOS** — install Apple's **Xcode command-line tools** from the Terminal you opened in §2:
 
 ``` bash
 xcode-select --install
@@ -40,16 +89,9 @@ xcode-select --install
 
 This provides `clang`, `git`, `make`, and the headers R needs to build packages. Some packages also need a Fortran compiler — if you later hit `gfortran not found`, install [gfortran for macOS](https://mac.r-project.org/tools/). Re-launch RStudio after it finishes.
 
-**Windows** — install **Rtools**, the toolchain that lets Windows build R packages from source, from <https://cran.r-project.org/bin/windows/Rtools/> (pick the version matching your R — e.g. Rtools44 for R 4.4). For the shell/command-line portions of the workshop, also install **WSL2 + Ubuntu**, which gives you a real POSIX shell:
+**Windows** — install **Rtools**, the toolchain that lets *native Windows* R build packages from source, from <https://cran.r-project.org/bin/windows/Rtools/>. Pick the version matching your R (e.g. **Rtools44** for R 4.4). Rtools is for the Windows R/RStudio you installed in §1; it is separate from the Ubuntu environment in §2 (Ubuntu compiles with `build-essential`, below, if you ever run R there).
 
-1. Run **PowerShell as Administrator**.
-2. `wsl --install -d ubuntu` and press Enter. Restart when prompted.
-3. Launch **Ubuntu** from the Start menu and set a username and password.
-4. `sudo apt update && sudo apt upgrade -y`
-
-Full Microsoft guide: <https://learn.microsoft.com/en-us/windows/wsl/install>. If you run R *inside* WSL rather than native Windows, see the [FAQ](FAQ.qmd) note on where to keep your project files.
-
-**Linux** — use your built-in terminal and install the build toolchain from your package manager. On Ubuntu/Debian:
+**Linux** — install the build toolchain from your package manager. On Ubuntu/Debian (including WSL2 Ubuntu):
 
 ``` bash
 sudo apt update && sudo apt install -y build-essential gfortran
@@ -57,7 +99,7 @@ sudo apt update && sudo apt install -y build-essential gfortran
 
 `build-essential` provides `gcc`, `g++`, and `make`; `gfortran` covers packages with Fortran code. On Fedora/RHEL, use `sudo dnf groupinstall "Development Tools"` plus `gcc-gfortran`.
 
-## 3. Refresh your skills
+## 4. Refresh your skills
 
 New to the command line, HPC, or R — or just rusty? The optional **Tuesday (Day 0)** session brings you up to speed, and is where we **install the R / Bioconductor packages** together. Two modules on the **[Materials](Materials.qmd)** page:
 

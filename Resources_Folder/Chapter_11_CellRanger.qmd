@@ -54,9 +54,9 @@ It is worth walking through the internal stages of `count`, because each one cor
 
 **Barcode correction.** Each read carries a cell barcode (which droplet) and a UMI (which original molecule). Sequencing introduces errors. Cell Ranger compares each observed barcode against the known 10x whitelist for that chemistry and corrects single-base errors to the nearest valid barcode. Barcodes too far from any whitelist entry are discarded.
 
-**Alignment.** The cDNA read (R2 in 3' chemistry) is aligned to the reference transcriptome with STAR. Reads are classified by where they land: confidently mapped to an exon, to an intron, to an intergenic region, or unmapped. The fraction "confidently mapped to transcriptome" is a key QC number; a low value usually means the wrong reference or contamination.
+**Alignment.** The cDNA read (R2 in 3' chemistry) is aligned to the reference transcriptome with STAR [@dobin2013star]. Reads are classified by where they land: confidently mapped to an exon, to an intron, to an intergenic region, or unmapped. The fraction "confidently mapped to transcriptome" is a key QC number; a low value usually means the wrong reference or contamination.
 
-**UMI deduplication.** Because libraries are PCR-amplified before sequencing, the same original molecule appears many times. Cell Ranger collapses reads that share a cell barcode, a gene, and a UMI (allowing for one-base UMI errors) into a single counted molecule. This is what makes the final numbers *molecule counts*, not *read counts* — the whole point of the UMI design.
+**UMI deduplication.** Because libraries are PCR-amplified before sequencing, the same original molecule appears many times. Cell Ranger collapses reads that share a cell barcode, a gene, and a UMI (allowing for one-base UMI errors) into a single counted molecule — the directional-network logic of UMI collapsing was worked out by UMI-tools [@smith2017umitools]. This is what makes the final numbers *molecule counts*, not *read counts* — the whole point of the UMI design [@zheng2017chromium].
 
 **Cell calling.** This is the most consequential step and the one most worth understanding (Section 11.6).
 
@@ -84,7 +84,7 @@ A droplet-based experiment generates far more barcodes than cells. Most droplets
 
 The classic tool for seeing this is the **barcode-rank plot** (the "knee" plot). Barcodes are ranked from most to fewest UMIs and plotted on log-log axes. A clean experiment shows a sharp **knee**: a plateau of high-UMI barcodes (real cells) that drops steeply to a long tail of low-UMI barcodes (empties). The location of the knee is, roughly, the cell count.
 
-Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a knee-based threshold identifies obvious high-count cells, and then an **EmptyDrops**-style test recovers real cells that happen to have lower counts by asking whether each remaining barcode's *expression profile* differs significantly from the ambient profile. A small dying cell with few UMIs but a distinctive transcriptome can thus be rescued, where a naive knee cut would have thrown it away. The consequence for you: the "filtered" matrix is the product of a statistical decision, not a simple threshold, and a soft or ambiguous knee in the plot is a sign to scrutinize that decision.
+Modern Cell Ranger does not just cut at the knee. It uses a two-step approach: a knee-based threshold identifies obvious high-count cells, and then an **EmptyDrops**-style test [@lun2019emptydrops] recovers real cells that happen to have lower counts by asking whether each remaining barcode's *expression profile* differs significantly from the ambient profile. A small dying cell with few UMIs but a distinctive transcriptome can thus be rescued, where a naive knee cut would have thrown it away. The consequence for you: the "filtered" matrix is the product of a statistical decision, not a simple threshold, and a soft or ambiguous knee in the plot is a sign to scrutinize that decision.
 
 ## 11.7 Reading `web_summary.html`
 
@@ -139,10 +139,19 @@ A few recurring pitfalls are worth internalizing:
 - **Reference / chemistry mismatch.** Running 5' reads against a 3' reference will "succeed" but produce statistics that are quietly wrong — always the hardest kind of error to catch.
 - **Aggregation confusion.** `cellranger aggr` performs a depth-normalized count-level merge of technical replicates of one library; it is *not* the same as the Seurat `merge()` + integration you do downstream, and for most analyses you want the latter for its finer control.
 
-## 11.10 See also
+## 11.10 Alternatives to Cell Ranger
+
+Cell Ranger is the official 10x pipeline, but it is not the only way to turn FASTQs into a counts matrix, and the open-source alternatives are often faster and more flexible. **STARsolo** [@kaminow2021starsolo] reproduces Cell Ranger's logic inside the STAR aligner [@dobin2013star] and is largely concordant with it; **alevin-fry / salmon** [@srivastava2019alevin] and **kallisto | bustools (kb-python)** [@melsted2021kallistobustools] use lightweight (pseudo)alignment for constant-memory, very fast quantification. All three accept custom references easily, which matters for non-model organisms where no 10x reference exists. They differ mainly in how they handle multimapping reads, intronic counts, and EmptyDrops-style cell calling, so a sample quantified two ways will agree on most genes but not every count — worth knowing when you compare results across pipelines.
+
+## 11.11 See also
 
 - [Lecture 11 — Cell Ranger: Raw Reads to Counts](../Lecture_Folder/Lecture_11_CellRanger.html)
 - [Tutorial 11 — Raw Data + Cell Ranger `count` on Talapas](../Exercise_Folder/Tutorial_11_CellRanger_RawData.html)
 - [Chapter 12 — Raw scATAC-seq Processing](Chapter_12_scATAC_CellRanger.html) — the chromatin companion
 - [Chapter 1 — QC & Preprocessing](Chapter_01_Preprocessing.html) — where the matrix is picked up
 - [10x Genomics Cell Ranger documentation](https://www.10xgenomics.com/support/software/cell-ranger/latest)
+
+## References
+
+::: {#refs}
+:::
