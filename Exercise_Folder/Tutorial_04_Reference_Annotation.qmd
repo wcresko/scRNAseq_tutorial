@@ -55,7 +55,9 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 
 
 ::: {.callout-warning title="Common errors / things that bite"}
-**`RunAzimuth` errors during reference download** — the PBMC reference is \~1 GB and downloads on first call. Confirm internet, sufficient disk, and no `tar` corruption. If it fails midway, delete the partial cache directory (`~/.cache/Azimuth/` or similar) and retry.
+**`RunAzimuth` errors during reference download** — on first call it installs the `pbmcref.SeuratData` package (~75 MB) from the SeuratData repo. Confirm internet and disk. If it fails midway, retry; you can also install it directly with `SeuratData::InstallData("pbmcref")`.
+
+**Lots of warnings while `RunAzimuth` runs (all expected)** — a successful run is *noisy*. You'll see `944 features … not present … Continuing with remaining 4056` (normal — your data has 4056 of the reference's model genes, which is plenty), `Feature names cannot have underscores … replacing with dashes` (from Azimuth's **own** internal assays, not your data), plus `refUMAP`/`integrated_dr_` key and `RunUMAP method changed` notices. None are errors. The tell that it worked: `detected … HUMAN with id type Gene.name` for **both** query and reference, `Found … anchors`, and new `predicted.celltype.l1/l2/l3` + `mapping.score` columns in `ifnb@meta.data`.
 
 **STIM cells get lower mapping scores than CTRL** — that's expected, not a bug: the interferon-β response shifts cells off the resting-PBMC reference manifold even though their *cell-type* identity is unchanged. Read it as a confidence flag, not a wrong label.
 
@@ -121,7 +123,7 @@ Azimuth wraps Seurat's anchor-based reference mapping with curated atlases, and 
 #| fig-cap: "Azimuth (pbmcref) level-2 predicted cell types projected onto the unintegrated UMAP."
 library(Azimuth)
 
-# Will download the PBMC reference on first use (~1 GB)
+# Installs the pbmcref.SeuratData reference package on first use (~75 MB download)
 ifnb <- RunAzimuth(ifnb, reference = "pbmcref")
 
 # New columns: predicted.celltype.l1 / l2 / l3 + scores

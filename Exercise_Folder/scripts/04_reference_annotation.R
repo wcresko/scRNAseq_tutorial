@@ -5,9 +5,9 @@
 # In:   ../data/ifnb_annotated.rds   Out: ../data/ifnb_annotated_final.rds
 # Figures/tables (match the Mod4 notebook filenames): ../output/Mod4/Mod4_C*_*
 #
-# NOTE: RunAzimuth downloads the ~1 GB pbmcref reference on first use. On a
-# compute node without internet, pre-cache it on a login node first (run
-# `Azimuth::RunAzimuth(<small object>, "pbmcref")` once) so the cache is warm.
+# NOTE: RunAzimuth installs the pbmcref.SeuratData reference (~75 MB) on first
+# use. On a compute node without internet, pre-install it on a login node first
+# (SeuratData::InstallData("pbmcref"), or run RunAzimuth once) so it's cached.
 
 suppressPackageStartupMessages({
   library(Seurat); library(Azimuth)
