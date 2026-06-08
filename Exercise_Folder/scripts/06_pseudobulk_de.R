@@ -34,6 +34,9 @@ DefaultAssay(seu) <- "RNA"
 
 # Real donor (ind) and real condition (stim)
 if (!"donor" %in% colnames(seu@meta.data)) seu$donor <- seu$ind
+# Letter-prefix the (numeric) donor IDs: AggregateExpression prepends 'g' to any
+# group.by value starting with a digit, which would break the colData join below.
+seu$donor <- paste0("d", sub("^d", "", as.character(seu$donor)))
 seu$condition <- seu$stim                 # CTRL / STIM
 seu$celltype  <- seu$seurat_annotations
 
@@ -49,9 +52,10 @@ group_meta <- seu@meta.data |>
 colnames(pb) <- fix_id(colnames(pb))
 meta_pb <- tibble(group_id = colnames(pb)) |> left_join(group_meta, by = "group_id")
 
-# Drop low-cell pseudobulk columns (< 10 cells)
+# Drop low-cell pseudobulk columns (< 10 cells). Use dplyr::count explicitly —
+# DESeq2/SummarizedExperiment attach matrixStats, whose count() masks dplyr::count.
 cells_per_group <- seu@meta.data |>
-  count(donor, condition, celltype) |>
+  dplyr::count(donor, condition, celltype) |>
   mutate(group_id = fix_id(paste(donor, condition, celltype, sep = "_")))
 meta_pb <- meta_pb |>
   left_join(cells_per_group |> select(group_id, n_cells = n), by = "group_id")
