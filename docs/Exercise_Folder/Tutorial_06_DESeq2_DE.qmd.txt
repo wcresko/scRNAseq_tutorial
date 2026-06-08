@@ -76,7 +76,9 @@ There's no separate download — the counts and metadata ride along with the pac
 ::: {.callout-warning title="Common errors / things that bite"}
 **Wrong sign on `log2FoldChange`** — `relevel()` matters. The reference level becomes the *denominator*. `dds$dex <- relevel(dds$dex, ref = "untrt")` makes `trt vs untrt` the comparison, with positive LFCs meaning higher in treated. Skip this and your "up" / "down" labels are reversed.
 
-**`apeglm` errors with "fitType = 'parametric'" or similar** — `apeglm` needs the design coefficient name, not the contrast vector. Use `lfcShrink(dds, coef = "dex_trt_vs_untrt", res = res, type = "apeglm")`. Run `resultsNames(dds)` to see the available coefficient names.
+**`lfcShrink(... type = "apeglm")` errors with "requires installing the Bioconductor package 'apeglm'"** — `apeglm` is only a *Suggests* of DESeq2, so it isn't pulled in automatically. It's in the [Tutorial 00 setup](Tutorial_00_Setup_RStudio_Packages.html) list; if you set up earlier, install it once with `BiocManager::install("apeglm")`.
+
+**`apeglm` errors with "coef ... not in resultsNames" or a `fitType` message** — `apeglm` needs the design **coefficient name**, not a contrast vector. This tutorial renames the `dex` levels to `treated`/`untreated`, so the coefficient is `dex_treated_vs_untreated` (not `dex_trt_vs_untrt`). Run `resultsNames(dds)` to see the exact names available.
 :::
 
 ## A.1 — Setup
@@ -279,24 +281,43 @@ save_base_fig(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"), width = 7, heigh
 
 ```{r}
 #| label: top-hit-airway
-#| fig-cap: "Per-sample normalized counts for the top-ranked airway hit, split by treatment."
+#| fig-cap: "Per-sample normalized counts for the top 5 airway hits (by padj), each panel labelled with its gene, split by treatment."
 top_genes <- as.data.frame(res_shrunk) |>
   rownames_to_column("gene") |>
   arrange(padj) |>
   head(5)
 top_genes
 
-plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
-           main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
+# Gather per-sample normalized counts for the top 5 genes (plotCounts can return
+# the data instead of drawing), so we can plot them together with gene labels.
+counts_top <- purrr::map_dfr(top_genes$gene, function(g) {
+  d <- plotCounts(dds, gene = g, intgroup = "dex", returnData = TRUE)
+  d$gene <- g
+  d
+})
+# Keep the panels ordered by significance (padj rank), not alphabetically.
+counts_top$gene <- factor(counts_top$gene, levels = top_genes$gene)
+
+p_top <- ggplot(counts_top, aes(x = dex, y = count, colour = dex)) +
+  geom_jitter(width = 0.12, height = 0, size = 2, alpha = 0.85) +
+  facet_wrap(~ gene, nrow = 1, scales = "free_y") +   # facet strip = the gene label
+  scale_y_log10() +
+  labs(
+    title    = "Top 5 airway hits (by padj) — per-sample normalized counts",
+    subtitle = "Each panel is a gene; points are samples, split by treatment",
+    x        = "Treatment (dex)",
+    y        = "Normalized count (log scale)",
+    colour   = "Treatment"
+  ) +
+  theme(legend.position = "none")
+p_top
 
 # --- Table out: top 5 hits by padj -----------------------------------------
 readr::write_csv(top_genes, file.path(out_dir, "Mod6_C10_airway_top_hits.csv"))
 
-# --- Figure out: base-graphics per-sample counts for the top hit -----------
-save_base_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), width = 6, height = 5, draw = function() {
-  plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
-             main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
-})
+# --- Figure out: per-sample counts for the top 5 hits (png + svg) -----------
+save_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), p_top,
+         width = 11, height = 4, dpi = 300)
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -379,6 +400,10 @@ Pseudobulk DE needs **biological replicates within each condition**, and here we
 
 **Underscores in donor or cell-type names break the column-name parsing** — if your sample is `donor_03_treated`, the `sub("^[^_]+_", "", colnames(pb))` parse will get confused. Defensive parsing approach: pull the metadata directly from the Seurat object's `@meta.data` rather than parsing column names. The tutorial shows this.
 
+**`colData` comes back all `NA` / numeric donor IDs get a `g` prefix** — `ifnb`'s donor column (`ind`) is **numeric** (101, 107, …), and `AggregateExpression()` prepends `g` to any `group.by` value that starts with a digit (it prints *"…starts with a number, appending 'g'…"*). The aggregated columns become `g101_…`, which no longer match a reconstructed `101_…` key, so the join yields all `NA` and every group is dropped. Fix: make donor a valid name up front — the tutorial uses `ifnb$donor <- paste0("d", ind)`.
+
+**`count(...)` errors with "Argument 'x' is not a vector: list"** — loading `DESeq2`/`SummarizedExperiment` attaches `matrixStats`, whose `count()` **masks** `dplyr::count()` (along with `desc`, `slice`, `rename`, `first` from S4Vectors/IRanges). Call the dplyr ones explicitly, e.g. `dplyr::count(...)`. Watch the package-startup messages for the list of masked names.
+
 **Synthetic pseudo-donors are a fallback, not the default** — objects loaded the way this series does (`muscData::Kang18_8vs8()`, Tutorial 01) carry real donor IDs in `ind`, so you'll take the real-donor path automatically. The synthetic `set.seed(2026)` 4-pseudo-donor split only triggers if no donor column is present (e.g. an older SeuratData `ifnb`); it's a teaching device whose p-values are not biologically meaningful — say so in any writeup.
 :::
 
@@ -413,7 +438,11 @@ candidate_cols
 #| label: donor
 
 if (length(candidate_cols) > 0) {
-  ifnb$donor <- ifnb@meta.data[[ candidate_cols[1] ]]
+  # Prefix with a letter: the ifnb donor IDs (`ind`) are numbers (101, 107, ...),
+  # and AggregateExpression() prepends "g" to any group.by value that starts with
+  # a digit. Making donor a valid name up front ("d101") keeps the aggregated
+  # column names stable so the colData join below matches.
+  ifnb$donor <- paste0("d", ifnb@meta.data[[ candidate_cols[1] ]])
   message("Using real donor column: ", candidate_cols[1])
 } else {
   # Synthetic pseudo-donors: 4 per stim, assigned by random cell index
@@ -500,8 +529,11 @@ A pseudobulk column built from very few cells is noise. Drop them.
 ```{r}
 #| label: filter-pb
 
+# NOTE: use dplyr::count explicitly — loading DESeq2/SummarizedExperiment attaches
+# matrixStats, whose count() masks dplyr::count() (you'd get "Argument 'x' is not
+# a vector: list").
 cells_per_group <- ifnb@meta.data |>
-  count(donor, condition, celltype) |>
+  dplyr::count(donor, condition, celltype) |>
   mutate(group_id_clean = fix_id(paste(donor, condition, celltype, sep = "_")))
 
 meta_pb <- meta_pb |>

@@ -2374,7 +2374,8 @@ Note
 </div>
 <div class="callout-body-container callout-body">
 <p><strong>Wrong sign on <code>log2FoldChange</code></strong> — <code>relevel()</code> matters. The reference level becomes the <em>denominator</em>. <code>dds$dex &lt;- relevel(dds$dex, ref = &quot;untrt&quot;)</code> makes <code>trt vs untrt</code> the comparison, with positive LFCs meaning higher in treated. Skip this and your “up” / “down” labels are reversed.</p>
-<p><strong><code>apeglm</code> errors with “fitType = ‘parametric’” or similar</strong> — <code>apeglm</code> needs the design coefficient name, not the contrast vector. Use <code>lfcShrink(dds, coef = &quot;dex_trt_vs_untrt&quot;, res = res, type = &quot;apeglm&quot;)</code>. Run <code>resultsNames(dds)</code> to see the available coefficient names.</p>
+<p><strong><code>lfcShrink(... type = &quot;apeglm&quot;)</code> errors with “requires installing the Bioconductor package ‘apeglm’”</strong> — <code>apeglm</code> is only a <em>Suggests</em> of DESeq2, so it isn’t pulled in automatically. It’s in the <a href="Tutorial_00_Setup_RStudio_Packages.html">Tutorial 00 setup</a> list; if you set up earlier, install it once with <code>BiocManager::install(&quot;apeglm&quot;)</code>.</p>
+<p><strong><code>apeglm</code> errors with “coef … not in resultsNames” or a <code>fitType</code> message</strong> — <code>apeglm</code> needs the design <strong>coefficient name</strong>, not a contrast vector. This tutorial renames the <code>dex</code> levels to <code>treated</code>/<code>untreated</code>, so the coefficient is <code>dex_treated_vs_untreated</code> (not <code>dex_trt_vs_untrt</code>). Run <code>resultsNames(dds)</code> to see the exact names available.</p>
 </div>
 </div>
 </section>
@@ -2642,17 +2643,36 @@ Tip
 <span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>(<span class="dv">5</span>)</span>
 <span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>top_genes</span>
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="fu">plotCounts</span>(dds, <span class="at">gene =</span> top_genes<span class="sc">$</span>gene[<span class="dv">1</span>], <span class="at">intgroup =</span> <span class="st">&quot;dex&quot;</span>,</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>           <span class="at">main =</span> <span class="fu">paste0</span>(<span class="st">&quot;Top hit: &quot;</span>, top_genes<span class="sc">$</span>gene[<span class="dv">1</span>], <span class="st">&quot; (by padj)&quot;</span>))</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: top 5 hits by padj -----------------------------------------</span></span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(top_genes, <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C10_airway_top_hits.csv&quot;</span>))</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out: base-graphics per-sample counts for the top hit -----------</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="fu">save_base_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C10_airway_top_hit_counts.png&quot;</span>), <span class="at">width =</span> <span class="dv">6</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">draw =</span> <span class="cf">function</span>() {</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plotCounts</span>(dds, <span class="at">gene =</span> top_genes<span class="sc">$</span>gene[<span class="dv">1</span>], <span class="at">intgroup =</span> <span class="st">&quot;dex&quot;</span>,</span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>             <span class="at">main =</span> <span class="fu">paste0</span>(<span class="st">&quot;Top hit: &quot;</span>, top_genes<span class="sc">$</span>gene[<span class="dv">1</span>], <span class="st">&quot; (by padj)&quot;</span>))</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Gather per-sample normalized counts for the top 5 genes (plotCounts can return</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co"># the data instead of drawing), so we can plot them together with gene labels.</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>counts_top <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(top_genes<span class="sc">$</span>gene, <span class="cf">function</span>(g) {</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  d <span class="ot">&lt;-</span> <span class="fu">plotCounts</span>(dds, <span class="at">gene =</span> g, <span class="at">intgroup =</span> <span class="st">&quot;dex&quot;</span>, <span class="at">returnData =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  d<span class="sc">$</span>gene <span class="ot">&lt;-</span> g</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  d</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep the panels ordered by significance (padj rank), not alphabetically.</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>counts_top<span class="sc">$</span>gene <span class="ot">&lt;-</span> <span class="fu">factor</span>(counts_top<span class="sc">$</span>gene, <span class="at">levels =</span> top_genes<span class="sc">$</span>gene)</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>p_top <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(counts_top, <span class="fu">aes</span>(<span class="at">x =</span> dex, <span class="at">y =</span> count, <span class="at">colour =</span> dex)) <span class="sc">+</span></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_jitter</span>(<span class="at">width =</span> <span class="fl">0.12</span>, <span class="at">height =</span> <span class="dv">0</span>, <span class="at">size =</span> <span class="dv">2</span>, <span class="at">alpha =</span> <span class="fl">0.85</span>) <span class="sc">+</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> gene, <span class="at">nrow =</span> <span class="dv">1</span>, <span class="at">scales =</span> <span class="st">&quot;free_y&quot;</span>) <span class="sc">+</span>   <span class="co"># facet strip = the gene label</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_log10</span>() <span class="sc">+</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Top 5 airway hits (by padj) — per-sample normalized counts&quot;</span>,</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Each panel is a gene; points are samples, split by treatment&quot;</span>,</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">x        =</span> <span class="st">&quot;Treatment (dex)&quot;</span>,</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">y        =</span> <span class="st">&quot;Normalized count (log scale)&quot;</span>,</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour   =</span> <span class="st">&quot;Treatment&quot;</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>p_top</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: top 5 hits by padj -----------------------------------------</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(top_genes, <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C10_airway_top_hits.csv&quot;</span>))</span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out: per-sample counts for the top 5 hits (png + svg) -----------</span></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C10_airway_top_hit_counts.png&quot;</span>), p_top,</span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a>         <span class="at">width =</span> <span class="dv">11</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2783,6 +2803,8 @@ Note
 <div class="callout-body-container callout-body">
 <p><strong><code>AggregateExpression</code> returns a different structure than expected</strong> — the API changed across Seurat versions. In v5+ it returns an Assay5 object; subset with <code>$RNA$counts</code>. In v4, it returns a sparse matrix list — use <code>$RNA</code>. The tutorial’s parsing handles both, but if you’re on a custom branch this can bite.</p>
 <p><strong>Underscores in donor or cell-type names break the column-name parsing</strong> — if your sample is <code>donor_03_treated</code>, the <code>sub(&quot;^[^_]+_&quot;, &quot;&quot;, colnames(pb))</code> parse will get confused. Defensive parsing approach: pull the metadata directly from the Seurat object’s <code>@meta.data</code> rather than parsing column names. The tutorial shows this.</p>
+<p><strong><code>colData</code> comes back all <code>NA</code> / numeric donor IDs get a <code>g</code> prefix</strong> — <code>ifnb</code>’s donor column (<code>ind</code>) is <strong>numeric</strong> (101, 107, …), and <code>AggregateExpression()</code> prepends <code>g</code> to any <code>group.by</code> value that starts with a digit (it prints <em>“…starts with a number, appending ‘g’…”</em>). The aggregated columns become <code>g101_…</code>, which no longer match a reconstructed <code>101_…</code> key, so the join yields all <code>NA</code> and every group is dropped. Fix: make donor a valid name up front — the tutorial uses <code>ifnb$donor &lt;- paste0(&quot;d&quot;, ind)</code>.</p>
+<p><strong><code>count(...)</code> errors with “Argument ‘x’ is not a vector: list”</strong> — loading <code>DESeq2</code>/<code>SummarizedExperiment</code> attaches <code>matrixStats</code>, whose <code>count()</code> <strong>masks</strong> <code>dplyr::count()</code> (along with <code>desc</code>, <code>slice</code>, <code>rename</code>, <code>first</code> from S4Vectors/IRanges). Call the dplyr ones explicitly, e.g. <code>dplyr::count(...)</code>. Watch the package-startup messages for the list of masked names.</p>
 <p><strong>Synthetic pseudo-donors are a fallback, not the default</strong> — objects loaded the way this series does (<code>muscData::Kang18_8vs8()</code>, Tutorial 01) carry real donor IDs in <code>ind</code>, so you’ll take the real-donor path automatically. The synthetic <code>set.seed(2026)</code> 4-pseudo-donor split only triggers if no donor column is present (e.g. an older SeuratData <code>ifnb</code>); it’s a teaching device whose p-values are not biologically meaningful — say so in any writeup.</p>
 </div>
 </div>
@@ -2812,27 +2834,31 @@ Note
 <h2 class="anchored" data-anchor-id="b.2-define-donor-real-or-synthetic-and-condition">B.2 — Define donor (real or synthetic) and condition</h2>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(candidate_cols) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
-<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data[[ candidate_cols[<span class="dv">1</span>] ]]</span>
-<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(<span class="st">&quot;Using real donor column: &quot;</span>, candidate_cols[<span class="dv">1</span>])</span>
-<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
-<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Synthetic pseudo-donors: 4 per stim, assigned by random cell index</span></span>
-<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
-<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
-<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    ifnb<span class="sc">$</span>stim, <span class="st">&quot;_d&quot;</span>,</span>
-<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">size =</span> <span class="fu">ncol</span>(ifnb), <span class="at">replace =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(<span class="st">&quot;Created synthetic pseudo-donors (teaching shortcut). &quot;</span>,</span>
-<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;DO NOT do this for a real publication.&quot;</span>)</span>
-<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>condition <span class="ot">&lt;-</span> ifnb<span class="sc">$</span>stim   <span class="co"># CTRL or STIM</span></span>
-<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype  <span class="ot">&lt;-</span> ifnb<span class="sc">$</span>seurat_annotations</span>
-<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>donor, ifnb<span class="sc">$</span>condition)</span>
-<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: cells per donor x condition --------------------------------</span></span>
-<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(<span class="fu">table</span>(<span class="at">donor =</span> ifnb<span class="sc">$</span>donor, <span class="at">condition =</span> ifnb<span class="sc">$</span>condition)) <span class="sc">|&gt;</span></span>
-<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C14_donor_by_condition.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Prefix with a letter: the ifnb donor IDs (`ind`) are numbers (101, 107, ...),</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="co"># and AggregateExpression() prepends &quot;g&quot; to any group.by value that starts with</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># a digit. Making donor a valid name up front (&quot;d101&quot;) keeps the aggregated</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># column names stable so the colData join below matches.</span></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>  ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;d&quot;</span>, ifnb<span class="sc">@</span>meta.data[[ candidate_cols[<span class="dv">1</span>] ]])</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(<span class="st">&quot;Using real donor column: &quot;</span>, candidate_cols[<span class="dv">1</span>])</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>} <span class="cf">else</span> {</span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Synthetic pseudo-donors: 4 per stim, assigned by random cell index</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>  ifnb<span class="sc">$</span>donor <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    ifnb<span class="sc">$</span>stim, <span class="st">&quot;_d&quot;</span>,</span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">sample</span>(<span class="dv">1</span><span class="sc">:</span><span class="dv">4</span>, <span class="at">size =</span> <span class="fu">ncol</span>(ifnb), <span class="at">replace =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">message</span>(<span class="st">&quot;Created synthetic pseudo-donors (teaching shortcut). &quot;</span>,</span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>          <span class="st">&quot;DO NOT do this for a real publication.&quot;</span>)</span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>condition <span class="ot">&lt;-</span> ifnb<span class="sc">$</span>stim   <span class="co"># CTRL or STIM</span></span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype  <span class="ot">&lt;-</span> ifnb<span class="sc">$</span>seurat_annotations</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(ifnb<span class="sc">$</span>donor, ifnb<span class="sc">$</span>condition)</span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: cells per donor x condition --------------------------------</span></span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(<span class="fu">table</span>(<span class="at">donor =</span> ifnb<span class="sc">$</span>donor, <span class="at">condition =</span> ifnb<span class="sc">$</span>condition)) <span class="sc">|&gt;</span></span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C14_donor_by_condition.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2896,24 +2922,27 @@ Click for answer
 <h2 class="anchored" data-anchor-id="b.4-filter-low-count-groups">B.4 — Filter low-count groups</h2>
 <p>A pseudobulk column built from very few cells is noise. Drop them.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>cells_per_group <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(donor, condition, celltype) <span class="sc">|&gt;</span></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">group_id_clean =</span> <span class="fu">fix_id</span>(<span class="fu">paste</span>(donor, condition, celltype, <span class="at">sep =</span> <span class="st">&quot;_&quot;</span>)))</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>meta_pb <span class="ot">&lt;-</span> meta_pb <span class="sc">|&gt;</span></span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(cells_per_group <span class="sc">|&gt;</span> <span class="fu">select</span>(group_id_clean, <span class="at">n_cells =</span> n),</span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>            <span class="at">by =</span> <span class="st">&quot;group_id_clean&quot;</span>)</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep groups with at least 10 cells</span></span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>keep    <span class="ot">&lt;-</span> <span class="sc">!</span><span class="fu">is.na</span>(meta_pb<span class="sc">$</span>n_cells) <span class="sc">&amp;</span> meta_pb<span class="sc">$</span>n_cells <span class="sc">&gt;=</span> <span class="dv">10</span></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>pb      <span class="ot">&lt;-</span> pb[, keep]</span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>meta_pb <span class="ot">&lt;-</span> meta_pb[keep, ]</span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(meta_pb<span class="sc">$</span>celltype, meta_pb<span class="sc">$</span>condition)</span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: surviving pseudobulk groups per celltype x condition --------</span></span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(<span class="fu">table</span>(<span class="at">celltype =</span> meta_pb<span class="sc">$</span>celltype, <span class="at">condition =</span> meta_pb<span class="sc">$</span>condition)) <span class="sc">|&gt;</span></span>
-<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C17_groups_per_celltype.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span><span class="al">NOTE</span><span class="co">: use dplyr::count explicitly — loading DESeq2/SummarizedExperiment attaches</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="co"># matrixStats, whose count() masks dplyr::count() (you&#39;d get &quot;Argument &#39;x&#39; is not</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co"># a vector: list&quot;).</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>cells_per_group <span class="ot">&lt;-</span> ifnb<span class="sc">@</span>meta.data <span class="sc">|&gt;</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">count</span>(donor, condition, celltype) <span class="sc">|&gt;</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">group_id_clean =</span> <span class="fu">fix_id</span>(<span class="fu">paste</span>(donor, condition, celltype, <span class="at">sep =</span> <span class="st">&quot;_&quot;</span>)))</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>meta_pb <span class="ot">&lt;-</span> meta_pb <span class="sc">|&gt;</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(cells_per_group <span class="sc">|&gt;</span> <span class="fu">select</span>(group_id_clean, <span class="at">n_cells =</span> n),</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">by =</span> <span class="st">&quot;group_id_clean&quot;</span>)</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep groups with at least 10 cells</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>keep    <span class="ot">&lt;-</span> <span class="sc">!</span><span class="fu">is.na</span>(meta_pb<span class="sc">$</span>n_cells) <span class="sc">&amp;</span> meta_pb<span class="sc">$</span>n_cells <span class="sc">&gt;=</span> <span class="dv">10</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>pb      <span class="ot">&lt;-</span> pb[, keep]</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>meta_pb <span class="ot">&lt;-</span> meta_pb[keep, ]</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a><span class="fu">table</span>(meta_pb<span class="sc">$</span>celltype, meta_pb<span class="sc">$</span>condition)</span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: surviving pseudobulk groups per celltype x condition --------</span></span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(<span class="fu">table</span>(<span class="at">celltype =</span> meta_pb<span class="sc">$</span>celltype, <span class="at">condition =</span> meta_pb<span class="sc">$</span>condition)) <span class="sc">|&gt;</span></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod6_C17_groups_per_celltype.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
