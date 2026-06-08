@@ -19,6 +19,19 @@ dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 seu <- readRDS(file.path(DATA_DIR, "ifnb_integrated.rds"))
 
 # Real condition + replicate. miloR needs one sample ID per replicate: donor x stim.
@@ -49,7 +62,7 @@ p_nhood_size <- plotNhoodSizeHist(milo) +
        x        = "Neighbourhood size (cells)",
        y        = "Number of neighbourhoods",
        caption  = "Module 8 · Differential Abundance")
-ggsave(file.path(OUT_DIR, "Mod8_C4_nhood_size_hist.png"), p_nhood_size,
+save_fig(file.path(OUT_DIR, "Mod8_C4_nhood_size_hist.png"), p_nhood_size,
        width = 6, height = 4, dpi = 300)
 
 # Step 4 — count cells per neighbourhood per sample
@@ -92,7 +105,7 @@ p_graph <- (um + da) +
     title    = "Differential abundance across the harmony UMAP — STIM vs CTRL",
     subtitle = "Each node is a neighbourhood, sized by cell count, coloured by log-fold change",
     caption  = "Module 8 · Differential Abundance")
-ggsave(file.path(OUT_DIR, "Mod8_C8_da_nhood_graph.png"), p_graph,
+save_fig(file.path(OUT_DIR, "Mod8_C8_da_nhood_graph.png"), p_graph,
        width = 12, height = 5, dpi = 300)
 
 # Step 8 — beeswarm: per-neighbourhood logFC grouped by cell type (Mod8_C9)
@@ -102,7 +115,7 @@ p_beeswarm <- plotDAbeeswarm(res, group.by = "seurat_annotations") +
        x        = "Cell type",
        y        = "Log-fold change (STIM vs CTRL)",
        colour   = "SpatialFDR")
-ggsave(file.path(OUT_DIR, "Mod8_C9_da_beeswarm.png"), p_beeswarm,
+save_fig(file.path(OUT_DIR, "Mod8_C9_da_beeswarm.png"), p_beeswarm,
        width = 8, height = 6, dpi = 300)
 
 # Pipeline hand-off: keep the DATA_DIR copy so downstream steps pick it up unchanged.

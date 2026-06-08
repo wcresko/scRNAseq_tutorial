@@ -101,6 +101,19 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 de <- read_csv("../data/ifnb_pseudobulk_de.csv")
 glimpse(de)
 table(de$celltype)
@@ -238,7 +251,7 @@ p_cc <- dotplot(cc, showCategory = 8) +
 p_cc
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod7_C4_comparecluster_dotplot.png"), p_cc,
+save_fig(file.path(out_dir, "Mod7_C4_comparecluster_dotplot.png"), p_cc,
        width = 10, height = 8, dpi = 300)
 ```
 
@@ -316,7 +329,7 @@ if (!is.null(gse_list[[ct_pick]])) {
   print(p_gsea)
 
   # --- Figure out ----------------------------------------------------------
-  ggsave(file.path(out_dir, "Mod7_C6_gsea_running_enrichment.png"), p_gsea,
+  save_fig(file.path(out_dir, "Mod7_C6_gsea_running_enrichment.png"), p_gsea,
          width = 8, height = 6, dpi = 300)
 }
 ```

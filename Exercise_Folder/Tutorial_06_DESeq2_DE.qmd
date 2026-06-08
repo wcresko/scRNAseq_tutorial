@@ -99,6 +99,28 @@ out_dir <- "../output/Mod6"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+# save_base_fig() does the same for BASE-graphics figures (plot()/heatmap()/etc.):
+# pass a no-argument function that draws the figure; it is rendered to .png and .svg.
+save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
+  grDevices::png(filename, width = width, height = height, units = "in", res = res)
+  draw(); grDevices::dev.off()
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch({ grDevices::svg(svg_path, width = width, height = height); draw(); grDevices::dev.off() },
+           error = function(e) message("  (could not write ", basename(svg_path), ")"))
+}
 ```
 
 ## A.2 — Load the data and pull out counts + metadata
@@ -241,13 +263,12 @@ plotMA(res_shrunk, ylim = c(-3, 3),
        ylab = "log2 fold change (apeglm-shrunken)")
 
 # --- Figure out: base-graphics MA plot via png device ----------------------
-png(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"),
-    width = 7, height = 5, units = "in", res = 300)
-plotMA(res_shrunk, ylim = c(-3, 3),
-       main = "airway: shrunken LFC (treated vs untreated)",
-       xlab = "Mean of normalized counts",
-       ylab = "log2 fold change (apeglm-shrunken)")
-dev.off()
+save_base_fig(file.path(out_dir, "Mod6_C9_airway_ma_plot.png"), width = 7, height = 5, draw = function() {
+  plotMA(res_shrunk, ylim = c(-3, 3),
+         main = "airway: shrunken LFC (treated vs untreated)",
+         xlab = "Mean of normalized counts",
+         ylab = "log2 fold change (apeglm-shrunken)")
+})
 ```
 
 ::: callout-tip
@@ -272,11 +293,10 @@ plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
 readr::write_csv(top_genes, file.path(out_dir, "Mod6_C10_airway_top_hits.csv"))
 
 # --- Figure out: base-graphics per-sample counts for the top hit -----------
-png(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"),
-    width = 6, height = 5, units = "in", res = 300)
-plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
-           main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
-dev.off()
+save_base_fig(file.path(out_dir, "Mod6_C10_airway_top_hit_counts.png"), width = 6, height = 5, draw = function() {
+  plotCounts(dds, gene = top_genes$gene[1], intgroup = "dex",
+             main = paste0("Top hit: ", top_genes$gene[1], " (by padj)"))
+})
 ```
 
 ::: {.callout-important title="Think about it"}
@@ -306,7 +326,7 @@ p_pca <- plotPCA(vsd, intgroup = c("dex", "cell")) +
 p_pca
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod6_C11_airway_vst_pca.png"), p_pca,
+save_fig(file.path(out_dir, "Mod6_C11_airway_vst_pca.png"), p_pca,
        width = 7, height = 5, dpi = 300)
 ```
 
@@ -601,7 +621,7 @@ p_volcano <- de_all |>
 p_volcano
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod6_C20_pseudobulk_volcano.png"), p_volcano,
+save_fig(file.path(out_dir, "Mod6_C20_pseudobulk_volcano.png"), p_volcano,
        width = 10, height = 4, dpi = 300)
 ```
 

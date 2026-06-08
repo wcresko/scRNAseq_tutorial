@@ -122,6 +122,19 @@ out_dir <- "../output/Mod5"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 ```
 
 ```{r}
@@ -307,9 +320,9 @@ p_compare_cell <- (p_un_cell + p_h_cell + p_s_cell) +
 p_compare_cell
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
+save_fig(file.path(out_dir, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
        width = 15, height = 5, dpi = 300)
-ggsave(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
+save_fig(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
        width = 15, height = 5, dpi = 300)
 ```
 
@@ -377,7 +390,7 @@ isg_by_celltype <- ifnb_h@meta.data |>
 isg_by_celltype
 
 # --- Outputs: ISG FeaturePlots + per-cell-type STIM-vs-CTRL ISG means -------
-ggsave(file.path(out_dir, "Mod5_C7_isg_featureplots.png"), p_isg,
+save_fig(file.path(out_dir, "Mod5_C7_isg_featureplots.png"), p_isg,
        width = 12, height = 5, dpi = 300)
 
 readr::write_csv(isg_by_celltype,

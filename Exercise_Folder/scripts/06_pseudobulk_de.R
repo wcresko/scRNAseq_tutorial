@@ -16,6 +16,19 @@ OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod6") # figures/tables, named to ma
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 seu <- readRDS(file.path(DATA_DIR, "ifnb_integrated.rds"))
 DefaultAssay(seu) <- "RNA"
 
@@ -100,7 +113,7 @@ p_volcano <- de_all |>
        x        = "log2 fold change (apeglm-shrunken)",
        y        = "-log10(padj)",
        caption  = "Module 6 · DESeq2 pseudobulk DE")
-ggsave(file.path(OUT_DIR, "Mod6_C20_pseudobulk_volcano.png"), p_volcano,
+save_fig(file.path(OUT_DIR, "Mod6_C20_pseudobulk_volcano.png"), p_volcano,
        width = 10, height = 4, dpi = 300)
 
 # --- Tables: student-facing DE copies (Mod6_C21) ---------------------------

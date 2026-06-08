@@ -46,7 +46,8 @@ SIBLINGS of scripts/ (i.e. at the project root):
     my_scrnaseq_project/
     ├── scripts/      ← your .qmd files (you created this)
     ├── data/         ← AUTO-CREATED: intermediate .rds objects (see below)
-    └── output/       ← AUTO-CREATED: figures (.png) and tables (.csv), per module
+    └── output/       ← AUTO-CREATED, per module: tables (.csv) and every figure
+                        as BOTH .png (viewing) and .svg (vector, for Illustrator)
         ├── Mod1/
         ├── Mod2/
         └── …

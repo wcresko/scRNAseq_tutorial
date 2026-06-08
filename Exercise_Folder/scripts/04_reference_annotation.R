@@ -19,6 +19,19 @@ OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod4") # figures/tables, named to ma
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 seu <- readRDS(file.path(DATA_DIR, "ifnb_annotated.rds"))
 DefaultAssay(seu) <- "RNA"
 
@@ -28,7 +41,7 @@ p_setup_umap <- DimPlot(seu, group.by = "seurat_annotations", reduction = "umap"
   labs(title    = "Manual cell-type annotations on the unintegrated UMAP",
        subtitle = "Author-curated seurat_annotations carried from Module 3",
        x = "UMAP 1", y = "UMAP 2")
-ggsave(file.path(OUT_DIR, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap,
+save_fig(file.path(OUT_DIR, "Mod4_C1_manual_annotations_umap.png"), p_setup_umap,
        width = 7, height = 6, dpi = 300)
 
 # Azimuth anchor-based reference mapping. ifnb is PBMCs, so the pbmcref reference
@@ -46,7 +59,7 @@ p_azimuth_umap <- DimPlot(seu, group.by = "predicted.celltype.l2", reduction = "
   labs(title    = "Azimuth predicted cell types (level 2) on the unintegrated UMAP",
        subtitle = "Anchor-based mapping against the Azimuth pbmcref reference",
        x = "UMAP 1", y = "UMAP 2")
-ggsave(file.path(OUT_DIR, "Mod4_C2_azimuth_labels_umap.png"), p_azimuth_umap,
+save_fig(file.path(OUT_DIR, "Mod4_C2_azimuth_labels_umap.png"), p_azimuth_umap,
        width = 7, height = 6, dpi = 300)
 
 # Figure out: Azimuth mapping score per cell (Mod4_C3) — low = off-manifold
@@ -54,7 +67,7 @@ p_mapping <- FeaturePlot(seu, features = "mapping.score", reduction = "umap") +
   labs(title    = "Azimuth mapping score per cell",
        subtitle = "High (~0.7-1.0) = projects cleanly into the reference; low = off-manifold",
        x = "UMAP 1", y = "UMAP 2")
-ggsave(file.path(OUT_DIR, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
+save_fig(file.path(OUT_DIR, "Mod4_C3_azimuth_mapping_score.png"), p_mapping,
        width = 7, height = 6, dpi = 300)
 
 # Reconcile: keep the manual/ground-truth label where Azimuth agrees, else flag.

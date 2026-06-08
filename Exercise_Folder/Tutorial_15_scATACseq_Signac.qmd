@@ -158,6 +158,19 @@ out_dir <- "../output/Mod15"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 ```
 
 ## Data files and data dictionary
@@ -388,9 +401,9 @@ p_qc_vln <- p_qc_vln +
 p_qc_vln
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod15_C6_qc_density_scatter.png"), p_qc_density,
+save_fig(file.path(out_dir, "Mod15_C6_qc_density_scatter.png"), p_qc_density,
        width = 10, height = 5, dpi = 300)
-ggsave(file.path(out_dir, "Mod15_C6_qc_violins.png"),         p_qc_vln,
+save_fig(file.path(out_dir, "Mod15_C6_qc_violins.png"),         p_qc_vln,
        width = 14, height = 4, dpi = 300)
 ```
 
@@ -459,7 +472,7 @@ p_depthcor <- DepthCor(pbmc) +
 p_depthcor
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod15_C8_depthcor.png"), p_depthcor,
+save_fig(file.path(out_dir, "Mod15_C8_depthcor.png"), p_depthcor,
        width = 7, height = 4, dpi = 300)
 ```
 
@@ -498,7 +511,7 @@ p_umap <- DimPlot(pbmc, label = TRUE) +
 p_umap
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod15_C9_umap_clusters.png"), p_umap,
+save_fig(file.path(out_dir, "Mod15_C9_umap_clusters.png"), p_umap,
        width = 7, height = 6, dpi = 300)
 ```
 
