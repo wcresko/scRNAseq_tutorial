@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Talapas analysis pipeline 13 — parallels laptop Tutorial 13 (FAIR & Metadata).
+# Talapas analysis pipeline 17 — parallels laptop Tutorial 17 (FAIR & Metadata).
 # Learning notebook: Exercise_Folder/Tutorial_17_FAIR_Metadata.qmd
 # Runs on the annotated ifnb object (the same dataset as the laptop notebook).
 # Run:  sbatch --job-name=fair run_rscript.sbatch 17_fair_metadata.R

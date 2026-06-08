@@ -1,5 +1,5 @@
 #!/usr/bin/env Rscript
-# Talapas analysis pipeline 10 — parallels laptop Tutorial 10 (WGCNA).
+# Talapas analysis pipeline 13 — parallels laptop Tutorial 13 (WGCNA).
 # Standalone bonus track. Dataset: GSE152418 COVID-19 PBMC bulk RNA-seq.
 # Learning notebook: Exercise_Folder/Tutorial_13_WGCNA.qmd
 # Run:  sbatch --job-name=wgcna --mem=64G run_rscript.sbatch 13_wgcna.R
