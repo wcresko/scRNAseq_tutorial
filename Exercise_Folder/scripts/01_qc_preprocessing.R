@@ -26,14 +26,19 @@ message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", n
 #   - `donor` (= `ind`)    the 8 real lupus donors used downstream for DE / DA
 sce <- Kang18_8vs8()
 sce <- sce[, sce$multiplets == "singlet" & !is.na(sce$cell)]
-# Seurat forbids '_' in feature names (it would auto-rewrite '_' -> '-' and warn);
-# dashes are valid (HLA-A, MT-CO1), so rename explicitly and guard against collisions.
-cm <- counts(sce)
-flagged <- grep("_", rownames(cm), value = TRUE)
-if (length(flagged) > 0) {
-  message(length(flagged), " feature name(s) contain '_'; renaming '_' -> '-'")
-  rownames(cm) <- make.unique(gsub("_", "-", rownames(cm)))
-}
+# muscData's Kang18_8vs8 stores features as SYMBOL_ENSEMBLID (e.g.
+# "ISG15_ENSG00000187608"). Keep only the SYMBOL so markers / Azimuth /
+# org.Hs.eg.db match. Strip ONLY a trailing "_ENSEMBLID" suffix (NOT everything
+# after the first dash — real symbols like HLA-A / MT-CO1 contain dashes); keep
+# the original name where there is no symbol; de-duplicate collapsed symbols.
+cm   <- counts(sce)
+orig <- rownames(cm)
+sym  <- sub("_ENS[A-Z]*[0-9]+(\\.[0-9]+)?$", "", orig)
+blank <- is.na(sym) | sym == "" | grepl("^ENS[A-Z]*[0-9]+", sym)
+sym[blank] <- orig[blank]
+rownames(cm) <- make.unique(gsub("_", "-", sym))
+if (sum(rownames(cm) != orig) > 0)
+  message(sum(rownames(cm) != orig), " feature names simplified to gene symbols")
 seu <- CreateSeuratObject(counts    = cm,
                           meta.data = as.data.frame(colData(sce)),
                           project   = "ifnb", min.cells = 3, min.features = 200)
