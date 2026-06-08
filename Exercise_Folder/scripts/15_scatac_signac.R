@@ -14,8 +14,10 @@ set.seed(2026)
 DATA_DIR <- Sys.getenv("DATA_DIR", "../data")
 OBJ_DIR  <- Sys.getenv("OBJ_DIR",  "../objects")
 OUT_DIR  <- Sys.getenv("OUT_DIR",  "../output/Mod15") # figures/tables, named to match Tutorial_15.qmd
+dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)  # input datasets land here
 dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
 # Step 1 — Peek at the raw fragment file
 frag.file <- read.delim(file.path(DATA_DIR, "atac_v1_pbmc_10k_fragments.tsv.gz"),

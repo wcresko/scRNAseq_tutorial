@@ -9,7 +9,9 @@ suppressPackageStartupMessages({ library(Seurat); library(harmony); library(tidy
 set.seed(2026)
 OBJ_DIR <- Sys.getenv("OBJ_DIR", "../objects")
 OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod5") # figures/tables, named to match Tutorial_05.qmd
+dir.create(OBJ_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
+message("[dirs] objects -> ", normalizePath(OBJ_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 # Prefer the reference-reconciled object from step 04; fall back to step 03.
 in_file <- file.path(OBJ_DIR, "ifnb_annotated_final.rds")
 if (!file.exists(in_file)) in_file <- file.path(OBJ_DIR, "ifnb_annotated.rds")
