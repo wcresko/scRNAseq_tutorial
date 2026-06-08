@@ -156,7 +156,7 @@ save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
 :::
 
 ```{r}
-#| label: setup
+#| label: M1-setup
 
 # Packages are installed once in Tutorial 00 (Setup) — here we just load them.
 library(Seurat)
@@ -188,7 +188,7 @@ message("This module writes its figures & tables to: ", normalizePath(out_dir))
 ## Step 1 — Load the `ifnb` dataset
 
 ```{r}
-#| label: load
+#| label: M1-load
 
 # Fetch the Kang et al. 2017 PBMC dataset (CTRL + IFN-beta STIM) from
 # Bioconductor's ExperimentHub. The first call downloads ~25 MB and caches it;
@@ -275,7 +275,7 @@ tibble::enframe(table(ifnb$seurat_annotations),
 The `ifnb` object already arrives as a single Seurat object containing both conditions. For a two-sample QC workflow, it's useful to look at QC metrics **per sample** rather than globally — that way you'll catch a sample-specific quality issue (e.g. one sample with much lower depth) before it confounds the analysis.
 
 ```{r}
-#| label: split
+#| label: M1-split
 
 # Record the starting matrix dimensions
 dim_raw <- dim(ifnb)
@@ -307,7 +307,7 @@ tibble::tibble(
 ## Step 3 — Add QC metrics
 
 ```{r}
-#| label: qc-metrics
+#| label: M1-qc_metrics
 
 ifnb[["percent.mt"]] <- PercentageFeatureSet(ifnb, pattern = "^MT-")
 ifnb[["percent.rb"]] <- PercentageFeatureSet(ifnb, pattern = "^RP[SL]")
@@ -349,7 +349,7 @@ The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-c
 ## Step 4 — Visualize QC, per sample
 
 ```{r}
-#| label: qc-plots
+#| label: M1-qc_plots
 #| fig-cap: "Per-sample QC distributions (violins) and the UMI–gene relationship (scatter) for the ifnb dataset."
 
 # Violin panel: four QC metrics, split by sample, fully labelled.
@@ -420,7 +420,7 @@ In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambi
 *Optional reference pattern — left `#| eval: false` because it needs a raw Cell Ranger matrix (not shipped with `ifnb`). You don't need to change anything here; use it on your own 10x data.*
 
 ```{r}
-#| label: soupx
+#| label: M1-soupx
 #| eval: false
 
 # Pattern for any 10x dataset where you have the raw Cell Ranger output.
@@ -484,7 +484,7 @@ A **doublet** is one barcode's worth of counts that came from two cells getting 
 `scDblFinder` simulates artificial doublets, trains a classifier to distinguish them from singletons, and returns a per-cell score and class. Critically, **doublets form within a sample, not across samples**, so we run it per sample.
 
 ```{r}
-#| label: dbl
+#| label: M1-dbl
 
 library(scDblFinder)
 
@@ -561,7 +561,7 @@ save_fig(file.path(out_dir, "Mod1_C7_doublet_violins.png"), p_dbl,
 ## Step 7 — Filter low-quality cells
 
 ```{r}
-#| label: filter
+#| label: M1-filter
 
 ifnb <- subset(
   ifnb,
@@ -599,7 +599,7 @@ tibble::enframe(table(ifnb$stim),
 ## Step 8 — Normalize
 
 ```{r}
-#| label: normalize
+#| label: M1-normalize
 
 ifnb <- NormalizeData(ifnb)
 # Equivalent explicit form:
@@ -627,7 +627,7 @@ dim_after_normalize <- dim(ifnb)
 ## Step 9 — Highly variable features
 
 ```{r}
-#| label: hvgs
+#| label: M1-hvgs
 #| fig-cap: "Mean–variance relationship across genes with the top-10 highly variable features labelled."
 
 ifnb <- FindVariableFeatures(
@@ -678,7 +678,7 @@ tibble::tibble(rank = seq_along(top10), gene = top10) |>
 ## Step 10 — Scale
 
 ```{r}
-#| label: scale
+#| label: M1-scale
 
 ifnb <- ScaleData(ifnb)
 ```
@@ -704,7 +704,7 @@ By default `ScaleData` only scales the variable features identified in Step 9 (~
 ## Counts matrix progression — summary
 
 ```{r}
-#| label: dim-summary
+#| label: M1-dim_summary
 
 dim_summary <- tibble::tribble(
   ~step,                                                    ~features_after,        ~barcodes_after,
@@ -731,7 +731,7 @@ You should see roughly:
 ## Save and continue to Tutorial 02
 
 ```{r}
-#| label: save
+#| label: M1-save
 
 # Make sure data/ exists
 dir.create("../data", showWarnings = FALSE)

@@ -99,7 +99,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ## Setup {#setup}
 
 ```{r}
-#| label: setup
+#| label: M16-setup
 
 # Packages are installed in Tutorial 00 (Setup → bonus modules); the stxBrain
 # dataset install is on the Datasets page. Here we just load the libraries.
@@ -138,7 +138,7 @@ set.seed(2026)
 ## Step 1 — Load both sections
 
 ```{r}
-#| label: load
+#| label: M16-load
 
 ant  <- LoadData("stxBrain", type = "anterior1")
 post <- LoadData("stxBrain", type = "posterior1")
@@ -177,7 +177,7 @@ tibble::tibble(
 The same per-spot QC metrics as scRNA-seq apply: `nCount_Spatial`, `nFeature_Spatial`, percent mitochondrial. **But also visualize them spatially** — a localized QC outlier (e.g. one corner of the tissue with low UMI counts) is a tissue artefact (bubble, fold, edge cells), not random noise.
 
 ```{r}
-#| label: qc
+#| label: M16-qc
 #| fig-cap: "Per-spot QC for the anterior section: violin distributions and the same metrics overlaid on the tissue."
 
 ant[["percent.mt"]] <- PercentageFeatureSet(ant, pattern = "^mt-")
@@ -239,7 +239,7 @@ White matter is famously low-yield on Visium because the tissue is mostly axons 
 `SCTransform` is the recommended normalization for Visium because spot-level counts have a **wider dynamic range** than single-cell counts (each spot pools 1–10 cells), and `SCTransform`'s regularized negative binomial model handles that better than `LogNormalize`.
 
 ```{r}
-#| label: norm
+#| label: M16-norm
 
 ant  <- SCTransform(ant,  assay = "Spatial", verbose = FALSE)
 post <- SCTransform(post, assay = "Spatial", verbose = FALSE)
@@ -259,7 +259,7 @@ Sanity-check that the data captures known anatomy. For the mouse brain:
 -   `Cck` — broadly cortical inhibitory neurons
 
 ```{r}
-#| label: markers
+#| label: M16-markers
 #| fig-cap: "Known anatomical marker genes overlaid on the anterior and posterior tissue sections."
 
 p_markers_ant <- SpatialFeaturePlot(ant, features = c("Hpca", "Plp1", "Sst"),
@@ -305,7 +305,7 @@ If you don't recognize the hippocampus, open the [Allen Mouse Brain Atlas](https
 Same workflow as scRNA-seq, but on the SCT assay:
 
 ```{r}
-#| label: cluster
+#| label: M16-cluster
 #| fig-cap: "Anterior-section spot clusters shown as a UMAP and overlaid on the tissue."
 
 ant <- ant |>
@@ -351,7 +351,7 @@ Real cell types are spatially organized in tissue — neurons in cortex, oligode
 Some genes are variable *and* their variation has spatial structure (a clear pattern on the tissue), some are variable but spatially random. The first kind is what you usually want to study in a spatial dataset.
 
 ```{r}
-#| label: svf
+#| label: M16-svf
 #| fig-cap: "Top spatially variable genes (Moran's I) in the anterior section, overlaid on the tissue."
 
 ant <- FindSpatiallyVariableFeatures(
@@ -398,7 +398,7 @@ Either (a) genuine cell-cell heterogeneity within an anatomical region (rare cel
 The same two-sample integration logic as `ifnb`, but on Visium. We use `SCTransform` integration:
 
 ```{r}
-#| label: merge-integrate
+#| label: M16-merge_integrate
 #| fig-cap: "Joint embedding of both sections after SCT integration: UMAP coloured by section and cluster, plus per-section cluster maps on tissue."
 
 # Each section is its own "batch"
@@ -474,7 +474,7 @@ This is too heavy to install and run end-to-end here, but the recipe is:
 *Optional reference recipe — left `#| eval: false`; it's heavy to run and is here as a pattern for your own data, so you don't need to change anything.*
 
 ```{r}
-#| label: deconv-recipe
+#| label: M16-deconv_recipe
 #| eval: false
 
 # Reference recipe for an actual deconvolution with spacexr (RCTD).
@@ -497,7 +497,7 @@ For the laptop workflow here, **a fast proxy** is to compute a **module score** 
 *Optional illustrative sketch — left `#| eval: false`; you don't need to change it.*
 
 ```{r}
-#| label: module-score
+#| label: M16-module_score
 #| eval: false
 
 # Illustrative sketch only (cross-species gene-name conversion is non-trivial):
@@ -510,7 +510,7 @@ SpatialFeaturePlot(brain, features = "Microglia1")
 ## Step 9 — Save
 
 ```{r}
-#| label: save
+#| label: M16-save
 
 dir.create("../data", showWarnings = FALSE)
 saveRDS(brain, "../data/stxBrain_integrated.rds")

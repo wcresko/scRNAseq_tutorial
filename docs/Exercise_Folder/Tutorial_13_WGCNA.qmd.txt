@@ -64,6 +64,7 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 The tutorial reads the raw count table from `../data/`. Download it once from GEO's supplementary FTP and unzip it in place:
 
 ```{bash}
+#| label: M13-mkdir_p_data_cd
 #| eval: false
 mkdir -p ../data && cd ../data
 wget https://ftp.ncbi.nlm.nih.gov/geo/series/GSE152nnn/GSE152418/suppl/GSE152418_p20047_Study1_RawCounts.txt.gz
@@ -100,7 +101,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ## Setup
 
 ```{r}
-#| label: setup
+#| label: M13-setup
 # Packages are installed in Tutorial 00 (Setup → bonus modules) — load them here.
 library(WGCNA)
 library(DESeq2)
@@ -159,7 +160,7 @@ save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
 ## Step 1 — Load data and metadata
 
 ```{r}
-#| label: load
+#| label: M13-load
 data <- read.delim("../data/GSE152418_p20047_Study1_RawCounts.txt", header = TRUE)
 
 # Pull GEO metadata
@@ -175,7 +176,7 @@ phenoData |>
 ```
 
 ```{r}
-#| label: tidy-counts
+#| label: M13-tidy_counts
 # Reshape to a tidy long form, attach phenoData (matching `samples` to `title`),
 # then spread back to a counts matrix indexed by Ensembl ID.
 data <- data |>
@@ -205,7 +206,7 @@ tibble::tibble(
 :::
 
 ```{r}
-#| label: gsg
+#| label: M13-gsg
 gsg <- goodSamplesGenes(t(data))
 summary(gsg)
 gsg$allOK
@@ -225,7 +226,7 @@ data <- data[gsg$goodGenes == TRUE, ]
 ```
 
 ```{r}
-#| label: hclust
+#| label: M13-hclust
 #| fig-cap: "Average-linkage hierarchical clustering of samples (Euclidean distance) for outlier detection."
 htree <- hclust(dist(t(data)), method = "average")
 plot(htree,
@@ -243,7 +244,7 @@ save_base_fig(file.path(out_dir, "Mod13_C6_sample_dendrogram.png"), width = 10, 
 ```
 
 ```{r}
-#| label: pca-outlier
+#| label: M13-pca_outlier
 #| fig-cap: "Sample-level PCA (PC1 vs PC2) with each sample labelled, used to spot outlying samples."
 pca       <- prcomp(t(data))
 pca.dat   <- pca$x
@@ -277,7 +278,7 @@ PCA — it gives you a continuous view of how far each sample is from the rest, 
 :::
 
 ```{r}
-#| label: drop-outliers
+#| label: M13-drop_outliers
 # Patel's example drops a couple of obvious outliers; modify to fit your eyeballed picks.
 samples.to.exclude <- c("GSM4614993", "GSM4614994", "GSM4614995")
 data.subset <- data[, !(colnames(data) %in% samples.to.exclude)]
@@ -297,7 +298,7 @@ all(rownames(colData) == colnames(data.subset))
 WGCNA expects expression values that are **roughly homoscedastic** across the mean range. Variance-stabilizing transformation does that for count data:
 
 ```{r}
-#| label: vst
+#| label: M13-vst
 dds <- DESeqDataSetFromMatrix(countData = data.subset,
                               colData   = colData,
                               design    = ~ 1)        # WGCNA is unsupervised
@@ -317,7 +318,7 @@ norm.counts <- assay(dds_norm) |> t()      # WGCNA wants samples × genes
 ## Step 4 — Pick the soft-thresholding power
 
 ```{r}
-#| label: pick-power
+#| label: M13-pick_power
 #| fig-cap: "Soft-threshold scan: scale-free topology fit (signed R²) and mean connectivity versus candidate powers."
 power <- c(1:10, seq(12, 30, by = 2))
 sft <- pickSoftThreshold(norm.counts,
@@ -357,7 +358,7 @@ save_fig(file.path(out_dir, "Mod13_C10_soft_threshold.png"), p_sft,
 ## Step 5 — Build the network
 
 ```{r}
-#| label: build-network
+#| label: M13-build_network
 soft_power     <- 18
 temp_cor       <- cor                    # save base::cor before WGCNA shadows it
 cor            <- WGCNA::cor
@@ -379,7 +380,7 @@ cor <- temp_cor                          # restore base::cor
 :::
 
 ```{r}
-#| label: dendro
+#| label: M13-dendro
 #| fig-cap: "Gene dendrogram with unmerged and merged module-colour assignments from blockwiseModules."
 plotDendroAndColors(bwnet$dendrograms[[1]],
                     cbind(bwnet$unmergedColors, bwnet$colors),
@@ -406,7 +407,7 @@ save_base_fig(file.path(out_dir, "Mod13_C12_module_dendrogram.png"), width = 10,
 ## Step 6 — Module eigengenes & module–trait correlations
 
 ```{r}
-#| label: MEs
+#| label: M13-MEs
 module_eigengenes <- bwnet$MEs
 head(module_eigengenes)
 table(bwnet$colors)        # genes per module
@@ -424,7 +425,7 @@ tibble::enframe(table(bwnet$colors),
 ```
 
 ```{r}
-#| label: trait-binarize
+#| label: M13-trait_binarize
 # Build a numeric trait matrix: severity (Healthy / Convalescent / ICU / Moderate / Severe).
 traits <- colData |>
   mutate(disease_state_bin = ifelse(grepl("severe", `disease state:ch1`,
@@ -439,7 +440,7 @@ traits <- cbind(traits, severity.out)
 ```
 
 ```{r}
-#| label: cor-trait
+#| label: M13-cor_trait
 #| fig-cap: "Module–trait relationships: correlation of each module eigengene with the severity traits."
 nSamples <- nrow(norm.counts)
 nGenes   <- ncol(norm.counts)
@@ -491,7 +492,7 @@ Two things in parallel:
 ## Step 7 — Hub genes within a module
 
 ```{r}
-#| label: kme
+#| label: M13-kme
 module.gene.mapping <- as.data.frame(bwnet$colors)
 module.gene.mapping |>
   rownames_to_column("gene") |>

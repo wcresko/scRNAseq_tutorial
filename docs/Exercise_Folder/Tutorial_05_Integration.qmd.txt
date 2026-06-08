@@ -105,7 +105,7 @@ If you're running a graded course, link the rendered solutions page from your LM
 ## Setup
 
 ```{r}
-#| label: setup
+#| label: M5-setup
 
 library(Seurat)
 library(tidyverse)
@@ -140,7 +140,7 @@ save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
 ```
 
 ```{r}
-#| label: resume
+#| label: M5-resume
 
 ifnb <- readRDS("../data/ifnb_annotated.rds")
 ifnb
@@ -153,7 +153,7 @@ ifnb
 Both Harmony and Seurat anchors work best when each sample's normalization, HVGs, and PCA are computed **per sample first**, then combined. The reasoning: HVGs are about within-sample variance, and per-sample HVGs avoid letting one dominant sample dictate the gene set.
 
 ```{r}
-#| label: split-norm
+#| label: M5-split_norm
 
 # Split object by sample of origin (the `stim` column from Tut 01)
 ifnb.list <- SplitObject(ifnb, split.by = "stim")
@@ -188,7 +188,7 @@ ifnb.list
 Harmony runs **after** PCA on the joint matrix. It iteratively soft-clusters cells in PC space and shifts each cluster centroid so that batches mix within clusters — producing a corrected `harmony` reduction that is a drop-in replacement for `pca` in `FindNeighbors` and `RunUMAP`.
 
 ```{r}
-#| label: harmony
+#| label: M5-harmony
 
 # Re-merge the per-sample objects, run joint normalization / HVG / scale / PCA
 features <- SelectIntegrationFeatures(object.list = ifnb.list, nfeatures = 2000)
@@ -238,7 +238,7 @@ ifnb_h <- RunUMAP(ifnb_h, reduction = "harmony", dims = 1:20,
 The classical Seurat approach: find **anchors** (mutual nearest neighbors after CCA) between sample pairs, then learn a transformation that maps each sample into a shared space.
 
 ```{r}
-#| label: seurat-anchors
+#| label: M5-seurat_anchors
 
 ifnb.anchors <- FindIntegrationAnchors(object.list = ifnb.list,
                                        anchor.features = features,
@@ -280,7 +280,7 @@ After `IntegrateData()` the **default assay** becomes `"integrated"`. That assay
 ## Step 2 — Compare unintegrated, Harmony, and Seurat-anchor UMAPs
 
 ```{r}
-#| label: compare
+#| label: M5-compare
 #| fig-cap: "Unintegrated vs Harmony vs Seurat-anchor UMAPs, coloured by sample (mixing check) and by cell type (structure check)."
 
 # Unintegrated UMAP from Tut 02 (still inside the `ifnb` object)
@@ -351,7 +351,7 @@ save_fig(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
 The risk of integration is **erasing real biology**. The ISG response is real — STIM cells *should* differ from CTRL cells in every cell type — and integration should **mix the cells in space** without zeroing out their expression.
 
 ```{r}
-#| label: isg-score
+#| label: M5-isg_score
 #| fig-cap: "Per-cell interferon-stimulated-gene (ISG) module score on the Harmony and Seurat-anchor UMAPs — integration should mix cells in space without flattening the ISG response."
 
 isg_set <- c("ISG15","IFI6","IFIT1","IFIT3","ISG20","MX1","OAS1","RSAD2","IFIT2")
@@ -418,7 +418,7 @@ readr::write_csv(isg_by_celltype,
 ## Step 4 — Re-find markers on integrated clusters
 
 ```{r}
-#| label: integrated-markers
+#| label: M5-integrated_markers
 
 # Switch back to the RNA assay for marker testing
 DefaultAssay(ifnb_h) <- "RNA"
@@ -476,7 +476,7 @@ For Tutorial 06's pseudobulk DE we want an object with:
 -   `seurat_annotations` carried through
 
 ```{r}
-#| label: save
+#| label: M5-save
 
 # Make sure RNA is the default assay before saving
 DefaultAssay(ifnb_h) <- "RNA"
