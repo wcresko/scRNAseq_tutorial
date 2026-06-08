@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ## About this tutorial
 
 A bonus hands-on companion to **[Lecture 14 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)**. These are *optional* downstream analyses; they build on the annotated, integrated object from the core workflow. We:
@@ -45,10 +54,9 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 
 ## Setup
 
-``` r
-# Bioconductor: slingshot, tradeSeq, CytoTRACE; CRAN/GitHub: monocle3, CellChat
-# BiocManager::install(c("slingshot", "tradeSeq", "SingleCellExperiment"))
-# remotes::install_github(c("cole-trapnell-lab/monocle3", "jinworks/CellChat"))
+```{r}
+#| eval: false
+# Packages are installed in Tutorial 00 (Setup → bonus modules) — load them here.
 library(Seurat); library(slingshot); library(SingleCellExperiment)
 library(tidyverse)
 
@@ -60,7 +68,8 @@ DefaultAssay(seu) <- "RNA"
 
 `slingshot` fits smooth principal curves through your clusters in a reduced space. You give it a **start cluster** (the root) — here we *pretend* one cell type is the progenitor purely to demonstrate the mechanics.
 
-``` r
+```{r}
+#| eval: false
 sce <- as.SingleCellExperiment(seu)
 sce <- slingshot(sce,
                  clusterLabels = "seurat_annotations",
@@ -87,7 +96,8 @@ You'd want an independent reason the start cells are the least-differentiated: k
 
 ### Monocle3 alternative
 
-``` r
+```{r}
+#| eval: false
 library(monocle3)
 cds <- as.cell_data_set(seu)                 # SeuratWrappers
 cds <- cluster_cells(cds)
@@ -100,7 +110,8 @@ plot_cells(cds, color_cells_by = "pseudotime")
 
 Velocity needs a **spliced/unspliced** count matrix, which the standard Cell Ranger *filtered* matrix does **not** contain. Generate it first with `velocyto run` or `kb count --workflow lamanno`, then:
 
-``` python
+```{python}
+#| eval: false
 import scvelo as scv, scanpy as sc
 adata = scv.read("ifnb_velocyto.loom")        # spliced + unspliced layers
 scv.pp.filter_and_normalize(adata, min_shared_counts=20, n_top_genes=2000)
@@ -116,7 +127,8 @@ If you only have the filtered matrix, you **cannot** run velocity — there is n
 
 ### CytoTRACE cross-check
 
-``` r
+```{r}
+#| eval: false
 library(CytoTRACE)
 cyto <- CytoTRACE(as.matrix(GetAssayData(seu, slot = "counts")))
 seu$cytotrace <- cyto$CytoTRACE
@@ -125,7 +137,8 @@ FeaturePlot(seu, "cytotrace")   # higher = less differentiated (more genes detec
 
 ## Part C — Cell–cell communication with CellChat
 
-``` r
+```{r}
+#| eval: false
 library(CellChat)
 cc  <- createCellChat(object = seu, group.by = "seurat_annotations")
 cc@DB <- CellChatDB.human                       # human L–R database

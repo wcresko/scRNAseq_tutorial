@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ::: callout-important
 **This is a bonus *upstream* Talapas exercise, not a laptop tutorial.** It runs *before* the core scATAC analysis (Module 15) — it produces the fragments + peak matrix Module 15 consumes. `cellranger-atac` requires a \~30 GB ATAC reference, multi-GB FASTQs, and a multi-core machine with 64+ GB RAM. Do not try to run it on your laptop. Work through the laptop sequence (core tutorials 01–08) and the [RNA Cell Ranger tutorial](Tutorial_11_CellRanger_RawData.html) first, then come here when you have your own raw 10x scATAC FASTQs.
 :::
@@ -53,7 +62,8 @@ The key file you'll see for the first time is **`fragments.tsv.gz`** — a sorte
 
 ## Step 1 — Install cellranger-atac on Talapas
 
-``` bash
+```{bash}
+#| eval: false
 cd /projects/<PIRG>/<your-username>/software
 
 # Get cellranger-atac from 10x. Generate a fresh signed URL from
@@ -74,7 +84,8 @@ On Talapas check `module avail cellranger-atac` first — the cluster may have a
 
 The ATAC reference is **separate** from the RNA reference because Cell Ranger ATAC indexes the whole genome (not just transcribed regions).
 
-``` bash
+```{bash}
+#| eval: false
 cd /projects/<PIRG>/<your-username>/refs
 
 # Human GRCh38 ATAC reference
@@ -88,7 +99,8 @@ Note the reference is `refdata-cellranger-arc-GRCh38-2024-A`, **not** the RNA `r
 
 If your downstream Signac analysis needs the **older hg19** annotation (because [Module 15](Tutorial_15_scATACseq_Signac.html) uses `EnsDb.Hsapiens.v75`), use the corresponding hg19 reference:
 
-```bash
+```{bash}
+#| eval: false
 # For matching Module 15's hg19 / EnsDb.Hsapiens.v75:
 wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-atac-GRCh37-1.2.0.tar.gz
 ```
@@ -97,7 +109,8 @@ wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-atac-GRCh37-1.
 
 10x's PBMC 5k v1 ATAC dataset is the workshop default downstream. The 1k version is smaller for first runs:
 
-``` bash
+```{bash}
+#| eval: false
 cd /projects/<PIRG>/<your-username>/test_data
 
 # PBMC 1k v1 ATAC FASTQs (~3 GB)
@@ -109,7 +122,8 @@ tar -xf atac_pbmc_1k_v1_fastqs.tar
 
 Create `run_cellranger_atac_count.sbatch`:
 
-``` bash
+```{bash}
+#| eval: false
 #!/bin/bash
 #SBATCH --job-name=cratac_pbmc1k
 #SBATCH --partition=compute
@@ -138,7 +152,8 @@ cellranger-atac count \
 
 Submit:
 
-``` bash
+```{bash}
+#| eval: false
 mkdir -p logs
 sbatch run_cellranger_atac_count.sbatch
 ```
@@ -157,7 +172,8 @@ scATAC processing has to: (a) align fragments to the **whole genome** (not the t
 
 ## Step 5 — Inspect the output
 
-``` bash
+```{bash}
+#| eval: false
 cd /projects/<PIRG>/<your-username>/cellranger_atac_runs/atac_pbmc_1k_v1/outs
 ls -la
 # web_summary.html
@@ -189,7 +205,8 @@ ATAC-specific metrics worth scrutinizing in `web_summary.html`:
 
 The four files Module 15 expects are exactly what `cellranger-atac` produces. Copy them to your local `data/` directory:
 
-``` bash
+```{bash}
+#| eval: false
 # From local:
 SRC=<username>@login.talapas.uoregon.edu:/projects/<PIRG>/<your-username>/cellranger_atac_runs/atac_pbmc_1k_v1/outs
 
@@ -205,7 +222,8 @@ Then [Module 15](Tutorial_15_scATACseq_Signac.html) loads them with `Read10X_h5(
 
 Same pattern as the RNA tutorial — one row in `samples.txt` per sample, then a SLURM array:
 
-``` bash
+```{bash}
+#| eval: false
 #!/bin/bash
 #SBATCH --job-name=cratac_array
 #SBATCH --partition=compute

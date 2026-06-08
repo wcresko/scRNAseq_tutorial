@@ -18,6 +18,15 @@ execute:
 editor: visual
 ---
 
+::: {.callout-note title="Running the code in this tutorial"}
+Every code chunk here is tagged with `#| eval: false`, so the published page shows the code **without running it**. To run it yourself, open the downloaded `.qmd` in **RStudio**:
+
+- **Run one chunk:** click the green ▶ (*Run Current Chunk*) at the chunk's top-right, or press *Ctrl/Cmd + Enter*. This runs the chunk **regardless of its `eval` setting** — the easiest way to work through the tutorial interactively.
+- **Run a chunk on render:** change that chunk's `#| eval: false` to `#| eval: true` (or delete the line) so it executes when the document is rendered.
+- **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
+:::
+
+
 ## About this tutorial
 
 This is the **first of the two Friday-morning Talapas modules** (the second is [Module 10 — the analysis pipeline](Tutorial_10_Talapas_Pipeline.html)). It covers the **basics of using SLURM** (the job scheduler on the University of Oregon's Talapas HPC cluster) --- both in **interactive mode** and through **batch scripts** --- and ends with an example batch script that runs the whole `01`–`08` analysis series. It is aimed at workshop participants who have a Duck ID and Talapas account and are ready to run their first jobs.
@@ -53,7 +62,8 @@ Before you start:
 1.  A Talapas account tied to a PIRG (request one at [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access)).
 2.  You have SSH'd into Talapas at least once:
 
-    ``` bash
+    ```{bash}
+    #| eval: false
     ssh <yourduckid>@login.talapas.uoregon.edu
     ```
 
@@ -61,7 +71,8 @@ Before you start:
 
 Optionally, set your account once in `~/.bash_profile` so you don't type `--account=` every time:
 
-``` bash
+```{bash}
+#| eval: false
 echo 'export SLURM_ACCOUNT=<myPIRG>'  >> ~/.bash_profile
 echo 'export SBATCH_ACCOUNT=<myPIRG>' >> ~/.bash_profile
 source ~/.bash_profile
@@ -125,7 +136,8 @@ Use an **interactive** session (`srun` / `salloc`) when you'll **sit and watch**
 
 From a Talapas login node, run:
 
-``` bash
+```{bash}
+#| eval: false
 srun --account=<myPIRG> \
      --partition=compute \
      --time=1:00:00 \
@@ -147,7 +159,8 @@ When the resources are available, your prompt will change to show the hostname o
 
 **`salloc` — the close cousin of `srun --pty bash`.** Run `salloc` from a **login node** to request an interactive allocation; when it's granted, your shell **prompt changes from the login node to the compute node** (e.g. `n0135`) and you work there directly:
 
-``` bash
+```{bash}
+#| eval: false
 salloc --account=<myPIRG> --partition=compute --time=1:00:00 --mem=4G --cpus-per-task=2
 # allocation granted → prompt changes, e.g.  [duckid@n0135 ~]$
 ```
@@ -158,13 +171,15 @@ salloc --account=<myPIRG> --partition=compute --time=1:00:00 --mem=4G --cpus-per
 
 For short, quick sessions the `interactive` partition is usually faster to start:
 
-``` bash
+```{bash}
+#| eval: false
 srun --account=<myPIRG> --partition=interactive --time=2:00:00 --mem=8G --pty bash
 ```
 
 ### 5.3 Interactive GPU session
 
-``` bash
+```{bash}
+#| eval: false
 srun --account=<myPIRG> \
      --partition=interactivegpu \
      --time=1:00:00 \
@@ -182,7 +197,8 @@ If you need a GUI (e.g. RStudio, MATLAB), two options:
 
 1.  **X11 forwarding** --- SSH in with `ssh -Y` and then:
 
-    ``` bash
+    ```{bash}
+    #| eval: false
     srun --account=<myPIRG> --x11 --partition=compute \
          --time=2:00:00 --mem=4G --pty bash
     ```
@@ -203,7 +219,8 @@ The Talapas scripts folder ships a tiny demo, [`hello_world.R`](scripts/hello_wo
 
 From an interactive session (above), load R and run it:
 
-``` bash
+```{bash}
+#| eval: false
 module load R
 Rscript hello_world.R
 ```
@@ -232,7 +249,8 @@ For longer-running analyses (which is most real workshop work), write a **batch 
 ::: {.callout-important title="Create the logs/ directory first (one time)"}
 The shipped scripts (`slurm_demo.sbatch`, `run_rscript.sbatch`, and the analysis-step examples below) write their `.out`/`.err` logs to a `logs/` subdirectory via `#SBATCH --output=logs/%x_%j.out`. **SLURM does not create this directory for you** — if it is missing, the job is rejected (or dies instantly with no log to explain why). From the `scripts/` folder you submit jobs from, run this once:
 
-``` bash
+```{bash}
+#| eval: false
 mkdir -p logs
 ```
 :::
@@ -243,7 +261,8 @@ mkdir -p logs
 
 Save the following as `hostname.sbatch`:
 
-``` bash
+```{bash}
+#| eval: false
 #!/bin/bash
 #SBATCH --account=<myPIRG>        ### PIRG / account for charging
 #SBATCH --partition=compute       ### queue
@@ -261,7 +280,8 @@ echo "Hello from $(hostname) at $(date)"
 
 Submit it:
 
-``` bash
+```{bash}
+#| eval: false
 sbatch hostname.sbatch
 ```
 
@@ -273,7 +293,8 @@ Submitted batch job 123456
 
 Check its status:
 
-``` bash
+```{bash}
+#| eval: false
 squeue -j 123456
 # or
 squeue -u $USER
@@ -289,7 +310,8 @@ You don't have to type it out: the Talapas scripts folder includes [`slurm_demo.
 
 All `#SBATCH` lines must be at the **top** of the script, before any other commands. A few additional flags worth knowing:
 
-``` bash
+```{bash}
+#| eval: false
 #SBATCH --mem-per-cpu=4G          ### per-core memory (alternative to --mem)
 #SBATCH --mail-type=END,FAIL      ### email on end/failure
 #SBATCH --mail-user=you@uoregon.edu
@@ -300,7 +322,8 @@ All `#SBATCH` lines must be at the **top** of the script, before any other comma
 
 A batch script that loads R and runs a Seurat QC pipeline looks like this:
 
-``` bash
+```{bash}
+#| eval: false
 #!/bin/bash
 #SBATCH --account=<myPIRG>
 #SBATCH --partition=compute
@@ -328,7 +351,8 @@ Note how `module purge` and `module load` happen *inside* the script --- modules
 
 ### 6.4 GPU batch job
 
-``` bash
+```{bash}
+#| eval: false
 #!/bin/bash
 #SBATCH --account=<myPIRG>
 #SBATCH --partition=gpu
@@ -356,13 +380,15 @@ python scripts/train_scvi.py
 
 You don't need a separate `.sbatch` file for every R script. The folder ships a generic wrapper, [`run_rscript.sbatch`](scripts/run_rscript.sbatch), whose last line is simply:
 
-``` bash
+```{bash}
+#| eval: false
 Rscript "${SCRIPT}"
 ```
 
 Pass the R script as an argument and override the job name per run:
 
-``` bash
+```{bash}
+#| eval: false
 sbatch --job-name=hello run_rscript.sbatch hello_world.R
 # or a real analysis step:
 sbatch --job-name=qc    run_rscript.sbatch 01_qc_preprocessing.R
@@ -370,7 +396,8 @@ sbatch --job-name=qc    run_rscript.sbatch 01_qc_preprocessing.R
 
 Then watch the queue and, when it finishes, read the logs (or open them in VS Code):
 
-``` bash
+```{bash}
+#| eval: false
 squeue -u $USER
 cat logs/hello_*.out      # stdout
 cat logs/hello_*.err      # stderr / R errors
@@ -382,7 +409,8 @@ This is exactly how the rest of the Talapas track is run — every analysis step
 
 When you want to reproduce the **entire core analysis** (Modules 01–08) end-to-end rather than one step at a time, the folder also ships [`run_pipeline.sbatch`](scripts/run_pipeline.sbatch). It runs the eight numbered scripts **in order** inside a single allocation — each step's `.rds`/`.csv` output is the next step's input:
 
-``` bash
+```{bash}
+#| eval: false
 #SBATCH ... (one allocation, ~12 h, 96 GB)
 STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
 for step in "${STEPS[@]}"; do
@@ -393,7 +421,8 @@ done
 
 Submit it once (after `mkdir -p logs` and pre-caching `ifnb` on a login node):
 
-``` bash
+```{bash}
+#| eval: false
 sbatch run_pipeline.sbatch
 squeue -u $USER
 seff <jobid>                 # confirm State: COMPLETED
@@ -415,13 +444,15 @@ control — running one step at a time, or right-sizing memory per step — use
 
 After a job finishes, check what it actually used:
 
-``` bash
+```{bash}
+#| eval: false
 seff 123456
 ```
 
 or:
 
-``` bash
+```{bash}
+#| eval: false
 sacct -j 123456 --format=JobID,JobName,ReqMem,MaxRSS,Elapsed,State,ExitCode
 ```
 
@@ -431,7 +462,8 @@ Use `MaxRSS` (peak memory) and `Elapsed` (wall time) to right-size future submis
 
 ## 8. Monitoring, cancelling, and troubleshooting
 
-``` bash
+```{bash}
+#| eval: false
 # See your jobs
 squeue -u $USER
 
@@ -457,7 +489,8 @@ Common reasons a job stays `PD` (pending):
 -   `QOSMaxJobsPerUserLimit` --- you have hit a per-user submission limit; let earlier jobs finish.
 -   `ReqNodeNotAvail, Reserved for maintenance` --- your `--time` would run into an upcoming quarterly maintenance window. Shorten `--time`, or add `--time-min=` to let SLURM start the job sooner with a reduced limit:
 
-    ``` bash
+    ```{bash}
+    #| eval: false
     #SBATCH --time=0-08:00:00
     #SBATCH --time-min=0-01:00:00
     ```
