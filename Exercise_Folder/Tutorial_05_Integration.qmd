@@ -84,6 +84,8 @@ We'll then re-cluster, re-UMAP, and **diagnose over-correction** by overlaying t
 **ISG score gap looks zero after integration** — you scored on the integrated assay instead of the `RNA` assay. `AddModuleScore` uses `DefaultAssay(seu)`. Switch back to `RNA` first.
 
 **Harmony's `RunHarmony` errors with "object has no `pca` reduction"** — you skipped the `RunPCA` step. Harmony works on PC space, not on the raw scaled counts.
+
+**`FindIntegrationAnchors` seems to hang at "Running CCA"** — it isn't hung; CCA is an SVD-based step that grows with cell number, and this `ifnb` is ~23k cells, so it can take **several minutes** on a laptop (much slower than Harmony's seconds). As long as a CPU core is busy, let it finish — "Finding anchors" and "Finding integration vectors" follow. The `Different features in new layer data than already exists for scale.data` warnings during "Scaling features" are benign (Seurat v5 re-scales the integration features over the HVG `scale.data` from Tutorial 01).
 :::
 
 
@@ -238,14 +240,14 @@ After `IntegrateData()` the **default assay** becomes `"integrated"`. That assay
 :::
 
 ::: {.callout-important title="Think about it"}
-1.  Anchor-based integration is widely considered the most rigorous of the alignment methods, but it's also slow on large datasets. For `ifnb` (\~14k cells, 2 samples), how does runtime compare to Harmony?
+1.  Anchor-based integration is widely considered the most rigorous of the alignment methods, but it's also slow on large datasets. For `ifnb` (\~23k cells, 2 samples), how does runtime compare to Harmony?
 2.  Why does `DefaultAssay(ifnb_s) <- "integrated"` matter for clustering but not for marker testing?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Harmony finishes in **\~10–30 seconds**; Seurat anchors take **\~1–3 minutes**. For atlas-scale data (1M cells, 50 samples) the difference balloons to hours-vs-minutes, and Harmony or scVI become the practical choice.
+1.  Harmony finishes in **well under a minute**; Seurat CCA anchors are much slower — on this ~23k-cell `ifnb` the `FindIntegrationAnchors` "Running CCA" step alone can take **several minutes** on a laptop (it's an SVD-based step that grows quickly with cell number), so don't be alarmed if it sits there. For atlas-scale data (1M cells, 50 samples) the difference balloons to hours-vs-minutes, and Harmony or scVI become the practical choice.
 2.  The integrated assay holds **batch-corrected** expression values that are valid for *geometry* (PCA, neighbor graph, UMAP). They're **not** valid for differential expression because the correction can dampen or distort real biological variation. Always run `FindMarkers()` on the original `RNA` assay.
 
 </details>
