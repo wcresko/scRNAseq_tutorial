@@ -4446,12 +4446,32 @@ Note
 <li>Manual labels (<code>celltype_manual</code> from Chapter 3, or the author-curated <code>seurat_annotations</code> ground truth)</li>
 <li>Azimuth labels (<code>predicted.celltype.l2</code>)</li>
 </ul>
-<p>A workable reconciliation rule: <strong>keep the manual label where the automatic call agrees, flag the rest</strong>:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>celltype_final <span class="ot">&lt;-</span> <span class="fu">with</span>(seu<span class="sc">@</span>meta.data, dplyr<span class="sc">::</span><span class="fu">case_when</span>(</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  celltype_manual <span class="sc">==</span> predicted.celltype.l2    <span class="sc">~</span> celltype_manual,</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="cn">TRUE</span>                                         <span class="sc">~</span> <span class="fu">paste0</span>(<span class="st">&quot;REVIEW:&quot;</span>, celltype_manual)</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>Cells where the automatic method agrees with manual get the manual label; the rest get a <code>REVIEW:</code> prefix and you investigate manually. (If you also ran a second method such as SingleR, add a clause so a cell that agrees with <em>either</em> method is accepted.)</p>
+<p>A workable reconciliation rule: <strong>keep the manual label where the automatic call agrees, flag the rest</strong> — but first, a critical gotcha:</p>
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Warning
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>Different methods speak different vocabularies.</strong> Manual/ground-truth labels and Azimuth labels rarely use identical strings, and they sit at different granularities — <code>CD14+ Monocytes</code> (a <code>muscData</code> ground-truth label) vs <code>CD14 Mono</code> (Azimuth level 2) vs <code>Mono</code> (Azimuth level 1); <code>B cells</code> vs <code>B naive</code>. A raw <code>==</code> comparison would mark <em>every</em> cell as a disagreement. <strong>Harmonize to a common coarse vocabulary first</strong>, then compare at the granularity the two sides share — usually Azimuth <strong>level 1</strong> (<code>predicted.celltype.l1</code>).</p>
+</div>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Map both sides to a common coarse vocabulary, then compare at level 1.</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>to_coarse <span class="ot">&lt;-</span> <span class="cf">function</span>(x) dplyr<span class="sc">::</span><span class="fu">recode</span>(<span class="fu">as.character</span>(x),</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;B cells&quot;</span> <span class="ot">=</span> <span class="st">&quot;B&quot;</span>, <span class="st">&quot;CD4 T cells&quot;</span> <span class="ot">=</span> <span class="st">&quot;CD4 T&quot;</span>, <span class="st">&quot;CD8 T cells&quot;</span> <span class="ot">=</span> <span class="st">&quot;CD8 T&quot;</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;NK cells&quot;</span> <span class="ot">=</span> <span class="st">&quot;NK&quot;</span>, <span class="st">&quot;Dendritic cells&quot;</span> <span class="ot">=</span> <span class="st">&quot;DC&quot;</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;CD14+ Monocytes&quot;</span> <span class="ot">=</span> <span class="st">&quot;Mono&quot;</span>, <span class="st">&quot;FCGR3A+ Monocytes&quot;</span> <span class="ot">=</span> <span class="st">&quot;Mono&quot;</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;Megakaryocytes&quot;</span> <span class="ot">=</span> <span class="st">&quot;Mk&quot;</span>, <span class="at">.default =</span> <span class="cn">NA_character_</span>)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>manual_coarse <span class="ot">&lt;-</span> <span class="fu">to_coarse</span>(seu<span class="sc">$</span>seurat_annotations)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>agree <span class="ot">&lt;-</span> <span class="sc">!</span><span class="fu">is.na</span>(manual_coarse) <span class="sc">&amp;</span> manual_coarse <span class="sc">==</span> <span class="fu">as.character</span>(seu<span class="sc">$</span>predicted.celltype.l1)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>seu<span class="sc">$</span>celltype_final <span class="ot">&lt;-</span> <span class="fu">ifelse</span>(agree, <span class="fu">as.character</span>(seu<span class="sc">$</span>seurat_annotations),</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>                             <span class="fu">paste0</span>(<span class="st">&quot;REVIEW:&quot;</span>, <span class="fu">as.character</span>(seu<span class="sc">$</span>seurat_annotations)))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>Cells where the calls agree at level 1 keep the ground-truth label; the rest get a <code>REVIEW:</code> prefix and you investigate manually. (If you also ran a second method, add a clause so a cell that agrees with <em>either</em> is accepted.)</p>
 <p>For the <code>ifnb</code> workflow this typically agrees on 92%+ of cells — the disagreements concentrate in:</p>
 <ul>
 <li>T-cell subsets (CD4 Naive vs Memory)</li>

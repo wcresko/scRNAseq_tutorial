@@ -2415,7 +2415,29 @@ Tip
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod13&quot;</span></span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;../data&quot;</span>,  <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)   <span class="co"># shared .rds hand-off folder (sibling of scripts/, created one level up)</span></span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure saving --------------------------------------------------------</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co"># save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="co"># .svg is written alongside with the same basename. (.svg uses the &#39;svglite&#39;</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="co"># package, installed in Tutorial 00.)</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>save_fig <span class="ot">&lt;-</span> <span class="cf">function</span>(filename, plot, width, height, <span class="at">dpi =</span> <span class="dv">300</span>, ...) {</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(filename, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, <span class="at">dpi =</span> dpi, ...)</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>  svg_path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(tools<span class="sc">::</span><span class="fu">file_path_sans_ext</span>(filename), <span class="st">&quot;.svg&quot;</span>)</span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(svg_path, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, ...),</span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a>           <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">message</span>(<span class="st">&quot;  (could not write &quot;</span>, <span class="fu">basename</span>(svg_path),</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">&quot; - install &#39;svglite&#39;? &quot;</span>, <span class="fu">conditionMessage</span>(e), <span class="st">&quot;)&quot;</span>))</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a><span class="co"># save_base_fig() does the same for BASE-graphics figures (plot()/heatmap()/etc.):</span></span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a><span class="co"># pass a no-argument function that draws the figure; it is rendered to .png and .svg.</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>save_base_fig <span class="ot">&lt;-</span> <span class="cf">function</span>(filename, draw, <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">res =</span> <span class="dv">300</span>) {</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>  grDevices<span class="sc">::</span><span class="fu">png</span>(filename, <span class="at">width =</span> width, <span class="at">height =</span> height, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">res =</span> res)</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">draw</span>(); grDevices<span class="sc">::</span><span class="fu">dev.off</span>()</span>
+<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>  svg_path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(tools<span class="sc">::</span><span class="fu">file_path_sans_ext</span>(filename), <span class="st">&quot;.svg&quot;</span>)</span>
+<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>({ grDevices<span class="sc">::</span><span class="fu">svg</span>(svg_path, <span class="at">width =</span> width, <span class="at">height =</span> height); <span class="fu">draw</span>(); grDevices<span class="sc">::</span><span class="fu">dev.off</span>() },</span>
+<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>           <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">message</span>(<span class="st">&quot;  (could not write &quot;</span>, <span class="fu">basename</span>(svg_path), <span class="st">&quot;)&quot;</span>))</span>
+<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="step-1-load-data-and-metadata" class="level2">
@@ -2498,13 +2520,12 @@ Note
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;Sample&quot;</span>)</span>
 <span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out (base graphics) --------------------------------------------</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="fu">png</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C6_sample_dendrogram.png&quot;</span>),</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(htree,</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">&quot;Sample clustering for outlier detection — GSE152418 PBMCs&quot;</span>,</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>     <span class="at">sub  =</span> <span class="st">&quot;Average linkage, Euclidean distance on samples&quot;</span>,</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>     <span class="at">xlab =</span> <span class="st">&quot;Sample&quot;</span>)</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="fu">save_base_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C6_sample_dendrogram.png&quot;</span>), <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">draw =</span> <span class="cf">function</span>() {</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plot</span>(htree,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>       <span class="at">main =</span> <span class="st">&quot;Sample clustering for outlier detection — GSE152418 PBMCs&quot;</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>       <span class="at">sub  =</span> <span class="st">&quot;Average linkage, Euclidean distance on samples&quot;</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>       <span class="at">xlab =</span> <span class="st">&quot;Sample&quot;</span>)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>pca       <span class="ot">&lt;-</span> <span class="fu">prcomp</span>(<span class="fu">t</span>(data))</span>
@@ -2524,7 +2545,7 @@ Note
 <span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>p_pca</span>
 <span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C7_sample_pca.png&quot;</span>), p_pca,</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C7_sample_pca.png&quot;</span>), p_pca,</span>
 <span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
@@ -2620,7 +2641,7 @@ Tip
 <span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Smallest power crossing signed R² ≈ 0.8 with reasonable connectivity&quot;</span>,</span>
 <span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">&quot;Module 13 · WGCNA&quot;</span></span>
 <span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C10_soft_threshold.png&quot;</span>), p_sft,</span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C10_soft_threshold.png&quot;</span>), p_sft,</span>
 <span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">8</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-warning callout-titled">
@@ -2679,17 +2700,16 @@ Warning
 <span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>                    <span class="at">main         =</span> <span class="st">&quot;Gene clustering dendrogram &amp; module colours&quot;</span>)</span>
 <span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out (base graphics) --------------------------------------------</span></span>
-<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="fu">png</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C12_module_dendrogram.png&quot;</span>),</span>
-<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
-<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="fu">plotDendroAndColors</span>(bwnet<span class="sc">$</span>dendrograms[[<span class="dv">1</span>]],</span>
-<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">cbind</span>(bwnet<span class="sc">$</span>unmergedColors, bwnet<span class="sc">$</span>colors),</span>
-<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>                    <span class="fu">c</span>(<span class="st">&quot;unmerged&quot;</span>, <span class="st">&quot;merged&quot;</span>),</span>
-<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>                    <span class="at">dendroLabels =</span> <span class="cn">FALSE</span>,</span>
-<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>                    <span class="at">addGuide     =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>                    <span class="at">hang         =</span> <span class="fl">0.03</span>,</span>
-<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>                    <span class="at">guideHang    =</span> <span class="fl">0.05</span>,</span>
-<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>                    <span class="at">main         =</span> <span class="st">&quot;Gene clustering dendrogram &amp; module colours&quot;</span>)</span>
-<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a><span class="fu">save_base_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C12_module_dendrogram.png&quot;</span>), <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">draw =</span> <span class="cf">function</span>() {</span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">plotDendroAndColors</span>(bwnet<span class="sc">$</span>dendrograms[[<span class="dv">1</span>]],</span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>                      <span class="fu">cbind</span>(bwnet<span class="sc">$</span>unmergedColors, bwnet<span class="sc">$</span>colors),</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>                      <span class="fu">c</span>(<span class="st">&quot;unmerged&quot;</span>, <span class="st">&quot;merged&quot;</span>),</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>                      <span class="at">dendroLabels =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>                      <span class="at">addGuide     =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>                      <span class="at">hang         =</span> <span class="fl">0.03</span>,</span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>                      <span class="at">guideHang    =</span> <span class="fl">0.05</span>,</span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>                      <span class="at">main         =</span> <span class="st">&quot;Gene clustering dendrogram &amp; module colours&quot;</span>)</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a>})</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="step-6-module-eigengenes-moduletrait-correlations" class="level2">
@@ -2740,23 +2760,22 @@ Warning
 <span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a>             <span class="at">main   =</span> <span class="st">&quot;Module–trait correlations — GSE152418 severity&quot;</span>)</span>
 <span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out (base graphics) --------------------------------------------</span></span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="fu">png</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C15_module_trait_heatmap.png&quot;</span>),</span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">8</span>, <span class="at">units =</span> <span class="st">&quot;in&quot;</span>, <span class="at">res =</span> <span class="dv">300</span>)</span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a><span class="fu">CorLevelPlot</span>(heatmap.data,</span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>             <span class="at">x      =</span> <span class="fu">names</span>(traits),</span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>             <span class="at">y      =</span> <span class="fu">names</span>(module_eigengenes),</span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>             <span class="at">col    =</span> <span class="fu">c</span>(<span class="st">&quot;blue1&quot;</span>, <span class="st">&quot;skyblue&quot;</span>, <span class="st">&quot;white&quot;</span>, <span class="st">&quot;pink&quot;</span>, <span class="st">&quot;red&quot;</span>),</span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>             <span class="at">main   =</span> <span class="st">&quot;Module–trait correlations — GSE152418 severity&quot;</span>)</span>
-<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a><span class="fu">dev.off</span>()</span>
-<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: module-trait correlations and p-values ---------------------</span></span>
-<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(module.trait.corr) <span class="sc">|&gt;</span></span>
-<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;module&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C15_module_trait_corr.csv&quot;</span>))</span>
-<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(module.trait.corr.p) <span class="sc">|&gt;</span></span>
-<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;module&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb15-33"><a href="#cb15-33" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C15_module_trait_pvalues.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a><span class="fu">save_base_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C15_module_trait_heatmap.png&quot;</span>), <span class="at">width =</span> <span class="dv">8</span>, <span class="at">height =</span> <span class="dv">8</span>, <span class="at">draw =</span> <span class="cf">function</span>() {</span>
+<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">CorLevelPlot</span>(heatmap.data,</span>
+<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>               <span class="at">x      =</span> <span class="fu">names</span>(traits),</span>
+<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>               <span class="at">y      =</span> <span class="fu">names</span>(module_eigengenes),</span>
+<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>               <span class="at">col    =</span> <span class="fu">c</span>(<span class="st">&quot;blue1&quot;</span>, <span class="st">&quot;skyblue&quot;</span>, <span class="st">&quot;white&quot;</span>, <span class="st">&quot;pink&quot;</span>, <span class="st">&quot;red&quot;</span>),</span>
+<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>               <span class="at">main   =</span> <span class="st">&quot;Module–trait correlations — GSE152418 severity&quot;</span>)</span>
+<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: module-trait correlations and p-values ---------------------</span></span>
+<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(module.trait.corr) <span class="sc">|&gt;</span></span>
+<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;module&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C15_module_trait_corr.csv&quot;</span>))</span>
+<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(module.trait.corr.p) <span class="sc">|&gt;</span></span>
+<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>  tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;module&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb15-32"><a href="#cb15-32" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod13_C15_module_trait_pvalues.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">

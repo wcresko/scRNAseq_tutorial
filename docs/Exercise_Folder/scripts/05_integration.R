@@ -12,6 +12,19 @@ OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod5") # figures/tables, named to ma
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, recursive = TRUE, showWarnings = FALSE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 # Prefer the reference-reconciled object from step 04; fall back to step 03.
 in_file <- file.path(DATA_DIR, "ifnb_annotated_final.rds")
 if (!file.exists(in_file)) in_file <- file.path(DATA_DIR, "ifnb_annotated.rds")
@@ -54,7 +67,7 @@ p_compare_sample <- DimPlot(seu, reduction = "umap_harmony", group.by = "stim") 
     title    = "Sample mixing after Harmony integration",
     subtitle = "CTRL vs STIM should interleave within clusters after integration",
     caption  = "Module 5 · Two-Sample Integration (Talapas pipeline, Harmony only)")
-ggsave(file.path(OUT_DIR, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
+save_fig(file.path(OUT_DIR, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
        width = 7, height = 5, dpi = 300)
 
 # --- Figure: cell-type structure on the Harmony UMAP (Mod5_C6) -------------
@@ -66,7 +79,7 @@ p_compare_cell <- DimPlot(seu, reduction = "umap_harmony",
     title    = "Cell-type structure after Harmony integration",
     subtitle = "Each cell type should collapse from two per-sample islands into one region",
     caption  = "Module 5 · Two-Sample Integration (Talapas pipeline, Harmony only)")
-ggsave(file.path(OUT_DIR, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
+save_fig(file.path(OUT_DIR, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
        width = 7, height = 5, dpi = 300)
 
 # --- Step 3 — Diagnose over-correction with a per-cell ISG module score -----
@@ -83,7 +96,7 @@ p_isg <- FeaturePlot(seu, features = "ISG_score1", reduction = "umap_harmony") +
     title    = "Per-cell IFN-beta response (ISG module score) after integration",
     subtitle = "Scored on the RNA assay; high-ISG STIM cells should co-cluster with low-ISG CTRL cells",
     caption  = "Module 5 · Two-Sample Integration")
-ggsave(file.path(OUT_DIR, "Mod5_C7_isg_featureplots.png"), p_isg,
+save_fig(file.path(OUT_DIR, "Mod5_C7_isg_featureplots.png"), p_isg,
        width = 7, height = 5, dpi = 300)
 
 # Table: mean ISG score per cell type, STIM vs CTRL (Mod5_C7)
@@ -96,6 +109,9 @@ write_csv(isg_by_celltype, file.path(OUT_DIR, "Mod5_C7_isg_mean_by_celltype.csv"
 
 # --- Step 4 — Re-find markers on the integrated (Harmony) clusters (Mod5_C8) -
 # Marker tests run on the RNA assay, not the integrated/corrected values.
+# Defensive: FindAllMarkers needs a single joined RNA layer (Seurat v5 merge/split
+# can leave per-sample layers); join if needed so no test is silently skipped.
+if (length(Layers(seu, search = "data")) > 1) seu <- JoinLayers(seu)
 Idents(seu) <- "seurat_clusters"
 integrated_markers <- FindAllMarkers(seu, only.pos = TRUE,
                                      min.pct = 0.25, logfc.threshold = 0.25)

@@ -123,6 +123,28 @@ out_dir <- "../output/Mod13"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+# save_base_fig() does the same for BASE-graphics figures (plot()/heatmap()/etc.):
+# pass a no-argument function that draws the figure; it is rendered to .png and .svg.
+save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
+  grDevices::png(filename, width = width, height = height, units = "in", res = res)
+  draw(); grDevices::dev.off()
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch({ grDevices::svg(svg_path, width = width, height = height); draw(); grDevices::dev.off() },
+           error = function(e) message("  (could not write ", basename(svg_path), ")"))
+}
 ```
 
 ## Step 1 — Load data and metadata
@@ -203,13 +225,12 @@ plot(htree,
      xlab = "Sample")
 
 # --- Figure out (base graphics) --------------------------------------------
-png(file.path(out_dir, "Mod13_C6_sample_dendrogram.png"),
-    width = 10, height = 6, units = "in", res = 300)
-plot(htree,
-     main = "Sample clustering for outlier detection — GSE152418 PBMCs",
-     sub  = "Average linkage, Euclidean distance on samples",
-     xlab = "Sample")
-dev.off()
+save_base_fig(file.path(out_dir, "Mod13_C6_sample_dendrogram.png"), width = 10, height = 6, draw = function() {
+  plot(htree,
+       main = "Sample clustering for outlier detection — GSE152418 PBMCs",
+       sub  = "Average linkage, Euclidean distance on samples",
+       xlab = "Sample")
+})
 ```
 
 ```{r}
@@ -232,7 +253,7 @@ p_pca <- ggplot(as.data.frame(pca.dat), aes(PC1, PC2)) +
 p_pca
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod13_C7_sample_pca.png"), p_pca,
+save_fig(file.path(out_dir, "Mod13_C7_sample_pca.png"), p_pca,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -316,7 +337,7 @@ p_sft <- (a1 / a2) +
     subtitle = "Smallest power crossing signed R² ≈ 0.8 with reasonable connectivity",
     caption  = "Module 13 · WGCNA"
   )
-ggsave(file.path(out_dir, "Mod13_C10_soft_threshold.png"), p_sft,
+save_fig(file.path(out_dir, "Mod13_C10_soft_threshold.png"), p_sft,
        width = 7, height = 8, dpi = 300)
 ```
 
@@ -361,17 +382,16 @@ plotDendroAndColors(bwnet$dendrograms[[1]],
                     main         = "Gene clustering dendrogram & module colours")
 
 # --- Figure out (base graphics) --------------------------------------------
-png(file.path(out_dir, "Mod13_C12_module_dendrogram.png"),
-    width = 10, height = 6, units = "in", res = 300)
-plotDendroAndColors(bwnet$dendrograms[[1]],
-                    cbind(bwnet$unmergedColors, bwnet$colors),
-                    c("unmerged", "merged"),
-                    dendroLabels = FALSE,
-                    addGuide     = TRUE,
-                    hang         = 0.03,
-                    guideHang    = 0.05,
-                    main         = "Gene clustering dendrogram & module colours")
-dev.off()
+save_base_fig(file.path(out_dir, "Mod13_C12_module_dendrogram.png"), width = 10, height = 6, draw = function() {
+  plotDendroAndColors(bwnet$dendrograms[[1]],
+                      cbind(bwnet$unmergedColors, bwnet$colors),
+                      c("unmerged", "merged"),
+                      dendroLabels = FALSE,
+                      addGuide     = TRUE,
+                      hang         = 0.03,
+                      guideHang    = 0.05,
+                      main         = "Gene clustering dendrogram & module colours")
+})
 ```
 
 ## Step 6 — Module eigengenes & module–trait correlations
@@ -428,14 +448,13 @@ CorLevelPlot(heatmap.data,
              main   = "Module–trait correlations — GSE152418 severity")
 
 # --- Figure out (base graphics) --------------------------------------------
-png(file.path(out_dir, "Mod13_C15_module_trait_heatmap.png"),
-    width = 8, height = 8, units = "in", res = 300)
-CorLevelPlot(heatmap.data,
-             x      = names(traits),
-             y      = names(module_eigengenes),
-             col    = c("blue1", "skyblue", "white", "pink", "red"),
-             main   = "Module–trait correlations — GSE152418 severity")
-dev.off()
+save_base_fig(file.path(out_dir, "Mod13_C15_module_trait_heatmap.png"), width = 8, height = 8, draw = function() {
+  CorLevelPlot(heatmap.data,
+               x      = names(traits),
+               y      = names(module_eigengenes),
+               col    = c("blue1", "skyblue", "white", "pink", "red"),
+               main   = "Module–trait correlations — GSE152418 severity")
+})
 
 # --- Table out: module-trait correlations and p-values ---------------------
 as.data.frame(module.trait.corr) |>

@@ -2280,7 +2280,7 @@ vertical-align: -.125em;
 </div>
 <section id="about-this-tutorial" class="level2">
 <h2 class="anchored" data-anchor-id="about-this-tutorial">About this tutorial</h2>
-<p>The first hands-on tutorial walking the standard <strong>Seurat</strong> scRNA-seq workflow on a <strong>laptop-friendly</strong> dataset. We use the <strong><code>ifnb</code></strong> dataset (Kang <em>et al.</em> 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a <strong>control</strong> sample and an <strong>interferon-β-stimulated</strong> sample. Two samples, ~14,000 cells, ~25 MB on disk, no 10x click-through.</p>
+<p>The first hands-on tutorial walking the standard <strong>Seurat</strong> scRNA-seq workflow on a <strong>laptop-friendly</strong> dataset. We use the <strong><code>ifnb</code></strong> dataset (Kang <em>et al.</em> 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a <strong>control</strong> sample and an <strong>interferon-β-stimulated</strong> sample. Two samples, ~24,000 cells, no 10x click-through.</p>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -2331,10 +2331,10 @@ Tip
 <h2 class="anchored" data-anchor-id="dataset-ifnb-kang-et-al.-2017">Dataset — <code>ifnb</code> (Kang <em>et al.</em> 2017)</h2>
 <p><strong>What it is.</strong> Peripheral blood mononuclear cells (PBMCs) from eight lupus patients. Each donor’s PBMCs were split into two aliquots:</p>
 <ul>
-<li><strong><code>CTRL</code></strong> — control (no stimulation), ~6,500 cells</li>
-<li><strong><code>STIM</code></strong> — treated with interferon-β for 6 hours, ~7,500 cells</li>
+<li><strong><code>CTRL</code></strong> — control (no stimulation), ~12,000 cells</li>
+<li><strong><code>STIM</code></strong> — treated with interferon-β for 6 hours, ~12,000 cells</li>
 </ul>
-<p>Together ~14,000 cells across two samples on the <strong>10x Chromium 3’ v1</strong> assay. <strong>Cell-type labels</strong> (e.g. <code>CD14 Mono</code>, <code>CD4 Naive T</code>, <code>B</code>, <code>NK</code>, <code>DC</code>) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.</p>
+<p>Together ~24,000 annotated singlets across two samples on the <strong>10x Chromium 3’ v1</strong> assay (the <code>muscData</code> build of <code>ifnb</code> is larger than the older SeuratData <code>ifnb</code> you may have seen quoted at ~14k). <strong>Cell-type labels</strong> (e.g. <code>CD14+ Monocytes</code>, <code>CD4 T cells</code>, <code>B cells</code>, <code>NK cells</code>, <code>Dendritic cells</code>) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.</p>
 <ul>
 <li><strong>Reference:</strong> Kang <em>et al.</em> (2017) <em>Nat Biotechnol</em> 36: 89–94. <a href="https://doi.org/10.1038/nbt.4042">doi:10.1038/nbt.4042</a></li>
 <li><strong>Origin:</strong> GEO accession <a href="https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583">GSE96583</a></li>
@@ -2399,7 +2399,7 @@ Note
 <tr class="odd">
 <td><code>ifnb@assays$RNA@counts</code></td>
 <td><code>dgCMatrix</code></td>
-<td>Raw UMI counts. ~14,000 genes × ~14,000 cells (sparse).</td>
+<td>Raw UMI counts. ~35,000 genes × ~24,000 cells (sparse).</td>
 </tr>
 <tr class="even">
 <td><code>ifnb@meta.data$stim</code></td>
@@ -2445,6 +2445,7 @@ Note
 <p><strong><code>scDblFinder</code> returns a different result than the workshop</strong> — <code>scDblFinder</code> is stochastic. The workshop uses <code>set.seed(2026)</code> <em>immediately before</em> calling it; if you set the seed earlier or not at all, the doublet calls will differ. The 5–10% range is what to expect; exact cell IDs will vary.</p>
 <p><strong>SoupX errors with “no raw matrix found”</strong> (or <code>subscript out of bounds</code> from <code>load10X</code>) — this is correct behaviour. The <code>Kang18_8vs8()</code> download only ships the <em>filtered</em> counts. SoupX needs both. The Step 5 block is an <strong>illustrative template</strong> for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger <code>raw_feature_bc_matrix/</code> folder.</p>
 <p><strong>Warnings (not errors) during doublet detection</strong> — when Step 6 runs you’ll see <code>Layer &#39;data&#39;/&#39;scale.data&#39; is empty</code> and <code>&#39;normalizeCounts&#39;/&#39;librarySizeFactors&#39; is deprecated</code>. Both are harmless: doublet detection runs on <strong>raw counts before normalization</strong> (so those layers are legitimately empty), and the deprecation notes come from <code>scran</code>/<code>scuttle</code> <em>inside</em> <code>scDblFinder</code>, not your code. As long as you see <code>Creating … artificial doublets</code>, it’s working.</p>
+<p><strong>Plotting warnings before normalization (harmless)</strong> — Steps 4 and 6 plot per-cell QC <em>metadata</em> (<code>nFeature_RNA</code>, <code>nCount_RNA</code>, …) before normalization, so Seurat prints <code>Default search for &quot;data&quot; layer … utilizing &quot;counts&quot; layer instead</code>. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot (Step 9) uses a log10 axis and prints <code>log-10 transformation introduced infinite values</code> for genes with zero mean expression (they’re not variable features). The tutorial wraps these plots in <code>suppressWarnings()</code> so you shouldn’t see them, but they’re safe either way.</p>
 <p><strong>Gene names look like <code>SYMBOL_ENSG…</code> / <code>SYMBOL-ENSG…</code></strong> — <code>muscData</code>’s <code>Kang18_8vs8()</code> stores each feature as <code>SYMBOL_ENSEMBLID</code> (e.g. <code>ISG15_ENSG00000187608</code>). The loader strips the trailing Ensembl-ID suffix so only the gene symbol remains (<code>ISG15</code>), which is what canonical markers, Azimuth, and <code>org.Hs.eg.db</code> match on. It strips <em>only</em> the Ensembl suffix — not everything after the first dash — so real dashed symbols (<code>HLA-A</code>, <code>MT-CO1</code>) are preserved, and it reports how many names it simplified.</p>
 </div>
 </div>
@@ -2489,6 +2490,22 @@ Note
 <li><strong><code>data/</code> is the hand-off.</strong> Tutorial 01 writes <code>../data/ifnb_preprocessed.rds</code>; Tutorial 02 reads it back from the same <code>../data/</code>. Keep all the <code>.qmd</code> files together in <code>scripts/</code> so they share one project <code>data/</code>.</li>
 <li><strong>Can’t find a file?</strong> The setup chunk prints the exact absolute path (<code>This module writes its figures &amp; tables to: …</code>). If it’s not where you expect, check <code>getwd()</code> — it should be your <code>scripts/</code> folder. See the downloadable <strong>README</strong> (linked on the <a href="../Materials.html">Materials</a> page) for the full layout.</li>
 </ol>
+<section id="figure-saving" class="level1">
+<h1>— Figure saving ——————————————————–</h1>
+</section>
+<section id="save_fig-writes-every-figure-as-a-.png-for-viewing-and-a-.svg-vector" class="level1">
+<h1>save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,</h1>
+</section>
+<section id="editable-in-illustrator-inkscape-for-a-manuscript.-pass-the-.png-path-the" class="level1">
+<h1>editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the</h1>
+</section>
+<section id="svg-is-written-alongside-with-the-same-basename.-.svg-uses-the-svglite" class="level1">
+<h1>.svg is written alongside with the same basename. (.svg uses the ‘svglite’</h1>
+</section>
+<section id="package-installed-in-tutorial-00." class="level1">
+<h1>package, installed in Tutorial 00.)</h1>
+<p>save_fig &lt;- function(filename, plot, width, height, dpi = 300, …) { ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, …) svg_path &lt;- paste0(tools::file_path_sans_ext(filename), “.svg”) tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, …), error = function(e) message(” (could not write “, basename(svg_path),” - install ‘svglite’? “, conditionMessage(e),”)“)) }</p>
+</section>
 </div>
 </div>
 <div class="cell">
@@ -2535,9 +2552,9 @@ Note
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co"># every subsequent call is a no-op.</span></span>
 <span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> <span class="fu">Kang18_8vs8</span>()</span>
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop the multiplexed multiplets so we end up with the same set of singletons</span></span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># that the historical `ifnb` Seurat object shipped (~14k cells), and drop any</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># cells without an author-assigned cell type label.</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Keep only true singlets that have an author-assigned cell-type label (drop the</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="co"># multiplexed multiplets and unlabeled droplets). This leaves ~24,000 cells — the</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="co"># muscData build is larger than the historical SeuratData `ifnb` (~14k).</span></span>
 <span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>sce <span class="ot">&lt;-</span> sce[, sce<span class="sc">$</span>multiplets <span class="sc">==</span> <span class="st">&quot;singlet&quot;</span> <span class="sc">&amp;</span> <span class="sc">!</span><span class="fu">is.na</span>(sce<span class="sc">$</span>cell)]</span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Gene (feature) name cleanup. muscData&#39;s Kang18_8vs8 stores each feature as</span></span>
@@ -2726,42 +2743,47 @@ Show answers
 <section id="step-4-visualize-qc-per-sample" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-visualize-qc-per-sample">Step 4 — Visualize QC, per sample</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Violin panel: four QC metrics, split by sample, fully labelled</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>p_qc_vln <span class="ot">&lt;-</span> <span class="fu">VlnPlot</span>(ifnb,</span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;nFeature_RNA&quot;</span>, <span class="st">&quot;nCount_RNA&quot;</span>, <span class="st">&quot;percent.mt&quot;</span>, <span class="st">&quot;percent.rb&quot;</span>),</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>        <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>,</span>
-<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>        <span class="at">ncol =</span> <span class="dv">4</span>,</span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>        <span class="at">pt.size =</span> <span class="dv">0</span>) <span class="sc">&amp;</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">&quot;Sample (stim condition)&quot;</span>) <span class="sc">&amp;</span></span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">11</span>))</span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>p_qc_vln <span class="ot">&lt;-</span> p_qc_vln <span class="sc">+</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  patchwork<span class="sc">::</span><span class="fu">plot_annotation</span>(</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Per-cell QC metrics by sample — ifnb (CTRL vs IFN-β STIM)&quot;</span>,</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Genes/cell, UMIs/cell, mitochondrial % and ribosomal % distributions&quot;</span>,</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">&quot;Module 1 · QC &amp; Preprocessing&quot;</span></span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>p_qc_vln</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Scatter: UMIs vs unique genes, coloured by sample, with a linear trend</span></span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>p_qc_scatter <span class="ot">&lt;-</span> <span class="fu">FeatureScatter</span>(ifnb,</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>               <span class="at">feature1 =</span> <span class="st">&quot;nCount_RNA&quot;</span>,</span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>               <span class="at">feature2 =</span> <span class="st">&quot;nFeature_RNA&quot;</span>,</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>               <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>) <span class="sc">+</span></span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">&quot;lm&quot;</span>) <span class="sc">+</span></span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Sequencing depth vs library complexity&quot;</span>,</span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Each point is a cell; the line is a per-group linear fit&quot;</span>,</span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">x        =</span> <span class="st">&quot;nCount_RNA (total UMIs per cell)&quot;</span>,</span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">y        =</span> <span class="st">&quot;nFeature_RNA (unique genes per cell)&quot;</span>,</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour   =</span> <span class="st">&quot;Sample&quot;</span></span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>p_qc_scatter</span>
-<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figures out -----------------------------------------------------------</span></span>
-<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C5_qc_violins.png&quot;</span>),  p_qc_vln,</span>
-<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">12</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C5_qc_scatter.png&quot;</span>),  p_qc_scatter,</span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">6</span>,  <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Violin panel: four QC metrics, split by sample, fully labelled.</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co"># These features are per-cell QC METADATA plotted before normalization, so Seurat</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># warns that the &quot;data&quot; layer is empty and falls back to &quot;counts&quot;. That&#39;s</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="co"># irrelevant here (metadata isn&#39;t read from an expression layer), so we silence</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a><span class="co"># the expected note.</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>p_qc_vln <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">VlnPlot</span>(ifnb,</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;nFeature_RNA&quot;</span>, <span class="st">&quot;nCount_RNA&quot;</span>, <span class="st">&quot;percent.mt&quot;</span>, <span class="st">&quot;percent.rb&quot;</span>),</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>        <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>,</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>        <span class="at">ncol =</span> <span class="dv">4</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>        <span class="at">pt.size =</span> <span class="dv">0</span>) <span class="sc">&amp;</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">&quot;Sample (stim condition)&quot;</span>) <span class="sc">&amp;</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">11</span>)))</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>p_qc_vln <span class="ot">&lt;-</span> p_qc_vln <span class="sc">+</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  patchwork<span class="sc">::</span><span class="fu">plot_annotation</span>(</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Per-cell QC metrics by sample — ifnb (CTRL vs IFN-β STIM)&quot;</span>,</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Genes/cell, UMIs/cell, mitochondrial % and ribosomal % distributions&quot;</span>,</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">&quot;Module 1 · QC &amp; Preprocessing&quot;</span></span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>p_qc_vln</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a><span class="co"># Scatter: UMIs vs unique genes, coloured by sample, with a linear trend</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>p_qc_scatter <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(<span class="fu">FeatureScatter</span>(ifnb,</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>               <span class="at">feature1 =</span> <span class="st">&quot;nCount_RNA&quot;</span>,</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>               <span class="at">feature2 =</span> <span class="st">&quot;nFeature_RNA&quot;</span>,</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>               <span class="at">group.by =</span> <span class="st">&quot;stim&quot;</span>)) <span class="sc">+</span></span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">&quot;lm&quot;</span>) <span class="sc">+</span></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Sequencing depth vs library complexity&quot;</span>,</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Each point is a cell; the line is a per-group linear fit&quot;</span>,</span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">x        =</span> <span class="st">&quot;nCount_RNA (total UMIs per cell)&quot;</span>,</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">y        =</span> <span class="st">&quot;nFeature_RNA (unique genes per cell)&quot;</span>,</span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour   =</span> <span class="st">&quot;Sample&quot;</span></span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>p_qc_scatter</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figures out -----------------------------------------------------------</span></span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C5_qc_violins.png&quot;</span>),  p_qc_vln,</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">12</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C5_qc_scatter.png&quot;</span>),  p_qc_scatter,</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">6</span>,  <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2911,23 +2933,26 @@ Show answers
 <span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a><span class="fu">as.data.frame</span>(<span class="fu">table</span>(<span class="at">sample =</span> ifnb<span class="sc">$</span>stim, <span class="at">class =</span> ifnb<span class="sc">$</span>scDblFinder.class)) <span class="sc">|&gt;</span></span>
 <span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C7_doublet_counts.csv&quot;</span>))</span>
 <span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a><span class="co"># Inspect: doublets should sit at the high end of nCount/nFeature</span></span>
-<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>p_dbl <span class="ot">&lt;-</span> <span class="fu">VlnPlot</span>(ifnb,</span>
-<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;nFeature_RNA&quot;</span>, <span class="st">&quot;nCount_RNA&quot;</span>),</span>
-<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>        <span class="at">group.by =</span> <span class="st">&quot;scDblFinder.class&quot;</span>, <span class="at">pt.size =</span> <span class="dv">0</span>) <span class="sc">&amp;</span></span>
-<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">&quot;scDblFinder class&quot;</span>) <span class="sc">&amp;</span></span>
-<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">11</span>))</span>
-<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>p_dbl <span class="ot">&lt;-</span> p_dbl <span class="sc">+</span></span>
-<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>  patchwork<span class="sc">::</span><span class="fu">plot_annotation</span>(</span>
-<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Library size and complexity for called singlets vs doublets&quot;</span>,</span>
-<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Doublets are expected to sit at the high end of both metrics&quot;</span>,</span>
-<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">&quot;Module 1 · QC &amp; Preprocessing&quot;</span></span>
-<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>p_dbl</span>
-<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
-<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C7_doublet_violins.png&quot;</span>), p_dbl,</span>
-<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a><span class="co"># Inspect: doublets should sit at the high end of nCount/nFeature.</span></span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a><span class="co"># (Same pre-normalization metadata plot as Step 4 — silence the expected</span></span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a><span class="co"># &quot;data layer empty, using counts&quot; note.)</span></span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>p_dbl <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">VlnPlot</span>(ifnb,</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>        <span class="at">features =</span> <span class="fu">c</span>(<span class="st">&quot;nFeature_RNA&quot;</span>, <span class="st">&quot;nCount_RNA&quot;</span>),</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>        <span class="at">group.by =</span> <span class="st">&quot;scDblFinder.class&quot;</span>, <span class="at">pt.size =</span> <span class="dv">0</span>) <span class="sc">&amp;</span></span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">xlab</span>(<span class="st">&quot;scDblFinder class&quot;</span>) <span class="sc">&amp;</span></span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">11</span>)))</span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>p_dbl <span class="ot">&lt;-</span> p_dbl <span class="sc">+</span></span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a>  patchwork<span class="sc">::</span><span class="fu">plot_annotation</span>(</span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>    <span class="at">title    =</span> <span class="st">&quot;Library size and complexity for called singlets vs doublets&quot;</span>,</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Doublets are expected to sit at the high end of both metrics&quot;</span>,</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption  =</span> <span class="st">&quot;Module 1 · QC &amp; Preprocessing&quot;</span></span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>p_dbl</span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C7_doublet_violins.png&quot;</span>), p_dbl,</span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">4</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -3060,14 +3085,19 @@ Show answers
 <span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">y        =</span> <span class="st">&quot;Standardized variance&quot;</span>,</span>
 <span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">colour   =</span> <span class="st">&quot;Selected as HVG&quot;</span></span>
 <span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>p_hvg</span>
-<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Outputs: HVG plot + the labelled top-10 genes as a table --------------</span></span>
-<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C10_variable_features.png&quot;</span>), p_hvg,</span>
-<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="co"># VariableFeaturePlot draws mean expression on a log10 x-axis. Genes with zero</span></span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a><span class="co"># mean (undetected across all retained cells) become -Inf and ggplot drops them</span></span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a><span class="co"># with &quot;log-10 transformation introduced infinite values&quot; — harmless, since those</span></span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a><span class="co"># genes are not variable features. Silence it at draw and save time.</span></span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressWarnings</span>(<span class="fu">print</span>(p_hvg))</span>
 <span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">rank =</span> <span class="fu">seq_along</span>(top10), <span class="at">gene =</span> top10) <span class="sc">|&gt;</span></span>
-<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C10_top10_hvgs.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Outputs: HVG plot + the labelled top-10 genes as a table --------------</span></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressWarnings</span>(</span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C10_variable_features.png&quot;</span>), p_hvg,</span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a>         <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>))</span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a>tibble<span class="sc">::</span><span class="fu">tibble</span>(<span class="at">rank =</span> <span class="fu">seq_along</span>(top10), <span class="at">gene =</span> top10) <span class="sc">|&gt;</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a>  readr<span class="sc">::</span><span class="fu">write_csv</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod1_C10_top10_hvgs.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -3166,12 +3196,12 @@ Show answers
 <tr class="even">
 <td>Step 7 — <code>subset()</code> QC filter (<code>nFeature_RNA</code>, <code>percent.mt</code>)</td>
 <td style="text-align: right;">~35,635</td>
-<td style="text-align: right;">~22,000</td>
+<td style="text-align: right;">~23,000</td>
 </tr>
 <tr class="odd">
 <td>Step 8 — <code>NormalizeData</code> (no dimension change)</td>
 <td style="text-align: right;">~35,635</td>
-<td style="text-align: right;">~22,000</td>
+<td style="text-align: right;">~23,000</td>
 </tr>
 </tbody>
 </table>

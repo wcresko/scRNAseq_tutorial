@@ -18,6 +18,16 @@ OUT_DIR <- Sys.getenv("OUT_DIR", "../output/Mod14") # figures/tables for this mo
 dir.create(DATA_DIR, showWarnings = FALSE, recursive = TRUE)   # pipeline hand-off objects (.rds/.csv)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
+
+# save_base_fig() does the same for BASE-graphics figures (plot()/heatmap()/etc.):
+# pass a no-argument function that draws the figure; it is rendered to .png and .svg.
+save_base_fig <- function(filename, draw, width = 7, height = 5, res = 300) {
+  grDevices::png(filename, width = width, height = height, units = "in", res = res)
+  draw(); grDevices::dev.off()
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch({ grDevices::svg(svg_path, width = width, height = height); draw(); grDevices::dev.off() },
+           error = function(e) message("  (could not write ", basename(svg_path), ")"))
+}
 seu <- readRDS(file.path(DATA_DIR, "ifnb_annotated.rds"))
 DefaultAssay(seu) <- "RNA"
 
@@ -39,15 +49,14 @@ write_csv(pt_tbl, file.path(OUT_DIR, "Mod14_slingshot_pseudotime.csv"))
 umap <- reducedDims(sce)$UMAP
 ct   <- factor(seu$celltype_manual)
 pal  <- setNames(scales::hue_pal()(nlevels(ct)), levels(ct))
-png(file.path(OUT_DIR, "Mod14_slingshot_umap_lineages.png"), width = 8, height = 6,
-    units = "in", res = 300)
-plot(umap, pch = 16, cex = 0.5, col = pal[ct],
-     main = "Slingshot pseudotime lineages — ifnb (mechanics demo)",
-     xlab = "UMAP 1", ylab = "UMAP 2")
-lines(SlingshotDataSet(sce), lwd = 2, col = "black")
-legend("topright", legend = levels(ct), col = pal, pch = 16, cex = 0.6,
-       title = "Cell type", bty = "n")
-dev.off()
+save_base_fig(file.path(OUT_DIR, "Mod14_slingshot_umap_lineages.png"), width = 8, height = 6, draw = function() {
+  plot(umap, pch = 16, cex = 0.5, col = pal[ct],
+       main = "Slingshot pseudotime lineages — ifnb (mechanics demo)",
+       xlab = "UMAP 1", ylab = "UMAP 2")
+  lines(SlingshotDataSet(sce), lwd = 2, col = "black")
+  legend("topright", legend = levels(ct), col = pal, pch = 16, cex = 0.6,
+         title = "Cell type", bty = "n")
+})
 
 cat("Wrote Slingshot pseudotime for", ncol(sce), "cells (root =", root, ")\n")
 cat("Wrote Mod14 figures/tables to", OUT_DIR, "\n")

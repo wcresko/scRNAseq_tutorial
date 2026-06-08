@@ -2373,7 +2373,8 @@ Note
 </div>
 <div class="callout-body-container callout-body">
 <p><strong><code>FindAllMarkers</code> takes 5+ minutes</strong> — <code>presto</code> (installed in the <a href="Tutorial_00_Setup_RStudio_Packages.html">Tutorial 00 setup</a>) makes it ~10× faster; Seurat detects it automatically.</p>
-<p><strong>Markers list is dominated by ISGs (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>)</strong> — that’s expected on the <em>unintegrated</em> <code>ifnb</code> data because clusters here are partly driven by <code>stim</code>. Tutorial 05 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.</p>
+<p><strong>ISGs (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>) top <em>some</em> clusters’ marker lists</strong> — expected on the <em>unintegrated</em> <code>ifnb</code> data: the cell types with the strongest interferon response (monocytes especially) split into CTRL vs STIM clusters, so those clusters’ top markers are condition genes rather than cell-type genes. Most clusters are still topped by cell-type markers. Tutorial 05 (Integration) collapses the condition split.</p>
+<p><strong><code>names(new.cluster.ids) &lt;- levels(ifnb)</code> errors with “‘names’ attribute [N] must be the same length as the vector [M]”</strong> — your clustering produced more clusters than the template’s label list. <strong>This is real biology, not a bug.</strong> You’re clustering the <em>unintegrated</em> data, where the interferon-β response is a strong, genome-wide transcriptional signal — so the cell types that respond most (monocytes above all) separate into <em>two</em> clusters, a CTRL one and a STIM one, instead of one. That’s the very same condition/batch split you visualized on the UMAP in Tutorial 02, now showing up as extra clusters: you commonly end up with ~15–20 clusters for ~13 cell types, often with two clusters of the same type. It’s expected, and Tutorial 05’s integration aligns CTRL and STIM so each cell type collapses back to a single cluster. Practically: the Step 4 template no longer uses that brittle line — it maps labels by cluster id and applies only the ids that exist, so it works for any cluster count. Run <code>levels(ifnb)</code> to see how many you have, and label each (giving the CTRL and STIM copies of a type the same label is fine).</p>
 <p><strong><code>Idents()</code> is set to the wrong column</strong> — clusters at multiple resolutions all live in <code>meta.data</code> (<code>RNA_snn_res.0.1</code>, <code>_0.3</code>, etc.) but only one is the “active” identity. <code>Idents(seu) &lt;- &quot;RNA_snn_res.0.5&quot;</code> switches; <code>levels(Idents(seu))</code> confirms.</p>
 <p><strong><code>FindMarkers</code> errors with “data layers are not joined. Please run JoinLayers”</strong> — Seurat v5 keeps per-sample split layers (<code>counts.CTRL</code>, <code>counts.STIM</code>, <code>data.CTRL</code>, <code>data.STIM</code>) after <code>merge()</code>, and <code>FindMarkers</code> refuses to run until they’re collapsed. Fix with <code>ifnb &lt;- JoinLayers(ifnb)</code> before calling <code>FindMarkers</code> / <code>FindAllMarkers</code>. The resume chunk above does this automatically. <code>Layers(ifnb)</code> shows the current layer list.</p>
 </div>
@@ -2415,7 +2416,20 @@ Note
 <span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod3&quot;</span></span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;../data&quot;</span>,  <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)   <span class="co"># shared .rds hand-off folder (sibling of scripts/, created one level up)</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure saving --------------------------------------------------------</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="co"># save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co"># editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co"># .svg is written alongside with the same basename. (.svg uses the &#39;svglite&#39;</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="co"># package, installed in Tutorial 00.)</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>save_fig <span class="ot">&lt;-</span> <span class="cf">function</span>(filename, plot, width, height, <span class="at">dpi =</span> <span class="dv">300</span>, ...) {</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(filename, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, <span class="at">dpi =</span> dpi, ...)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>  svg_path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(tools<span class="sc">::</span><span class="fu">file_path_sans_ext</span>(filename), <span class="st">&quot;.svg&quot;</span>)</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(svg_path, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, ...),</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>           <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">message</span>(<span class="st">&quot;  (could not write &quot;</span>, <span class="fu">basename</span>(svg_path),</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">&quot; - install &#39;svglite&#39;? &quot;</span>, <span class="fu">conditionMessage</span>(e), <span class="st">&quot;)&quot;</span>))</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_clustered.rds&quot;</span>)</span>
@@ -2499,7 +2513,7 @@ Show answers
 </div>
 <div class="callout-body-container callout-body">
 <ol type="1">
-<li>Many of the top markers will be <strong>interferon-stimulated genes</strong> (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>). Are those <em>cell-type</em> markers, or are they marking something else?</li>
+<li>Most of the top per-cluster markers are <strong>cell-type</strong> genes (e.g. <code>LYZ</code>/<code>S100A8</code> for monocytes, <code>MS4A1</code>/<code>CD79A</code> for B cells, <code>GNLY</code>/<code>NKG7</code> for NK). But for <em>some</em> clusters — especially the <strong>monocytes</strong> — you’ll also see <strong>interferon-stimulated genes</strong> (<code>ISG15</code>, <code>IFI6</code>, <code>IFIT3</code>, <code>MX1</code>) near the top. If those ISGs aren’t cell-type markers, what are they marking?</li>
 <li>For condition-level DE (STIM vs CTRL), is <code>FindAllMarkers</code> the right tool?</li>
 </ol>
 <details>
@@ -2507,7 +2521,7 @@ Show answers
 Show answers
 </summary>
 <ol type="1">
-<li>Those are <strong>condition markers</strong> — they distinguish IFN-β–stimulated cells from control cells, <em>not</em> cell types. They top the list because cluster identities at this stage are partly driven by <code>stim</code>. Tutorial 05 will integrate the data so cluster identities track biology, not condition.</li>
+<li>Those ISGs are <strong>condition markers</strong> — they distinguish IFN-β–stimulated cells from control cells, <em>not</em> cell types. They surface because, on the <strong>unintegrated</strong> data, the cell types with the strongest interferon response (monocytes most of all) split into separate CTRL and STIM clusters — so a “STIM monocyte” cluster’s top markers are ISGs. Most clusters are still driven by cell-type identity, which is why cell-type markers dominate the lists overall. Tutorial 05 integrates CTRL and STIM so clusters track biology, not condition, and the ISGs drop out of the per-cluster marker lists.</li>
 <li>No. <code>FindAllMarkers</code> / <code>FindMarkers</code> treat each cell as an independent observation, which is <strong>anti-conservative</strong> for condition-level comparisons across biological samples. For STIM vs CTRL within a cell type, use <strong>pseudobulk</strong> + DESeq2/edgeR/limma — that’s exactly what Tutorial 06 covers, on this dataset.</li>
 </ol>
 </details>
@@ -2593,7 +2607,7 @@ Show answers
 <span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>p_vln</span>
 <span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
-<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C5_marker_violins.png&quot;</span>), p_vln,</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C5_marker_violins.png&quot;</span>), p_vln,</span>
 <span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
@@ -2615,7 +2629,7 @@ Show answers
 <span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>p_feature</span>
 <span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C6_marker_featureplots.png&quot;</span>), p_feature,</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C6_marker_featureplots.png&quot;</span>), p_feature,</span>
 <span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">9</span>, <span class="at">height =</span> <span class="dv">8</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
@@ -2638,7 +2652,7 @@ Show answers
 <span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>p_heatmap</span>
 <span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C7_marker_heatmap.png&quot;</span>), p_heatmap,</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C7_marker_heatmap.png&quot;</span>), p_heatmap,</span>
 <span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">12</span>, <span class="at">height =</span> <span class="dv">10</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
@@ -2661,7 +2675,7 @@ Show answers
 <span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>p_dot</span>
 <span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure out ------------------------------------------------------------</span></span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C8_marker_dotplot.png&quot;</span>), p_dot,</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C8_marker_dotplot.png&quot;</span>), p_dot,</span>
 <span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
@@ -2695,33 +2709,45 @@ Show answers
 </section>
 <section id="step-4-manual-annotation" class="level2">
 <h2 class="anchored" data-anchor-id="step-4-manual-annotation">Step 4 — Manual annotation</h2>
-<p>Use the canonical marker table above and the dot plot to assign labels. Your cluster numbering will depend on the random seed and Seurat version, so <strong>do not copy these labels blindly</strong> — pick from the table that matches <em>your</em> dot plot.</p>
+<p>Use the canonical marker table above and the dot plot to assign labels. Your cluster <strong>count and numbering</strong> depend on the random seed, Seurat version, and the fact that this is <em>unintegrated</em> data — so you’ll often have <strong>more clusters than cell types</strong> (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). <strong>Do not copy these labels blindly</strong> — run <code>levels(ifnb)</code> to see your clusters, then label each one from the table that matches <em>your</em> dot plot (it’s fine to give two clusters the same label).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># TEMPLATE — edit the labels to match YOUR clusters (the order must match</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co"># levels(Idents(ifnb)) at this point). This chunk is left `eval: false` because</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># the labels below are placeholders; once they match your dot plot, change it to</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># `eval: true` (or just run the chunk) to apply them.</span></span>
-<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>new.cluster.ids <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;0&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD14 Mono&quot;</span>,</span>
-<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;1&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD4 Naive T&quot;</span>,</span>
-<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;2&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD4 Memory T&quot;</span>,</span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;3&quot;</span>  <span class="ot">=</span> <span class="st">&quot;B&quot;</span>,</span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;4&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD8 T&quot;</span>,</span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;5&quot;</span>  <span class="ot">=</span> <span class="st">&quot;NK&quot;</span>,</span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;6&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD16 Mono&quot;</span>,</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;7&quot;</span>  <span class="ot">=</span> <span class="st">&quot;T activated&quot;</span>,</span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;8&quot;</span>  <span class="ot">=</span> <span class="st">&quot;DC&quot;</span>,</span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;9&quot;</span>  <span class="ot">=</span> <span class="st">&quot;Mk&quot;</span>,</span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;10&quot;</span> <span class="ot">=</span> <span class="st">&quot;B activated&quot;</span>,</span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;11&quot;</span> <span class="ot">=</span> <span class="st">&quot;pDC&quot;</span>,</span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;12&quot;</span> <span class="ot">=</span> <span class="st">&quot;Eryth&quot;</span></span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(new.cluster.ids) <span class="ot">&lt;-</span> <span class="fu">levels</span>(ifnb)</span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RenameIdents</span>(ifnb, new.cluster.ids)</span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype_manual <span class="ot">&lt;-</span> <span class="fu">Idents</span>(ifnb)</span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># First, see how many clusters you actually have, and their ids:</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">levels</span>(ifnb)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="co"># On the UNINTEGRATED data, cell types often split by CONDITION (e.g. CTRL vs</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="co"># STIM monocytes), so you&#39;ll usually get MORE clusters than cell types — often</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># ~15-20, sometimes two clusters of the same type. That&#39;s expected here;</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Tutorial 05 integrates the samples and collapses these.</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="co"># TEMPLATE — give each cluster id a label. Edit this named vector so the names on</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># the LEFT (cluster ids, in quotes) cover YOUR clusters from the dot plot. The</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># left side is the cluster id, the right side is the label you assign. You can</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="co"># reuse a label (e.g. two monocyte clusters both &quot;CD14 Mono&quot;). It&#39;s fine to label</span></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="co"># only some clusters while you iterate — unlisted ones keep their number.</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>new.cluster.ids <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;0&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD14 Mono&quot;</span>,</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;1&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD4 Naive T&quot;</span>,</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;2&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD4 Memory T&quot;</span>,</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;3&quot;</span>  <span class="ot">=</span> <span class="st">&quot;B&quot;</span>,</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;4&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD8 T&quot;</span>,</span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;5&quot;</span>  <span class="ot">=</span> <span class="st">&quot;NK&quot;</span>,</span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;6&quot;</span>  <span class="ot">=</span> <span class="st">&quot;CD16 Mono&quot;</span>,</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;7&quot;</span>  <span class="ot">=</span> <span class="st">&quot;T activated&quot;</span>,</span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;8&quot;</span>  <span class="ot">=</span> <span class="st">&quot;DC&quot;</span>,</span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;9&quot;</span>  <span class="ot">=</span> <span class="st">&quot;Mk&quot;</span>,</span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;10&quot;</span> <span class="ot">=</span> <span class="st">&quot;B activated&quot;</span>,</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;11&quot;</span> <span class="ot">=</span> <span class="st">&quot;pDC&quot;</span>,</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;12&quot;</span> <span class="ot">=</span> <span class="st">&quot;Eryth&quot;</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># ... add entries for any remaining cluster ids your run produced (13, 14, ...)</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="co"># Apply only the labels whose cluster id actually exists. This keys on the vector</span></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="co"># NAMES (cluster ids), so it works for any number of clusters and never throws the</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="co"># &quot;&#39;names&#39; attribute [N] must be the same length as the vector [M]&quot; error.</span></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>new.cluster.ids <span class="ot">&lt;-</span> new.cluster.ids[<span class="fu">names</span>(new.cluster.ids) <span class="sc">%in%</span> <span class="fu">levels</span>(ifnb)]</span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">RenameIdents</span>(ifnb, new.cluster.ids)</span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a>ifnb<span class="sc">$</span>celltype_manual <span class="ot">&lt;-</span> <span class="fu">Idents</span>(ifnb)</span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a><span class="fu">DimPlot</span>(ifnb, <span class="at">reduction =</span> <span class="st">&quot;umap&quot;</span>, <span class="at">label =</span> <span class="cn">TRUE</span>, <span class="at">repel =</span> <span class="cn">TRUE</span>) <span class="sc">+</span> <span class="fu">NoLegend</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2786,11 +2812,11 @@ Show answers
 <span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>manual_vs_truth</span>
 <span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figures out -----------------------------------------------------------</span></span>
-<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_umap_manual.png&quot;</span>),         p_manual,</span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_umap_manual.png&quot;</span>),         p_manual,</span>
 <span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>,  <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_umap_ground_truth.png&quot;</span>),   p_truth,</span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_umap_ground_truth.png&quot;</span>),   p_truth,</span>
 <span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">7</span>,  <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_umap_manual_vs_truth.png&quot;</span>), p_validate,</span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod3_C10_umap_manual_vs_truth.png&quot;</span>), p_validate,</span>
 <span id="cb10-39"><a href="#cb10-39" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">13</span>, <span class="at">height =</span> <span class="dv">6</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
 <span id="cb10-40"><a href="#cb10-40" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb10-41"><a href="#cb10-41" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Table out: cross-tab of manual labels vs ground-truth labels ----------</span></span>

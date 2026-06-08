@@ -120,6 +120,19 @@ out_dir <- "../output/Mod2"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 ```
 
 ```{r}
@@ -173,7 +186,7 @@ p_pca_heatmap <- patchwork::wrap_elements(p_pca_heatmap) +
 p_pca_heatmap
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap,
+save_fig(file.path(out_dir, "Mod2_C3_pca_heatmap.png"), p_pca_heatmap,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -207,7 +220,7 @@ p_elbow <- ElbowPlot(ifnb, ndims = 40) +
 p_elbow
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod2_C4_elbow.png"), p_elbow,
+save_fig(file.path(out_dir, "Mod2_C4_elbow.png"), p_elbow,
        width = 7, height = 5, dpi = 300)
 ```
 
@@ -304,7 +317,7 @@ p_umap_clusters <- DimPlot(ifnb, reduction = "umap", label = TRUE) +
 p_umap_clusters
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod2_C8_umap_clusters.png"), p_umap_clusters,
+save_fig(file.path(out_dir, "Mod2_C8_umap_clusters.png"), p_umap_clusters,
        width = 7, height = 6, dpi = 300)
 ```
 
@@ -347,11 +360,11 @@ p_batch <- (p_by_sample | p_by_celltype) +
   )
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod2_C9_umap_by_sample.png"),   p_by_sample,
+save_fig(file.path(out_dir, "Mod2_C9_umap_by_sample.png"),   p_by_sample,
        width = 7, height = 6, dpi = 300)
-ggsave(file.path(out_dir, "Mod2_C9_umap_by_celltype.png"), p_by_celltype,
+save_fig(file.path(out_dir, "Mod2_C9_umap_by_celltype.png"), p_by_celltype,
        width = 7, height = 6, dpi = 300)
-ggsave(file.path(out_dir, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,
+save_fig(file.path(out_dir, "Mod2_C9_umap_batch_diagnostic.png"), p_batch,
        width = 13, height = 6, dpi = 300)
 ```
 

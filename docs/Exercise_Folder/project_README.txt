@@ -46,7 +46,8 @@ SIBLINGS of scripts/ (i.e. at the project root):
     my_scrnaseq_project/
     ├── scripts/      ← your .qmd files (you created this)
     ├── data/         ← AUTO-CREATED: intermediate .rds objects (see below)
-    └── output/       ← AUTO-CREATED: figures (.png) and tables (.csv), per module
+    └── output/       ← AUTO-CREATED, per module: tables (.csv) and every figure
+                        as BOTH .png (viewing) and .svg (vector, for Illustrator)
         ├── Mod1/
         ├── Mod2/
         └── …
@@ -82,7 +83,44 @@ Module 15 scATAC) also read those files from data/ — the tutorial gives you th
 download command; run it so the files land in your project's data/ folder.
 
 
-5. Notes
+5. Getting a clean run (avoiding "stale" results)
+-------------------------------------------------
+
+R keeps every object you create in memory for the whole session, and each
+tutorial reads the .rds its predecessor saved into data/. So after you edit or
+re-run an EARLIER tutorial, two kinds of staleness can bite you:
+
+  (a) in-memory: a later chunk uses an old object still sitting in the session;
+  (b) on-disk:   a later tutorial loads an OLD data/*.rds because you didn't
+                 re-run the earlier tutorial that writes it.
+
+These tutorials do NOT use knitr/Quarto chunk caching, so a "clean run" just
+means clearing those two things:
+
+  1. Restart R to empty the session:
+       RStudio: Session > Restart R   (Ctrl/Cmd + Shift + F10)
+       then re-run the tutorial top-to-bottom
+       ("Run > Restart R and Run All Chunks" does both at once).
+     (rm(list = ls()) clears variables but NOT loaded packages — prefer Restart R.)
+
+  2. Stop RStudio from silently reloading old objects:
+       Tools > Global Options > General
+         - uncheck "Restore .RData into workspace at startup"
+         - set "Save workspace to .RData on exit" to "Never"
+
+  3. If you changed an earlier tutorial, RE-RUN IT so it overwrites its data/*.rds
+     — otherwise the next tutorial reads the old file. To force a full clean
+     rebuild of all intermediates, delete data/ and start again from Tutorial 01
+     (run this from your scripts/ folder):
+         unlink("../data", recursive = TRUE)
+     (ifnb itself re-downloads from its package cache, so you only regenerate the
+     intermediate .rds files.)
+
+  4. To clear only the stale plots/tables shown under chunks in the editor (a
+     display thing, not computation): the Run/gear menu has "Clear All Output".
+
+
+6. Notes
 --------
 
 - The workshop dataset (ifnb) downloads automatically the first time Tutorial 01

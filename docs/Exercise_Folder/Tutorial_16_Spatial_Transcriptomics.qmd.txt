@@ -119,6 +119,19 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 set.seed(2026)
 ```
 
@@ -199,9 +212,9 @@ p1
 p2
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod16_C3_qc_violins.png"), p1,
+save_fig(file.path(out_dir, "Mod16_C3_qc_violins.png"), p1,
        width = 10, height = 4, dpi = 300)
-ggsave(file.path(out_dir, "Mod16_C3_qc_spatial.png"), p2,
+save_fig(file.path(out_dir, "Mod16_C3_qc_spatial.png"), p2,
        width = 10, height = 5, dpi = 300)
 ```
 
@@ -269,9 +282,9 @@ p_markers_ant
 p_markers_post
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod16_C5_markers_anterior.png"),  p_markers_ant,
+save_fig(file.path(out_dir, "Mod16_C5_markers_anterior.png"),  p_markers_ant,
        width = 12, height = 4, dpi = 300)
-ggsave(file.path(out_dir, "Mod16_C5_markers_posterior.png"), p_markers_post,
+save_fig(file.path(out_dir, "Mod16_C5_markers_posterior.png"), p_markers_post,
        width = 12, height = 4, dpi = 300)
 ```
 
@@ -317,7 +330,7 @@ p_cluster <- (p_umap + p_tis) +
 p_cluster
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod16_C6_anterior_clusters.png"), p_cluster,
+save_fig(file.path(out_dir, "Mod16_C6_anterior_clusters.png"), p_cluster,
        width = 12, height = 5, dpi = 300)
 ```
 
@@ -364,7 +377,7 @@ p_svf
 tibble::tibble(rank = seq_along(top_sv), gene = top_sv) |>
   readr::write_csv(file.path(out_dir, "Mod16_C7_spatially_variable_features.csv"))
 
-ggsave(file.path(out_dir, "Mod16_C7_spatially_variable_features.png"), p_svf,
+save_fig(file.path(out_dir, "Mod16_C7_spatially_variable_features.png"), p_svf,
        width = 12, height = 7, dpi = 300)
 ```
 
@@ -434,9 +447,9 @@ p_int_spatial <- SpatialDimPlot(brain, label = TRUE) +
 p_int_spatial
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod16_C8_integrated_umap.png"), p_int_umap,
+save_fig(file.path(out_dir, "Mod16_C8_integrated_umap.png"), p_int_umap,
        width = 12, height = 5, dpi = 300)
-ggsave(file.path(out_dir, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial,
+save_fig(file.path(out_dir, "Mod16_C8_integrated_spatial_clusters.png"), p_int_spatial,
        width = 10, height = 5, dpi = 300)
 ```
 

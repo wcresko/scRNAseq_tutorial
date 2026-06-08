@@ -29,7 +29,7 @@ Every code chunk here is tagged with `#| eval: false`, so the published page sho
 
 ## About this tutorial
 
-The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~14,000 cells, ~25 MB on disk, no 10x click-through.
+The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~24,000 cells, no 10x click-through.
 
 
 ::: callout-note
@@ -55,10 +55,10 @@ The rendered HTML shows the code but does **not** execute it (chunks default to 
 
 **What it is.** Peripheral blood mononuclear cells (PBMCs) from eight lupus patients. Each donor's PBMCs were split into two aliquots:
 
--   **`CTRL`** — control (no stimulation), \~6,500 cells
--   **`STIM`** — treated with interferon-β for 6 hours, \~7,500 cells
+-   **`CTRL`** — control (no stimulation), \~12,000 cells
+-   **`STIM`** — treated with interferon-β for 6 hours, \~12,000 cells
 
-Together \~14,000 cells across two samples on the **10x Chromium 3' v1** assay. **Cell-type labels** (e.g. `CD14 Mono`, `CD4 Naive T`, `B`, `NK`, `DC`) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.
+Together \~24,000 annotated singlets across two samples on the **10x Chromium 3' v1** assay (the `muscData` build of `ifnb` is larger than the older SeuratData `ifnb` you may have seen quoted at \~14k). **Cell-type labels** (e.g. `CD14+ Monocytes`, `CD4 T cells`, `B cells`, `NK cells`, `Dendritic cells`) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.
 
 -   **Reference:** Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94. [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
 -   **Origin:** GEO accession [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
@@ -83,7 +83,7 @@ Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01
 
 | Slot | Class | Contents |
 |---|---|---|
-| `ifnb@assays$RNA@counts` | `dgCMatrix` | Raw UMI counts. \~14,000 genes × \~14,000 cells (sparse). |
+| `ifnb@assays$RNA@counts` | `dgCMatrix` | Raw UMI counts. \~35,000 genes × \~24,000 cells (sparse). |
 | `ifnb@meta.data$stim` | factor | `"CTRL"` or `"STIM"` — the **sample-of-origin** label. This becomes the integration covariate. |
 | `ifnb@meta.data$seurat_annotations` | factor | Author-curated cell-type labels from the original paper. Useful as ground truth in Tutorial 03. |
 | `ifnb@meta.data$nCount_RNA`, `nFeature_RNA` | numeric | Auto-populated by `CreateSeuratObject` — UMIs and unique genes per cell. |
@@ -108,6 +108,8 @@ By the end of this tutorial you will be able to:
 **SoupX errors with "no raw matrix found"** (or `subscript out of bounds` from `load10X`) — this is correct behaviour. The `Kang18_8vs8()` download only ships the *filtered* counts. SoupX needs both. The Step 5 block is an **illustrative template** for your own 10x data and now stops with a clear message if you run it with the placeholder path. Run it for real on data that has a Cell Ranger `raw_feature_bc_matrix/` folder.
 
 **Warnings (not errors) during doublet detection** — when Step 6 runs you'll see `Layer 'data'/'scale.data' is empty` and `'normalizeCounts'/'librarySizeFactors' is deprecated`. Both are harmless: doublet detection runs on **raw counts before normalization** (so those layers are legitimately empty), and the deprecation notes come from `scran`/`scuttle` *inside* `scDblFinder`, not your code. As long as you see `Creating … artificial doublets`, it's working.
+
+**Plotting warnings before normalization (harmless)** — Steps 4 and 6 plot per-cell QC *metadata* (`nFeature_RNA`, `nCount_RNA`, …) before normalization, so Seurat prints `Default search for "data" layer … utilizing "counts" layer instead`. The QC values are metadata, so the layer it uses is irrelevant. Likewise the HVG plot (Step 9) uses a log10 axis and prints `log-10 transformation introduced infinite values` for genes with zero mean expression (they're not variable features). The tutorial wraps these plots in `suppressWarnings()` so you shouldn't see them, but they're safe either way.
 
 **Gene names look like `SYMBOL_ENSG…` / `SYMBOL-ENSG…`** — `muscData`'s `Kang18_8vs8()` stores each feature as `SYMBOL_ENSEMBLID` (e.g. `ISG15_ENSG00000187608`). The loader strips the trailing Ensembl-ID suffix so only the gene symbol remains (`ISG15`), which is what canonical markers, Azimuth, and `org.Hs.eg.db` match on. It strips *only* the Ensembl suffix — not everything after the first dash — so real dashed symbols (`HLA-A`, `MT-CO1`) are preserved, and it reports how many names it simplified.
 :::
@@ -138,6 +140,19 @@ Run each tutorial **from `scripts/`** (open the `.qmd` in RStudio from there). T
 
 1. **`data/` is the hand-off.** Tutorial 01 writes `../data/ifnb_preprocessed.rds`; Tutorial 02 reads it back from the same `../data/`. Keep all the `.qmd` files together in `scripts/` so they share one project `data/`.
 2. **Can't find a file?** The setup chunk prints the exact absolute path (`This module writes its figures & tables to: …`). If it's not where you expect, check `getwd()` — it should be your `scripts/` folder. See the downloadable **README** (linked on the [Materials](../Materials.html) page) for the full layout.
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 :::
 
 ```{r}
@@ -180,9 +195,9 @@ message("This module writes its figures & tables to: ", normalizePath(out_dir))
 # every subsequent call is a no-op.
 sce <- Kang18_8vs8()
 
-# Drop the multiplexed multiplets so we end up with the same set of singletons
-# that the historical `ifnb` Seurat object shipped (~14k cells), and drop any
-# cells without an author-assigned cell type label.
+# Keep only true singlets that have an author-assigned cell-type label (drop the
+# multiplexed multiplets and unlabeled droplets). This leaves ~24,000 cells — the
+# muscData build is larger than the historical SeuratData `ifnb` (~14k).
 sce <- sce[, sce$multiplets == "singlet" & !is.na(sce$cell)]
 
 # Gene (feature) name cleanup. muscData's Kang18_8vs8 stores each feature as
@@ -337,14 +352,19 @@ The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-c
 #| label: qc-plots
 #| fig-cap: "Per-sample QC distributions (violins) and the UMI–gene relationship (scatter) for the ifnb dataset."
 
-# Violin panel: four QC metrics, split by sample, fully labelled
-p_qc_vln <- VlnPlot(ifnb,
+# Violin panel: four QC metrics, split by sample, fully labelled.
+# These features are per-cell QC METADATA plotted before normalization, so Seurat
+# warns that the "data" layer is empty and falls back to "counts". That's
+# irrelevant here (metadata isn't read from an expression layer), so we silence
+# the expected note.
+p_qc_vln <- suppressWarnings(
+  VlnPlot(ifnb,
         features = c("nFeature_RNA", "nCount_RNA", "percent.mt", "percent.rb"),
         group.by = "stim",
         ncol = 4,
         pt.size = 0) &
   xlab("Sample (stim condition)") &
-  theme(plot.title = element_text(size = 11))
+  theme(plot.title = element_text(size = 11)))
 p_qc_vln <- p_qc_vln +
   patchwork::plot_annotation(
     title    = "Per-cell QC metrics by sample — ifnb (CTRL vs IFN-β STIM)",
@@ -354,10 +374,10 @@ p_qc_vln <- p_qc_vln +
 p_qc_vln
 
 # Scatter: UMIs vs unique genes, coloured by sample, with a linear trend
-p_qc_scatter <- FeatureScatter(ifnb,
+p_qc_scatter <- suppressWarnings(FeatureScatter(ifnb,
                feature1 = "nCount_RNA",
                feature2 = "nFeature_RNA",
-               group.by = "stim") +
+               group.by = "stim")) +
   geom_smooth(method = "lm") +
   labs(
     title    = "Sequencing depth vs library complexity",
@@ -369,9 +389,9 @@ p_qc_scatter <- FeatureScatter(ifnb,
 p_qc_scatter
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod1_C5_qc_violins.png"),  p_qc_vln,
+save_fig(file.path(out_dir, "Mod1_C5_qc_violins.png"),  p_qc_vln,
        width = 12, height = 4, dpi = 300)
-ggsave(file.path(out_dir, "Mod1_C5_qc_scatter.png"),  p_qc_scatter,
+save_fig(file.path(out_dir, "Mod1_C5_qc_scatter.png"),  p_qc_scatter,
        width = 6,  height = 5, dpi = 300)
 ```
 
@@ -500,12 +520,15 @@ table(sample = ifnb$stim, class = ifnb$scDblFinder.class)
 as.data.frame(table(sample = ifnb$stim, class = ifnb$scDblFinder.class)) |>
   readr::write_csv(file.path(out_dir, "Mod1_C7_doublet_counts.csv"))
 
-# Inspect: doublets should sit at the high end of nCount/nFeature
-p_dbl <- VlnPlot(ifnb,
+# Inspect: doublets should sit at the high end of nCount/nFeature.
+# (Same pre-normalization metadata plot as Step 4 — silence the expected
+# "data layer empty, using counts" note.)
+p_dbl <- suppressWarnings(
+  VlnPlot(ifnb,
         features = c("nFeature_RNA", "nCount_RNA"),
         group.by = "scDblFinder.class", pt.size = 0) &
   xlab("scDblFinder class") &
-  theme(plot.title = element_text(size = 11))
+  theme(plot.title = element_text(size = 11)))
 p_dbl <- p_dbl +
   patchwork::plot_annotation(
     title    = "Library size and complexity for called singlets vs doublets",
@@ -515,7 +538,7 @@ p_dbl <- p_dbl +
 p_dbl
 
 # --- Figure out ------------------------------------------------------------
-ggsave(file.path(out_dir, "Mod1_C7_doublet_violins.png"), p_dbl,
+save_fig(file.path(out_dir, "Mod1_C7_doublet_violins.png"), p_dbl,
        width = 7, height = 4, dpi = 300)
 ```
 
@@ -623,11 +646,16 @@ p_hvg <- LabelPoints(plot = plot1, points = top10, repel = TRUE) +
     y        = "Standardized variance",
     colour   = "Selected as HVG"
   )
-p_hvg
+# VariableFeaturePlot draws mean expression on a log10 x-axis. Genes with zero
+# mean (undetected across all retained cells) become -Inf and ggplot drops them
+# with "log-10 transformation introduced infinite values" — harmless, since those
+# genes are not variable features. Silence it at draw and save time.
+suppressWarnings(print(p_hvg))
 
 # --- Outputs: HVG plot + the labelled top-10 genes as a table --------------
-ggsave(file.path(out_dir, "Mod1_C10_variable_features.png"), p_hvg,
-       width = 7, height = 5, dpi = 300)
+suppressWarnings(
+  save_fig(file.path(out_dir, "Mod1_C10_variable_features.png"), p_hvg,
+         width = 7, height = 5, dpi = 300))
 
 tibble::tibble(rank = seq_along(top10), gene = top10) |>
   readr::write_csv(file.path(out_dir, "Mod1_C10_top10_hvgs.csv"))
@@ -695,8 +723,8 @@ You should see roughly:
 | Step | Features after | Barcodes after |
 |---|---:|---:|
 | Step 1 — `Kang18_8vs8` (singlets, annotated)                    | ~35,635 | ~24,500 |
-| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~35,635 | ~22,000 |
-| Step 8 — `NormalizeData` (no dimension change)                  | ~35,635 | ~22,000 |
+| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~35,635 | ~23,000 |
+| Step 8 — `NormalizeData` (no dimension change)                  | ~35,635 | ~23,000 |
 
 (Numbers will vary by a few hundred depending on package versions.)
 

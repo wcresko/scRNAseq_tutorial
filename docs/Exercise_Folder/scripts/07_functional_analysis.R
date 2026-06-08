@@ -18,6 +18,19 @@ dir.create(FUN_DIR, showWarnings = FALSE, recursive = TRUE)
 dir.create(OUT_DIR, showWarnings = FALSE, recursive = TRUE)
 message("[dirs] data -> ", normalizePath(DATA_DIR), "  |  figures/tables -> ", normalizePath(OUT_DIR))
 
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
+
 de <- read_csv(file.path(DATA_DIR, "ifnb_pseudobulk_de.csv"), show_col_types = FALSE)
 
 # Step 1 — map gene SYMBOL -> ENTREZID (cheap bitr call; enrichment tools key on
@@ -76,7 +89,7 @@ if (!is.null(cc)) {
          y        = "GO Biological Process term",
          colour   = "Adjusted p-value",
          size     = "Gene ratio")
-  ggsave(file.path(OUT_DIR, "Mod7_C4_comparecluster_dotplot.png"), p_cc,
+  save_fig(file.path(OUT_DIR, "Mod7_C4_comparecluster_dotplot.png"), p_cc,
          width = 10, height = 8, dpi = 300)
 }
 
@@ -110,7 +123,7 @@ if (!is.null(gse_list[[ct_pick]]) && nrow(gse_list[[ct_pick]]@result) > 0) {
   p_gsea <- gseaplot2(gse_list[[ct_pick]],
                       geneSetID = head(gse_list[[ct_pick]]@result$ID, 3),
                       title     = paste0(ct_pick, " — top 3 BP enrichments"))
-  ggsave(file.path(OUT_DIR, "Mod7_C6_gsea_running_enrichment.png"), p_gsea,
+  save_fig(file.path(OUT_DIR, "Mod7_C6_gsea_running_enrichment.png"), p_gsea,
          width = 8, height = 6, dpi = 300)
 }
 

@@ -2377,6 +2377,8 @@ Note
 <p><strong><code>DefaultAssay()</code> is <code>&quot;integrated&quot;</code> when running <code>FindMarkers</code></strong> — the <code>IntegrateData</code> step switches the default assay. Always <code>DefaultAssay(seu) &lt;- &quot;RNA&quot;</code> <em>before</em> any DE / marker work. The integrated assay holds <em>batch-corrected</em> values that are valid for <em>geometry</em> (PCA, UMAP, clustering) but NOT for differential expression.</p>
 <p><strong>ISG score gap looks zero after integration</strong> — you scored on the integrated assay instead of the <code>RNA</code> assay. <code>AddModuleScore</code> uses <code>DefaultAssay(seu)</code>. Switch back to <code>RNA</code> first.</p>
 <p><strong>Harmony’s <code>RunHarmony</code> errors with “object has no <code>pca</code> reduction”</strong> — you skipped the <code>RunPCA</code> step. Harmony works on PC space, not on the raw scaled counts.</p>
+<p><strong><code>FindAllMarkers</code> on the Harmony object returns “No DE genes identified” + “data layers are not joined”</strong> — <code>ifnb_h</code> is built with <code>merge()</code>, which in Seurat v5 leaves the RNA assay with per-sample split layers (<code>counts.CTRL</code>/<code>counts.STIM</code>, <code>data.*</code>). <code>FindAllMarkers</code> then silently skips every test and returns an empty table, so the downstream <code>group_by(cluster)</code> errors with <em>“Column <code>cluster</code> is not found”</em>. Fix: <code>ifnb_h &lt;- JoinLayers(ifnb_h)</code> after the merge (the Harmony chunk now does this). <code>Layers(ifnb_h)</code> should show single <code>counts</code>/<code>data</code> layers.</p>
+<p><strong><code>FindIntegrationAnchors</code> seems to hang at “Running CCA”</strong> — it isn’t hung; CCA is an SVD-based step that grows with cell number, and this <code>ifnb</code> is ~23k cells, so it can take <strong>several minutes</strong> on a laptop (much slower than Harmony’s seconds). As long as a CPU core is busy, let it finish — “Finding anchors” and “Finding integration vectors” follow. The <code>Different features in new layer data than already exists for scale.data</code> warnings during “Scaling features” are benign (Seurat v5 re-scales the integration features over the HVG <code>scale.data</code> from Tutorial 01).</p>
 </div>
 </div>
 <div class="callout callout-style-default callout-tip callout-titled" title="Solutions / instructor copy">
@@ -2417,7 +2419,20 @@ Note
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod5&quot;</span></span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;../data&quot;</span>,  <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)   <span class="co"># shared .rds hand-off folder (sibling of scripts/, created one level up)</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure saving --------------------------------------------------------</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a><span class="co"># save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a><span class="co"># editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a><span class="co"># .svg is written alongside with the same basename. (.svg uses the &#39;svglite&#39;</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a><span class="co"># package, installed in Tutorial 00.)</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>save_fig <span class="ot">&lt;-</span> <span class="cf">function</span>(filename, plot, width, height, <span class="at">dpi =</span> <span class="dv">300</span>, ...) {</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(filename, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, <span class="at">dpi =</span> dpi, ...)</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  svg_path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(tools<span class="sc">::</span><span class="fu">file_path_sans_ext</span>(filename), <span class="st">&quot;.svg&quot;</span>)</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(svg_path, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, ...),</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>           <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">message</span>(<span class="st">&quot;  (could not write &quot;</span>, <span class="fu">basename</span>(svg_path),</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">&quot; - install &#39;svglite&#39;? &quot;</span>, <span class="fu">conditionMessage</span>(e), <span class="st">&quot;)&quot;</span>))</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>ifnb <span class="ot">&lt;-</span> <span class="fu">readRDS</span>(<span class="st">&quot;../data/ifnb_annotated.rds&quot;</span>)</span>
@@ -2452,7 +2467,7 @@ Note
 <div class="callout-body-container callout-body">
 <ol type="1">
 <li>Why pick HVGs <strong>per sample</strong> instead of on the joint matrix?</li>
-<li>Suppose CTRL has 6,500 cells and STIM has 7,500. Will the per-sample HVG lists overlap?</li>
+<li>Suppose CTRL has 11,000 cells and STIM has 12,000. Will the per-sample HVG lists overlap?</li>
 </ol>
 <details>
 <summary>
@@ -2478,19 +2493,24 @@ Show answers
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">merge</span>(ifnb.list[[<span class="dv">1</span>]], <span class="at">y =</span> ifnb.list[[<span class="dv">2</span>]],</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>                <span class="at">merge.data =</span> <span class="cn">TRUE</span>,</span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>                <span class="at">project    =</span> <span class="st">&quot;ifnb_harmony&quot;</span>)</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="fu">VariableFeatures</span>(ifnb_h) <span class="ot">&lt;-</span> features</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">ScaleData</span>(ifnb_h, <span class="at">features =</span> features, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">RunPCA</span>(ifnb_h, <span class="at">features =</span> features, <span class="at">npcs =</span> <span class="dv">30</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Harmony alignment in PC space — `group.by.vars` is the batch column</span></span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">RunHarmony</span>(ifnb_h, <span class="at">group.by.vars =</span> <span class="st">&quot;stim&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;pca&quot;</span>,</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>                     <span class="at">reduction.save =</span> <span class="st">&quot;harmony&quot;</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Re-cluster + UMAP on the harmony reduction</span></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(ifnb_h, <span class="at">reduction =</span> <span class="st">&quot;harmony&quot;</span>, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>)</span>
-<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(ifnb_h, <span class="at">resolution =</span> <span class="fl">0.5</span>)</span>
-<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(ifnb_h, <span class="at">reduction =</span> <span class="st">&quot;harmony&quot;</span>, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>,</span>
-<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>                  <span class="at">reduction.name =</span> <span class="st">&quot;umap_harmony&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># In Seurat v5, merge() leaves the RNA assay with per-sample split layers</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># (counts.CTRL/counts.STIM, data.*). Join them back into single counts/data layers</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co"># so later RNA-assay steps (ISG module score, FindAllMarkers) work. Harmony aligns</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="co"># in PCA space, so joining the expression layers doesn&#39;t affect the alignment.</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">JoinLayers</span>(ifnb_h)</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="fu">VariableFeatures</span>(ifnb_h) <span class="ot">&lt;-</span> features</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">ScaleData</span>(ifnb_h, <span class="at">features =</span> features, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">RunPCA</span>(ifnb_h, <span class="at">features =</span> features, <span class="at">npcs =</span> <span class="dv">30</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Harmony alignment in PC space — `group.by.vars` is the batch column</span></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">RunHarmony</span>(ifnb_h, <span class="at">group.by.vars =</span> <span class="st">&quot;stim&quot;</span>, <span class="at">reduction =</span> <span class="st">&quot;pca&quot;</span>,</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a>                     <span class="at">reduction.save =</span> <span class="st">&quot;harmony&quot;</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Re-cluster + UMAP on the harmony reduction</span></span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(ifnb_h, <span class="at">reduction =</span> <span class="st">&quot;harmony&quot;</span>, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>)</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">FindClusters</span>(ifnb_h, <span class="at">resolution =</span> <span class="fl">0.5</span>)</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>ifnb_h <span class="ot">&lt;-</span> <span class="fu">RunUMAP</span>(ifnb_h, <span class="at">reduction =</span> <span class="st">&quot;harmony&quot;</span>, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">20</span>,</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>                  <span class="at">reduction.name =</span> <span class="st">&quot;umap_harmony&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2563,7 +2583,7 @@ Note
 </div>
 <div class="callout-body-container callout-body">
 <ol type="1">
-<li>Anchor-based integration is widely considered the most rigorous of the alignment methods, but it’s also slow on large datasets. For <code>ifnb</code> (~14k cells, 2 samples), how does runtime compare to Harmony?</li>
+<li>Anchor-based integration is widely considered the most rigorous of the alignment methods, but it’s also slow on large datasets. For <code>ifnb</code> (~23k cells, 2 samples), how does runtime compare to Harmony?</li>
 <li>Why does <code>DefaultAssay(ifnb_s) &lt;- &quot;integrated&quot;</code> matter for clustering but not for marker testing?</li>
 </ol>
 <details>
@@ -2571,7 +2591,7 @@ Note
 Show answers
 </summary>
 <ol type="1">
-<li>Harmony finishes in <strong>~10–30 seconds</strong>; Seurat anchors take <strong>~1–3 minutes</strong>. For atlas-scale data (1M cells, 50 samples) the difference balloons to hours-vs-minutes, and Harmony or scVI become the practical choice.</li>
+<li>Harmony finishes in <strong>well under a minute</strong>; Seurat CCA anchors are much slower — on this ~23k-cell <code>ifnb</code> the <code>FindIntegrationAnchors</code> “Running CCA” step alone can take <strong>several minutes</strong> on a laptop (it’s an SVD-based step that grows quickly with cell number), so don’t be alarmed if it sits there. For atlas-scale data (1M cells, 50 samples) the difference balloons to hours-vs-minutes, and Harmony or scVI become the practical choice.</li>
 <li>The integrated assay holds <strong>batch-corrected</strong> expression values that are valid for <em>geometry</em> (PCA, neighbor graph, UMAP). They’re <strong>not</strong> valid for differential expression because the correction can dampen or distort real biological variation. Always run <code>FindMarkers()</code> on the original <code>RNA</code> assay.</li>
 </ol>
 </details>
@@ -2621,9 +2641,9 @@ Show answers
 <span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>p_compare_cell</span>
 <span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figures out -----------------------------------------------------------</span></span>
-<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C6_compare_by_sample.png&quot;</span>), p_compare_sample,</span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C6_compare_by_sample.png&quot;</span>), p_compare_sample,</span>
 <span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">15</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
-<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C6_compare_by_celltype.png&quot;</span>), p_compare_cell,</span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C6_compare_by_celltype.png&quot;</span>), p_compare_cell,</span>
 <span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">15</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
@@ -2697,7 +2717,7 @@ Show answers
 <span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>isg_by_celltype</span>
 <span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Outputs: ISG FeaturePlots + per-cell-type STIM-vs-CTRL ISG means -------</span></span>
-<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C7_isg_featureplots.png&quot;</span>), p_isg,</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a><span class="fu">save_fig</span>(<span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C7_isg_featureplots.png&quot;</span>), p_isg,</span>
 <span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">12</span>, <span class="at">height =</span> <span class="dv">5</span>, <span class="at">dpi =</span> <span class="dv">300</span>)</span>
 <span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(isg_by_celltype,</span>
@@ -2735,26 +2755,33 @@ Show answers
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Switch back to the RNA assay for marker testing</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">DefaultAssay</span>(ifnb_h) <span class="ot">&lt;-</span> <span class="st">&quot;RNA&quot;</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(ifnb_h) <span class="ot">&lt;-</span> <span class="st">&quot;seurat_clusters&quot;</span></span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>ifnb_h_markers <span class="ot">&lt;-</span> <span class="fu">FindAllMarkers</span>(</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  ifnb_h,</span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">only.pos        =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.pct         =</span> <span class="fl">0.25</span>,</span>
-<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">logfc.threshold =</span> <span class="fl">0.25</span></span>
-<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a><span class="co"># ifnb_h was built with merge() (in the Harmony step), and Seurat v5 merge leaves</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a><span class="co"># the RNA assay with per-sample split layers (counts.CTRL/counts.STIM, data.*).</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a><span class="co"># FindAllMarkers needs a single joined layer, so rejoin before testing — otherwise</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="co"># every test fails with &quot;data layers are not joined&quot; and returns no markers.</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">length</span>(<span class="fu">Layers</span>(ifnb_h, <span class="at">search =</span> <span class="st">&quot;data&quot;</span>)) <span class="sc">&gt;</span> <span class="dv">1</span>) ifnb_h <span class="ot">&lt;-</span> <span class="fu">JoinLayers</span>(ifnb_h)</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="fu">Idents</span>(ifnb_h) <span class="ot">&lt;-</span> <span class="st">&quot;seurat_clusters&quot;</span></span>
 <span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>ifnb_h_top_markers <span class="ot">&lt;-</span> ifnb_h_markers <span class="sc">|&gt;</span></span>
-<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cluster) <span class="sc">|&gt;</span></span>
-<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(avg_log2FC, <span class="at">n =</span> <span class="dv">5</span>) <span class="sc">|&gt;</span></span>
-<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>ifnb_h_top_markers</span>
-<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Tables out: all integrated-cluster markers + top-5 per cluster ---------</span></span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(ifnb_h_markers,</span>
-<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C8_integrated_markers.csv&quot;</span>))</span>
-<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(ifnb_h_top_markers,</span>
-<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C8_integrated_top5_markers.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>ifnb_h_markers <span class="ot">&lt;-</span> <span class="fu">FindAllMarkers</span>(</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  ifnb_h,</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">only.pos        =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">min.pct         =</span> <span class="fl">0.25</span>,</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="at">logfc.threshold =</span> <span class="fl">0.25</span></span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>ifnb_h_top_markers <span class="ot">&lt;-</span> ifnb_h_markers <span class="sc">|&gt;</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cluster) <span class="sc">|&gt;</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(avg_log2FC, <span class="at">n =</span> <span class="dv">5</span>) <span class="sc">|&gt;</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a>ifnb_h_top_markers</span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Tables out: all integrated-cluster markers + top-5 per cluster ---------</span></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(ifnb_h_markers,</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C8_integrated_markers.csv&quot;</span>))</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>readr<span class="sc">::</span><span class="fu">write_csv</span>(ifnb_h_top_markers,</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>                 <span class="fu">file.path</span>(out_dir, <span class="st">&quot;Mod5_C8_integrated_top5_markers.csv&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-important callout-titled" title="Think about it">
 <div class="callout-header d-flex align-content-center">
@@ -2819,7 +2846,7 @@ Tip
 <li>How to identify cell types from canonical markers (Tut 03)</li>
 <li>How to integrate two samples with two different methods, compare them, and check for over-correction (Tut 05 — this one)</li>
 </ol>
-<p>The same workflow scales to atlas-scale data — but at ~14k cells, a laptop is fine. When you graduate to bigger datasets, see the <strong>Talapas HPC modules</strong> — <a href="Tutorial_09_SLURM_Basics.html">Module 09 — SLURM Basics</a> and <a href="Tutorial_10_Talapas_Pipeline.html">Module 10 — the analysis pipeline on Talapas</a> — for running this same pipeline on the cluster.</p>
+<p>The same workflow scales to atlas-scale data — but at ~23k cells, a laptop is fine. When you graduate to bigger datasets, see the <strong>Talapas HPC modules</strong> — <a href="Tutorial_09_SLURM_Basics.html">Module 09 — SLURM Basics</a> and <a href="Tutorial_10_Talapas_Pipeline.html">Module 10 — the analysis pipeline on Talapas</a> — for running this same pipeline on the cluster.</p>
 </section>
 <section id="credits" class="level2">
 <h2 class="anchored" data-anchor-id="credits">Credits</h2>

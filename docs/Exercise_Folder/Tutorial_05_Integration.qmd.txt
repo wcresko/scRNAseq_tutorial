@@ -84,6 +84,10 @@ We'll then re-cluster, re-UMAP, and **diagnose over-correction** by overlaying t
 **ISG score gap looks zero after integration** — you scored on the integrated assay instead of the `RNA` assay. `AddModuleScore` uses `DefaultAssay(seu)`. Switch back to `RNA` first.
 
 **Harmony's `RunHarmony` errors with "object has no `pca` reduction"** — you skipped the `RunPCA` step. Harmony works on PC space, not on the raw scaled counts.
+
+**`FindAllMarkers` on the Harmony object returns "No DE genes identified" + "data layers are not joined"** — `ifnb_h` is built with `merge()`, which in Seurat v5 leaves the RNA assay with per-sample split layers (`counts.CTRL`/`counts.STIM`, `data.*`). `FindAllMarkers` then silently skips every test and returns an empty table, so the downstream `group_by(cluster)` errors with *"Column `cluster` is not found"*. Fix: `ifnb_h <- JoinLayers(ifnb_h)` after the merge (the Harmony chunk now does this). `Layers(ifnb_h)` should show single `counts`/`data` layers.
+
+**`FindIntegrationAnchors` seems to hang at "Running CCA"** — it isn't hung; CCA is an SVD-based step that grows with cell number, and this `ifnb` is ~23k cells, so it can take **several minutes** on a laptop (much slower than Harmony's seconds). As long as a CPU core is busy, let it finish — "Finding anchors" and "Finding integration vectors" follow. The `Different features in new layer data than already exists for scale.data` warnings during "Scaling features" are benign (Seurat v5 re-scales the integration features over the HVG `scale.data` from Tutorial 01).
 :::
 
 
@@ -118,6 +122,19 @@ out_dir <- "../output/Mod5"
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create("../data",  showWarnings = FALSE)   # shared .rds hand-off folder (sibling of scripts/, created one level up)
 message("This module writes its figures & tables to: ", normalizePath(out_dir))
+
+# --- Figure saving --------------------------------------------------------
+# save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,
+# editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the
+# .svg is written alongside with the same basename. (.svg uses the 'svglite'
+# package, installed in Tutorial 00.)
+save_fig <- function(filename, plot, width, height, dpi = 300, ...) {
+  ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, ...)
+  svg_path <- paste0(tools::file_path_sans_ext(filename), ".svg")
+  tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, ...),
+           error = function(e) message("  (could not write ", basename(svg_path),
+                                       " - install 'svglite'? ", conditionMessage(e), ")"))
+}
 ```
 
 ```{r}
@@ -150,7 +167,7 @@ ifnb.list
 
 ::: {.callout-important title="Think about it"}
 1.  Why pick HVGs **per sample** instead of on the joint matrix?
-2.  Suppose CTRL has 6,500 cells and STIM has 7,500. Will the per-sample HVG lists overlap?
+2.  Suppose CTRL has 11,000 cells and STIM has 12,000. Will the per-sample HVG lists overlap?
 
 <details>
 
@@ -178,6 +195,11 @@ features <- SelectIntegrationFeatures(object.list = ifnb.list, nfeatures = 2000)
 ifnb_h <- merge(ifnb.list[[1]], y = ifnb.list[[2]],
                 merge.data = TRUE,
                 project    = "ifnb_harmony")
+# In Seurat v5, merge() leaves the RNA assay with per-sample split layers
+# (counts.CTRL/counts.STIM, data.*). Join them back into single counts/data layers
+# so later RNA-assay steps (ISG module score, FindAllMarkers) work. Harmony aligns
+# in PCA space, so joining the expression layers doesn't affect the alignment.
+ifnb_h <- JoinLayers(ifnb_h)
 VariableFeatures(ifnb_h) <- features
 ifnb_h <- ScaleData(ifnb_h, features = features, verbose = FALSE)
 ifnb_h <- RunPCA(ifnb_h, features = features, npcs = 30, verbose = FALSE)
@@ -238,14 +260,14 @@ After `IntegrateData()` the **default assay** becomes `"integrated"`. That assay
 :::
 
 ::: {.callout-important title="Think about it"}
-1.  Anchor-based integration is widely considered the most rigorous of the alignment methods, but it's also slow on large datasets. For `ifnb` (\~14k cells, 2 samples), how does runtime compare to Harmony?
+1.  Anchor-based integration is widely considered the most rigorous of the alignment methods, but it's also slow on large datasets. For `ifnb` (\~23k cells, 2 samples), how does runtime compare to Harmony?
 2.  Why does `DefaultAssay(ifnb_s) <- "integrated"` matter for clustering but not for marker testing?
 
 <details>
 
 <summary>Show answers</summary>
 
-1.  Harmony finishes in **\~10–30 seconds**; Seurat anchors take **\~1–3 minutes**. For atlas-scale data (1M cells, 50 samples) the difference balloons to hours-vs-minutes, and Harmony or scVI become the practical choice.
+1.  Harmony finishes in **well under a minute**; Seurat CCA anchors are much slower — on this ~23k-cell `ifnb` the `FindIntegrationAnchors` "Running CCA" step alone can take **several minutes** on a laptop (it's an SVD-based step that grows quickly with cell number), so don't be alarmed if it sits there. For atlas-scale data (1M cells, 50 samples) the difference balloons to hours-vs-minutes, and Harmony or scVI become the practical choice.
 2.  The integrated assay holds **batch-corrected** expression values that are valid for *geometry* (PCA, neighbor graph, UMAP). They're **not** valid for differential expression because the correction can dampen or distort real biological variation. Always run `FindMarkers()` on the original `RNA` assay.
 
 </details>
@@ -298,9 +320,9 @@ p_compare_cell <- (p_un_cell + p_h_cell + p_s_cell) +
 p_compare_cell
 
 # --- Figures out -----------------------------------------------------------
-ggsave(file.path(out_dir, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
+save_fig(file.path(out_dir, "Mod5_C6_compare_by_sample.png"), p_compare_sample,
        width = 15, height = 5, dpi = 300)
-ggsave(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
+save_fig(file.path(out_dir, "Mod5_C6_compare_by_celltype.png"), p_compare_cell,
        width = 15, height = 5, dpi = 300)
 ```
 
@@ -368,7 +390,7 @@ isg_by_celltype <- ifnb_h@meta.data |>
 isg_by_celltype
 
 # --- Outputs: ISG FeaturePlots + per-cell-type STIM-vs-CTRL ISG means -------
-ggsave(file.path(out_dir, "Mod5_C7_isg_featureplots.png"), p_isg,
+save_fig(file.path(out_dir, "Mod5_C7_isg_featureplots.png"), p_isg,
        width = 12, height = 5, dpi = 300)
 
 readr::write_csv(isg_by_celltype,
@@ -398,6 +420,13 @@ readr::write_csv(isg_by_celltype,
 
 # Switch back to the RNA assay for marker testing
 DefaultAssay(ifnb_h) <- "RNA"
+
+# ifnb_h was built with merge() (in the Harmony step), and Seurat v5 merge leaves
+# the RNA assay with per-sample split layers (counts.CTRL/counts.STIM, data.*).
+# FindAllMarkers needs a single joined layer, so rejoin before testing — otherwise
+# every test fails with "data layers are not joined" and returns no markers.
+if (length(Layers(ifnb_h, search = "data")) > 1) ifnb_h <- JoinLayers(ifnb_h)
+
 Idents(ifnb_h) <- "seurat_clusters"
 
 ifnb_h_markers <- FindAllMarkers(
@@ -464,7 +493,7 @@ Tutorial 06 (Pseudobulk DE) loads `ifnb_integrated.rds` and tests `STIM` vs `CTR
 3.  How to identify cell types from canonical markers (Tut 03)
 4.  How to integrate two samples with two different methods, compare them, and check for over-correction (Tut 05 — this one)
 
-The same workflow scales to atlas-scale data — but at \~14k cells, a laptop is fine. When you graduate to bigger datasets, see the **Talapas HPC modules** — [Module 09 — SLURM Basics](Tutorial_09_SLURM_Basics.html) and [Module 10 — the analysis pipeline on Talapas](Tutorial_10_Talapas_Pipeline.html) — for running this same pipeline on the cluster.
+The same workflow scales to atlas-scale data — but at \~23k cells, a laptop is fine. When you graduate to bigger datasets, see the **Talapas HPC modules** — [Module 09 — SLURM Basics](Tutorial_09_SLURM_Basics.html) and [Module 10 — the analysis pipeline on Talapas](Tutorial_10_Talapas_Pipeline.html) — for running this same pipeline on the cluster.
 
 ## Credits
 
