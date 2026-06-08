@@ -72,7 +72,9 @@ The rendered HTML shows the code but does **not** execute it. To run it:
 ::: {.callout-warning title="Common errors / things that bite"}
 **`FindAllMarkers` takes 5+ minutes** — `presto` (installed in the [Tutorial 00 setup](Tutorial_00_Setup_RStudio_Packages.html)) makes it \~10× faster; Seurat detects it automatically.
 
-**Markers list is dominated by ISGs (`ISG15`, `IFI6`, `IFIT3`, `MX1`)** — that's expected on the *unintegrated* `ifnb` data because clusters here are partly driven by `stim`. Tutorial 05 (Integration) fixes this; cell-type-specific markers reclaim the top of the lists after integration.
+**ISGs (`ISG15`, `IFI6`, `IFIT3`, `MX1`) top *some* clusters' marker lists** — expected on the *unintegrated* `ifnb` data: the cell types with the strongest interferon response (monocytes especially) split into CTRL vs STIM clusters, so those clusters' top markers are condition genes rather than cell-type genes. Most clusters are still topped by cell-type markers. Tutorial 05 (Integration) collapses the condition split.
+
+**`names(new.cluster.ids) <- levels(ifnb)` errors with "'names' attribute [N] must be the same length as the vector [M]"** — your clustering produced a different number of clusters than the template's label list (unintegrated data usually gives *more* clusters than cell types). The Step 4 template no longer uses that line — it maps labels by cluster id and applies only the ids that exist, so it works for any cluster count. Run `levels(ifnb)` to see how many you have and label each.
 
 **`Idents()` is set to the wrong column** — clusters at multiple resolutions all live in `meta.data` (`RNA_snn_res.0.1`, `_0.3`, etc.) but only one is the "active" identity. `Idents(seu) <- "RNA_snn_res.0.5"` switches; `levels(Idents(seu))` confirms.
 
@@ -333,16 +335,24 @@ ggsave(file.path(out_dir, "Mod3_C8_marker_dotplot.png"), p_dot,
 
 ## Step 4 — Manual annotation
 
-Use the canonical marker table above and the dot plot to assign labels. Your cluster numbering will depend on the random seed and Seurat version, so **do not copy these labels blindly** — pick from the table that matches *your* dot plot.
+Use the canonical marker table above and the dot plot to assign labels. Your cluster **count and numbering** depend on the random seed, Seurat version, and the fact that this is *unintegrated* data — so you'll often have **more clusters than cell types** (e.g. 15–20, with two clusters of the same type that split CTRL vs STIM). **Do not copy these labels blindly** — run `levels(ifnb)` to see your clusters, then label each one from the table that matches *your* dot plot (it's fine to give two clusters the same label).
 
 ```{r}
 #| label: rename
 #| eval: false
 
-# TEMPLATE — edit the labels to match YOUR clusters (the order must match
-# levels(Idents(ifnb)) at this point). This chunk is left `eval: false` because
-# the labels below are placeholders; once they match your dot plot, change it to
-# `eval: true` (or just run the chunk) to apply them.
+# First, see how many clusters you actually have, and their ids:
+levels(ifnb)
+# On the UNINTEGRATED data, cell types often split by CONDITION (e.g. CTRL vs
+# STIM monocytes), so you'll usually get MORE clusters than cell types — often
+# ~15-20, sometimes two clusters of the same type. That's expected here;
+# Tutorial 05 integrates the samples and collapses these.
+
+# TEMPLATE — give each cluster id a label. Edit this named vector so the names on
+# the LEFT (cluster ids, in quotes) cover YOUR clusters from the dot plot. The
+# left side is the cluster id, the right side is the label you assign. You can
+# reuse a label (e.g. two monocyte clusters both "CD14 Mono"). It's fine to label
+# only some clusters while you iterate — unlisted ones keep their number.
 new.cluster.ids <- c(
   "0"  = "CD14 Mono",
   "1"  = "CD4 Naive T",
@@ -357,9 +367,13 @@ new.cluster.ids <- c(
   "10" = "B activated",
   "11" = "pDC",
   "12" = "Eryth"
+  # ... add entries for any remaining cluster ids your run produced (13, 14, ...)
 )
 
-names(new.cluster.ids) <- levels(ifnb)
+# Apply only the labels whose cluster id actually exists. This keys on the vector
+# NAMES (cluster ids), so it works for any number of clusters and never throws the
+# "'names' attribute [N] must be the same length as the vector [M]" error.
+new.cluster.ids <- new.cluster.ids[names(new.cluster.ids) %in% levels(ifnb)]
 ifnb <- RenameIdents(ifnb, new.cluster.ids)
 ifnb$celltype_manual <- Idents(ifnb)
 
