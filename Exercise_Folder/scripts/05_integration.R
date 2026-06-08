@@ -96,6 +96,9 @@ write_csv(isg_by_celltype, file.path(OUT_DIR, "Mod5_C7_isg_mean_by_celltype.csv"
 
 # --- Step 4 — Re-find markers on the integrated (Harmony) clusters (Mod5_C8) -
 # Marker tests run on the RNA assay, not the integrated/corrected values.
+# Defensive: FindAllMarkers needs a single joined RNA layer (Seurat v5 merge/split
+# can leave per-sample layers); join if needed so no test is silently skipped.
+if (length(Layers(seu, search = "data")) > 1) seu <- JoinLayers(seu)
 Idents(seu) <- "seurat_clusters"
 integrated_markers <- FindAllMarkers(seu, only.pos = TRUE,
                                      min.pct = 0.25, logfc.threshold = 0.25)

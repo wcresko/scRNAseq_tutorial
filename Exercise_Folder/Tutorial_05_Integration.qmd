@@ -85,6 +85,8 @@ We'll then re-cluster, re-UMAP, and **diagnose over-correction** by overlaying t
 
 **Harmony's `RunHarmony` errors with "object has no `pca` reduction"** — you skipped the `RunPCA` step. Harmony works on PC space, not on the raw scaled counts.
 
+**`FindAllMarkers` on the Harmony object returns "No DE genes identified" + "data layers are not joined"** — `ifnb_h` is built with `merge()`, which in Seurat v5 leaves the RNA assay with per-sample split layers (`counts.CTRL`/`counts.STIM`, `data.*`). `FindAllMarkers` then silently skips every test and returns an empty table, so the downstream `group_by(cluster)` errors with *"Column `cluster` is not found"*. Fix: `ifnb_h <- JoinLayers(ifnb_h)` after the merge (the Harmony chunk now does this). `Layers(ifnb_h)` should show single `counts`/`data` layers.
+
 **`FindIntegrationAnchors` seems to hang at "Running CCA"** — it isn't hung; CCA is an SVD-based step that grows with cell number, and this `ifnb` is ~23k cells, so it can take **several minutes** on a laptop (much slower than Harmony's seconds). As long as a CPU core is busy, let it finish — "Finding anchors" and "Finding integration vectors" follow. The `Different features in new layer data than already exists for scale.data` warnings during "Scaling features" are benign (Seurat v5 re-scales the integration features over the HVG `scale.data` from Tutorial 01).
 :::
 
@@ -152,7 +154,7 @@ ifnb.list
 
 ::: {.callout-important title="Think about it"}
 1.  Why pick HVGs **per sample** instead of on the joint matrix?
-2.  Suppose CTRL has 6,500 cells and STIM has 7,500. Will the per-sample HVG lists overlap?
+2.  Suppose CTRL has 11,000 cells and STIM has 12,000. Will the per-sample HVG lists overlap?
 
 <details>
 
@@ -180,6 +182,11 @@ features <- SelectIntegrationFeatures(object.list = ifnb.list, nfeatures = 2000)
 ifnb_h <- merge(ifnb.list[[1]], y = ifnb.list[[2]],
                 merge.data = TRUE,
                 project    = "ifnb_harmony")
+# In Seurat v5, merge() leaves the RNA assay with per-sample split layers
+# (counts.CTRL/counts.STIM, data.*). Join them back into single counts/data layers
+# so later RNA-assay steps (ISG module score, FindAllMarkers) work. Harmony aligns
+# in PCA space, so joining the expression layers doesn't affect the alignment.
+ifnb_h <- JoinLayers(ifnb_h)
 VariableFeatures(ifnb_h) <- features
 ifnb_h <- ScaleData(ifnb_h, features = features, verbose = FALSE)
 ifnb_h <- RunPCA(ifnb_h, features = features, npcs = 30, verbose = FALSE)
@@ -400,6 +407,13 @@ readr::write_csv(isg_by_celltype,
 
 # Switch back to the RNA assay for marker testing
 DefaultAssay(ifnb_h) <- "RNA"
+
+# ifnb_h was built with merge() (in the Harmony step), and Seurat v5 merge leaves
+# the RNA assay with per-sample split layers (counts.CTRL/counts.STIM, data.*).
+# FindAllMarkers needs a single joined layer, so rejoin before testing — otherwise
+# every test fails with "data layers are not joined" and returns no markers.
+if (length(Layers(ifnb_h, search = "data")) > 1) ifnb_h <- JoinLayers(ifnb_h)
+
 Idents(ifnb_h) <- "seurat_clusters"
 
 ifnb_h_markers <- FindAllMarkers(
@@ -466,7 +480,7 @@ Tutorial 06 (Pseudobulk DE) loads `ifnb_integrated.rds` and tests `STIM` vs `CTR
 3.  How to identify cell types from canonical markers (Tut 03)
 4.  How to integrate two samples with two different methods, compare them, and check for over-correction (Tut 05 — this one)
 
-The same workflow scales to atlas-scale data — but at \~14k cells, a laptop is fine. When you graduate to bigger datasets, see the **Talapas HPC modules** — [Module 09 — SLURM Basics](Tutorial_09_SLURM_Basics.html) and [Module 10 — the analysis pipeline on Talapas](Tutorial_10_Talapas_Pipeline.html) — for running this same pipeline on the cluster.
+The same workflow scales to atlas-scale data — but at \~23k cells, a laptop is fine. When you graduate to bigger datasets, see the **Talapas HPC modules** — [Module 09 — SLURM Basics](Tutorial_09_SLURM_Basics.html) and [Module 10 — the analysis pipeline on Talapas](Tutorial_10_Talapas_Pipeline.html) — for running this same pipeline on the cluster.
 
 ## Credits
 

@@ -29,7 +29,7 @@ Every code chunk here is tagged with `#| eval: false`, so the published page sho
 
 ## About this tutorial
 
-The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~14,000 cells, ~25 MB on disk, no 10x click-through.
+The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~24,000 cells, no 10x click-through.
 
 
 ::: callout-note
@@ -55,10 +55,10 @@ The rendered HTML shows the code but does **not** execute it (chunks default to 
 
 **What it is.** Peripheral blood mononuclear cells (PBMCs) from eight lupus patients. Each donor's PBMCs were split into two aliquots:
 
--   **`CTRL`** — control (no stimulation), \~6,500 cells
--   **`STIM`** — treated with interferon-β for 6 hours, \~7,500 cells
+-   **`CTRL`** — control (no stimulation), \~12,000 cells
+-   **`STIM`** — treated with interferon-β for 6 hours, \~12,000 cells
 
-Together \~14,000 cells across two samples on the **10x Chromium 3' v1** assay. **Cell-type labels** (e.g. `CD14 Mono`, `CD4 Naive T`, `B`, `NK`, `DC`) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.
+Together \~24,000 annotated singlets across two samples on the **10x Chromium 3' v1** assay (the `muscData` build of `ifnb` is larger than the older SeuratData `ifnb` you may have seen quoted at \~14k). **Cell-type labels** (e.g. `CD14+ Monocytes`, `CD4 T cells`, `B cells`, `NK cells`, `Dendritic cells`) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.
 
 -   **Reference:** Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94. [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
 -   **Origin:** GEO accession [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
@@ -83,7 +83,7 @@ Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01
 
 | Slot | Class | Contents |
 |---|---|---|
-| `ifnb@assays$RNA@counts` | `dgCMatrix` | Raw UMI counts. \~14,000 genes × \~14,000 cells (sparse). |
+| `ifnb@assays$RNA@counts` | `dgCMatrix` | Raw UMI counts. \~35,000 genes × \~24,000 cells (sparse). |
 | `ifnb@meta.data$stim` | factor | `"CTRL"` or `"STIM"` — the **sample-of-origin** label. This becomes the integration covariate. |
 | `ifnb@meta.data$seurat_annotations` | factor | Author-curated cell-type labels from the original paper. Useful as ground truth in Tutorial 03. |
 | `ifnb@meta.data$nCount_RNA`, `nFeature_RNA` | numeric | Auto-populated by `CreateSeuratObject` — UMIs and unique genes per cell. |
@@ -182,9 +182,9 @@ message("This module writes its figures & tables to: ", normalizePath(out_dir))
 # every subsequent call is a no-op.
 sce <- Kang18_8vs8()
 
-# Drop the multiplexed multiplets so we end up with the same set of singletons
-# that the historical `ifnb` Seurat object shipped (~14k cells), and drop any
-# cells without an author-assigned cell type label.
+# Keep only true singlets that have an author-assigned cell-type label (drop the
+# multiplexed multiplets and unlabeled droplets). This leaves ~24,000 cells — the
+# muscData build is larger than the historical SeuratData `ifnb` (~14k).
 sce <- sce[, sce$multiplets == "singlet" & !is.na(sce$cell)]
 
 # Gene (feature) name cleanup. muscData's Kang18_8vs8 stores each feature as
@@ -710,8 +710,8 @@ You should see roughly:
 | Step | Features after | Barcodes after |
 |---|---:|---:|
 | Step 1 — `Kang18_8vs8` (singlets, annotated)                    | ~35,635 | ~24,500 |
-| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~35,635 | ~22,000 |
-| Step 8 — `NormalizeData` (no dimension change)                  | ~35,635 | ~22,000 |
+| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~35,635 | ~23,000 |
+| Step 8 — `NormalizeData` (no dimension change)                  | ~35,635 | ~23,000 |
 
 (Numbers will vary by a few hundred depending on package versions.)
 
