@@ -1,5 +1,5 @@
 ---
-title: "Chapter 9 — SLURM & HPC Scheduling on Talapas"
+title: "Chapter 9 — VS Code & SLURM Basics on Talapas"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -18,10 +18,292 @@ editor: visual
 ---
 
 ::: callout-note
-**Where this chapter sits.** This is the conceptual reading for the **first of the two Friday-morning Talapas modules**. Companion to **[Lecture 09 — SLURM Basics on Talapas](../Lecture_Folder/Lecture_09_SLURM_Basics.html)** and **[Tutorial 09 — SLURM Basics](../Exercise_Folder/Tutorial_09_SLURM_Basics.html)**. The lecture is the concept map and the tutorial is the command-by-command walkthrough; this chapter is the long-form prose that explains *why* a scheduler behaves the way it does. For first-time login and editing on Talapas, pair it with the [VS Code & Talapas](Chapter_P1_Computer_Systems.html) reference. Material draws on the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and Shannon Snyder's *Talapas Basics*.
+**Where this chapter sits.** This is the conceptual reading for the **first of the two Friday-morning Talapas modules**. Companion to **[Lecture 09 — SLURM Basics on Talapas](../Lecture_Folder/Lecture_09_SLURM_Basics.html)** and **[Tutorial 09 — SLURM Basics](../Exercise_Folder/Tutorial_09_SLURM_Basics.html)**. The lecture is the concept map and the tutorial is the command-by-command walkthrough; this chapter is the long-form prose that explains *why* a scheduler behaves the way it does. This chapter also covers first-time login, VS Code Remote-SSH setup, Lmod modules, Talapas file systems, and reproducible environments — everything you need before you submit your first job. Material draws on the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and Shannon Snyder's *Talapas Basics*.
 :::
 
-## 9.1 What a cluster is, and why it needs a scheduler
+## 9.1 What is Talapas, and how do you get an account?
+
+**Talapas** is UO's flagship high-performance computing (HPC) cluster. Named from the Chinook word for *coyote* — the educator and keeper of knowledge — it is managed by **Research Advanced Computing Services (RACS)** and located in the Allen Hall Data Center. It combines centrally funded open-use resources with researcher-funded ("condo") resources.
+
+**Key resources:** over **14,500 CPU cores**, **129 TB of memory**, roughly **89 GPUs** (NVIDIA A40 through H100), and about **3 petabytes of storage**. CPU generations span AMD Milan and Intel Broadwell/Cascadelake/Icelake/Sapphire Rapids; node memory ranges from 128 GB to 6 TB.
+
+Documentation: [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/).
+
+![Talapas Architecture](images/appendix_F_S03_talapas_architecture.svg){fig-align="center" width="80%"}
+
+### Getting an account (Duck ID + PIRG)
+
+To work on Talapas you need a UO Duck ID and a Talapas account tied to a research group called a **PIRG** (Principal Investigator Research Group).
+
+::: panel-tabset
+### Step 1: Join a PIRG
+
+-   A **PIRG** = Principal Investigator Research Group.
+-   Contact your PI to be added to their PIRG, or contact RACS to create a new one.
+
+### Step 2: Request access
+
+-   Request an account at [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access).
+-   Your **username** is your Duck ID (the part of your UO email before `@uoregon.edu`).
+-   Your **password** is your University-wide UO password, managed via UO's password reset page.
+:::
+
+## 9.2 Connecting to Talapas
+
+The Talapas login host is `login.talapas.uoregon.edu`.
+
+::: panel-tabset
+### Command line (SSH)
+
+``` bash
+# Basic SSH connection
+ssh yourduckid@login.talapas.uoregon.edu
+
+# Or a specific login node (login1 ... login4)
+ssh yourduckid@login1.talapas.uoregon.edu
+```
+
+-   For security, **no characters appear while you type your password**.
+-   SSH logins use **Duo two-factor authentication**: when prompted, type `1` and press Enter to receive a Duo push (`2` sends a text, `3` calls you).
+-   **Off campus?** Connect to the UO VPN first, then SSH as normal.
+-   Mac and Linux users can set up an **ED25519 SSH key** to avoid typing a password every session (Duo will still prompt when required by policy).
+-   **From Windows:** use PuTTY, MobaXterm, or Windows Terminal.
+
+### Web browser (Open OnDemand)
+
+RACS provides a web portal at [ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu/) (Chrome or Firefox recommended):
+
+-   No command line or SSH client needed.
+-   File browser for uploads/downloads.
+-   Interactive applications: JupyterLab, RStudio, MATLAB, and a remote X11 desktop via VNC.
+-   The easiest way to run RStudio or Jupyter sessions on Talapas, and great for beginners.
+:::
+
+## 9.3 VS Code + Remote-SSH: working interactively on Talapas
+
+The most productive day-to-day way to work on Talapas is from an editor that connects directly to the cluster. We recommend **VS Code with Remote-SSH**, but [Open OnDemand](https://ondemand.talapas.uoregon.edu/) (see §9.2) is an excellent browser-based alternative that requires no local installation.
+
+**VS Code** (Visual Studio Code) is a free, cross-platform editor from Microsoft. Its **Remote-SSH** extension lets you browse Talapas file systems and edit files there exactly as you would locally, while the integrated terminal gives you a shell on the login node without leaving the editor. The local VS Code setup (installation, laptop-only extensions) is in [Chapter P1](Chapter_P1_Computer_Systems.html); this section covers the Remote-SSH configuration that connects VS Code to Talapas.
+
+![Connecting VS Code to Talapas over Remote-SSH: install the remote extensions, add the `login.talapas.uoregon.edu` SSH host, then connect (Duck ID password + Duo) until the green remote banner appears.](images/vscode_talapas_remote_ssh.svg){fig-align="center" width="100%"}
+
+### Step 1 — Install remote extensions
+
+In the left sidebar, click the **Extensions** tab, search for `ssh`, and install:
+
+-   **Remote — SSH**
+-   **Remote Explorer**
+-   **Remote — SSH: Editing Configuration Files** (optional but recommended)
+
+Also handy for cluster work: the **Quarto** extension (for editing `.qmd` files), an **R** extension, and a **PDF viewer** / **CSV viewer** so you can open plots and tables your jobs produce without leaving VS Code.
+
+### Step 2 — Add the Talapas SSH host
+
+Open **Remote Explorer** from the left sidebar, click the **+** icon next to **SSH**, and enter the following, replacing `[yourduckid]` with your Duck ID:
+
+``` bash
+ssh [yourduckid]@login.talapas.uoregon.edu
+```
+
+Press **Enter**, then **Enter** again to save to the default config file.
+
+### Step 3 — Connect to Talapas
+
+In the **Remote Explorer** dropdown, expand **SSH**; you should see `login.talapas.uoregon.edu`. Click the **→** arrow to connect, then:
+
+1.  Enter your Duck ID password when prompted (characters will not appear as you type).
+2.  When asked for Duo confirmation, type `1` and press **Enter** for a Duo push (`2` sends a text, `3` calls you).
+3.  Once connected, a green banner reading **SSH: login.talapas.uoregon.edu** appears in the bottom-left corner.
+
+Click **Open Folder** to browse directories on Talapas — open the base directory of your current project. You may also want a second window pointed at your home or project directory, e.g.:
+
+```
+/home/[yourduckid]/nereus
+```
+
+### Editor tips for Talapas work
+
+-   Use the integrated terminal (**Terminal → New Terminal**) to run scripts and SLURM commands directly on Talapas without leaving VS Code.
+-   You can have multiple VS Code windows open — one per server or project.
+-   The file explorer on the left updates in real time, making complex directory structures easy to navigate.
+-   **View outputs in place.** With the PDF/CSV viewer extensions, double-click a `.pdf` plot, `.csv` summary, or `.out`/`.err` log your job wrote and it opens right in the editor.
+-   **Comment / uncomment** selected lines: `Ctrl + /` (macOS `Cmd + /`).
+-   Add more terminal tabs with the **+** at the top-right of the terminal pane.
+-   Split-pane editing and search-across-files make it easy to work on a script and its log side by side.
+
+::: {.callout-note .key-concept title="🔑 Key concept — login node vs compute node"}
+A login node is a small, shared gateway machine: every user on Talapas lands there when they SSH in (or when VS Code opens its integrated terminal), so it handles dozens of simultaneous sessions. Its purpose is navigation, editing, and job submission — not computation. A compute node is a large, dedicated machine that SLURM reserves exclusively for your job. Running a Seurat pipeline or any memory-hungry analysis on the login node does not just slow your own work; it degrades the experience for every other user trying to log in at that moment. Always route real computation through `srun`, `salloc`, or `sbatch`.
+:::
+
+The full login-node/compute-node distinction and the SLURM mechanics are developed in §9.5 and §9.6.
+
+## 9.4 Talapas file systems
+
+Every Talapas user has access to several directories on the ~3 PB IBM Elastic Storage System (GPFS).
+
+![Storage Structure](images/appendix_F_S09_storage_structure.svg){fig-align="center" width="90%"}
+
+| Location                | Quota                 | Purpose                                                                   |
+|-------------------------|-----------------------|---------------------------------------------------------------------------|
+| `/home/<duckid>`        | 250 GB                | Personal files, scripts, dotfiles; small software installs                |
+| `/projects/<PIRG>`      | Shared (2 TB default) | Large shared project data and analysis for your research group            |
+| `/scratch/<PIRG>`       | 20 TB                 | High-throughput working space; **files untouched for 90 days are purged** |
+| `/tmp`                  | Local to node         | Temporary scratch space                                                   |
+
+``` bash
+# Check your storage usage
+df -h ~
+du -sh /projects/myPIRG/myusername
+```
+
+::: {.callout-warning}
+**You are responsible for backing up your data — RACS does NOT back up Talapas file systems.** Some snapshotting exists for home and project directories, but it is not a substitute for your own backups. Use `/projects` for large files and clean up when done. The `/scratch` filesystem purges files not accessed in 90 days — it is for working data, not long-term archives.
+:::
+
+**File transfer options:**
+
+-   `scp` / `sftp` from the terminal.
+-   [FileZilla](https://filezilla-project.org/) — cross-platform GUI for SCP/SFTP.
+-   [**Globus**](https://www.globus.org/) — RACS's recommended tool for large transfers, especially to/from the Large-Scale Research Storage (LSRS) system.
+
+## 9.5 Software modules (Lmod)
+
+Talapas uses [Lmod](https://lmod.readthedocs.io/) to manage centrally installed software. Modules are loaded **per shell** — you must `module load` again in every new session (or in every SLURM job script).
+
+::: panel-tabset
+### Commands
+
+``` bash
+module spider blast        # search for software by name
+module spider R            # find available versions
+module avail               # list modules loadable right now
+module load R/4.3.3        # load a specific version
+module load samtools       # load a module (default version)
+module list                # show currently loaded modules
+module unload samtools     # unload a module
+module purge               # unload everything; reset to defaults
+```
+
+### Best practices
+
+::: {.callout-note title="Module tips"}
+-   In batch scripts, always load modules **after** the `#SBATCH` directives.
+-   Use `module spider` to find available versions.
+-   `module purge` resets your environment to defaults.
+-   Specify version numbers for reproducibility (e.g., `R/4.3.3`, not just `R`).
+:::
+:::
+
+::: {.callout-note .key-concept title="🔑 Key concept — modules do not follow you into a batch job"}
+If you `module load R` on the login node and then submit a batch job, that job starts on a fresh compute node with none of your modules loaded. You must load the modules you need *inside* the job script itself, after the `#SBATCH` directives. This is one of the most common sources of "command not found" errors in first batch jobs. The fix is always `module purge` followed by explicit `module load` lines inside the script.
+:::
+
+## 9.6 Reproducible compute environments
+
+Getting onto Talapas is only half the battle; you also want your analysis to produce the *same* results next month and on a co-author's machine. The workshop ships reproducible environments so you can skip the install dance (Docker / Apptainer), pin exact package versions (`renv`), or use Talapas's centrally installed software (`module load`).
+
+::: {.callout-note title="Why bother?"}
+A pinned environment lets you reproduce a tutorial output exactly six months from now, get the same Seurat version a co-author was running, and avoid two days of `BiocManager::install()` debugging on Talapas.
+:::
+
+### Layer 1 — `renv` lockfile (R level)
+
+`renv` records the exact version of every R package used in a project. The workshop ships an `renv.lock` at the repository root.
+
+**First-time setup** in a fresh clone:
+
+``` r
+install.packages("renv")
+renv::restore()       # reads renv.lock and installs the pinned versions
+```
+
+Subsequent R sessions in the project will use the pinned library automatically.
+
+**Updating the lockfile (instructors)** after upgrading a package:
+
+``` r
+renv::snapshot()      # rewrite renv.lock from the currently loaded versions
+```
+
+Commit `renv.lock` (and only the lockfile, not the entire `renv/library/` cache).
+
+### Layer 2 — Docker / Apptainer image
+
+For a fully self-contained environment (R + Bioconductor + system dependencies + the dataset paths), use the workshop image. Containers package the *entire* software stack into one portable, versioned artifact: **Docker** [@merkel2014docker] is the standard on laptops and in the cloud, while **Singularity/Apptainer** [@kurtzer2017singularity] is its HPC-safe cousin (it runs without root, which is why clusters allow it). Combined with per-tool environments from **Bioconda** [@gruning2018bioconda], a container is the strongest reproducibility guarantee available.
+
+**Docker (laptop):**
+
+``` bash
+# pull the workshop image
+docker pull ghcr.io/wcresko/scrnaseq_tutorial:latest
+
+# run RStudio Server, mounting your data folder
+docker run --rm -p 8787:8787 \
+  -e PASSWORD=workshop \
+  -v "$PWD/data:/home/rstudio/data" \
+  -v "$PWD:/home/rstudio/scrnaseq_workshop" \
+  ghcr.io/wcresko/scrnaseq_tutorial:latest
+```
+
+Then open <http://localhost:8787> and log in as `rstudio` / `workshop`.
+
+**Apptainer (Talapas):** Talapas does not run Docker, but it does run [Apptainer](https://apptainer.org/) (formerly Singularity). Convert and run the same image:
+
+``` bash
+# on a login node, request an interactive node first
+srun --account=<myPIRG> --partition=interactive --time=2:00:00 \
+     --mem=16G --pty bash
+
+# pull the image (one-time)
+module load apptainer
+apptainer pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest
+
+# run an interactive R session inside the container
+apptainer exec scrnaseq_tutorial_latest.sif R
+```
+
+For batch jobs, the relevant `sbatch` line becomes:
+
+``` bash
+apptainer exec /path/to/scrnaseq_tutorial_latest.sif Rscript scripts/01_qc_preprocessing.R
+```
+
+::: callout-note
+The image is rebuilt nightly from the project's `Dockerfile` against the latest Bioconductor release; check the [GitHub releases](https://github.com/wcresko/scrnaseq_tutorial/releases) page for the SHA of the version used in a given workshop session.
+:::
+
+### Layer 3 — Talapas modules (no container)
+
+If you would rather use Talapas's centrally installed software, the modules used by the workshop are:
+
+``` bash
+module purge
+module load R/4.4.1            # matches the workshop's renv.lock R version
+module load gcc/13.2.0         # for source builds
+module load hdf5/1.14.2        # for HDF5 files (used by some Bioconductor pkgs)
+module load apptainer          # only if you'll use the container layer
+```
+
+Add these to your `~/.bash_profile` or load them in every job script. For a per-user R library that survives upgrades:
+
+``` bash
+mkdir -p $HOME/Rlibs
+echo 'R_LIBS_USER=$HOME/Rlibs' >> $HOME/.Renviron
+```
+
+Then `install.packages()` and `BiocManager::install()` will write into `$HOME/Rlibs` instead of the system library.
+
+### Which layer should I use?
+
+| Goal                                    | Use                                                                  |
+|-----------------------------------------|----------------------------------------------------------------------|
+| "Match the slides exactly on my laptop" | `renv::restore()` (Layer 1)                                          |
+| "Skip installing anything"              | Docker image (Layer 2)                                              |
+| "Run the tutorials on Talapas"          | Apptainer + `renv::restore()` (Layers 2 + 1), or `module load` (Layer 3) |
+
+Files in the repository that support this: `renv.lock` (Layer 1), `Dockerfile` (Layer 2), and `.github/workflows/build-image.yml` (the CI that rebuilds the image on a schedule). For the data these environments are built around, see [Datasets](../Datasets.html).
+
+## 9.7 What a cluster is, and why it needs a scheduler
 
 So far in this workshop you have run everything on your own laptop. That works for the `ifnb` dataset because it is small, but it stops working the moment your data grows: a full 10x run with tens of thousands of cells, an integration across many samples, or a pseudobulk model with bootstrapped confidence intervals can exhaust a laptop's memory or run for many hours. The solution is to move the work to a **high-performance computing (HPC) cluster** — at the University of Oregon, that cluster is **Talapas**.
 
@@ -33,7 +315,7 @@ Sharing a finite pool of hardware among many users who all want it at once is fu
 A scheduler is the software layer that translates your resource request (CPUs, memory, time, GPU) into an exclusive reservation on a specific compute node, ensuring no two jobs share hardware they did not agree to share. You do not *take* resources on a cluster — you *ask* for them by declaring what your job needs. The declaration is a contract: SLURM promises you that much exclusive capacity, and your job promises not to exceed it. Every SLURM skill in this chapter is really about understanding both sides of that contract.
 :::
 
-## 9.2 What SLURM does
+## 9.8 What SLURM does
 
 **SLURM** — the Simple Linux Utility for Resource Management [@yoo2003slurm] — is the scheduler that runs Talapas. It is the dominant scheduler on academic and national-lab HPC systems worldwide, so the skills here transfer to almost any cluster you encounter. Its job is to decide *when*, *where*, and *with what resources* every job runs. The mental model is a request-and-grant transaction:
 
@@ -57,23 +339,19 @@ echo 'export SBATCH_ACCOUNT=<myPIRG>' >> ~/.bash_profile
 source ~/.bash_profile
 ```
 
-## 9.3 Login nodes vs compute nodes
+## 9.9 Login nodes vs compute nodes
 
 When you `ssh` into Talapas you land on a **login node** (`login.talapas.uoregon.edu`). It is tempting to think of this as "the cluster," but it is not where your analysis should run. A login node is the front desk: a small, shared machine meant for editing files, browsing your directories, running short commands, and — most importantly — **submitting jobs**. There are only a handful of login nodes, and every user on the cluster shares them simultaneously.
 
 The actual computation happens on **compute nodes**, which you never touch directly. Instead, you ask SLURM for one, and SLURM hands you a slice of a compute node that matches your request. A useful metaphor: login nodes are the front desk of a workshop, and compute nodes are the workbenches in the back. You check in at the desk and you fill out a request slip, but you do your sawing and welding at a bench.
 
-::: {.callout-note .key-concept title="🔑 Key concept — login node vs compute node"}
-A login node is a small, shared gateway machine: every user on Talapas lands there when they SSH in, so it handles dozens of simultaneous sessions. Its purpose is navigation, editing, and job submission — not computation. A compute node is a large, dedicated machine that SLURM reserves exclusively for your job. Running a Seurat pipeline or any memory-hungry analysis on the login node does not just slow your own work; it degrades the experience for every other user trying to log in at that moment. Always route real computation through `srun`, `salloc`, or `sbatch`.
-:::
-
 ::: callout-important
 **Never run heavy computation on a login node.** Launching a Seurat pipeline, an integration, or any multi-hour analysis directly on the login node degrades the machine for *every* user trying to log in, edit, or submit. It is the single most common — and most disruptive — beginner mistake on a shared cluster. Always route real work through `srun`, `salloc`, or `sbatch`.
 :::
 
-One consequence of the login/compute split catches almost everyone the first time: **software environments do not follow you from the login node into a job.** If you `module load R` on the login node and then submit a batch job, that job starts on a fresh compute node with none of your modules loaded. You must load the modules you need *inside* the job script itself. We return to this in §9.6.
+One consequence of the login/compute split catches almost everyone the first time: **software environments do not follow you from the login node into a job.** If you `module load R` on the login node and then submit a batch job, that job starts on a fresh compute node with none of your modules loaded. You must load the modules you need *inside* the job script itself. We return to this in §9.11.
 
-## 9.4 Fair-share: how SLURM decides whose turn it is
+## 9.10 Fair-share: how SLURM decides whose turn it is
 
 A naive scheduler might run jobs first-come, first-served. SLURM does something more sophisticated and more equitable: **fair-share** scheduling. Rather than ordering strictly by submission time, SLURM assigns each job a priority that depends in part on how much your group has used the cluster *recently*. Groups that have consumed a lot of compute in the recent past are gently nudged down the queue; groups that have used little are nudged up. Over time this balances access so that no single heavy user can monopolize the machine.
 
@@ -85,7 +363,7 @@ Fair-share is not first-come-first-served. SLURM tracks how much CPU time each P
 
 **QOS** (quality of service) limits ride alongside fair-share. A QOS caps how much one user can hold at once — for example, a maximum number of simultaneously running jobs, or a ceiling on total cores. These limits are why you will sometimes see a job sit in the queue with a reason like `QOSMaxJobsPerUserLimit`: you have not done anything wrong, you have simply hit a per-user cap, and earlier jobs must finish before the next one starts.
 
-## 9.5 Partitions: matching jobs to the right hardware
+## 9.11 Partitions: matching jobs to the right hardware
 
 Talapas's nodes are not identical. Some are ordinary CPU nodes, some carry GPUs, some have enormous amounts of RAM. SLURM groups nodes into **partitions** — queues that each map to a class of hardware and a maximum allowed wall-clock time. Every job must target a partition, and choosing the right one is how you ask for the right *kind* of machine. The available partitions are summarized in @tbl-ch09-partitions.
 
@@ -104,9 +382,9 @@ Reading @tbl-ch09-partitions: the most important column is "Max time" — it set
 
 Most of the core scRNA-seq pipeline runs comfortably on `compute`. You reach for `memory` only when a step genuinely needs more RAM than a standard node provides, for `gpu` when you run GPU-accelerated tools, and for `interactive` when you want a quick session that starts fast. Running `sinfo` shows you each partition and the live state of its nodes (idle, allocated, down) so you can see where capacity is currently free.
 
-A common beginner mistake is to use `memory` or `memorylong` as a precaution — "just in case" — rather than because a step genuinely needs it. The high-memory nodes are few and heavily contended; using them unnecessarily prevents other users' legitimate high-memory work from starting. Conversely, using `compute` for a step that truly needs 200 GB will result in an `OUT_OF_MEMORY` kill mid-run. The right calibration comes from empirical measurement: run the first instance of any new step with a modest over-estimate, then check `seff` afterward and right-size subsequent submissions (§9.8).
+A common beginner mistake is to use `memory` or `memorylong` as a precaution — "just in case" — rather than because a step genuinely needs it. The high-memory nodes are few and heavily contended; using them unnecessarily prevents other users' legitimate high-memory work from starting. Conversely, using `compute` for a step that truly needs 200 GB will result in an `OUT_OF_MEMORY` kill mid-run. The right calibration comes from empirical measurement: run the first instance of any new step with a modest over-estimate, then check `seff` afterward and right-size subsequent submissions (§9.14).
 
-## 9.6 Interactive vs batch: two ways to use a compute node
+## 9.12 Interactive vs batch: two ways to use a compute node
 
 There are two fundamentally different ways to get work onto a compute node, and choosing between them is mostly a question of whether you intend to *watch* the job or *walk away* from it. Use an **interactive session** (`srun`/`salloc`) when you'll sit and watch: testing or debugging a script, exploring data by hand, or running something short. Use a **batch job** (`sbatch`) for anything long-running, or anything you want to start and walk away from — a batch job keeps running after you log out.
 
@@ -147,7 +425,7 @@ module load R/4.3.2
 Rscript scripts/01_qc_preprocessing.R
 ```
 
-Two details deserve emphasis. First, the `module purge` and `module load` lines live *inside* the script — as noted in §9.3, the environment does not carry over from your login session, so the job must build its own. Second, the `--output` path points into a `logs/` subdirectory. **SLURM will not create that directory for you.** If `logs/` does not exist, the job is rejected (sometimes silently, with no log to explain why, because the log is exactly what could not be written). The one-time fix, run once from the directory you submit from, is `mkdir -p logs`.
+Two details deserve emphasis. First, the `module purge` and `module load` lines live *inside* the script — as noted in §9.9, the environment does not carry over from your login session, so the job must build its own. Second, the `--output` path points into a `logs/` subdirectory. **SLURM will not create that directory for you.** If `logs/` does not exist, the job is rejected (sometimes silently, with no log to explain why, because the log is exactly what could not be written). The one-time fix, run once from the directory you submit from, is `mkdir -p logs`.
 
 The most useful `#SBATCH` flags map directly onto the resource contract:
 
@@ -200,7 +478,7 @@ Reading @tbl-ch09-sbatch-directives as a decision checklist: every job must have
 :::
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — `--time`"}
-**Default: 24 hours on `compute`, 14 days on `computelong`.** When your job exceeds this wall-clock limit, SLURM kills it with `TIMEOUT`. The job is terminated at exactly that boundary — there is no grace period. For a new pipeline, run once with a generous time limit and note `Elapsed` from `seff`; set subsequent submissions to `Elapsed × 1.2`. Use the `--array` directive (§9.6) rather than requesting unrealistically long time for jobs that process many samples — arrays let each sub-job have its own fair time limit and restart independently if one fails.
+**Default: 24 hours on `compute`, 14 days on `computelong`.** When your job exceeds this wall-clock limit, SLURM kills it with `TIMEOUT`. The job is terminated at exactly that boundary — there is no grace period. For a new pipeline, run once with a generous time limit and note `Elapsed` from `seff`; set subsequent submissions to `Elapsed × 1.2`. Use the `--array` directive (§9.12) rather than requesting unrealistically long time for jobs that process many samples — arrays let each sub-job have its own fair time limit and restart independently if one fails.
 :::
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — `--partition`"}
@@ -211,7 +489,7 @@ Reading @tbl-ch09-sbatch-directives as a decision checklist: every job must have
 **Syntax: `--array=1-N` (or `1-N%M` to limit M simultaneously running sub-jobs).** A job array submits N independent sub-jobs from a single script, with each receiving a unique `$SLURM_ARRAY_TASK_ID` (1 through N). Inside the script you use that ID to select the sample to process — for example `SAMPLE=$(sed -n "${SLURM_ARRAY_TASK_ID}p" samples.txt)`. This is the standard pattern for running Cell Ranger or any per-sample step on many samples without writing N separate scripts. The `%M` throttle is important when N is large: `--array=1-50%4` allows at most 4 sub-jobs to run simultaneously, so you don't monopolize the queue for everyone else.
 :::
 
-## 9.7 Submitting, monitoring, and reading the result
+## 9.13 Submitting, monitoring, and reading the result
 
 The lifecycle of a batch job is short to describe. You submit it, SLURM queues it, it runs, and it finishes — and a small set of commands lets you follow it the whole way. Understanding the difference between these commands matters: `squeue` shows the *current* state of a job while it is in the system; once a job finishes and leaves the queue, you must use `seff` or `sacct` to retrieve information about it. Many beginners check `squeue`, see nothing, and conclude the job never ran — when in fact it completed successfully and left the queue before they checked. Always pair `squeue` (for live monitoring) with `seff` (for post-mortem accounting).
 
@@ -251,7 +529,7 @@ sacct -j 123456 --format=JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode
 
 Reading @tbl-ch09-monitoring: the most immediately useful line from `seff` is `Memory Efficiency`. If it reads "19% of 64 GB," your next submission should ask for roughly 64 × 0.19 × 1.2 ≈ 15 GB — a substantial reduction that will move you up the queue. `CPU Efficiency` deserves a different interpretation depending on the job: low efficiency on a single-threaded step is expected, because `seff` computes efficiency relative to the *allocated* cores; low efficiency on a step you requested 8 cores for is a signal that the tool is not actually multithreading and you should reduce `--cpus-per-task`. The `ExitCode` field is the clearest binary: `0:0` is clean; anything else is a failure. A job with `State: COMPLETED` and `ExitCode: 1:0` means the job ran to the time limit but the R script inside it errored — you must look at the `.err` log to find the actual failure message.
 
-## 9.8 Right-sizing: the central skill
+## 9.14 Right-sizing: the central skill
 
 Resource requests pull in two opposite directions, and learning to balance them is the single most valuable HPC skill.
 
@@ -261,7 +539,7 @@ The practical resolution is empirical. The first time you run a new pipeline ste
 
 The right-sizing workflow in practice is a two-submission loop. **First submission:** set generous but not absurd limits — for an unknown Seurat step, `--mem=64G --time=04:00:00 --cpus-per-task=4` is a reasonable starting point. Run `seff <jobid>` immediately after completion. **Second and later submissions:** set `--mem` to `MaxRSS × 1.2` (20% safety margin), `--time` to `Elapsed × 1.2`, and `--cpus-per-task` to whatever the tool actually uses (check `CPU Efficiency` from `seff`). A step that requested 64 GB but used only 12 GB has a `MaxRSS`-based new request of roughly 15 GB — a fourfold reduction that significantly improves its queue priority. Over the course of running the full `01`–`08` pipeline twice, you will have accurate resource profiles for all eight steps, and subsequent runs start promptly because each step requests only what it genuinely needs.
 
-## 9.9 Why is my job stuck in `PD`?
+## 9.15 Why is my job stuck in `PD`?
 
 A job sitting in the pending state is normal far more often than it is broken. The reason SLURM gives (visible in `squeue`'s reason column or via `scontrol show job <id>`) tells you which it is; the most common reasons are collected in @tbl-ch09-pending-reasons.
 
@@ -287,7 +565,7 @@ Reading @tbl-ch09-pending-reasons: the most important lesson is that most pendin
 
 The official Knowledge Base FAQ, [*Why is my SLURM job not running?*](https://uoracs.github.io/talapas2-knowledge-base/docs/faqs/why_is_my_job_not_running/), catalogs the less common reasons.
 
-## 9.10 Being a good cluster citizen
+## 9.16 Being a good cluster citizen
 
 Because Talapas is shared across the whole university, the etiquette of using it is not just politeness — it is what keeps the machine usable for everyone, including you.
 
@@ -295,7 +573,32 @@ Never run intensive work on login nodes; always route real computation through `
 
 Put large output — caches and intermediate files — in `/scratch/<PIRG>/`, not in `/home/`. The scratch filesystem has generous per-PIRG quotas that home directories lack, but note that `/scratch` purges files not accessed in 90 days, so it is for working data, not long-term archives. Back up anything you care about: RACS does not back up Talapas, and a disk failure or an accidental deletion is final without your own copy. If you have a genuine deadline that needs special scheduling, email RACS rather than trying to outmaneuver the queue.
 
-## 9.10b Reading the output: what a finished batch job leaves behind
+::::: columns
+::: {.column width="50%"}
+**Do**
+
+-   Request only the resources you need.
+-   Test with small datasets first.
+-   Use `--time` conservatively.
+-   Clean up old files regularly.
+-   Use `/projects` for large data.
+:::
+
+::: {.column width="50%"}
+**Don't**
+
+-   Run heavy computation on login nodes.
+-   Leave jobs running indefinitely.
+-   Store sensitive data without encryption.
+-   Forget to acknowledge RACS in publications.
+:::
+:::::
+
+### Acknowledgment text
+
+> "The authors acknowledge Research Advanced Computing Services (RACS) at the University of Oregon for providing computing resources that have contributed to the research results reported within this publication."
+
+## 9.17 Reading the output: what a finished batch job leaves behind
 
 After a batch job completes, check two things in combination before treating the run as successful.
 
@@ -305,7 +608,7 @@ Second, run `seff <jobid>` and verify that **`State: COMPLETED`**. The states `O
 
 The two fields to read in `seff` output are **CPU Efficiency** (for future tuning), **Memory Efficiency** (if you requested 64 GB and used 12 GB, your next run can ask for far less), and **Job Wall-clock time** (to judge whether the time limit was adequate). If `seff` shows zero for CPU efficiency, the job was almost certainly killed before it could run.
 
-## 9.10c Workshop scripts: `hello_world.R` and the generic wrappers
+## 9.18 Workshop scripts: `hello_world.R` and the generic wrappers
 
 The Talapas scripts folder ships two items that the tutorial uses directly:
 
@@ -315,11 +618,11 @@ The Talapas scripts folder ships two items that the tutorial uses directly:
 
 All three require a `logs/` subdirectory in the directory you submit from. SLURM will not create it for you; run `mkdir -p logs` once before submitting any job.
 
-## 9.11 Where this leads
+## 9.19 Where this leads
 
-This chapter gave you the *mechanics* of the cluster: how a scheduler thinks, the difference between login and compute nodes, how to size and submit and monitor a job, and how to behave on a shared system. None of it was specific to scRNA-seq — these same skills apply to any analysis you ever run on Talapas.
+This chapter gave you everything you need to start working on Talapas: how to connect with VS Code Remote-SSH, how to manage files and load software with Lmod, how to set up a reproducible environment, and the full mechanics of the SLURM scheduler — how it thinks, the difference between login and compute nodes, how to size and submit and monitor a job, and how to behave on a shared system. None of the SLURM mechanics are specific to scRNA-seq — these same skills apply to any analysis you ever run on Talapas.
 
-[Chapter 10 — The Talapas Analysis Pipeline](Chapter_10_Talapas_Pipeline.html) puts them to work. There, the numbered `01`–`08` analysis scripts become a chain of SLURM jobs, each one's output feeding the next, reproducing the entire `ifnb` workflow on the cluster. For the official UO references behind this chapter, see the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html), the [partition list](https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html), and the canonical [SLURM documentation](https://slurm.schedmd.com/).
+[Chapter 10 — The Talapas Analysis Pipeline](Chapter_10_Talapas_Pipeline.html) puts them to work. There, the numbered `01`–`08` analysis scripts become a chain of SLURM batch jobs, each one's output feeding the next, reproducing the entire `ifnb` workflow on the cluster. For the official UO references behind this chapter, see the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html), the [partition list](https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html), and the canonical [SLURM documentation](https://slurm.schedmd.com/).
 
 ## Going further
 
