@@ -1,9 +1,9 @@
 ---
-title: "Lecture 09 — SLURM Basics on Talapas"
+title: "Lecture 09 — VS Code & SLURM Basics on Talapas"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: "Single Cell RNA-seq Workshop · Lecture 09 — SLURM Basics on Talapas"
+    footer: "Single Cell RNA-seq Workshop · Lecture 09 — VS Code & SLURM Basics on Talapas"
     transition: fade
     transition-speed: slow
     theme: default
@@ -21,7 +21,7 @@ execute:
 editor: visual
 ---
 
-# Lecture 09: SLURM Basics on Talapas {background-color="#2c3e50"}
+# Lecture 09: VS Code & SLURM Basics on Talapas {background-color="#2c3e50"}
 
 ## Where this fits
 
@@ -36,12 +36,194 @@ editor: visual
 ## Goals of this lecture
 
 ::: incremental
+-   Connect to **Talapas** with VS Code Remote-SSH (Duck ID + Duo)
+-   Navigate the **Talapas file systems** — home, projects, scratch
+-   Load software with **Lmod** (`module load`)
 -   Understand **why** a shared cluster needs a scheduler at all
 -   Tell apart **login nodes** and **compute nodes** — and why it matters
 -   Choose between **interactive** and **batch** work
 -   Read the **key SLURM flags** and **partitions** you'll use constantly
 -   Submit, monitor, and right-size jobs with `sbatch` / `squeue` / `seff`
 -   Be a **good cluster citizen** at UO
+:::
+
+# What is an HPC cluster? {background-color="#2c3e50"}
+
+## Many nodes, one scheduler
+
+::: incremental
+-   An **HPC cluster** is a network of computers (nodes) that share storage and are managed as a single system.
+-   You interact with a **login node** — a lightweight gateway machine. Heavy work runs on **compute nodes** you request from the scheduler.
+-   Nodes share a **parallel file system** so your files look the same from every node.
+-   The scheduler (**SLURM** at UO) queues and routes jobs fairly among all users.
+:::
+
+## Meet Talapas — UO's cluster
+
+::: incremental
+-   **Talapas** is managed by UO Research Advanced Computing Services (RACS).
+-   Thousands of CPU cores, GPUs, high-memory nodes, and petabytes of storage.
+-   Access is through a **PIRG** (PI Research Group) — your PI requests an account for the lab.
+-   Once you have an account your Duck ID grants access via SSH and Open OnDemand.
+:::
+
+::: {.callout-tip}
+Run `groups` after logging in to see your PIRG name — you'll need it for every SLURM job.
+:::
+
+# Connecting to Talapas with VS Code {background-color="#2c3e50"}
+
+## VS Code Remote-SSH overview
+
+::: incremental
+-   The **Remote-SSH** extension (Microsoft) turns VS Code into a full remote IDE.
+-   You edit, browse, and run code **on Talapas** — but the interface lives on your laptop.
+-   One-time setup: add Talapas as an SSH host; after that, one click connects you.
+-   Install the extension: `Ctrl/Cmd + Shift + X` → search "Remote - SSH" → Install.
+:::
+
+## Add the SSH host
+
+::: incremental
+-   Press `F1` → **Remote-SSH: Add New SSH Host** → enter:
+:::
+
+``` bash
+ssh <duckid>@login.talapas.uoregon.edu
+```
+
+::: incremental
+-   Save to `~/.ssh/config` when prompted.
+-   The host then appears in the **Remote Explorer** panel on the left sidebar.
+:::
+
+## Connect with Duck ID + Duo
+
+::: incremental
+-   Click the host in Remote Explorer (or `F1` → **Remote-SSH: Connect to Host**).
+-   Enter your **Duck ID password** when prompted, then approve the **Duo push**.
+-   The bottom-left status bar turns green and shows `SSH: login.talapas.uoregon.edu` — you're in.
+-   Open a folder (`File → Open Folder`) to browse the Talapas file system in the sidebar.
+:::
+
+::: {.callout-note}
+Multi-factor authentication (Duo) is required for every connection — have your phone handy.
+:::
+
+## The integrated terminal is a shell on Talapas
+
+::: incremental
+-   Open it: **Terminal → New Terminal** (or `` Ctrl/Cmd+` ``).
+-   This is **not** your laptop's terminal — it is a shell running on the Talapas login node.
+-   The green `SSH: login.talapas.uoregon.edu` banner in the status bar confirms you're remote. Verify with:
+:::
+
+``` bash
+hostname   # e.g. login1.talapas.uoregon.edu
+whoami     # your Duck ID
+```
+
+::: incremental
+-   All the shell commands from [P1 (Computer Systems & the Command Line)](../Resources_Folder/Chapter_P1_Computer_Systems.html) — `pwd`, `ls`, `cd`, pipes — work here, now on the cluster.
+-   `module load`, `srun`, and `sbatch` are all typed in this terminal.
+:::
+
+::: {.callout-note .key-concept title="🔑 Key concept — the integrated terminal is a remote shell"}
+When VS Code is connected via Remote-SSH, its integrated terminal opens a shell **on the Talapas login node**, not on your laptop. You edit files in the VS Code editor (left) while running commands in the terminal (bottom) — both operating on the same remote files.
+:::
+
+## The edit-in-editor / run-in-terminal loop
+
+::: incremental
+-   **Editor pane** (left/top): open and edit `.R`, `.qmd`, or `.sbatch` files on Talapas — changes are saved directly on the cluster filesystem.
+-   **Terminal pane** (bottom): run the file, submit the job, or tail the log — all on the same machine.
+-   This is the core workflow for scRNA-seq analysis on Talapas:
+:::
+
+``` bash
+# In the integrated terminal (on the login node):
+module load R/4.3.2
+Rscript scripts/01_qc_preprocessing.R   # quick smoke-test on login
+sbatch run_rscript.sbatch 01_qc_preprocessing.R  # or submit as a batch job
+tail -f logs/seurat_qc_*.out            # watch the job as it runs
+```
+
+::: incremental
+-   For anything real (full data, long runs): always use `sbatch` — the job survives you closing the laptop.
+-   For `.qmd` rendering on the cluster: `quarto render my_analysis.qmd` in the terminal.
+:::
+
+## Open OnDemand — browser alternative
+
+::: incremental
+-   **Open OnDemand** ([ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu)) gives a full HPC portal in the browser — no SSH client needed.
+-   Launches interactive apps: RStudio Server, Jupyter, a desktop session.
+-   Useful when VS Code Remote-SSH isn't an option or for one-off interactive work.
+-   For this workshop, VS Code Remote-SSH is the primary workflow.
+:::
+
+# Talapas file systems {background-color="#2c3e50"}
+
+## Three places to put files
+
+| Location | Path | Quota | Backed up? | Use for |
+|---|---|---|---|---|
+| Home | `/home/<duckid>/` | ~20 GB | Yes | scripts, configs, small results |
+| Projects | `/projects/<PIRG>/` | shared lab quota | Yes | shared data, final outputs |
+| Scratch | `/scratch/<PIRG>/<duckid>/` | large | **No** (purged 90 d) | large intermediates |
+
+::: {.callout-warning}
+Scratch purges files older than 90 days automatically and is **never backed up**. Keep only transient intermediates there; copy results to `/projects/`.
+:::
+
+## Navigating on login
+
+::: incremental
+-   All commands run in the **VS Code integrated terminal** — the shell on the login node.
+-   Shell basics (`pwd`, `ls`, `cd`, pipes) were covered in [P1 — Computer Systems & the Command Line](../Resources_Folder/Chapter_P1_Computer_Systems.html); the focus here is what's **different** on the cluster.
+-   Check your quotas: `df -h /home/$USER` and `df -h /projects/<PIRG>`.
+-   Your first visit: `ls /projects/<PIRG>` and `ls /scratch/<PIRG>/` to see the lab space.
+-   Workshop data lives in `/projects/<PIRG>/` — copy or symlink it into your working directory.
+:::
+
+# Loading software with Lmod {background-color="#2c3e50"}
+
+## What are modules?
+
+::: incremental
+-   Talapas does not have R (or most tools) in your default `PATH`.
+-   **Lmod** is the module system that adds software to your environment on demand.
+-   Each `module load` command sets `PATH`, `LD_LIBRARY_PATH`, etc. for one piece of software.
+-   Modules are **temporary** — they must be loaded at the start of every session and inside every batch script.
+:::
+
+## Common module commands
+
+``` bash
+module avail              # list all available modules
+module avail R            # filter by name
+module load R/4.3.2       # load a specific version
+module list               # see what is currently loaded
+module purge              # unload everything (good start for scripts)
+```
+
+::: incremental
+-   Always load a **specific version** (e.g. `R/4.3.2`) — `module load R` picks whatever is default today, which may change.
+-   `module purge` at the top of every batch script ensures a clean, reproducible environment.
+:::
+
+::: {.callout-tip}
+Add `module purge && module load R/4.3.2` to your `~/.bash_profile` if you want R ready on every login — but always put explicit loads inside batch scripts too.
+:::
+
+# Working interactively on Talapas {background-color="#2c3e50"}
+
+## Explore before you batch
+
+::: incremental
+-   Use an **interactive session** (`srun --pty bash`) to prototype, debug, and explore.
+-   VS Code Remote-SSH works seamlessly in interactive sessions: open your folder, run code in the integrated terminal.
+-   Prototype interactively on a small slice of data → then submit the same script as a batch job for the full run.
 :::
 
 # Why a scheduler? {background-color="#2c3e50"}
@@ -261,10 +443,49 @@ source ~/.bash_profile
 -   Your PIRG name appears in the output of `groups` after you log in
 :::
 
+# Reproducible environments {background-color="#2c3e50"}
+
+## Why reproducibility matters on a cluster
+
+::: incremental
+-   On your laptop, R packages live in one user library — it just works.
+-   On a shared cluster, **package versions drift** between users and over time.
+-   Reproducible environments lock down exact versions so results are stable and shareable.
+:::
+
+## renv — per-project R libraries
+
+::: incremental
+-   **renv** captures a snapshot of every package and its version in a `renv.lock` file.
+-   `renv::restore()` rebuilds the exact library on any machine (laptop or Talapas).
+-   The workshop project ships with a `renv.lock` — run `renv::restore()` once after cloning.
+:::
+
+``` r
+# In the R console or batch script, once per project
+renv::restore()
+```
+
+## Containers — Apptainer on Talapas
+
+::: incremental
+-   **Apptainer** (formerly Singularity) runs OCI/Docker containers on HPC clusters.
+-   A container bundles the OS, R, and all libraries into a single portable image (`.sif`).
+-   Pull a container from Docker Hub; submit the `.sif` file in your batch script.
+-   Stronger isolation than `renv` — useful for complex dependency stacks or sharing workflows externally.
+:::
+
+``` bash
+# Pull once on a login node
+apptainer pull docker://bioconductor/bioconductor_docker:RELEASE_3_19
+# Run R inside the container in a batch job
+apptainer exec bioconductor_docker_RELEASE_3_19.sif Rscript scripts/01_qc_preprocessing.R
+```
+
 ## What's next — Module 10
 
 ::: incremental
--   You can now request resources and submit jobs — the *mechanics*.
+-   You can now connect, navigate file systems, load modules, and submit jobs — the *mechanics*.
 -   **Module 10** uses these to run the **real scRNA-seq pipeline** on Talapas: the numbered `01`–`08` scripts, chained through `.rds` hand-offs.
 -   Read the [companion chapter](../Resources_Folder/Chapter_09_SLURM_Basics.html) for the conceptual deep-dive on schedulers and fair-share.
 :::
@@ -297,9 +518,14 @@ seff 123456
 ## Key takeaways
 
 ::: incremental
+-   Connect with **VS Code Remote-SSH** (Duck ID + Duo) — green banner = you're on Talapas.
+-   The **VS Code integrated terminal** (`` Ctrl/Cmd+` ``) is a shell on the login node — `hostname` confirms it. Shell skills from [P1](../Resources_Folder/Chapter_P1_Computer_Systems.html) all apply here.
+-   **Edit in the editor, run in the terminal** — both operate on the same remote filesystem.
+-   Files live in **home** (backed up, small), **projects** (lab-shared), and **scratch** (large, 90-day purge).
+-   Load software with **`module load`**; always `module purge` first in batch scripts.
 -   A scheduler exists because the cluster is **shared** — declare what you need.
 -   **Login nodes edit and submit; compute nodes compute.**
 -   **Interactive** to watch, **batch** to walk away.
 -   `sbatch` → `squeue` → `seff`, then **right-size** the next run.
--   Size honestly, clean up after yourself, back up your data.
+-   Lock dependencies with **renv** (or Apptainer) for reproducible results.
 :::

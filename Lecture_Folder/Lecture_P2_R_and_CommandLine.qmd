@@ -1,9 +1,9 @@
 ---
-title: "P2 — R & the Command Line"
+title: "P2 — R & RStudio"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: "Single Cell RNA-seq Workshop · P2 — R & the Command Line"
+    footer: "Single Cell RNA-seq Workshop · P2 — R & RStudio"
     transition: fade
     transition-speed: slow
     theme: default
@@ -21,379 +21,188 @@ execute:
 editor: visual
 ---
 
-# P2 — R & the Command Line {background-color="#2c3e50"}
+# P2 — R & RStudio {background-color="#2c3e50"}
 
 ## Where this fits
 
 ::: incremental
--   **Day 0 (optional Tuesday refresher)** — for getting everyone up and running before the core workshop
--   **Module 2 of 2** — follows **Module 1 (Computer Systems)**
--   Goal today: just enough **shell** and **R** to be productive on Day 1, not a full course
--   Pairs with the reading: [P2 — R & the Command Line](../Resources_Folder/Chapter_P2_R_and_CommandLine.html)
+-   **Day 0 (optional Tuesday refresher)** — Module 2 of 2, follows P1 (Computer Systems)
+-   P1 covered the shell and filesystem — this session is entirely **R**
+-   Goal: just enough R to be productive on Day 1, not a full course
+-   Pairs with the reading: [P2 — R & RStudio](../Resources_Folder/Chapter_P2_R_and_CommandLine.html)
 :::
 
 ## What you'll walk away with
 
 ::: incremental
--   Open a terminal and **move around the filesystem** with confidence
--   Create, view, move, and delete files; combine tools with **pipes & redirection**
--   Download data with `wget` / `curl`, and **get help** when stuck
--   Launch **RStudio**, assign variables, and work with vectors, data frames, and lists
--   Install and load packages; read & write data; write **tidyverse** pipelines
+-   Work confidently in **RStudio** (or VS Code + R extension)
+-   Assign variables, work with **vectors, data frames, lists, and factors**
+-   Write simple **functions**
+-   Understand `install.packages()` vs `library()`
+-   Chain operations with the **tidyverse pipe `|>`**
+-   Read and write tabular data with `read_csv` / `write_csv`
+-   See how these tools appear in **Modules 00–08**
 :::
 
-# Part 1 — Get set up: install your tools {background-color="#2c3e50"}
+# Why R? {background-color="#2c3e50"}
 
-## What you'll install
+## Why R for single-cell analysis?
 
 ::: incremental
--   **R** + **RStudio** — the language and the desktop IDE you'll work in
--   **VS Code** — a second IDE, used to connect to **Talapas** over SSH
--   **Quarto** — turns the `.qmd` notebooks into rendered HTML / PDF
--   **LaTeX** (TinyTeX) — only needed for PDF output
--   The **command-line compiler tools** some R / Bioconductor packages need to build
+-   **Free, open-source, cross-platform** — runs the same on Mac, Linux, and Windows
+-   The **Bioconductor** ecosystem — 2,000+ packages for genomics, including Seurat, DESeq2, scran
+-   Superb data wrangling, statistics, and publication-quality graphics with **ggplot2**
+-   **Reproducibility** — your scripts are a complete record of every step
+-   **Quarto** turns those scripts into the rendered tutorials you'll work through
 :::
-
-::: callout-note
-**Which is which?** **R** and **LaTeX** are *languages* you write code / markup in; **Quarto** is the *publishing system* that weaves code + prose into a finished document; **RStudio** and **VS Code** are *IDEs* — the workbenches where you write, run, and (for VS Code) reach remote clusters like Talapas.
-:::
-
-## Required tools — install before Day 1
-
-| Tool | Where to get it |
-|----|----|
-| **R ≥ 4.4** | [r-project.org](https://www.r-project.org) |
-| **RStudio Desktop** | [posit.co/download/rstudio-desktop](https://posit.co/download/rstudio-desktop/) |
-| **VS Code** | [code.visualstudio.com](https://code.visualstudio.com/download) |
-| **Quarto** | [quarto.org/docs/get-started](https://quarto.org/docs/get-started/) |
-| **LaTeX (TinyTeX)** | `quarto install tinytex` (only for PDF output) |
 
 ::: callout-tip
-Plan **30–60 minutes the day before** — not the morning of. Full step-by-step: [Software Setup](../Software_Setup.html).
+Everything in this workshop — QC, clustering, DE, enrichment — is R code you can read, adapt, and re-run.
 :::
 
-## Find or install a terminal
+## Your two IDE options
 
 ::: panel-tabset
-### macOS
+### RStudio
 
-Built-in **Terminal** (Applications → Utilities) runs `zsh`, a POSIX shell — nothing to install. (iTerm2 is a nicer optional upgrade.)
+The comfortable default for R work:
 
-### Windows
-
-Windows has no POSIX shell, so install **WSL2 + Ubuntu** from **PowerShell (Admin)**:
-
-``` bash
-wsl --install -d Ubuntu     # restart when prompted
-```
-
-Then launch **Ubuntu** from the Start menu — *that window is your terminal*.
-
-### Linux
-
-Use your built-in **Terminal** (`bash`). Nothing to install.
-:::
-
-## Windows: WSL2 → Ubuntu → your files
-
-::: incremental
--   **WSL2** is the engine — a lightweight Linux VM built into Windows
--   **Ubuntu** is the Linux you actually use; launching it *is* opening your terminal
--   Your Windows drives are mounted at **`/mnt/c`** — e.g. `cd /mnt/c/Users/<you>/Desktop`
--   Your Linux files show up in File Explorer under **Linux** (or type `\\wsl$`)
--   Keep the project in your Linux home (`~`) for speed; reach over to `/mnt/c` when you need a Windows file
-:::
-
-## Install the compiler toolchain
-
-Several R / Bioconductor packages **compile from source** the first time you install them:
-
-::: panel-tabset
-### macOS
-
-``` bash
-xcode-select --install      # clang, git, make, headers
-```
-
-### Windows
-
-Install **Rtools** matching your R (e.g. **Rtools44** for R 4.4), for the native Windows R / RStudio.
-
-### Linux
-
-``` bash
-sudo apt install -y build-essential gfortran
-```
-:::
-
-## Install the workshop packages
-
-::: incremental
--   The full install lives in **[Tutorial 00](../Exercise_Folder/Tutorial_00_Setup_RStudio_Packages.html)** and **Part C** of this module's tutorial — paste the block into the R console
--   First install takes **20–60 min** (it builds some packages from source) — do it **before** Day 1
--   It also pre-caches the `ifnb` dataset so Tutorial 01 starts instantly
-:::
-
-::: callout-warning
-Hit an install error? The [FAQ](../FAQ.html) covers the common ones — Mac compiler errors, Bioconductor mirrors, and stale library paths.
-:::
-
-# Part 2 — The Command Line {background-color="#2c3e50"}
-
-## Why the shell first?
-
-::: incremental
--   The **shell** is the gateway: it runs everything else (R, aligners, HPC jobs)
--   A program that takes typed **commands** and hands them to the operating system
--   **Bash** is the shell on Mac, Linux, and Windows (via WSL)
--   You reach it through a **terminal window**
--   Bioinformatics data is big — these tools scale to gigabytes effortlessly
-:::
-
-## Anatomy of a command
-
-``` bash
-ls -l Documents
-```
-
-::: incremental
--   **Prompt** — the shell signaling it's ready for input
--   **Command** — the action (`ls`)
--   **Options / flags** — change behavior (`-l` = long format)
--   **Argument** — what it operates on (`Documents`)
-:::
-
-## How a computer is organized
-
-::: incremental
--   A tree of **directories** (folders) and **files**
--   `/` = the **root** — holds everything else
--   `~` = your **home** directory (e.g. `/Users/yourname`)
--   A **path** is a location in the tree (`/Users/wcresko/Documents`)
--   Navigating = jumping up and down between directories
-:::
-
-## Where am I? Navigating
-
-``` bash
-pwd            # print working directory — where am I?
-ls             # list contents of current directory
-ls -l          # long format: sizes, dates, permissions
-ls -la         # also show hidden files (start with .)
-cd Documents   # change into Documents
-```
-
-::: incremental
--   `pwd` tells you where you are
--   `ls` shows what's there (`-l` long, `-a` all, `-t` by time, `-S` by size)
--   `cd` moves you around
-:::
-
-## Paths: absolute vs. relative
-
-``` bash
-cd /Users/wcresko/Documents   # absolute — full path from /
-cd data                       # relative — from where I am now
-cd ..                         # up one directory (parent)
-cd ../scripts                 # up one, then into scripts
-cd ~                          # home directory
-cd -                          # back to previous directory
-```
-
-::: incremental
--   **Absolute** = full path starting at `/`
--   **Relative** = from your current location
--   `.` = here · `..` = parent · `~` = home
-:::
-
-## Making, moving, removing
-
-``` bash
-mkdir project          # make a new directory
-touch notes.txt        # make a new empty file
-mv notes.txt README    # rename (or move) a file
-cp README README.bak   # copy a file
-rm README.bak          # delete a file
-rmdir project          # delete an (empty) directory
-```
-
-::: incremental
--   **The shell trusts you** — `rm` deletes immediately, no trash bin
--   Naming: avoid spaces, don't start with `-`, stick to letters/numbers/`.`/`-`/`_`
--   Use meaningful extensions (`.txt`, `.csv`, `.fasta`)
-:::
-
-## Viewing files
-
-``` bash
-cat small.txt          # dump a whole (small) file
-less large.txt         # page through: space=fwd, b=back, /=search, q=quit
-head data.txt          # first 10 lines
-head -n 20 data.txt    # first 20 lines
-tail data.txt          # last 10 lines
-tail -f log.txt        # follow a growing file in real time
-wc -l data.txt         # count lines
-```
-
-::: {.callout-important title="Never cat a huge file"}
-A 3 GB genome will freeze your session. Use `head`, `tail`, or `less` instead.
-:::
-
-## Wildcards
-
-``` bash
-ls *.csv               # everything ending in .csv
-ls sample_*.fastq      # sample_1.fastq, sample_2.fastq, ...
-ls data_?.txt          # ? matches exactly one character
-rm tmp_*               # careful! deletes everything matching
-```
-
-::: incremental
--   `*` matches **any number** of characters
--   `?` matches **exactly one** character
--   Lets one command act on many files at once
-:::
-
-## Pipes & redirection
-
-``` bash
-ls -l > files.txt          # > send output to a file (overwrites!)
-echo "more" >> files.txt   # >> append to a file
-ls /nope 2> errors.txt     # 2> capture error messages
-sort names.txt | uniq      # | feed one command's output into the next
-```
-
-::: incremental
--   `>` writes to a file (**overwrites**), `>>` **appends**
--   `|` chains commands — no intermediate files needed
--   Three streams: **stdin (0)**, **stdout (1)**, **stderr (2)**
-:::
-
-## Pipes: small tools, combined
-
-``` bash
-# Count how many lines match a pattern
-grep "pattern" file.txt | wc -l
-
-# Sort, find unique values, count them, rank by frequency
-cat data.csv | cut -d',' -f2 | sort | uniq -c | sort -rn
-
-# Count sequences in a FASTA file
-grep "^>" genome.fa | wc -l
-```
-
-::: incremental
--   **Unix philosophy**: small tools that each do one thing well
--   Build complex pipelines one stage at a time, checking output as you go
--   Filter early to keep the data flowing through small
-:::
-
-## Downloading data
-
-::: panel-tabset
-### wget
-
-``` bash
-wget https://example.org/genome.fna.gz
-```
-
-### curl
-
-``` bash
-curl -o genome.fa.gz https://example.org/genome.fna.gz
-```
-
-### Notes
-
--   Both download files from a URL
--   `curl -o` lets you name the saved file
--   `.gz` = compressed — work with it directly via `zcat`, `zless`, `zgrep`
-:::
-
-## Getting help
-
-``` bash
-man ls          # full manual page (q to quit)
-ls --help       # quick usage summary
-```
-
-::: incremental
--   `man command` opens the manual; press `q` to exit
--   `command --help` gives a fast summary
--   And of course: the internet and generative AI (Claude, ChatGPT)
-:::
-
-# Part 3 — R & RStudio {background-color="#2c3e50"}
-
-## Why R?
-
-::: incremental
--   Powerful, flexible, **free**, runs everywhere
--   Superb data management, statistics, and graphics
--   **Reproducibility** — your scripts record exactly what you did
--   Write your own functions; huge online help and community
--   Nice front end (**RStudio**) and dynamic documents (**Quarto**)
-:::
-
-## The R interpreter & RStudio panes
-
-::: incremental
--   **R** is the engine that runs your commands; **RStudio** is the comfortable cockpit around it
--   **Source** (top-left) — your scripts and Quarto docs you edit and save
--   **Console** (bottom-left) — where commands actually run
--   **Environment / History** (top-right) — the objects you've created
+-   **Source** (top-left) — scripts and Quarto docs you edit and save
+-   **Console** (bottom-left) — where R commands actually run
+-   **Environment / History** (top-right) — every object you've created
 -   **Files / Plots / Packages / Help** (bottom-right) — everything else
+
+Write code in the **Source** pane so it's saved; use the **Console** for quick experiments.
+
+### VS Code + R extension
+
+A capable alternative, especially for SSH work:
+
+-   Install the **R extension** (search "REditorSupport" in the Extensions panel)
+-   Open an R terminal: **Terminal → New Terminal**, then type `R`
+-   *Ctrl/Cmd + Enter* runs the current line or selection into the terminal
+-   Used in **Module 09** when connecting to Talapas over SSH
+
+Both IDEs run the same R — pick the one you prefer for local work.
 :::
 
-## Assignment & basic math
+# R Basics {background-color="#2c3e50"}
+
+## Assignment & arithmetic
 
 ``` r
-x <- 2          # assign with <-
-x * 3           # 6
-y <- x * 3      # store a result
-log(x)          # built-in functions: object goes in parentheses
-sqrt(16)        # 4
+x <- 2               # assign with <-; names start with a letter
+x * 3                # 6
+y <- x * 3           # store a result
+
+(4 + 3 * 2^2)        # R obeys PEMDAS; parentheses control order
+log(16)              # natural log — built-in function; argument in ()
+sqrt(81)             # 9
+log(1000, base = 10) # named argument — clearer and order-independent
 ```
 
 ::: incremental
--   Assign with `<-`; names start with a letter; R is **case sensitive** (`x` ≠ `X`)
--   Normal math precedence (PEMDAS); parentheses control order
+-   Assign with `<-`; R is **case-sensitive** (`x` ≠ `X`)
+-   Normal math precedence; parentheses clarify
 -   Comment with `#`
 :::
 
-## Vectors — R thinks in vectors
+## Vectors — R's fundamental unit
 
 ``` r
-x <- c(2, 3, 4, 2, 1, 5)   # c() = concatenate into a vector
-y <- x^2                   # operations are element-wise
-mean(x); median(x); sd(x)  # built-in summaries
-length(x)                  # how many elements
-seq(0, 10, by = 0.5)       # a regular sequence
+counts <- c(8, 3, 0, 12, 5, 1, 0, 9)   # c() = concatenate
+counts * 2           # every element doubled — no loop needed
+counts + counts      # element-wise addition
+
+sum(counts); mean(counts); median(counts)
+sd(counts); max(counts); min(counts)
+length(counts)       # how many elements
+
+seq(0, 10, by = 2)   # 0 2 4 6 8 10
+1:10                 # shorthand integer sequence
 ```
 
 ::: incremental
--   A **vector** is a list of values of one type
--   Math applies to **every element at once**
--   Types: `int`, `dbl` (numeric), `chr`, `lgl`, plus **factors** for categories
+-   A **vector** holds values of a **single type**: `dbl`, `int`, `chr`, `lgl`, or `fctr`
+-   Math applies **element-wise** — this is how R processes thousands of cells at once
+-   `NA` marks a missing value; most summary functions accept `na.rm = TRUE`
 :::
+
+## Vectors of other types
+
+``` r
+genes    <- c("CD3D", "MS4A1", "LYZ", "NKG7")   # character vector
+expressed <- c(TRUE, TRUE, FALSE, TRUE)           # logical vector
+
+genes[expressed]          # keep where TRUE — logical subsetting
+genes[c(1, 3)]            # keep elements 1 and 3
+```
+
+::: incremental
+-   **Logical subsetting** — make a `TRUE`/`FALSE` mask, then use it to filter
+-   `counts > 4` returns a logical vector; `counts[counts > 4]` keeps the hits
+-   This "mask then subset" pattern is everywhere in QC filtering
+:::
+
+# Data Structures {background-color="#2c3e50"}
 
 ## Data frames — tabular data
 
 ``` r
-conc    <- factor(c("low", "high", "high", "med"))
-stiff   <- c(3.4, 8.4, 3.0, 5.6)
-mydata  <- data.frame(conc, stiff)
+cells <- data.frame(
+  barcode    = c("AAAC", "AAAG", "AAAT", "AACA"),
+  sample     = c("CTRL", "CTRL", "STIM", "STIM"),
+  nCount_RNA = c(8500, 12000, 6400, 9100),
+  nFeature   = c(2300, 3100, 1900, 2500)
+)
 
-mydata$stiff        # a column by name (preferred)
-mydata[, 2]         # column 2
-mydata[1, ]         # row 1
-mydata[mydata$stiff > 4, ]   # rows meeting a condition
+str(cells)                           # structure: columns, types, values
+summary(cells)                       # per-column summary stats
+nrow(cells); ncol(cells)             # dimensions
+colnames(cells)                      # column names
 ```
 
 ::: incremental
--   The primary structure for tabular data; vectors become **columns**
--   `[row, column]` indexing; `$` grabs a column by name
--   `factor()` marks a column as categorical
+-   The workhorse for tabular data — columns are vectors, can be **different types**
+-   Seurat stores per-cell QC metrics in a data frame (`obj@meta.data`)
+-   `str()` and `summary()` are your first-look tools; `nrow()` / `ncol()` give dimensions
+:::
+
+## Indexing & subsetting
+
+``` r
+cells[1, ]                            # row 1, all columns
+cells[, "nCount_RNA"]                 # column by name
+cells$nCount_RNA                      # same column — $ is the usual way
+cells[cells$sample == "STIM", ]       # rows where sample is STIM
+
+mean(cells$nCount_RNA)                # 9000
+```
+
+::: incremental
+-   `[row, column]` — leave either blank to mean "all"
+-   `$name` is the shorthand for a single column — you'll use this constantly
+-   Condition in the row position filters rows — this is how QC cutoffs work
+:::
+
+## Factors — categorical variables with levels
+
+``` r
+condition <- factor(c("CTRL", "STIM", "CTRL", "STIM"),
+                    levels = c("CTRL", "STIM"))
+condition
+levels(condition)    # "CTRL" "STIM" — CTRL is the reference
+table(condition)     # counts per level
+```
+
+::: incremental
+-   A **factor** encodes categories with a fixed, ordered set of **levels**
+-   The **first level is the reference** in any statistical model
+-   `levels = c("CTRL", "STIM")` → contrast is "STIM vs CTRL"
+:::
+
+::: callout-important
+**Module 06 (DESeq2):** factor level order sets the reference level in `~ condition`. Flip the levels and every log-fold-change flips sign. Always set levels explicitly.
 :::
 
 ## Lists — the pocket that holds anything
@@ -402,37 +211,43 @@ mydata[mydata$stiff > 4, ]   # rows meeting a condition
 experiment <- list(
   sample_id  = "donor_01_CTRL",
   age        = 42,
-  cell_types = c("B cell", "CD4 T", "NK")
+  cell_types = c("B cell", "CD4 T", "Monocyte", "NK")
 )
 
-experiment$sample_id     # access a slot by name
-experiment[[3]]          # the contents of the 3rd slot
+experiment$sample_id        # access a named slot with $
+experiment[["cell_types"]]  # [[ ]] returns the slot's contents
+experiment[3]               # [ ] returns a length-1 sub-list
 ```
 
 ::: incremental
--   Each slot can hold a **different kind of thing** — even another list
--   `[[ ]]` returns the *contents*; `[ ]` returns a sub-list
+-   Each slot can hold a **different kind of object** — even another list
 -   **Seurat** and **SingleCellExperiment** objects are lists under the hood
+-   `[[ ]]` extracts contents; `[ ]` returns a sub-list
 :::
 
-## Functions
+# Functions & Packages {background-color="#2c3e50"}
+
+## Writing simple functions
 
 ``` r
-round(3.14159, 2)              # positional args — order matters
-round(x = 3.14159, digits = 2) # named args — order-independent, clearer
-
-# Define your own
+# coefficient of variation — a small helper function
 cv <- function(x, na.rm = TRUE) {
   if (na.rm) x <- x[!is.na(x)]
   sd(x) / mean(x)
 }
-cv(c(1, 2, 3, 4, 5))
+
+cv(c(1, 2, 3, 4, 5))         # 0.527
+cv(c(1, 2, NA, 4, 5))        # NA dropped first
+
+# named vs positional arguments
+round(3.14159, 2)             # positional — order matters
+round(x = 3.14159, digits = 2) # named — clearer, order-independent
 ```
 
 ::: incremental
--   Use **named arguments** whenever there's ambiguity — self-documenting
--   scRNA-seq functions have long signatures, so almost everything is named
--   You'll write small helper functions all the time
+-   Structure: `name <- function(args) { body }`; last expression is returned
+-   **Use named arguments** — scRNA-seq functions have long signatures
+-   You'll write small wrappers around Seurat/Bioconductor calls routinely
 :::
 
 ## Packages: `install.packages()` vs `library()`
@@ -443,80 +258,139 @@ library(tidyverse)              # load — EVERY new R session
 ```
 
 ::: incremental
--   **`install.packages()`** = get it onto your computer (do once)
--   **`library()`** = make it available in this session (do every time)
--   Bioconductor packages (Seurat ecosystem, DESeq2) use `BiocManager::install()`
+-   **`install.packages()`** = get it onto your computer (do **once**)
+-   **`library()`** = make it available this session (do **every time**)
+-   Bioconductor packages use **`BiocManager::install()`** instead of `install.packages()`
+-   Call one function without loading a package: `muscData::Kang18_8vs8()`
 :::
 
-## The tidyverse & the pipe
+::: callout-note
+**Workshop package installation** is fully covered in **Module 00 — Setup**. That's the canonical install block for everything through Module 08. Today's goal is just to understand the `install` vs `library` distinction.
+:::
+
+# The Tidyverse {background-color="#2c3e50"}
+
+## The tidyverse & the pipe `|>`
 
 ``` r
 library(tidyverse)
 
-result <- meta |>
-  filter(nFeature_RNA > 200, nFeature_RNA < 2500) |>
-  group_by(sample, cluster) |>
-  summarise(n_cells = n(),
-            median_umi = median(nCount_RNA),
-            .groups = "drop") |>
-  arrange(sample, desc(n_cells))
+cells |>
+  filter(nCount_RNA > 7000) |>                      # keep cells with > 7000 UMIs
+  mutate(genes_per_umi = nFeature / nCount_RNA) |>  # add a derived column
+  group_by(sample) |>                               # group by condition
+  summarise(
+    n_cells    = n(),
+    median_umi = median(nCount_RNA),
+    .groups    = "drop"
+  ) |>
+  arrange(desc(median_umi))                         # sort highest first
 ```
 
 ::: incremental
--   Six verbs cover most work: `filter`, `select`, `mutate`, `arrange`, `group_by`, `summarise`
--   The pipe **`|>`** chains steps — read top-to-bottom, left-to-right
--   This style appears throughout the workshop tutorials
+-   The pipe **`|>`** feeds the left side into the first argument of the right side
+-   Read top-to-bottom: filter → add column → group → summarise → sort
+-   No intermediate objects needed — concise and readable
 :::
 
-## Reading & writing data
+## The six dplyr verbs
+
+| Verb | What it does | Workshop use |
+|---|---|---|
+| `filter()` | Keep rows matching a condition | QC cutoffs (Module 01) |
+| `select()` | Keep / drop columns | Tidy up result tables |
+| `mutate()` | Add or modify columns | `percent.mt`, `genes_per_umi` (Module 01) |
+| `arrange()` | Sort rows | Top DE genes by p-value |
+| `group_by()` | Define groups for summaries | Pseudobulk aggregation (Module 06) |
+| `summarise()` | Reduce groups to one row | Counts per donor × condition (Module 06) |
+
+These six verbs cover the majority of data-frame work in every tutorial.
+
+## A real-workshop pipeline
 
 ``` r
-# Read
-df <- read_csv("data.csv")     # tidyverse — returns a tibble
-df <- read_tsv("data.txt")     # tab-separated
-df <- read.csv("data.csv")     # base R equivalent
-
-# Write
-write_csv(df, "results.csv")
+# Module 06 flavour: per-donor QC summary before pseudobulk DE
+meta |>
+  filter(nFeature_RNA > 200, nFeature_RNA < 2500,
+         percent.mt < 20) |>
+  group_by(donor, condition) |>
+  summarise(
+    n_cells      = n(),
+    median_umi   = median(nCount_RNA),
+    median_genes = median(nFeature_RNA),
+    .groups      = "drop"
+  ) |>
+  arrange(condition, desc(n_cells))
 ```
 
 ::: incremental
--   `read_csv()` / `read_tsv()` (tidyverse) return tibbles; `read.csv()` is base R
--   Store data in plain text; keep an **untouched original**; include a header row
+-   `meta` is the per-cell metadata data frame from a Seurat object
+-   This exact pattern appears in the QC and pseudobulk DE modules
+-   The `|>` pipe is used in **every tutorial from Module 01 onward**
+:::
+
+# Reading & Writing Data {background-color="#2c3e50"}
+
+## Reading & writing tabular data
+
+``` r
+# write our data frame, then read it back
+write_csv(cells, "cells_demo.csv")          # tidyverse — no row names
+back <- read_csv("cells_demo.csv")          # returns a tibble
+back
+
+# base R equivalents
+write.csv(cells, "cells_demo.csv", row.names = FALSE)
+back2 <- read.csv("cells_demo.csv")
+
+# other separators and formats
+df_tsv <- read_tsv("data.txt")              # tab-separated
+# library(readxl); xl <- read_excel("file.xlsx")
+```
+
+::: incremental
+-   `read_csv()` / `write_csv()` (tidyverse) return **tibbles** and are faster and friendlier
+-   Store data in **plain text** (`.csv`, `.tsv`) — it outlasts any software version
+-   Keep an **untouched original**; always write results to a **new file**
 -   One column = one data type
 :::
 
-# You're ready for Day 1 {background-color="#2c3e50"}
+# Putting It Together {background-color="#2c3e50"}
 
-## You're ready for Day 1
+## How R skills map to Modules 00–08
+
+| Skill | First used in |
+|---|---|
+| `filter()` on per-cell QC metadata | Module 01 — QC filtering |
+| `mutate()` to add derived columns | Module 01 — `percent.mt` |
+| `factor()`, `relevel()` for reference levels | Module 06 — DESeq2 design |
+| `group_by()` + `summarise()` | Module 06 — pseudobulk aggregation |
+| `arrange()` on DE results | Modules 03, 06, 07 — sorting by p-value / LFC |
+| `read_csv()` / `write_csv()` | Throughout Modules 01–08 |
+| The `|>` pipe | Every module from 01 onward |
+| Lists / `[[ ]]` indexing | Seurat object internals — Modules 01–08 |
+
+## Recap — what you now have
 
 ::: incremental
--   **Shell:** navigate (`pwd`/`ls`/`cd`), manage files, view with `head`/`less`, combine with `|`, `>`, `>>`, get help with `man`
--   **R:** assign with `<-`, work with vectors / data frames / lists, write functions, `install.packages()` once + `library()` each session, pipe with `|>`, read/write data
--   These are the everyday tools under every analysis step ahead
+-   **Assignment & arithmetic** — `<-`, math, `log()`, `sqrt()`
+-   **Vectors** — `c()`, element-wise ops, logical subsetting, `seq()`
+-   **Data frames** — build, inspect with `str()` / `summary()`, index with `[row, col]` and `$`
+-   **Factors** — categorical levels; first level = reference in models (Module 06)
+-   **Lists** — flexible containers; `$` and `[[ ]]` access
+-   **Functions** — `function(args) { body }`; named arguments
+-   **Packages** — `install.packages()` once; `library()` every session; Module 00 installs everything
+-   **Tidyverse pipe** — `filter`, `mutate`, `group_by`, `summarise`, `arrange`
+-   **I/O** — `read_csv()`, `write_csv()`
 :::
-
-## Skills you'll use — and when
-
-| Skill (today) | First used in |
-|---|---|
-| `filter()` on per-cell QC metadata | [Tutorial 01](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html) QC filtering |
-| `mutate()` to add derived columns | [Tutorial 01](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html) `percent.mt` |
-| `group_by()` + `summarise()` | [Tutorial 06](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) pseudobulk aggregation |
-| `factor()`, `relevel()` for reference levels | [Tutorial 06](../Exercise_Folder/Tutorial_06_DESeq2_DE.html) DESeq2 design |
-| `read_csv()` / `write_csv()` | Throughout Tutorials 01–08 |
-| The `|>` pipe | Every tutorial from Tutorial 01 onward |
-| Shell pipes & paths | [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) batch scripts |
 
 ## What's next
 
 ::: incremental
--   **Day 1 core modules** build directly on this:
-    -   Tutorial 00 — Setup: R, RStudio, Quarto, and **install the workshop packages**
-    -   Lec/Tut 01 — QC & Preprocessing
-    -   Lec/Tut 02 — Dimension Reduction & Clustering
-    -   Lec/Tut 03+ — Annotation, Integration, DE, and beyond
--   **Friday (Modules 09–10):** shell skills + Talapas → SLURM batch jobs running the same R scripts on the cluster
--   Revisit the reading: [P2 — R & the Command Line](../Resources_Folder/Chapter_P2_R_and_CommandLine.html)
+-   **Module 00 — Setup:** install every workshop package (the canonical install block lives there); confirm RStudio and Quarto render correctly
+-   **Module 01 — QC & Preprocessing:** `filter()` and `mutate()` on live single-cell data, immediately
+-   **Module 02 — Dimension Reduction & Clustering:** data frames of UMAP coordinates
+-   **Module 06 — DESeq2:** factors and `group_by()` / `summarise()` for pseudobulk aggregation
+-   **Module 07 — Enrichment:** `arrange()` and `write_csv()` for results tables
 -   Keep a cheat sheet open — fluency comes from doing. See you Day 1!
 :::

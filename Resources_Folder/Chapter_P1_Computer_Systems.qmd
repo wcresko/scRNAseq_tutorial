@@ -1,5 +1,5 @@
 ---
-title: "P1 — Computer System Fundamentals"
+title: "Chapter P1 — Computer Systems & the Command Line"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -17,18 +17,17 @@ execute:
 editor: visual
 ---
 
-Single-cell RNA-seq analysis pushes against the limits of a laptop almost immediately: datasets are large, the software stack is deep, and many steps run faster (or only run at all) on shared research computing infrastructure. This chapter builds the mental model you need before you touch any of that — how a computer actually executes work, how an operating system manages resources, what a high-performance computing (HPC) cluster is and when to reach for one, how to get onto and work productively on the University of Oregon's Talapas cluster, and how to make your compute environment reproducible so your results survive the trip from your laptop to the cluster and back.
+Single-cell RNA-seq analysis pushes against the limits of a laptop almost immediately: datasets are large, the software stack is deep, and many steps run faster (or only run at all) on shared research computing infrastructure. This chapter builds the mental model you need — how a computer actually executes work, how an operating system manages resources, how to use VS Code as a local editor, and how to navigate and manipulate the file system from the command line. The University of Oregon's Talapas HPC cluster, SSH login, modules, and SLURM scheduling are covered in [Chapter 9 — VS Code & SLURM Basics on Talapas](Chapter_09_SLURM_Basics.html) (the Friday track).
 
 ::: {.callout-tip title="P1 reading"}
-This is the reading for **P1 — Computer System Fundamentals**, the first hour of the optional two-hour Tuesday refresher. It pairs with the Module 1 lecture slides. Nothing here is single-cell-specific yet; it is the computing foundation that the rest of the workshop assumes. If you are already comfortable with HPC and SSH, skim to the [Reproducible compute environments](#reproducible-compute-environments) section.
+This is the reading for **P1 — Computer Systems & the Command Line**, the first hour of the optional two-hour Tuesday refresher. It pairs with the Module P1 lecture slides. Nothing here is single-cell-specific yet; it is the computing foundation that the rest of the workshop assumes. Connecting to and working on Talapas — VS Code Remote-SSH, Lmod modules, file systems, interactive sessions, and reproducible environments — is covered on Friday in [Chapter 9](Chapter_09_SLURM_Basics.html).
+:::
+
+::: callout-tip
+**Keep a cheat sheet open.** The [Cheat Sheets](../Cheat_Sheets.html) tab collects one-page Unix shell and VS Code references that pair with this chapter; you will lean on the Unix shell sheet again every time you work in a terminal — locally now, and on Talapas during the Friday track ([Modules 09–10](../Materials.html)). See also the [Software Setup](../Software_Setup.html) page for installation instructions if you have not yet installed VS Code, R, or the workshop repository.
 :::
 
 # How computers and operating systems work
-
-
-::: callout-tip
-**Keep a cheat sheet open.** The [Cheat Sheets](../Cheat_Sheets.html) tab collects one-page SLURM, Unix, and Git references that pair with this module; you'll lean on the SLURM sheet again in the Friday Talapas track ([Modules 09–10](../Materials.html)).
-:::
 
 ## What is a computer system?
 
@@ -140,6 +139,16 @@ Every operation a computer performs reduces to a small cycle repeated billions o
 :::
 :::::
 
+::: {.callout-note .key-concept title="🔑 Key concept — CPU, RAM, and disk are three different resources"}
+These three are often confused but serve entirely different roles:
+
+- **CPU (processor)**: does the actual computation — arithmetic, logic, calling functions. More cores = more things happening in parallel; higher clock speed = each thing happens faster.
+- **RAM (memory)**: holds the data and code the CPU is actively working with. Fast but small and *volatile* — it empties when you power off. A Seurat object for 50,000 cells can easily occupy 8–16 GB of RAM.
+- **Disk (storage)**: holds files permanently. Much slower than RAM but far larger and persistent. Reading a `.rds` file moves data from disk into RAM; saving it moves data from RAM back to disk.
+
+The most common reason a single-cell analysis crashes on a laptop is **running out of RAM**, not disk space or CPU. Knowing which resource is the bottleneck guides every decision about whether to work locally or on a cluster.
+:::
+
 Input/output (I/O) systems connect the computer to the outside world: keyboards, mice, touchscreens, cameras and sensors on the input side; monitors, printers, speakers and actuators on the output side; and network interfaces in both directions.
 
 ## Operating systems
@@ -164,7 +173,7 @@ An operating system (OS) is system software that manages hardware and software r
 -   **Server**: Unix, Linux, Windows Server
 -   **Specialized**: supercomputers, IoT
 
-Talapas, like nearly all HPC clusters, runs **Linux** — which is why the workshop spends time on the Unix command line.
+Research computing clusters — including the University of Oregon's Talapas cluster covered in [Chapter 9](Chapter_09_SLURM_Basics.html) — run **Linux**, which is why the workshop spends time on the Unix command line.
 :::
 :::::
 
@@ -218,11 +227,11 @@ Why work at the command line and in code rather than point-and-click GUIs?
 -   It can analyze datasets far too large for Excel or other GUIs.
 -   It gives access to thousands of free programs made for and by scientists.
 -   Commands work almost identically across platforms.
--   It is the *only* practical way to use a computer cluster like Talapas.
+-   It is the *only* practical way to use a computer cluster (see [Chapter 9](Chapter_09_SLURM_Basics.html) for the Talapas-specific details).
 
 There is a loose distinction between **coding** (compiled languages such as C++, Fortran — faster but less flexible) and **scripting** (interpreted languages such as Unix shell, Python, R, Julia — flexible but slower). The line has blurred, and most modern analytical pipelines mix both.
 
-# What is an HPC cluster, and when do you use one?
+# Where computation can happen
 
 Before reaching for a cluster, it helps to see the landscape of where computation can happen.
 
@@ -232,602 +241,405 @@ Before reaching for a cluster, it helps to see the landscape of where computatio
 - **Cloud computing** — on-demand resources delivered over the internet with pay-as-you-go pricing (AWS, Azure, Google Cloud).
 :::
 
-## Local computing
+A laptop is fine for learning and for small single-cell datasets, but it runs out of memory and time quickly once you scale to full experiments. The University of Oregon's **Talapas** HPC cluster is free to UO researchers, has large-memory nodes and GPUs, and is where the Friday modules run the real single-cell pipeline. Everything you need to know about connecting to Talapas, loading software, managing files, and submitting jobs is in [Chapter 9 — VS Code & SLURM Basics on Talapas](Chapter_09_SLURM_Basics.html).
 
-::::: columns
-::: {.column width="50%"}
-**Advantages**
+# VS Code on your laptop
 
--   **Low latency**: no network overhead
--   **Data control & privacy**: data never leaves the premises
--   **Predictable costs**: one-time investment
--   **Offline capability** and full customization
+**Visual Studio Code** is a free, cross-platform editor from Microsoft that you will use throughout the workshop — first locally on your laptop, and later to connect to Talapas over SSH (covered in [Chapter 9](Chapter_09_SLURM_Basics.html)). This section covers the local laptop setup only.
+
+## Installing VS Code
+
+Install it from <https://code.visualstudio.com/download>. Run the installer for your operating system (Windows, macOS, or Linux). On first launch, allow any requested permissions.
+
+Take a moment to find the **Activity Bar** down the left edge — the icons there switch between the Explorer, Search, Source Control, Extensions, and (after the next step) Remote Explorer panels. The **Command Palette** (`Ctrl+Shift+P` on Windows/Linux, `Cmd+Shift+P` on macOS) searches every VS Code command by name; you will use it constantly.
+
+## Useful extensions
+
+In the left sidebar, click the **Extensions** tab (the four-squares icon) and search for the following:
+
+-   **Quarto** — edit, preview, and run `.qmd` files (the workshop chapters and tutorials). With this extension installed, a **Preview** button appears in the editor's top-right corner; clicking it (or pressing `Ctrl+Shift+K` / `Cmd+Shift+K`) renders a live HTML preview in a split pane that refreshes on save.
+-   **R** — syntax highlighting, autocompletion, and integration with the R language server.
+-   **vscode-pdf** (PDF Viewer) — open plots and rendered documents without leaving the editor.
+-   **Excel Viewer** (CSV Editor/Viewer) — renders `.csv` files as a formatted table.
+-   **GitLens** or **Git Graph** — visualize the repository history alongside your code.
+
+After installing, restart VS Code if prompted. The **Remote — SSH** and **Remote Explorer** extensions (for connecting VS Code to Talapas) are installed and configured in [Chapter 9](Chapter_09_SLURM_Basics.html) — no need to install them today.
+
+## Opening a project folder
+
+VS Code is folder-centric: almost everything works better when you open the root folder of a project rather than individual files.
+
+1.  Download or clone the workshop repository so it is somewhere on your laptop (e.g. `~/scRNAseq_tutorial`).
+2.  In VS Code choose **File → Open Folder…** (macOS: **File → Open…**) and navigate to that folder.
+3.  The **Explorer** panel on the left now shows the directory tree. Click on any file to open it.
+4.  VS Code may ask if you trust the authors of the files in this folder — click **Yes, I trust the authors** to enable full functionality.
+
+::: {.callout-tip title="Workspace vs. folder"}
+A **folder** opened directly is the simplest way to work. A **workspace** (`.code-workspace` file) lets you group multiple root folders — handy when a project spans several directories, but unnecessary for this workshop. Stick with **Open Folder** for now.
 :::
 
-::: {.column width="50%"}
-**Disadvantages**
+## Using VS Code as a local IDE
 
--   **Limited scale**: hardware constraints
--   **Maintenance** is the user's responsibility
--   **High upfront costs** and manual disaster recovery
--   **Resource waste**: idle during off-hours
-:::
-:::::
+Once you have a project folder open, VS Code behaves as a full local IDE:
 
-A laptop is fine for learning and for small single-cell datasets, but it runs out of memory and time quickly once you scale to full experiments.
+-   The **Explorer** panel (left sidebar) shows the directory tree; click a file to open it in the editor.
+-   The **integrated terminal** (**Terminal → New Terminal**, or `` Ctrl+` ``) opens a shell in the project directory — use it to run R scripts, shell commands, or Git commands without leaving VS Code. Press `` Ctrl+` `` to toggle it open and closed.
+-   **Comment / uncomment** selected lines with `Ctrl + /` (macOS `Cmd + /`).
+-   **Search across all files** in the folder with `Ctrl + Shift + F` (macOS `Cmd + Shift + F`).
+-   Split-pane editing lets you view a script and its output log side by side (`Ctrl+\` / `Cmd+\`).
+-   Add more terminal tabs with the **+** at the top-right of the terminal pane; you can have multiple shells open simultaneously.
+-   **Run R locally**: the integrated terminal is a full shell — start an interactive R session with `R`, or run a script with `Rscript my_script.R`, exactly as you would in any terminal.
 
-## Cluster computing
+## Useful VS Code shortcuts
 
-A cluster is a collection of interconnected computers working together as a single system.
+| What | How (Win/Linux) | How (macOS) |
+|---|---|---|
+| Toggle word wrap | Alt+Z | Alt+Z |
+| Find in current file | Ctrl+F | Cmd+F |
+| Find across all files | Ctrl+Shift+F | Cmd+Shift+F |
+| Go to a line number | Ctrl+G | Cmd+G |
+| Format a file | Shift+Alt+F | Shift+Option+F |
+| Toggle integrated terminal | Ctrl+` | Ctrl+` |
+| Open new terminal | Ctrl+Shift+` | Cmd+Shift+` |
+| Split editor pane | Ctrl+\ | Cmd+\ |
+| Open Command Palette | Ctrl+Shift+P | Cmd+Shift+P |
+| Preview Quarto document | Ctrl+Shift+K | Cmd+Shift+K |
 
-![Cluster Computing](images/appendix_A_S24_cluster_computing.svg){fig-align="center" width="70%"}
-
-**Key components**
-
--   **Head/login node**: where you connect, edit files, and submit jobs
--   **Compute nodes**: the worker machines that actually run your work
--   **Interconnect**: a high-speed network (InfiniBand, 10GbE+)
--   **Shared storage**: parallel file systems (Lustre, GPFS)
-
-A **resource manager** schedules jobs onto the compute nodes:
-
-| System     | Use case        | Key features                          |
-|------------|-----------------|---------------------------------------|
-| SLURM      | HPC             | Advanced scheduling, power management |
-| PBS/Torque | Traditional HPC | Mature, stable, wide support          |
-| SGE/UGE    | Mixed workloads | Flexible policies                     |
-| Kubernetes | Containers      | Microservices, auto-scaling           |
-
-::: {.callout-important title="What we use"}
-We use **SLURM** on **Talapas** at the University of Oregon for scheduling compute jobs. The rest of this chapter covers Talapas in detail.
+::: {.callout-tip title="Laptop workflow tip"}
+For the early modules (Modules 01–08) you work entirely locally — open the workshop repository folder in VS Code and run everything from the integrated terminal or from RStudio. When you move to the Friday Talapas modules, VS Code's Remote-SSH extension connects the same editor interface directly to the cluster; the experience feels nearly identical, but your files and terminal are on Talapas. That setup is in [Chapter 9](Chapter_09_SLURM_Basics.html).
 :::
 
-::::: columns
-::: {.column width="50%"}
-**Advantages**
+# The command line
 
--   **Scalability**: add nodes as needed
--   **Performance**: parallel processing power
--   **Fault tolerance**: node redundancy
--   **Resource sharing** across users/projects
--   **Specialized hardware**: GPUs, high-memory nodes
+The **shell** is a text-based interface to your computer's operating system. You type a command, the shell passes it to the OS, the OS executes it, and the result comes back as text. This is not a workaround for an absence of GUI tools — it is a deliberate design: small, focused programs that each do one thing well, combined in flexible ways.
+
+::: {.callout-note .key-concept title="🔑 Key concept — what the shell is and why it matters"}
+The shell is both a **command interpreter** (it reads what you type and runs the corresponding programs) and a **scripting language** (you can save a sequence of commands in a file and run it repeatedly). Every bioinformatics tool you will encounter — Cell Ranger, STAR, samtools, salmon — is run from the shell. Seurat workflows on a cluster are submitted as shell scripts. Knowing the shell is not optional for serious genomics work.
+
+The most common shell on macOS and Linux is **bash** (Bourne-Again SHell); modern macOS defaults to **zsh**, which is nearly identical for interactive use. On Windows, **WSL (Windows Subsystem for Linux)** gives a full Linux environment; the **RStudio Terminal** tab also works for the commands in this chapter. All examples here run the same on macOS, Linux, and WSL.
 :::
 
-::: {.column width="50%"}
-**Disadvantages**
+## Where am I? Navigating the file system
 
--   **Complexity**: requires expertise
--   **Infrastructure**: space, power, cooling
--   **Network dependency**: interconnect bottlenecks
--   **Maintenance** and complex initial setup
-:::
-:::::
+Open a terminal (the VS Code integrated terminal, or your system Terminal app) and orient yourself.
 
-## Cloud computing
+A shell command is a **command** plus optional **flags/options** (like `-l`) and **arguments** (what to act on):
 
-For completeness: the cloud delivers computing on demand over the internet.
+```bash
+command  -flag  argument
+ls       -l     ~/Documents
+```
 
-::::: columns
-::: {.column width="50%"}
-**Advantages**
+![The anatomy of a shell command — the command itself, its options/flags, and its arguments.](images/appendix_B_S38_shell_command_anatomy.svg){fig-align="center" width="70%"}
 
--   **Elastic scaling**: instant resource adjustment
--   **Pay-per-use**: no idle resource costs
--   **Managed services** and built-in disaster recovery
-:::
+The foundational navigation commands:
 
-::: {.column width="50%"}
-**Disadvantages**
+```bash
+pwd                 # "print working directory" — the absolute path you are in right now
+ls                  # list files and folders in the current directory
+ls -F               # mark directories with /, executables with *
+ls -l               # long format: permissions, owner, size, modified date
+ls -la              # long format + hidden (dot-)files like .bashrc
+cd ~                # go to your home directory (~ is shorthand for home)
+pwd                 # confirm you moved
+```
 
--   **Ongoing costs** that can exceed on-prem
--   **Vendor lock-in** and internet dependency
--   **Data transfer (egress) costs** and compliance complexity
-:::
-:::::
-
-**When to use which?** Learn and prototype locally; run real single-cell workloads on Talapas (free to UO researchers, GPUs available, large memory nodes); consider the cloud only when you need elasticity or services Talapas does not provide.
-
-# UO's Talapas cluster
-
-## What is Talapas?
-
--   **Talapas** is UO's flagship high-performance computing (HPC) cluster.
--   Named from the Chinook word for *coyote* — the educator and keeper of knowledge.
--   Managed by **Research Advanced Computing Services (RACS)** and located in the Allen Hall Data Center.
--   It combines centrally funded open-use resources with researcher-funded ("condo") resources.
--   Documentation: [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/).
-
-**Key resources:** over **14,500 CPU cores**, **129 TB of memory**, roughly **89 GPUs** (NVIDIA A40 through H100), and about **3 petabytes of storage**. CPU generations span AMD Milan and Intel Broadwell/Cascadelake/Icelake/Sapphire Rapids; node memory ranges from 128 GB to 6 TB.
-
-![Talapas Architecture](images/appendix_F_S03_talapas_architecture.svg){fig-align="center" width="80%"}
-
-## Getting an account (Duck ID + PIRG)
-
-To work on Talapas you need a UO Duck ID and a Talapas account tied to a research group called a **PIRG** (Principal Investigator Research Group).
-
-::: panel-tabset
-### Step 1: Join a PIRG
-
--   A **PIRG** = Principal Investigator Research Group.
--   Contact your PI to be added to their PIRG, or contact RACS to create a new one.
-
-### Step 2: Request access
-
--   Request an account at [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access).
--   Your **username** is your Duck ID (the part of your UO email before `@uoregon.edu`).
--   Your **password** is your University-wide UO password, managed via UO's password reset page.
+::: {.callout-note .key-concept title="🔑 Key concept — the working directory"}
+Every shell session has a **current working directory** (CWD) — the folder the shell is "standing in" right now. `pwd` prints it. Relative paths are interpreted from the CWD, so the CWD determines what `ls` shows, what `./script.sh` runs, and where files are written when you give a bare filename like `output.csv`. Keeping track of your CWD is the single most important habit for avoiding "file not found" errors.
 :::
 
-## Logging in (SSH + Duo)
+::: {.callout-note .key-parameter title="⚙️ Key parameter — ls flags"}
+| Flag | Effect |
+|------|--------|
+| `-l` | Long listing: permissions, owner, size, modification date |
+| `-a` | Show all files including hidden dotfiles (names starting with `.`) |
+| `-h` | Human-readable file sizes (1K, 5M, 2G) — use with `-l` |
+| `-t` | Sort by modification time, newest first |
+| `-r` | Reverse sort order |
 
-The Talapas login host is `login.talapas.uoregon.edu`.
-
-::: panel-tabset
-### Command line (SSH)
-
-``` bash
-# Basic SSH connection
-ssh yourduckid@login.talapas.uoregon.edu
-
-# Or a specific login node (login1 ... login4)
-ssh yourduckid@login1.talapas.uoregon.edu
-```
-
--   For security, **no characters appear while you type your password**.
--   SSH logins use **Duo two-factor authentication**: when prompted, type `1` and press Enter to receive a Duo push (`2` sends a text, `3` calls you).
--   **Off campus?** Connect to the UO VPN first, then SSH as normal. The VPN also lets you reach the direct login nodes.
--   Mac and Linux users can set up an **ED25519 SSH key** to avoid typing a password every session (Duo will still prompt when required by policy).
--   **From Windows:** use PuTTY, MobaXterm, or Windows Terminal.
-
-### Web browser (Open OnDemand)
-
-RACS provides a web portal at [ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu/) (Chrome or Firefox recommended):
-
--   No command line or SSH client needed.
--   File browser for uploads/downloads.
--   Interactive applications: JupyterLab, RStudio, MATLAB, and a remote X11 desktop via VNC.
--   The easiest way to run RStudio or Jupyter sessions on Talapas, and great for beginners.
+Flags can be combined: `ls -lah` gives a long, human-readable listing of all files.
 :::
 
-### Login nodes vs compute nodes
+## Absolute vs relative paths
 
-::: panel-tabset
-### Login nodes
+Every file on a Unix-like system has an **absolute path** — the full address from the root `/` of the file system — and you can also refer to files by a **relative path** from wherever you currently are.
 
--   Where you land when you SSH into Talapas.
--   For **light tasks only**: file management, editing, job submission.
--   Shared by all users — be considerate. Heavy processes will be killed.
+![The Unix file system is a single tree rooted at `/`. An absolute path traces the route from `/`; a relative path starts from your current working directory.](images/appendix_B_S42_file_structure.svg){fig-align="center" width="60%"}
 
-### Compute nodes
+```bash
+cd /                    # jump to the root of the whole file system (absolute)
+ls                      # the top-level directories of the machine
+cd ~                    # back home (absolute, via the ~ shortcut)
+cd ..                   # up one level (relative — .. means "parent directory")
+cd -                    # back to where you just were (toggles between last two dirs)
+cd ~/Desktop            # absolute path built from home; adjust if Desktop does not exist
+pwd
+```
 
--   Where your actual work runs.
--   Accessed through the SLURM scheduler (see below).
--   Different types for different needs: standard CPU, GPU, and high-memory ("fat") nodes.
+::: {.callout-note .key-concept title="🔑 Key concept — absolute vs relative paths"}
+An **absolute path** starts at the filesystem root `/` and is unambiguous from anywhere on the machine: `/home/wcresko/projects/scrnaseq/data/sample01.csv`. A **relative path** is interpreted from the current working directory: `../data/sample01.csv` means "go up one level, then into `data/`."
+
+Special path shortcuts:
+
+| Shortcut | Meaning |
+|----------|---------|
+| `.` | The current directory |
+| `..` | The parent directory (one level up) |
+| `~` | Your home directory |
+| `-` | The previous directory (where you just were) |
+
+Relative paths are shorter and survive moving an entire project to a new location; absolute paths are unambiguous but brittle if anything above them moves. In analysis scripts, **relative paths anchored to the project root** (e.g. `data/raw/sample01.fastq.gz`) are best for reproducibility.
 :::
 
-| Node type      | Cores   | Memory      | Purpose                |
-|----------------|---------|-------------|------------------------|
-| Standard CPU   | 28--128 | 128--512 GB | General computation    |
-| Large memory   | 56+     | up to 4 TB  | Memory-intensive work  |
-| GPU (A40–H100) | 28--128 | 256 GB–1 TB | Machine learning, CUDA |
-| Interactive    | Various | Various     | Testing, development   |
+## Making, moving, copying, and removing files
 
-::: {.callout-important title="The golden rule"}
-**Do not run heavy computation on the login nodes.** Anything that takes more than a few seconds belongs in an interactive session (`srun --pty bash`) or a batch job (`sbatch my_script.sh`).
+Create a scratch workspace and practice the core file operations.
+
+```bash
+cd ~
+mkdir p1_practice            # make a new directory
+cd p1_practice
+
+touch notes.txt              # create an empty file
+echo "single cell RNA-seq" > notes.txt    # write one line (> overwrites)
+echo "day 0 refresher" >> notes.txt       # append a second line (>> appends)
+
+cp notes.txt notes_backup.txt   # copy a file
+mv notes.txt readme.txt          # rename (move within the same directory)
+mkdir archive
+mv notes_backup.txt archive/     # move a file into a subdirectory
+
+ls -F                            # see what you have made
+ls archive/
+```
+
+Now clean up selectively:
+
+```bash
+rm archive/notes_backup.txt      # remove a single file
+rmdir archive                    # remove an *empty* directory
+# rm -r somedir                  # remove a directory AND everything inside it
+```
+
+A few rules the shell enforces that can surprise newcomers: the shell **trusts you** — it deletes what you tell it to and overwrites same-named files without asking. There is no Recycle Bin. Avoid spaces in filenames; stick to letters, numbers, `.`, `-`, and `_`.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — rm and cp flags"}
+| Command | Effect |
+|---------|--------|
+| `rm file` | Delete a single file (irreversible — no Recycle Bin) |
+| `rm -r dir/` | Delete a directory **and all its contents** recursively |
+| `rm -i file` | Interactive: ask before each deletion |
+| `cp src dst` | Copy a single file |
+| `cp -r src/ dst/` | Copy a directory and all its contents recursively |
+| `mv src dst` | Move or rename a file or directory |
+
+`rm -r` is powerful and irreversible. Always double-check the path before pressing Enter, and never combine it with wildcards (`rm -r *`) without careful thought.
 :::
 
-## File systems and storage
+## Viewing file contents
 
-Every Talapas user has access to several directories on the ~3 PB IBM Elastic Storage System (GPFS).
+You rarely open genomics data files in a GUI; you inspect them directly in the shell. Build a test file, then look at it several ways:
 
-![Storage Structure](images/appendix_F_S09_storage_structure.svg){fig-align="center" width="90%"}
+```bash
+cd ~/p1_practice
+# write 100 numbered lines into a file
+for i in {1..100}; do echo "line $i"; done > big.txt
 
-| Location                | Quota                 | Purpose                                                                   |
-|-------------------------|-----------------------|---------------------------------------------------------------------------|
-| `/home/<duckid>`        | 250 GB                | Personal files, scripts, dotfiles; small software installs                |
-| `/projects/<PIRG>`      | Shared (2 TB default) | Large shared project data and analysis for your research group            |
-| `/scratch/<PIRG>`       | 20 TB                 | High-throughput working space; **files untouched for 90 days are purged** |
-| `/tmp`                  | Local to node         | Temporary scratch space                                                   |
-
-``` bash
-# Check your storage usage
-df -h ~
-du -sh /projects/myPIRG/myusername
+cat readme.txt          # dump an entire (small) file to the screen
+head big.txt            # first 10 lines (default)
+head -n 3 big.txt       # first 3 lines
+tail big.txt            # last 10 lines
+tail -n 3 big.txt       # last 3 lines
+wc -l big.txt           # count lines in a file
+less big.txt            # page through interactively (SPACE=down, b=up, /pattern=search, q=quit)
 ```
 
-::: {.callout-warning}
-**You are responsible for backing up your data — RACS does NOT back up Talapas file systems.** Some snapshotting exists for home and project directories, but it is not a substitute for your own backups. Use `/projects` for large files and clean up when done.
+::: {.callout-warning title="Do not use cat on large files"}
+`cat` dumps the **entire file** to the screen. That is fine for a 10-line README, but a 3 GB genome FASTA or a 50,000-cell expression matrix will flood your terminal and can stall your session. For big files always use `head`, `tail`, `less`, or streaming tools — they never load the whole file into memory at once.
 :::
 
-**File transfer options:**
-
--   `scp` / `sftp` from the terminal.
--   [FileZilla](https://filezilla-project.org/) — cross-platform GUI for SCP/SFTP.
--   [**Globus**](https://www.globus.org/) — RACS's recommended tool for large transfers, especially to/from the Large-Scale Research Storage (LSRS) system.
-
-## Software modules (Lmod)
-
-Talapas uses [Lmod](https://lmod.readthedocs.io/) to manage centrally installed software. Modules are loaded **per shell** — you must `module load` again in every new session (or in every SLURM job script).
-
-::: panel-tabset
-### Commands
-
-``` bash
-module spider blast        # search for software by name
-module spider R            # find available versions
-module avail               # list modules loadable right now
-module load R/4.3.3        # load a specific version
-module load samtools       # load a module (default version)
-module list                # show currently loaded modules
-module unload samtools     # unload a module
-module purge               # unload everything; reset to defaults
-```
-
-### Best practices
-
-::: {.callout-note title="Module tips"}
--   In batch scripts, always load modules **after** the `#SBATCH` directives.
--   Use `module spider` to find available versions.
--   `module purge` resets your environment to defaults.
--   Specify version numbers for reproducibility (e.g., `R/4.3.3`, not just `R`).
-:::
+::: {.callout-note .key-parameter title="⚙️ Key parameter — file-viewing commands"}
+| Command | What it does |
+|---------|-------------|
+| `cat file` | Print entire file to stdout |
+| `head -n N file` | Print first N lines (default 10) |
+| `tail -n N file` | Print last N lines (default 10) |
+| `wc -l file` | Count lines; `-w` = words, `-c` = bytes |
+| `less file` | Interactive pager: scroll, search, quit with `q` |
+| `zcat file.gz` | Stream a gzip-compressed file without unpacking |
+| `zless file.gz` | Page through a gzip-compressed file |
 :::
 
-## Partitions and the SLURM scheduler
+## Wildcards
 
-Talapas uses [SLURM](https://slurm.schedmd.com/) (**S**imple **L**inux **U**tility for **R**esource **M**anagement) [@yoo2003slurm] to allocate resources fairly among users and keep the cluster busy. It is the same scheduler used on most academic and national-lab clusters, so these skills transfer directly. The full mechanics are covered in [Chapter 9](Chapter_09_SLURM_Basics.html).
+Wildcards let one command act on many files at once. The shell expands them before passing the result to the command.
 
-![SLURM Job Workflow](images/appendix_F_S10_slurm_workflow.svg){fig-align="center" width="90%"}
+```bash
+cd ~/p1_practice
+touch sample_01.fastq sample_02.fastq sample_03.fastq control.fastq notes.md
 
-**Key concepts:** *jobs* are units of work you submit; *partitions* are queues with different properties; *accounts* (your PIRG) are used for resource tracking and charging.
-
-### Partitions (queues)
-
-These are the current Talapas partitions — always confirm against `sinfo` and the [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/):
-
-| Partition                        | Typical use                                | Max wall time |
-|----------------------------------|--------------------------------------------|---------------|
-| `compute`                        | Standard CPU jobs                          | 1 day         |
-| `computelong`                    | Long CPU jobs                              | 14 days       |
-| `gpu` / `gpulong`                | GPU jobs (short / long)                    | 1 day / 14 d  |
-| `memory` / `memorylong`          | High-memory CPU jobs (up to 4 TB RAM)      | 1 day / 14 d  |
-| `interactive` / `interactivegpu` | Short interactive sessions                 | 12 h / 8 h    |
-| `preempt`                        | Access to all nodes; jobs may be preempted | Variable      |
-
-All SLURM jobs **must specify an account** (your PIRG) for correct service charging. Pass `--account=<myPIRG>` on every command, or export it once in your `~/.bash_profile`:
-
-``` bash
-export SLURM_ACCOUNT=<myPIRG>
-export SBATCH_ACCOUNT=<myPIRG>
+ls *.fastq              # everything ending in .fastq
+ls sample_*.fastq       # the three sample files (prefix match)
+ls sample_0?.fastq      # ? matches exactly one character
+ls sample_0[12].fastq   # character class: only sample_01 and sample_02
+ls *.{fastq,md}         # brace expansion: match .fastq OR .md
 ```
 
-### Essential SLURM commands
+::: {.callout-note .key-concept title="🔑 Key concept — shell wildcards"}
+| Pattern | Matches |
+|---------|---------|
+| `*` | Any string of characters (including none) |
+| `?` | Exactly one character |
+| `[abc]` | Any single character in the set |
+| `[a-z]` | Any single character in the range |
+| `{foo,bar}` | Either `foo` or `bar` (brace expansion, not a true wildcard) |
 
-::: panel-tabset
-### Submit & monitor
-
-``` bash
-sbatch myscript.sh           # submit a batch job
-squeue -u $USER              # check your jobs in the queue
-squeue -p compute            # check all jobs on a partition
-scancel JOBID                # cancel a job
-scontrol show job JOBID      # detailed job info
-```
-
-### After completion
-
-``` bash
-# Check job history and resource usage
-sacct -j JOBID --format=JobID,Elapsed,MaxRSS
-
-# View partition information
-sinfo -p compute
-```
-
-### Status codes
-
-| Code | Meaning           |
-|------|-------------------|
-| PD   | Pending (waiting) |
-| R    | Running           |
-| CG   | Completing        |
-| CD   | Completed         |
-| F    | Failed            |
+Wildcards are expanded by the **shell** before the command receives them. If no file matches, many shells pass the literal pattern to the command, which will usually error — a useful signal that your pattern is wrong or you are in the wrong directory.
 :::
 
-### Interactive jobs
+## Pipes and redirection
 
-``` bash
-# Start an interactive session on a compute node
-srun --pty --partition=compute --account=myPIRG \
-     --time=2:00:00 --cpus-per-task=4 --mem=8G /bin/bash
+Two mechanisms power most command-line work:
+
+**Redirection** routes a command's input or output to/from a file:
+
+- `>` writes stdout to a file (overwrites if it exists)
+- `>>` appends stdout to a file
+- `<` reads stdin from a file
+- `2>` redirects stderr (error messages) to a file
+
+**Pipes** (`|`) connect the stdout of one command directly to the stdin of the next — no temporary file needed. This is the Unix philosophy: small tools that each do one thing well, chained together into powerful pipelines.
+
+```bash
+cd ~/p1_practice
+
+# --- redirection ---
+ls -l > listing.txt                     # write a directory listing to a file (overwrites)
+echo "generated $(date)" >> listing.txt # append a timestamp line
+wc -l < big.txt                         # feed big.txt as stdin; counts its lines
+
+# --- pipes ---
+cat big.txt | wc -l                     # count lines via a pipe (same result)
+head -n 50 big.txt | tail -n 5          # lines 46–50: take first 50, then last 5 of those
+ls *.fastq | wc -l                      # how many .fastq files are there?
+
+# --- a longer pipeline ---
+# count and rank the most common words in readme.txt
+cat readme.txt | tr ' ' '\n' | sort | uniq -c | sort -rn | head
 ```
 
-Use interactive jobs for testing a workflow before batch submission, debugging, quick data exploration, or GUI applications. Your prompt will change from `login1` to something like `n049`.
+Every program has three standard streams: **stdin** (0, input), **stdout** (1, normal output), and **stderr** (2, error messages). You can redirect each independently — for example, `command 2> errors.log` keeps error messages out of your results file.
 
-### Batch script template
+::: {.callout-note .key-concept title="🔑 Key concept — pipes and the Unix philosophy"}
+A **pipe** `|` makes the output of one program the input of the next — all in memory, with no temporary files written to disk. This lets you chain simple, specialized tools into powerful one-liners. For example:
 
-``` bash
-#!/bin/bash
-#SBATCH --job-name=my_analysis      # Job name
-#SBATCH --partition=compute         # Partition (queue)
-#SBATCH --account=myPIRG            # Your PIRG name
-#SBATCH --output=output_%j.log      # Standard output (%j = job ID)
-#SBATCH --error=error_%j.log        # Standard error
-#SBATCH --time=04:00:00             # Time limit (HH:MM:SS)
-#SBATCH --nodes=1                   # Number of nodes
-#SBATCH --ntasks-per-node=1         # Tasks per node
-#SBATCH --cpus-per-task=4           # CPUs per task
-#SBATCH --mem=16G                   # Memory per node
-
-# Load required modules (after the SBATCH directives)
-module load R/4.3.3
-
-# Run your program
-Rscript my_analysis.R
+```bash
+grep "^>" sequences.fasta | sort | uniq | wc -l
 ```
 
-| Directive         | Description         | Example                                    |
-|-------------------|---------------------|--------------------------------------------|
-| `--partition`     | Queue to use        | `compute`, `computelong`, `gpu`, `memory`  |
-| `--account`       | PIRG for accounting | `nereus`                                   |
-| `--time`          | Max runtime         | `1-12:00:00` (1 day, 12 hrs)               |
-| `--nodes`         | Number of nodes     | `1`                                        |
-| `--cpus-per-task` | Cores per task      | `8`                                        |
-| `--mem`           | Memory per node     | `32G`                                      |
-| `--gres`          | Generic resources   | `gpu:1`                                     |
+reads a FASTA file, keeps only header lines (starting with `>`), sorts them, removes duplicates, and counts the result — four operations in one readable command.
 
-Lines starting with `#SBATCH` are directives for the scheduler; `%j` in filenames is replaced by the job ID. **Request only what you need — smaller jobs run sooner.**
+Pipes and redirection can be combined freely: `ls | wc -l > count.txt` pipes the listing into a counter, then saves the count to a file.
 
-### GPU jobs
-
-``` bash
-#!/bin/bash
-#SBATCH --job-name=gpu_job
-#SBATCH --partition=gpu             # GPU partition
-#SBATCH --account=myPIRG
-#SBATCH --time=1-00:00:00           # 1 day
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:1                # Request 1 GPU
-#SBATCH --mem=32G
-
-# Load CUDA and your software
-module load cuda/12.4
-module load miniconda3/20240410
-
-# Activate your conda environment, then run
-conda activate my_ml_env
-python train_model.py
-```
-
-``` bash
-# See available GPUs
-/packages/racs/bin/slurm-show-gpus
-```
-
-::: {.callout-note title="Going deeper on SLURM"}
-The hands-on [SLURM Basics tutorial](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) walks through submitting and monitoring batch and interactive jobs step by step — including the `sbatch`/`run_rscript.sbatch` wrapper, the `logs/` directory, `seff` for resource checking, and the end-to-end R-script pipeline covered in [Module 10](../Exercise_Folder/Tutorial_10_Talapas_Pipeline.html).
+For deeper treatment of `grep`, regular expressions, and shell scripting see [Appendix C — grep, regex & shell scripting](Appendix_C_GREP_Regex_Shell.html).
 :::
 
-# Connecting and working interactively
+## Downloading data with wget and curl
 
-Once you have an account, the most productive way to work day to day is from an editor that connects directly to Talapas. We recommend **VS Code with Remote-SSH**, but Open OnDemand is an excellent browser-based alternative.
+Genomic references, annotation files, and datasets are usually distributed by URL. `wget` and `curl` fetch them directly to your machine or the cluster — no browser required.
 
-## VS Code + Remote-SSH
+```bash
+cd ~/p1_practice
 
-**What is VS Code?** Visual Studio Code is a free, cross-platform editor from Microsoft that lets you browse file systems and edit text, including on remote servers such as Talapas. Its built-in terminal lets you run commands without leaving the editor, which is ideal during the workshop.
+# wget: download a file to the current directory
+wget https://raw.githubusercontent.com/githubtraining/hellogitworld/master/README.txt
 
-Install it from <https://code.visualstudio.com/download>. On first launch, allow any requested permissions; from the main interface you can browse and open folders on your local computer.
+# curl: -o specifies the output filename
+curl -o readme_copy.txt \
+  https://raw.githubusercontent.com/githubtraining/hellogitworld/master/README.txt
 
-![Connecting VS Code to Talapas over Remote-SSH: install the remote extensions, add the `login.talapas.uoregon.edu` SSH host, then connect (Duck ID password + Duo) until the green remote banner appears.](images/vscode_talapas_remote_ssh.svg){fig-align="center" width="100%"}
-
-### Step 1 — Install remote extensions
-
-In the left sidebar, click the **Extensions** tab, search for `ssh`, and install:
-
--   **Remote — SSH**
--   **Remote Explorer**
--   **Remote — SSH: Editing Configuration Files** (optional but recommended)
-
-Also handy: the **Quarto** extension (for editing and previewing `.qmd` files like the workshop chapters), an **R** extension, and a **PDF viewer** / **CSV viewer**, so you can open plots and tables your jobs produce without leaving VS Code.
-
-### Step 2 — Add the Talapas SSH host
-
-Open **Remote Explorer** from the left sidebar, click the **+** icon next to **SSH**, and enter the following, replacing `[yourduckid]` with your Duck ID:
-
-``` bash
-ssh [yourduckid]@login.talapas.uoregon.edu
+ls -lh README.txt     # -h = human-readable size (e.g. 1.2K instead of 1234)
+head README.txt
 ```
 
-Press **Enter**, then **Enter** again to save to the default config file.
+::: {.callout-note .key-parameter title="⚙️ Key parameter — wget and curl flags"}
+| Flag | Tool | Effect |
+|------|------|--------|
+| `-O filename` | wget | Save to a specific filename instead of the URL's basename |
+| `-q` | wget | Quiet mode — suppress progress output |
+| `-o filename` | curl | Write output to a named file |
+| `-L` | curl | Follow HTTP redirects (important for some data portals) |
+| `-C -` | wget | Resume a partially downloaded file |
 
-### Step 3 — Connect to Talapas
-
-In the **Remote Explorer** dropdown, expand **SSH**; you should see `login.talapas.uoregon.edu`. Click the **→** arrow to connect, then:
-
-1.  Enter your Duck ID password when prompted (characters will not appear as you type).
-2.  When asked for Duo confirmation, type `1` and press **Enter** for a Duo push (`2` sends a text, `3` calls you).
-3.  Once connected, a green banner reading **SSH: login.talapas.uoregon.edu** appears in the bottom-left corner.
-
-Click **Open Folder** to browse directories on Talapas — it helps to open the base directory of your current project. You may also want a second window pointed at your home or project directory, e.g.:
-
-```
-/home/[yourduckid]/nereus
-```
-
-### Editor tips
-
--   Use the integrated terminal (**Terminal → New Terminal**) to run scripts directly on Talapas without leaving VS Code.
--   You can have multiple VS Code windows open — one per server or project.
--   The file explorer on the left updates in real time, making complex directory structures easy to navigate.
--   **View outputs in place.** With the PDF/CSV viewer extensions, double-click a `.pdf` plot, `.csv` summary, or `.out`/`.err` log your job wrote and it opens right in the editor.
--   **Comment / uncomment** selected lines: `Ctrl + /` (macOS `Cmd + /`).
--   Add more terminal tabs with the **+** at the top-right of the terminal pane.
--   Split-pane editing and search-across-files make it easy to work on a script and its log side by side.
-
-## Open OnDemand (browser-based)
-
-If you would rather not install anything, the [Open OnDemand portal](https://ondemand.talapas.uoregon.edu/) gives you a file browser, an in-browser shell, and one-click interactive apps (JupyterLab, RStudio, MATLAB, remote desktop). See [Logging in](#logging-in-ssh-duo) above for details.
-
-# Reproducible compute environments
-
-Getting onto Talapas is only half the battle; you also want your analysis to produce the *same* results next month and on a co-author's machine. The workshop ships reproducible environments so you can skip the install dance (Docker / Apptainer), pin exact package versions (`renv`), or use Talapas's centrally installed software (`module load`).
-
-::: {.callout-note title="Why bother?"}
-A pinned environment lets you reproduce a tutorial output exactly six months from now, get the same Seurat version a co-author was running, and avoid two days of `BiocManager::install()` debugging on Talapas.
+The backslash `\` at the end of a line continues the command on the next line — useful for long URLs or multi-flag commands. Compressed files ending in `.gz` can be streamed without unpacking: `wget -qO- url | zcat | head` pipes the download straight into `zcat` for inspection.
 :::
 
-## Layer 1 — `renv` lockfile (R level)
+When you finish practicing, clean up the scratch folder:
 
-`renv` records the exact version of every R package used in a project. The workshop ships an `renv.lock` at the repository root.
-
-**First-time setup** in a fresh clone:
-
-``` r
-install.packages("renv")
-renv::restore()       # reads renv.lock and installs the pinned versions
+```bash
+cd ~
+rm -r p1_practice   # deletes the folder and everything in it — intentional here
 ```
 
-Subsequent R sessions in the project will use the pinned library automatically.
+## Quick reference: the most-used shell commands
 
-**Updating the lockfile (instructors)** after upgrading a package:
+| Category | Command | What it does |
+|----------|---------|-------------|
+| Navigation | `pwd` | Print current directory |
+| | `ls [-la]` | List directory contents |
+| | `cd path` | Change directory |
+| File ops | `touch file` | Create empty file |
+| | `cp src dst` | Copy file or directory (`-r` for directories) |
+| | `mv src dst` | Move or rename |
+| | `rm file` | Delete file (`-r` for directories) |
+| | `mkdir dir` | Create directory |
+| Viewing | `cat file` | Print file contents |
+| | `head / tail` | First/last lines |
+| | `less file` | Page through interactively |
+| | `wc -l file` | Count lines |
+| Streams | `>` / `>>` | Redirect stdout (overwrite / append) |
+| | `\|` | Pipe stdout to next command's stdin |
+| | `2>` | Redirect stderr |
+| Download | `wget url` | Download file from URL |
+| | `curl -o file url` | Download to named file |
 
-``` r
-renv::snapshot()      # rewrite renv.lock from the currently loaded versions
-```
-
-Commit `renv.lock` (and only the lockfile, not the entire `renv/library/` cache).
-
-## Layer 2 — Docker / Apptainer image
-
-For a fully self-contained environment (R + Bioconductor + system dependencies + the dataset paths), use the workshop image. Containers package the *entire* software stack into one portable, versioned artifact: **Docker** [@merkel2014docker] is the standard on laptops and in the cloud, while **Singularity/Apptainer** [@kurtzer2017singularity] is its HPC-safe cousin (it runs without root, which is why clusters allow it). Combined with per-tool environments from **Bioconda** [@gruning2018bioconda], a container is the strongest reproducibility guarantee available.
-
-**Docker (laptop):**
-
-``` bash
-# pull the workshop image
-docker pull ghcr.io/wcresko/scrnaseq_tutorial:latest
-
-# run RStudio Server, mounting your data folder
-docker run --rm -p 8787:8787 \
-  -e PASSWORD=workshop \
-  -v "$PWD/data:/home/rstudio/data" \
-  -v "$PWD:/home/rstudio/scrnaseq_workshop" \
-  ghcr.io/wcresko/scrnaseq_tutorial:latest
-```
-
-Then open <http://localhost:8787> and log in as `rstudio` / `workshop`.
-
-**Apptainer (Talapas):** Talapas does not run Docker, but it does run [Apptainer](https://apptainer.org/) (formerly Singularity). Convert and run the same image:
-
-``` bash
-# on a login node, request an interactive node first
-srun --account=<myPIRG> --partition=interactive --time=2:00:00 \
-     --mem=16G --pty bash
-
-# pull the image (one-time)
-module load apptainer
-apptainer pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest
-
-# run an interactive R session inside the container
-apptainer exec scrnaseq_tutorial_latest.sif R
-```
-
-For batch jobs, the relevant `sbatch` line becomes:
-
-``` bash
-apptainer exec /path/to/scrnaseq_tutorial_latest.sif Rscript scripts/01_qc_preprocessing.R
-```
-
-::: callout-note
-The image is rebuilt nightly from the project's `Dockerfile` against the latest Bioconductor release; check the [GitHub releases](https://github.com/wcresko/scrnaseq_tutorial/releases) page for the SHA of the version used in a given workshop session.
-:::
-
-## Layer 3 — Talapas modules (no container)
-
-If you would rather use Talapas's centrally installed software, the modules used by the workshop are:
-
-``` bash
-module purge
-module load R/4.4.1            # matches the workshop's renv.lock R version
-module load gcc/13.2.0         # for source builds
-module load hdf5/1.14.2        # for HDF5 files (used by some Bioconductor pkgs)
-module load apptainer          # only if you'll use the container layer
-```
-
-Add these to your `~/.bash_profile` or load them in every job script. For a per-user R library that survives upgrades:
-
-``` bash
-mkdir -p $HOME/Rlibs
-echo 'R_LIBS_USER=$HOME/Rlibs' >> $HOME/.Renviron
-```
-
-Then `install.packages()` and `BiocManager::install()` will write into `$HOME/Rlibs` instead of the system library.
-
-## Which layer should I use?
-
-| Goal                                    | Use                                                                  |
-|-----------------------------------------|----------------------------------------------------------------------|
-| "Match the slides exactly on my laptop" | `renv::restore()` (Layer 1)                                          |
-| "Skip installing anything"              | Docker image (Layer 2)                                              |
-| "Run the tutorials on Talapas"          | Apptainer + `renv::restore()` (Layers 2 + 1), or `module load` (Layer 3) |
-
-Files in the repository that support this: `renv.lock` (Layer 1), `Dockerfile` (Layer 2), and `.github/workflows/build-image.yml` (the CI that rebuilds the image on a schedule). For the data these environments are built around, see [Datasets](../Datasets.html).
+For advanced shell topics — `grep` pattern matching, regular expressions, `sed`, `awk`, loops, and writing shell scripts — see [Appendix C — grep, regex & shell scripting](Appendix_C_GREP_Regex_Shell.html). The [Cheat Sheets](../Cheat_Sheets.html) page has a printable one-page Unix shell reference.
 
 # Best practices and getting help
 
-## Talapas best practices
+## Getting help in the shell
 
-::::: columns
-::: {.column width="50%"}
-**Do**
+The shell has several built-in ways to learn about a command:
 
--   Request only the resources you need.
--   Test with small datasets first.
--   Use `--time` conservatively.
--   Clean up old files regularly.
--   Use `/projects` for large data.
-:::
+```bash
+man ls          # the full manual page (q to quit)
+ls --help       # brief usage summary (works on Linux; not all macOS tools support it)
+whatis ls       # one-line description
+```
 
-::: {.column width="50%"}
-**Don't**
+Most commands follow the pattern `command --help` or `man command`. Reading a man page for any command you are about to use on production data is a good habit.
 
--   Run heavy computation on login nodes.
--   Leave jobs running indefinitely.
--   Store sensitive data without encryption.
--   Forget to acknowledge RACS in publications.
-:::
-:::::
+## Getting help with VS Code
 
-## Getting help
+-   **Command Palette**: `Ctrl + Shift + P` (macOS `Cmd + Shift + P`) searches all available VS Code commands by name.
+-   **Official docs**: [code.visualstudio.com/docs](https://code.visualstudio.com/docs) — thorough reference for every feature and extension.
+-   **Extension pages**: each extension's page in the Marketplace explains its keybindings and settings.
+-   **Settings Sync**: if you use VS Code on multiple machines, **File → Preferences → Turn on Settings Sync…** keeps your extensions and keybindings in sync automatically.
 
--   **Knowledge Base**: [uoracs.github.io/talapas2-knowledge-base](https://uoracs.github.io/talapas2-knowledge-base/) — searchable docs and how-to articles.
--   **RACS website**: [racs.uoregon.edu](https://racs.uoregon.edu/) — overview of services.
--   **Service Desk**: [hpcrcf.atlassian.net/servicedesk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) — submit a ticket (include job IDs, scripts, and error messages).
+## Getting help with Talapas
+
+Everything Talapas-related — accounts, SSH login, modules, SLURM, file systems, and reproducible environments — is covered in [Chapter 9](Chapter_09_SLURM_Basics.html). Quick links for when you need UO support directly:
+
+-   **Knowledge Base**: [uoracs.github.io/talapas2-knowledge-base](https://uoracs.github.io/talapas2-knowledge-base/)
+-   **Service Desk**: [hpcrcf.atlassian.net/servicedesk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1)
 -   **Email**: racs\@uoregon.edu
--   **Office Hours**: in-person help from RACS — check the Knowledge Base homepage for the current term's schedule and location.
 
-### Acknowledgment text
+## Additional resources
 
-> "The authors acknowledge Research Advanced Computing Services (RACS) at the University of Oregon for providing computing resources that have contributed to the research results reported within this publication."
-
-::: {.callout-tip title="Where to go next"}
-This chapter is the computing foundation for the workshop. The Unix command line, Git/GitHub, and the hands-on SLURM tutorial build directly on it; the analysis chapters assume you can get onto Talapas and load a reproducible environment.
-
-**Skills used in later modules — prerequisite check:**
-
-| Skill covered here | First used in |
-|---|---|
-| SSH login, login vs compute nodes, `srun --pty bash` | [Tutorial P1 (hands-on)](../Exercise_Folder/Tutorial_P1_Computer_Systems.html) · [Module 00](../Exercise_Folder/Tutorial_00_Setup_RStudio_Packages.html) §6 |
-| `module load R` (and pinning a version) | [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §5.5; required inside every batch script |
-| `sbatch` batch scripts, `#SBATCH` directives, `--account`, `--partition` | [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §6 |
-| `squeue`, `scancel`, `seff`, `sacct` | [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §7–8 |
-| `/projects` vs `/scratch` file systems | Required for locating output in [Module 10](../Exercise_Folder/Tutorial_10_Talapas_Pipeline.html) |
-| `renv` + Apptainer reproducible environments | [Module 09–10](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) batch scripts; the workshop container |
-
-**One Friday-specific detail:** [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) requires you to create a `logs/` directory before submitting the first batch job (`mkdir -p logs`). SLURM will not create it for you.
-:::
+-   [Appendix C — grep, regex & shell scripting](Appendix_C_GREP_Regex_Shell.html) — deeper treatment of pattern matching, sed, awk, and writing reusable shell scripts.
+-   [Cheat Sheets](../Cheat_Sheets.html) — one-page Unix shell and VS Code references.
+-   [Software Setup](../Software_Setup.html) — step-by-step installation instructions for VS Code, R, and RStudio.
+-   [Software Carpentry — The Unix Shell](https://swcarpentry.github.io/shell-novice/) — a well-regarded self-paced introduction that covers everything in this chapter and more with hands-on exercises.
 
 ## References
 
