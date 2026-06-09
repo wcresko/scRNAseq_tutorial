@@ -398,10 +398,49 @@ source ~/.bash_profile
 -   Your PIRG name appears in the output of `groups` after you log in
 :::
 
+# Reproducible environments {background-color="#2c3e50"}
+
+## Why reproducibility matters on a cluster
+
+::: incremental
+-   On your laptop, R packages live in one user library — it just works.
+-   On a shared cluster, **package versions drift** between users and over time.
+-   Reproducible environments lock down exact versions so results are stable and shareable.
+:::
+
+## renv — per-project R libraries
+
+::: incremental
+-   **renv** captures a snapshot of every package and its version in a `renv.lock` file.
+-   `renv::restore()` rebuilds the exact library on any machine (laptop or Talapas).
+-   The workshop project ships with a `renv.lock` — run `renv::restore()` once after cloning.
+:::
+
+``` r
+# In the R console or batch script, once per project
+renv::restore()
+```
+
+## Containers — Apptainer on Talapas
+
+::: incremental
+-   **Apptainer** (formerly Singularity) runs OCI/Docker containers on HPC clusters.
+-   A container bundles the OS, R, and all libraries into a single portable image (`.sif`).
+-   Pull a container from Docker Hub; submit the `.sif` file in your batch script.
+-   Stronger isolation than `renv` — useful for complex dependency stacks or sharing workflows externally.
+:::
+
+``` bash
+# Pull once on a login node
+apptainer pull docker://bioconductor/bioconductor_docker:RELEASE_3_19
+# Run R inside the container in a batch job
+apptainer exec bioconductor_docker_RELEASE_3_19.sif Rscript scripts/01_qc_preprocessing.R
+```
+
 ## What's next — Module 10
 
 ::: incremental
--   You can now request resources and submit jobs — the *mechanics*.
+-   You can now connect, navigate file systems, load modules, and submit jobs — the *mechanics*.
 -   **Module 10** uses these to run the **real scRNA-seq pipeline** on Talapas: the numbered `01`–`08` scripts, chained through `.rds` hand-offs.
 -   Read the [companion chapter](../Resources_Folder/Chapter_09_SLURM_Basics.html) for the conceptual deep-dive on schedulers and fair-share.
 :::
@@ -434,9 +473,12 @@ seff 123456
 ## Key takeaways
 
 ::: incremental
+-   Connect with **VS Code Remote-SSH** (Duck ID + Duo) — green banner = you're on Talapas.
+-   Files live in **home** (backed up, small), **projects** (lab-shared), and **scratch** (large, 90-day purge).
+-   Load software with **`module load`**; always `module purge` first in batch scripts.
 -   A scheduler exists because the cluster is **shared** — declare what you need.
 -   **Login nodes edit and submit; compute nodes compute.**
 -   **Interactive** to watch, **batch** to walk away.
 -   `sbatch` → `squeue` → `seff`, then **right-size** the next run.
--   Size honestly, clean up after yourself, back up your data.
+-   Lock dependencies with **renv** (or Apptainer) for reproducible results.
 :::
