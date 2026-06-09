@@ -116,7 +116,7 @@ You are now connected, and the green banner says `login.talapas.uoregon.edu`. Wh
 
 <details><summary>Show answers</summary>
 
-You are on a **login (head) node**. Login nodes are **shared by everyone** and are for *light* tasks only: browsing and editing files, managing data, and submitting jobs. They are **not** for running real analysis — heavy processes on a login node will be throttled or killed, and they slow the node down for every other user. To do actual computing you must move onto a **compute node**, which you do through SLURM in Sections 5–6.
+You are on a **login (head) node**. Login nodes are **shared by everyone** and are for *light* tasks only: browsing and editing files, managing data, and submitting jobs. They are **not** for running real analysis — heavy processes on a login node will be throttled or killed, and they slow the node down for every other user. To do actual computing you must move onto a **compute node**, which you do through SLURM in Sections 7–8.
 
 </details>
 :::
@@ -341,7 +341,7 @@ srun --account=<myPIRG> \
 
 `--constraint=gpu-10gb` (or `gpu-40gb` / `gpu-80gb`) pins the job to a GPU of that memory tier.
 
-### 5.4 Graphical interactive jobs
+### 7.4 Graphical interactive jobs
 
 If you need a GUI (e.g. RStudio, MATLAB), two options:
 
@@ -363,7 +363,7 @@ Interactive jobs reserve their resources even when you are not actively typing. 
 
 ------------------------------------------------------------------------
 
-### 5.5 Hands-on: run `hello_world.R` on an interactive node
+### 7.5 Hands-on: run `hello_world.R` on an interactive node
 
 The Talapas scripts folder ships a tiny demo, [`hello_world.R`](scripts/hello_world.R) — open it in VS Code to read it (note the `#!/usr/bin/env Rscript` shebang on the first line). It uses only base R, prints which compute node it ran on, and writes a PDF plot and a summary CSV.
 
@@ -388,12 +388,30 @@ hello_world_summary.csv
 :::
 
 ::: {.callout-tip title="View the outputs in VS Code"}
-With VS Code connected to Talapas (see [VS Code & Talapas](../Resources_Folder/Chapter_P1_Computer_Systems.html)) and the PDF/CSV viewer extensions installed, **double-click** `hello_world_plot.pdf` or `hello_world_summary.csv` in the file explorer to open them right in the editor — no download needed.
+With VS Code connected to Talapas (Section 3 above) and the PDF/CSV viewer extensions installed, **double-click** `hello_world_plot.pdf` or `hello_world_summary.csv` in the file explorer to open them right in the editor — no download needed.
 :::
+
+::: {.callout-important title="Think about it"}
+The output says `Hello from n0123`. On your laptop earlier (Tutorial P1), the same script said `Hello from <your-laptop-name>`. Why does the hostname tell you where the job actually ran — and why does confirming a compute-node name matter?
+
+<details><summary>Show answers</summary>
+
+The script prints `Sys.info()[["nodename"]]`, so the hostname is proof of execution location. Seeing a compute node (`n0123`) confirms you ran on the node SLURM allocated — **not** on the login node. Running heavy analysis on the login node is the golden rule violation: it slows the machine for every other user and gets your process killed. The hostname test is a quick sanity check every time you run a job.
+
+</details>
+:::
+
+**End the session.** When you are done, exit the interactive shell to release the node back to the cluster:
+
+```{bash}
+#| label: M9-exit_interactive_session
+#| eval: false
+exit          # ends the srun/salloc session; prompt returns to the login node
+```
 
 ------------------------------------------------------------------------
 
-## 6. Batch mode --- `sbatch`
+## 8. Batch mode --- `sbatch`
 
 For longer-running analyses (which is most real workshop work), write a **batch script** and submit it with `sbatch`. The script runs without an interactive terminal: you can log out and the job keeps running.
 
@@ -409,7 +427,7 @@ mkdir -p logs
 
 ![A batch job's lifecycle: you `sbatch` from a login node; SLURM queues it (`PD`), runs it on a compute node (`R`), and writes your results and `.out`/`.err` logs. Monitor with `squeue`, cancel with `scancel`.](images/slurm_job_lifecycle.svg){fig-align="center" width="98%"}
 
-### 6.1 A first batch script
+### 8.1 A first batch script
 
 Save the following as `hostname.sbatch`:
 
@@ -461,7 +479,7 @@ State codes you'll see: `PD` (pending), `R` (running), `CG` (completing). Once i
 You don't have to type it out: the Talapas scripts folder includes [`slurm_demo.sbatch`](scripts/slurm_demo.sbatch) (the same idea). Open it in VS Code, set `--account`, and `sbatch slurm_demo.sbatch`. Because it's a very short job, it may finish before you can catch it in `squeue`.
 :::
 
-### 6.2 Anatomy of `#SBATCH` directives
+### 8.2 Anatomy of `#SBATCH` directives
 
 All `#SBATCH` lines must be at the **top** of the script, before any other commands. A few additional flags worth knowing:
 
@@ -474,7 +492,7 @@ All `#SBATCH` lines must be at the **top** of the script, before any other comma
 #SBATCH --array=1-10              ### job array: 10 independent tasks
 ```
 
-### 6.3 A realistic scRNA-seq job
+### 8.3 A realistic scRNA-seq job
 
 A batch script that loads R and runs a Seurat QC pipeline looks like this:
 
@@ -506,7 +524,7 @@ Rscript scripts/01_qc_preprocessing.R
 
 Note how `module purge` and `module load` happen *inside* the script --- modules don't survive from the login node into the job.
 
-### 6.4 GPU batch job
+### 8.4 GPU batch job
 
 ```{bash}
 #| label: M9-bin_bash_3
@@ -534,7 +552,7 @@ python scripts/train_scvi.py
 
 ------------------------------------------------------------------------
 
-### 6.5 Running an R script as a batch job (the wrapper)
+### 8.5 Running an R script as a batch job (the wrapper)
 
 You don't need a separate `.sbatch` file for every R script. The folder ships a generic wrapper, [`run_rscript.sbatch`](scripts/run_rscript.sbatch), whose last line is simply:
 
@@ -566,7 +584,7 @@ cat logs/hello_*.err      # stderr / R errors
 
 This is exactly how the rest of the Talapas track is run — every analysis step (the numbered pipeline scripts in [Module 10 — the analysis pipeline](Tutorial_10_Talapas_Pipeline.html)) is an R script submitted through this wrapper.
 
-### 6.6 Example: run the whole `01`–`08` series in one job
+### 8.6 Example: run the whole `01`–`08` series in one job
 
 When you want to reproduce the **entire core analysis** (Modules 01–08) end-to-end rather than one step at a time, the folder also ships [`run_core_pipeline.sbatch`](scripts/run_core_pipeline.sbatch). It runs the eight numbered scripts **in order** inside a single allocation — each step's `.rds`/`.csv` output is the next step's input:
 
@@ -598,7 +616,7 @@ control — running one step at a time, or right-sizing memory per step — use
 
 ------------------------------------------------------------------------
 
-## 7. Choosing the right resources
+## 9. Choosing the right resources
 
 -   **Smaller requests run sooner.** SLURM finds small gaps in the schedule more easily, so over-requesting memory or time will delay your job.
 -   **But specify enough.** If your job exceeds its `--mem` or `--time`, SLURM **kills it** (`OUT_OF_MEMORY` or `TIMEOUT`). Err slightly on the high side the first time you run a new pipeline.
@@ -625,7 +643,7 @@ Use `MaxRSS` (peak memory) and `Elapsed` (wall time) to right-size future submis
 
 ------------------------------------------------------------------------
 
-## 8. Monitoring, cancelling, and troubleshooting
+## 10. Monitoring, cancelling, and troubleshooting
 
 ```{bash}
 #| label: M9-see_jobs
@@ -665,7 +683,7 @@ See also the Knowledge Base FAQ [*Why is my SLURM job not running?*](https://uor
 
 ------------------------------------------------------------------------
 
-## 9. Being a good cluster citizen at UO
+## 11. Being a good cluster citizen at UO
 
 Talapas is shared across all of UO's research community. Please:
 
@@ -679,7 +697,7 @@ Talapas is shared across all of UO's research community. Please:
 
 ------------------------------------------------------------------------
 
-## 10. Where to go next
+## 12. Where to go next
 
 -   [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) --- the official UO source for everything on this page.
 -   [Talapas Partition List](https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html) --- up-to-date details on hardware per partition.
