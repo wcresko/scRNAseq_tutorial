@@ -121,14 +121,71 @@ Click **Open Folder** to browse directories on Talapas — open the base directo
 /home/[yourduckid]/nereus
 ```
 
+### The integrated terminal is a shell on Talapas
+
+This is the most important thing to understand about VS Code Remote-SSH: when you are connected to Talapas, the VS Code **integrated terminal** is not a terminal on your laptop — it is a shell running on the Talapas **login node**. Every command you type there executes on the cluster's filesystem and hardware.
+
+> The shell commands you learned in [P1 — Computer Systems & the Command Line](Chapter_P1_Computer_Systems.html) (`pwd`, `ls`, `cd`, paths, pipes, redirection) all work exactly the same way here — the only difference is that they now run on a remote machine instead of your laptop.
+
+**Opening the integrated terminal:**
+
+``` bash
+# Keyboard shortcut
+Ctrl + `      # Windows / Linux
+Cmd  + `      # macOS
+
+# Or via the menu: Terminal → New Terminal
+```
+
+**Verify you are on Talapas** — the green `SSH: login.talapas.uoregon.edu` banner in the bottom-left status bar is the primary indicator, but you can confirm with shell commands:
+
+``` bash
+hostname   # e.g. login1.talapas.uoregon.edu  (you are on the login node)
+whoami     # your Duck ID
+pwd        # your current working directory on Talapas
+```
+
+::: {.callout-note .key-concept title="🔑 Key concept — the integrated terminal is a remote shell"}
+When VS Code is connected via Remote-SSH, its integrated terminal opens a shell **on the Talapas login node**, not on your laptop. The green remote indicator in the status bar confirms this. All shell skills from [P1](Chapter_P1_Computer_Systems.html) apply — `pwd`, `ls`, `cd`, pipes — but now they operate on the cluster's filesystem. `module load`, `srun` (interactive jobs), and `sbatch` (batch jobs) are all typed into this same terminal. This is the single workflow that connects everything in Module 09.
+:::
+
+### The edit-in-editor / run-in-terminal loop
+
+The core VS Code + Talapas workflow is a tight loop between two panes in the same window:
+
+-   **Editor pane** (left / main area): open and edit `.R`, `.qmd`, or `.sbatch` files directly on Talapas — your changes are saved to the cluster filesystem immediately, with no need to upload.
+-   **Terminal pane** (bottom): run those files, submit jobs, or tail logs — all running on the same remote machine.
+
+Because both panes operate on the same filesystem, there is no copy-step between "editing" and "running":
+
+``` bash
+# -- In the integrated terminal (on the login node) --
+
+# 1. Load R (must be done each session — modules do not persist)
+module load R/4.3.2
+
+# 2. Quick smoke-test on the login node (small input only)
+Rscript scripts/01_qc_preprocessing.R
+
+# 3. Submit the same script as a proper batch job for the full data
+sbatch run_rscript.sbatch 01_qc_preprocessing.R
+
+# 4. Watch the job as it runs
+tail -f logs/seurat_qc_*.out
+
+# 5. Render a .qmd notebook on the cluster
+quarto render my_analysis.qmd
+```
+
+Keep an R or `.qmd` file open in the editor while its job runs in the terminal — when something goes wrong, edit, save (on the cluster), resubmit, without ever leaving VS Code.
+
 ### Editor tips for Talapas work
 
--   Use the integrated terminal (**Terminal → New Terminal**) to run scripts and SLURM commands directly on Talapas without leaving VS Code.
 -   You can have multiple VS Code windows open — one per server or project.
 -   The file explorer on the left updates in real time, making complex directory structures easy to navigate.
 -   **View outputs in place.** With the PDF/CSV viewer extensions, double-click a `.pdf` plot, `.csv` summary, or `.out`/`.err` log your job wrote and it opens right in the editor.
 -   **Comment / uncomment** selected lines: `Ctrl + /` (macOS `Cmd + /`).
--   Add more terminal tabs with the **+** at the top-right of the terminal pane.
+-   Add more terminal tabs with the **+** at the top-right of the terminal pane, or split the terminal vertically to tail two job logs side by side.
 -   Split-pane editing and search-across-files make it easy to work on a script and its log side by side.
 
 ::: {.callout-note .key-concept title="🔑 Key concept — login node vs compute node"}
@@ -150,10 +207,16 @@ Every Talapas user has access to several directories on the ~3 PB IBM Elastic St
 | `/scratch/<PIRG>`       | 20 TB                 | High-throughput working space; **files untouched for 90 days are purged** |
 | `/tmp`                  | Local to node         | Temporary scratch space                                                   |
 
+All navigation commands below are typed in the **VS Code integrated terminal** — the shell on the login node covered in §9.3. The basic shell commands (`pwd`, `ls`, `cd`, paths, pipes) were introduced in [P1 — Computer Systems & the Command Line](Chapter_P1_Computer_Systems.html); what is different here is that they operate on the cluster's shared parallel filesystem, which looks the same from every login and compute node.
+
 ``` bash
-# Check your storage usage
+# Check your storage usage (run in the integrated terminal)
 df -h ~
 du -sh /projects/myPIRG/myusername
+
+# First visit: see your lab space
+ls /projects/<PIRG>
+ls /scratch/<PIRG>/
 ```
 
 ::: {.callout-warning}
