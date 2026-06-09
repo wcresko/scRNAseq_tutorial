@@ -2489,22 +2489,6 @@ Note
 <li><strong><code>data/</code> is the hand-off.</strong> Tutorial 01 writes <code>../data/ifnb_preprocessed.rds</code>; Tutorial 02 reads it back from the same <code>../data/</code>. Keep all the <code>.qmd</code> files together in <code>scripts/</code> so they share one project <code>data/</code>.</li>
 <li><strong>Can’t find a file?</strong> The setup chunk prints the exact absolute path (<code>This module writes its figures &amp; tables to: …</code>). If it’s not where you expect, check <code>getwd()</code> — it should be your <code>scripts/</code> folder. See the downloadable <strong>README</strong> (linked on the <a href="../Materials.html">Materials</a> page) for the full layout.</li>
 </ol>
-<section id="figure-saving" class="level1">
-<h1>— Figure saving ——————————————————–</h1>
-</section>
-<section id="save_fig-writes-every-figure-as-a-.png-for-viewing-and-a-.svg-vector" class="level1">
-<h1>save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,</h1>
-</section>
-<section id="editable-in-illustrator-inkscape-for-a-manuscript.-pass-the-.png-path-the" class="level1">
-<h1>editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the</h1>
-</section>
-<section id="svg-is-written-alongside-with-the-same-basename.-.svg-uses-the-svglite" class="level1">
-<h1>.svg is written alongside with the same basename. (.svg uses the ‘svglite’</h1>
-</section>
-<section id="package-installed-in-tutorial-00." class="level1">
-<h1>package, installed in Tutorial 00.)</h1>
-<p>save_fig &lt;- function(filename, plot, width, height, dpi = 300, …) { ggplot2::ggsave(filename, plot, width = width, height = height, dpi = dpi, …) svg_path &lt;- paste0(tools::file_path_sans_ext(filename), “.svg”) tryCatch(ggplot2::ggsave(svg_path, plot, width = width, height = height, …), error = function(e) message(” (could not write “, basename(svg_path),” - install ‘svglite’? “, conditionMessage(e),”)“)) }</p>
-</section>
 </div>
 </div>
 <div class="cell">
@@ -2517,16 +2501,29 @@ Note
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">2026</span>)</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Output directory for this module&#39;s figures and tables.</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Every figure/table chunk below writes a file named  Mod1_C&lt;chunk&gt;_&lt;name&gt;</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># into ../output/Mod1/ so it can be cross-referenced from the rest of the site.</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   Mod1 = Module 1 (this tutorial);  C&lt;n&gt; = the nth code chunk.</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod1&quot;</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;../data&quot;</span>,  <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)   <span class="co"># shared .rds hand-off folder (sibling of scripts/, created one level up)</span></span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Figure saving --------------------------------------------------------</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="co"># save_fig() writes every figure as a .png (for viewing) AND a .svg (vector,</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="co"># editable in Illustrator / Inkscape for a manuscript). Pass the .png path; the</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="co"># .svg is written alongside with the same basename. (.svg uses the &#39;svglite&#39;</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="co"># package, installed in Tutorial 00.)</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>save_fig <span class="ot">&lt;-</span> <span class="cf">function</span>(filename, plot, width, height, <span class="at">dpi =</span> <span class="dv">300</span>, ...) {</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(filename, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, <span class="at">dpi =</span> dpi, ...)</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  svg_path <span class="ot">&lt;-</span> <span class="fu">paste0</span>(tools<span class="sc">::</span><span class="fu">file_path_sans_ext</span>(filename), <span class="st">&quot;.svg&quot;</span>)</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tryCatch</span>(ggplot2<span class="sc">::</span><span class="fu">ggsave</span>(svg_path, plot, <span class="at">width =</span> width, <span class="at">height =</span> height, ...),</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>           <span class="at">error =</span> <span class="cf">function</span>(e) <span class="fu">message</span>(<span class="st">&quot;  (could not write &quot;</span>, <span class="fu">basename</span>(svg_path),</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">&quot; - install &#39;svglite&#39;? &quot;</span>, <span class="fu">conditionMessage</span>(e), <span class="st">&quot;)&quot;</span>))</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Output directory for this module&#39;s figures and tables.</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co"># Every figure/table chunk below writes a file named  Mod1_C&lt;chunk&gt;_&lt;name&gt;</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co"># into ../output/Mod1/ so it can be cross-referenced from the rest of the site.</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="co">#   Mod1 = Module 1 (this tutorial);  C&lt;n&gt; = the nth code chunk.</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="co"># ---------------------------------------------------------------------------</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>out_dir <span class="ot">&lt;-</span> <span class="st">&quot;../output/Mod1&quot;</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(out_dir, <span class="at">recursive =</span> <span class="cn">TRUE</span>, <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="fu">dir.create</span>(<span class="st">&quot;../data&quot;</span>,  <span class="at">showWarnings =</span> <span class="cn">FALSE</span>)   <span class="co"># shared .rds hand-off folder (sibling of scripts/, created one level up)</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="fu">message</span>(<span class="st">&quot;This module writes its figures &amp; tables to: &quot;</span>, <span class="fu">normalizePath</span>(out_dir))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
