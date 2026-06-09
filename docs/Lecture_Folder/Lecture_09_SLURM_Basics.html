@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Analysis Workshop – Lecture 09 — SLURM Basics on Talapas</title>
+  <title>Single Cell RNA-seq Analysis Workshop – Lecture 09 — VS Code &amp; SLURM Basics on Talapas</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1160,7 +1160,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 09 — SLURM Basics on Talapas</h1>
+  <h1 class="title">Lecture 09 — VS Code &amp; SLURM Basics on Talapas</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1172,8 +1172,8 @@ Bill Cresko
 
 </section>
 <section>
-<section id="lecture-09-slurm-basics-on-talapas" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Lecture 09: SLURM Basics on Talapas</h1>
+<section id="lecture-09-vs-code-slurm-basics-on-talapas" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Lecture 09: VS Code &amp; SLURM Basics on Talapas</h1>
 
 </section>
 <section id="where-this-fits" class="slide level2">
@@ -1189,12 +1189,277 @@ Bill Cresko
 <section id="goals-of-this-lecture" class="slide level2">
 <h2>Goals of this lecture</h2>
 <ul>
+<li class="fragment">Connect to <strong>Talapas</strong> with VS Code Remote-SSH (Duck ID + Duo)</li>
+<li class="fragment">Navigate the <strong>Talapas file systems</strong> — home, projects, scratch</li>
+<li class="fragment">Load software with <strong>Lmod</strong> (<code>module load</code>)</li>
 <li class="fragment">Understand <strong>why</strong> a shared cluster needs a scheduler at all</li>
 <li class="fragment">Tell apart <strong>login nodes</strong> and <strong>compute nodes</strong> — and why it matters</li>
 <li class="fragment">Choose between <strong>interactive</strong> and <strong>batch</strong> work</li>
 <li class="fragment">Read the <strong>key SLURM flags</strong> and <strong>partitions</strong> you’ll use constantly</li>
 <li class="fragment">Submit, monitor, and right-size jobs with <code>sbatch</code> / <code>squeue</code> / <code>seff</code></li>
 <li class="fragment">Be a <strong>good cluster citizen</strong> at UO</li>
+</ul>
+</section></section>
+<section>
+<section id="what-is-an-hpc-cluster" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>What is an HPC cluster?</h1>
+
+</section>
+<section id="many-nodes-one-scheduler" class="slide level2">
+<h2>Many nodes, one scheduler</h2>
+<ul>
+<li class="fragment">An <strong>HPC cluster</strong> is a network of computers (nodes) that share storage and are managed as a single system.</li>
+<li class="fragment">You interact with a <strong>login node</strong> — a lightweight gateway machine. Heavy work runs on <strong>compute nodes</strong> you request from the scheduler.</li>
+<li class="fragment">Nodes share a <strong>parallel file system</strong> so your files look the same from every node.</li>
+<li class="fragment">The scheduler (<strong>SLURM</strong> at UO) queues and routes jobs fairly among all users.</li>
+</ul>
+</section>
+<section id="meet-talapas-uos-cluster" class="slide level2">
+<h2>Meet Talapas — UO’s cluster</h2>
+<ul>
+<li class="fragment"><strong>Talapas</strong> is managed by UO Research Advanced Computing Services (RACS).</li>
+<li class="fragment">Thousands of CPU cores, GPUs, high-memory nodes, and petabytes of storage.</li>
+<li class="fragment">Access is through a <strong>PIRG</strong> (PI Research Group) — your PI requests an account for the lab.</li>
+<li class="fragment">Once you have an account your Duck ID grants access via SSH and Open OnDemand.</li>
+</ul>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>Run <code>groups</code> after logging in to see your PIRG name — you’ll need it for every SLURM job.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="connecting-to-talapas-with-vs-code" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Connecting to Talapas with VS Code</h1>
+
+</section>
+<section id="vs-code-remote-ssh-overview" class="slide level2">
+<h2>VS Code Remote-SSH overview</h2>
+<ul>
+<li class="fragment">The <strong>Remote-SSH</strong> extension (Microsoft) turns VS Code into a full remote IDE.</li>
+<li class="fragment">You edit, browse, and run code <strong>on Talapas</strong> — but the interface lives on your laptop.</li>
+<li class="fragment">One-time setup: add Talapas as an SSH host; after that, one click connects you.</li>
+<li class="fragment">Install the extension: <code>Ctrl/Cmd + Shift + X</code> → search “Remote - SSH” → Install.</li>
+</ul>
+</section>
+<section id="add-the-ssh-host" class="slide level2">
+<h2>Add the SSH host</h2>
+<ul>
+<li class="fragment">Press <code>F1</code> → <strong>Remote-SSH: Add New SSH Host</strong> → enter:</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="fu">ssh</span> <span class="op">&lt;</span>duckid<span class="op">&gt;</span>@login.talapas.uoregon.edu</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">Save to <code>~/.ssh/config</code> when prompted.</li>
+<li class="fragment">The host then appears in the <strong>Remote Explorer</strong> panel on the left sidebar.</li>
+</ul>
+</section>
+<section id="connect-with-duck-id-duo" class="slide level2">
+<h2>Connect with Duck ID + Duo</h2>
+<ul>
+<li class="fragment">Click the host in Remote Explorer (or <code>F1</code> → <strong>Remote-SSH: Connect to Host</strong>).</li>
+<li class="fragment">Enter your <strong>Duck ID password</strong> when prompted, then approve the <strong>Duo push</strong>.</li>
+<li class="fragment">The bottom-left status bar turns green and shows <code>SSH: login.talapas.uoregon.edu</code> — you’re in.</li>
+<li class="fragment">Open a folder (<code>File → Open Folder</code>) to browse the Talapas file system in the sidebar.</li>
+</ul>
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Note</strong></p>
+</div>
+<div class="callout-content">
+<p>Multi-factor authentication (Duo) is required for every connection — have your phone handy.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="the-integrated-terminal-is-a-shell-on-talapas" class="slide level2">
+<h2>The integrated terminal is a shell on Talapas</h2>
+<ul>
+<li class="fragment">Open it: <strong>Terminal → New Terminal</strong> (or <code>Ctrl/Cmd+`</code>).</li>
+<li class="fragment">This is <strong>not</strong> your laptop’s terminal — it is a shell running on the Talapas login node.</li>
+<li class="fragment">The green <code>SSH: login.talapas.uoregon.edu</code> banner in the status bar confirms you’re remote. Verify with:</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="fu">hostname</span>   <span class="co"># e.g. login1.talapas.uoregon.edu</span></span>
+<span id="cb2-2"><a></a><span class="fu">whoami</span>     <span class="co"># your Duck ID</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">All the shell commands from <a href="../Resources_Folder/Chapter_P1_Computer_Systems.html">P1 (Computer Systems &amp; the Command Line)</a> — <code>pwd</code>, <code>ls</code>, <code>cd</code>, pipes — work here, now on the cluster.</li>
+<li class="fragment"><code>module load</code>, <code>srun</code>, and <code>sbatch</code> are all typed in this terminal.</li>
+</ul>
+<div class="key-concept" title="🔑 Key concept — the integrated terminal is a remote shell">
+<div class="callout callout-note callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>🔑 Key concept — the integrated terminal is a remote shell</strong></p>
+</div>
+<div class="callout-content">
+<p>When VS Code is connected via Remote-SSH, its integrated terminal opens a shell <strong>on the Talapas login node</strong>, not on your laptop. You edit files in the VS Code editor (left) while running commands in the terminal (bottom) — both operating on the same remote files.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section id="the-edit-in-editor-run-in-terminal-loop" class="slide level2">
+<h2>The edit-in-editor / run-in-terminal loop</h2>
+<ul>
+<li class="fragment"><strong>Editor pane</strong> (left/top): open and edit <code>.R</code>, <code>.qmd</code>, or <code>.sbatch</code> files on Talapas — changes are saved directly on the cluster filesystem.</li>
+<li class="fragment"><strong>Terminal pane</strong> (bottom): run the file, submit the job, or tail the log — all on the same machine.</li>
+<li class="fragment">This is the core workflow for scRNA-seq analysis on Talapas:</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="co"># In the integrated terminal (on the login node):</span></span>
+<span id="cb3-2"><a></a><span class="ex">module</span> load R/4.3.2</span>
+<span id="cb3-3"><a></a><span class="ex">Rscript</span> scripts/01_qc_preprocessing.R   <span class="co"># quick smoke-test on login</span></span>
+<span id="cb3-4"><a></a><span class="ex">sbatch</span> run_rscript.sbatch 01_qc_preprocessing.R  <span class="co"># or submit as a batch job</span></span>
+<span id="cb3-5"><a></a><span class="fu">tail</span> <span class="at">-f</span> logs/seurat_qc_<span class="pp">*</span>.out            <span class="co"># watch the job as it runs</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">For anything real (full data, long runs): always use <code>sbatch</code> — the job survives you closing the laptop.</li>
+<li class="fragment">For <code>.qmd</code> rendering on the cluster: <code>quarto render my_analysis.qmd</code> in the terminal.</li>
+</ul>
+</section>
+<section id="open-ondemand-browser-alternative" class="slide level2">
+<h2>Open OnDemand — browser alternative</h2>
+<ul>
+<li class="fragment"><strong>Open OnDemand</strong> (<a href="https://ondemand.talapas.uoregon.edu">ondemand.talapas.uoregon.edu</a>) gives a full HPC portal in the browser — no SSH client needed.</li>
+<li class="fragment">Launches interactive apps: RStudio Server, Jupyter, a desktop session.</li>
+<li class="fragment">Useful when VS Code Remote-SSH isn’t an option or for one-off interactive work.</li>
+<li class="fragment">For this workshop, VS Code Remote-SSH is the primary workflow.</li>
+</ul>
+</section></section>
+<section>
+<section id="talapas-file-systems" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Talapas file systems</h1>
+
+</section>
+<section id="three-places-to-put-files" class="slide level2">
+<h2>Three places to put files</h2>
+<table class="caption-top">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Location</th>
+<th>Path</th>
+<th>Quota</th>
+<th>Backed up?</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Home</td>
+<td><code>/home/&lt;duckid&gt;/</code></td>
+<td>~20 GB</td>
+<td>Yes</td>
+<td>scripts, configs, small results</td>
+</tr>
+<tr class="even">
+<td>Projects</td>
+<td><code>/projects/&lt;PIRG&gt;/</code></td>
+<td>shared lab quota</td>
+<td>Yes</td>
+<td>shared data, final outputs</td>
+</tr>
+<tr class="odd">
+<td>Scratch</td>
+<td><code>/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/</code></td>
+<td>large</td>
+<td><strong>No</strong> (purged 90 d)</td>
+<td>large intermediates</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-warning callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Warning</strong></p>
+</div>
+<div class="callout-content">
+<p>Scratch purges files older than 90 days automatically and is <strong>never backed up</strong>. Keep only transient intermediates there; copy results to <code>/projects/</code>.</p>
+</div>
+</div>
+</div>
+</section>
+<section id="navigating-on-login" class="slide level2">
+<h2>Navigating on login</h2>
+<ul>
+<li class="fragment">All commands run in the <strong>VS Code integrated terminal</strong> — the shell on the login node.</li>
+<li class="fragment">Shell basics (<code>pwd</code>, <code>ls</code>, <code>cd</code>, pipes) were covered in <a href="../Resources_Folder/Chapter_P1_Computer_Systems.html">P1 — Computer Systems &amp; the Command Line</a>; the focus here is what’s <strong>different</strong> on the cluster.</li>
+<li class="fragment">Check your quotas: <code>df -h /home/$USER</code> and <code>df -h /projects/&lt;PIRG&gt;</code>.</li>
+<li class="fragment">Your first visit: <code>ls /projects/&lt;PIRG&gt;</code> and <code>ls /scratch/&lt;PIRG&gt;/</code> to see the lab space.</li>
+<li class="fragment">Workshop data lives in <code>/projects/&lt;PIRG&gt;/</code> — copy or symlink it into your working directory.</li>
+</ul>
+</section></section>
+<section>
+<section id="loading-software-with-lmod" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Loading software with Lmod</h1>
+
+</section>
+<section id="what-are-modules" class="slide level2">
+<h2>What are modules?</h2>
+<ul>
+<li class="fragment">Talapas does not have R (or most tools) in your default <code>PATH</code>.</li>
+<li class="fragment"><strong>Lmod</strong> is the module system that adds software to your environment on demand.</li>
+<li class="fragment">Each <code>module load</code> command sets <code>PATH</code>, <code>LD_LIBRARY_PATH</code>, etc. for one piece of software.</li>
+<li class="fragment">Modules are <strong>temporary</strong> — they must be loaded at the start of every session and inside every batch script.</li>
+</ul>
+</section>
+<section id="common-module-commands" class="slide level2">
+<h2>Common module commands</h2>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="ex">module</span> avail              <span class="co"># list all available modules</span></span>
+<span id="cb4-2"><a></a><span class="ex">module</span> avail R            <span class="co"># filter by name</span></span>
+<span id="cb4-3"><a></a><span class="ex">module</span> load R/4.3.2       <span class="co"># load a specific version</span></span>
+<span id="cb4-4"><a></a><span class="ex">module</span> list               <span class="co"># see what is currently loaded</span></span>
+<span id="cb4-5"><a></a><span class="ex">module</span> purge              <span class="co"># unload everything (good start for scripts)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment">Always load a <strong>specific version</strong> (e.g. <code>R/4.3.2</code>) — <code>module load R</code> picks whatever is default today, which may change.</li>
+<li class="fragment"><code>module purge</code> at the top of every batch script ensures a clean, reproducible environment.</li>
+</ul>
+<div class="callout callout-tip callout-titled callout-style-default">
+<div class="callout-body">
+<div class="callout-title">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<p><strong>Tip</strong></p>
+</div>
+<div class="callout-content">
+<p>Add <code>module purge &amp;&amp; module load R/4.3.2</code> to your <code>~/.bash_profile</code> if you want R ready on every login — but always put explicit loads inside batch scripts too.</p>
+</div>
+</div>
+</div>
+</section></section>
+<section>
+<section id="working-interactively-on-talapas" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Working interactively on Talapas</h1>
+
+</section>
+<section id="explore-before-you-batch" class="slide level2">
+<h2>Explore before you batch</h2>
+<ul>
+<li class="fragment">Use an <strong>interactive session</strong> (<code>srun --pty bash</code>) to prototype, debug, and explore.</li>
+<li class="fragment">VS Code Remote-SSH works seamlessly in interactive sessions: open your folder, run code in the integrated terminal.</li>
+<li class="fragment">Prototype interactively on a small slice of data → then submit the same script as a batch job for the full run.</li>
 </ul>
 </section></section>
 <section>
@@ -1269,12 +1534,12 @@ Bill Cresko
 </section>
 <section id="a-minimal-interactive-session" class="slide level2">
 <h2>A minimal interactive session</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> <span class="dt">\</span></span>
-<span id="cb1-2"><a></a>     <span class="at">--partition</span><span class="op">=</span>compute <span class="dt">\</span></span>
-<span id="cb1-3"><a></a>     <span class="at">--time</span><span class="op">=</span>1:00:00 <span class="dt">\</span></span>
-<span id="cb1-4"><a></a>     <span class="at">--mem</span><span class="op">=</span>4G <span class="dt">\</span></span>
-<span id="cb1-5"><a></a>     <span class="at">--cpus-per-task</span><span class="op">=</span>2 <span class="dt">\</span></span>
-<span id="cb1-6"><a></a>     <span class="at">--pty</span> bash</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a></a><span class="ex">srun</span> <span class="at">--account</span><span class="op">=&lt;</span>myPIRG<span class="op">&gt;</span> <span class="dt">\</span></span>
+<span id="cb5-2"><a></a>     <span class="at">--partition</span><span class="op">=</span>compute <span class="dt">\</span></span>
+<span id="cb5-3"><a></a>     <span class="at">--time</span><span class="op">=</span>1:00:00 <span class="dt">\</span></span>
+<span id="cb5-4"><a></a>     <span class="at">--mem</span><span class="op">=</span>4G <span class="dt">\</span></span>
+<span id="cb5-5"><a></a>     <span class="at">--cpus-per-task</span><span class="op">=</span>2 <span class="dt">\</span></span>
+<span id="cb5-6"><a></a>     <span class="at">--pty</span> bash</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment">When granted, your prompt changes to a compute node (e.g. <code>n0123</code>).</li>
 <li class="fragment"><code>salloc</code> is the close cousin — request an allocation, prompt jumps to the node.</li>
@@ -1299,7 +1564,7 @@ Bill Cresko
 </section>
 <section id="run-sinfo-to-see-the-cluster" class="slide level2">
 <h2>Run <code>sinfo</code> to see the cluster</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a></a><span class="ex">sinfo</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="ex">sinfo</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>Shows each partition and the <strong>state of its nodes</strong> (idle, allocated, down).</li>
 <li>QOS (quality-of-service) limits ride on partitions too — they cap how much one user can hold at once.</li>
@@ -1323,19 +1588,19 @@ Bill Cresko
 </section>
 <section id="anatomy-of-an-sbatch-script" class="slide level2">
 <h2>Anatomy of an <code>sbatch</code> script</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a></a><span class="co">#!/bin/bash</span></span>
-<span id="cb3-2"><a></a><span class="co">#SBATCH --account=&lt;myPIRG&gt;</span></span>
-<span id="cb3-3"><a></a><span class="co">#SBATCH --partition=compute</span></span>
-<span id="cb3-4"><a></a><span class="co">#SBATCH --job-name=seurat_qc</span></span>
-<span id="cb3-5"><a></a><span class="co">#SBATCH --output=logs/seurat_qc_%j.out</span></span>
-<span id="cb3-6"><a></a><span class="co">#SBATCH --error=logs/seurat_qc_%j.err</span></span>
-<span id="cb3-7"><a></a><span class="co">#SBATCH --time=04:00:00</span></span>
-<span id="cb3-8"><a></a><span class="co">#SBATCH --cpus-per-task=8</span></span>
-<span id="cb3-9"><a></a><span class="co">#SBATCH --mem=64G</span></span>
-<span id="cb3-10"><a></a></span>
-<span id="cb3-11"><a></a><span class="ex">module</span> purge</span>
-<span id="cb3-12"><a></a><span class="ex">module</span> load R/4.3.2</span>
-<span id="cb3-13"><a></a><span class="ex">Rscript</span> scripts/01_qc_preprocessing.R</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="co">#!/bin/bash</span></span>
+<span id="cb7-2"><a></a><span class="co">#SBATCH --account=&lt;myPIRG&gt;</span></span>
+<span id="cb7-3"><a></a><span class="co">#SBATCH --partition=compute</span></span>
+<span id="cb7-4"><a></a><span class="co">#SBATCH --job-name=seurat_qc</span></span>
+<span id="cb7-5"><a></a><span class="co">#SBATCH --output=logs/seurat_qc_%j.out</span></span>
+<span id="cb7-6"><a></a><span class="co">#SBATCH --error=logs/seurat_qc_%j.err</span></span>
+<span id="cb7-7"><a></a><span class="co">#SBATCH --time=04:00:00</span></span>
+<span id="cb7-8"><a></a><span class="co">#SBATCH --cpus-per-task=8</span></span>
+<span id="cb7-9"><a></a><span class="co">#SBATCH --mem=64G</span></span>
+<span id="cb7-10"><a></a></span>
+<span id="cb7-11"><a></a><span class="ex">module</span> purge</span>
+<span id="cb7-12"><a></a><span class="ex">module</span> load R/4.3.2</span>
+<span id="cb7-13"><a></a><span class="ex">Rscript</span> scripts/01_qc_preprocessing.R</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li>All <code>#SBATCH</code> lines sit at the <strong>top</strong>, before any command.</li>
 <li><code>%j</code> is the job ID; <code>module load</code> happens <strong>inside</strong> the job.</li>
@@ -1347,7 +1612,7 @@ Bill Cresko
 <li class="fragment">The shipped scripts write <code>.out</code>/<code>.err</code> to a <code>logs/</code> subdirectory.</li>
 <li class="fragment"><strong>SLURM will not create it for you</strong> — a missing dir means the job is rejected with no log to explain why.</li>
 </ul>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a></a><span class="fu">mkdir</span> <span class="at">-p</span> logs</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="fu">mkdir</span> <span class="at">-p</span> logs</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section></section>
 <section>
 <section id="submitting-monitoring" class="title-slide slide level1 center" data-background-color="#2c3e50">
@@ -1356,10 +1621,10 @@ Bill Cresko
 </section>
 <section id="submit-and-watch" class="slide level2">
 <h2>Submit and watch</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a></a><span class="ex">sbatch</span> hostname.sbatch        <span class="co"># -&gt; Submitted batch job 123456</span></span>
-<span id="cb5-2"><a></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span>               <span class="co"># your jobs</span></span>
-<span id="cb5-3"><a></a><span class="ex">squeue</span> <span class="at">-j</span> 123456              <span class="co"># one job</span></span>
-<span id="cb5-4"><a></a><span class="ex">scancel</span> 123456                <span class="co"># cancel it</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb9"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a></a><span class="ex">sbatch</span> hostname.sbatch        <span class="co"># -&gt; Submitted batch job 123456</span></span>
+<span id="cb9-2"><a></a><span class="ex">squeue</span> <span class="at">-u</span> <span class="va">$USER</span>               <span class="co"># your jobs</span></span>
+<span id="cb9-3"><a></a><span class="ex">squeue</span> <span class="at">-j</span> 123456              <span class="co"># one job</span></span>
+<span id="cb9-4"><a></a><span class="ex">scancel</span> 123456                <span class="co"># cancel it</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment">State codes: <code>PD</code> pending, <code>R</code> running, <code>CG</code> completing.</li>
 <li class="fragment">Two files appear when done: <code>*_123456.out</code> (stdout) and <code>*_123456.err</code> (stderr).</li>
@@ -1367,8 +1632,8 @@ Bill Cresko
 </section>
 <section id="check-what-a-job-actually-used" class="slide level2">
 <h2>Check what a job actually used</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb6"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a></a><span class="ex">seff</span> 123456</span>
-<span id="cb6-2"><a></a><span class="ex">sacct</span> <span class="at">-j</span> 123456 <span class="at">--format</span><span class="op">=</span>JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb10"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a></a><span class="ex">seff</span> 123456</span>
+<span id="cb10-2"><a></a><span class="ex">sacct</span> <span class="at">-j</span> 123456 <span class="at">--format</span><span class="op">=</span>JobID,ReqMem,MaxRSS,Elapsed,State,ExitCode</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment"><code>seff</code> gives a friendly summary: CPU efficiency, peak memory, wall time.</li>
 <li class="fragment"><code>MaxRSS</code> = peak memory used; <code>Elapsed</code> = wall time.</li>
@@ -1414,29 +1679,65 @@ Bill Cresko
 </section>
 <section id="slurm_account-set-it-once" class="slide level2">
 <h2><code>SLURM_ACCOUNT</code> — set it once</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb7"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a></a><span class="bu">echo</span> <span class="st">&#39;export SLURM_ACCOUNT=&lt;myPIRG&gt;&#39;</span>  <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
-<span id="cb7-2"><a></a><span class="bu">echo</span> <span class="st">&#39;export SBATCH_ACCOUNT=&lt;myPIRG&gt;&#39;</span> <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
-<span id="cb7-3"><a></a><span class="bu">source</span> ~/.bash_profile</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb11"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a></a><span class="bu">echo</span> <span class="st">&#39;export SLURM_ACCOUNT=&lt;myPIRG&gt;&#39;</span>  <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
+<span id="cb11-2"><a></a><span class="bu">echo</span> <span class="st">&#39;export SBATCH_ACCOUNT=&lt;myPIRG&gt;&#39;</span> <span class="op">&gt;&gt;</span> ~/.bash_profile</span>
+<span id="cb11-3"><a></a><span class="bu">source</span> ~/.bash_profile</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment">Once set, you can omit <code>--account=</code> from every command</li>
 <li class="fragment">Your PIRG name appears in the output of <code>groups</code> after you log in</li>
 </ul>
+</section></section>
+<section>
+<section id="reproducible-environments" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Reproducible environments</h1>
+
+</section>
+<section id="why-reproducibility-matters-on-a-cluster" class="slide level2">
+<h2>Why reproducibility matters on a cluster</h2>
+<ul>
+<li class="fragment">On your laptop, R packages live in one user library — it just works.</li>
+<li class="fragment">On a shared cluster, <strong>package versions drift</strong> between users and over time.</li>
+<li class="fragment">Reproducible environments lock down exact versions so results are stable and shareable.</li>
+</ul>
+</section>
+<section id="renv-per-project-r-libraries" class="slide level2">
+<h2>renv — per-project R libraries</h2>
+<ul>
+<li class="fragment"><strong>renv</strong> captures a snapshot of every package and its version in a <code>renv.lock</code> file.</li>
+<li class="fragment"><code>renv::restore()</code> rebuilds the exact library on any machine (laptop or Talapas).</li>
+<li class="fragment">The workshop project ships with a <code>renv.lock</code> — run <code>renv::restore()</code> once after cloning.</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a></a><span class="co"># In the R console or batch script, once per project</span></span>
+<span id="cb12-2"><a></a>renv<span class="sc">::</span><span class="fu">restore</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="containers-apptainer-on-talapas" class="slide level2">
+<h2>Containers — Apptainer on Talapas</h2>
+<ul>
+<li class="fragment"><strong>Apptainer</strong> (formerly Singularity) runs OCI/Docker containers on HPC clusters.</li>
+<li class="fragment">A container bundles the OS, R, and all libraries into a single portable image (<code>.sif</code>).</li>
+<li class="fragment">Pull a container from Docker Hub; submit the <code>.sif</code> file in your batch script.</li>
+<li class="fragment">Stronger isolation than <code>renv</code> — useful for complex dependency stacks or sharing workflows externally.</li>
+</ul>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a></a><span class="co"># Pull once on a login node</span></span>
+<span id="cb13-2"><a></a><span class="ex">apptainer</span> pull docker://bioconductor/bioconductor_docker:RELEASE_3_19</span>
+<span id="cb13-3"><a></a><span class="co"># Run R inside the container in a batch job</span></span>
+<span id="cb13-4"><a></a><span class="ex">apptainer</span> exec bioconductor_docker_RELEASE_3_19.sif Rscript scripts/01_qc_preprocessing.R</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="whats-next-module-10" class="slide level2">
 <h2>What’s next — Module 10</h2>
 <ul>
-<li class="fragment">You can now request resources and submit jobs — the <em>mechanics</em>.</li>
+<li class="fragment">You can now connect, navigate file systems, load modules, and submit jobs — the <em>mechanics</em>.</li>
 <li class="fragment"><strong>Module 10</strong> uses these to run the <strong>real scRNA-seq pipeline</strong> on Talapas: the numbered <code>01</code>–<code>08</code> scripts, chained through <code>.rds</code> hand-offs.</li>
 <li class="fragment">Read the <a href="../Resources_Folder/Chapter_09_SLURM_Basics.html">companion chapter</a> for the conceptual deep-dive on schedulers and fair-share.</li>
 </ul>
 </section>
 <section id="monitoring-a-running-job" class="slide level2">
 <h2>Monitoring a running job</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb8"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a></a><span class="co"># Live log tail (follow output as it writes)</span></span>
-<span id="cb8-2"><a></a><span class="fu">tail</span> <span class="at">-f</span> logs/seurat_qc_<span class="pp">*</span>.out</span>
-<span id="cb8-3"><a></a></span>
-<span id="cb8-4"><a></a><span class="co"># Friendly resource summary after completion</span></span>
-<span id="cb8-5"><a></a><span class="ex">seff</span> 123456</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb14"><pre class="sourceCode numberSource bash number-lines code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a></a><span class="co"># Live log tail (follow output as it writes)</span></span>
+<span id="cb14-2"><a></a><span class="fu">tail</span> <span class="at">-f</span> logs/seurat_qc_<span class="pp">*</span>.out</span>
+<span id="cb14-3"><a></a></span>
+<span id="cb14-4"><a></a><span class="co"># Friendly resource summary after completion</span></span>
+<span id="cb14-5"><a></a><span class="ex">seff</span> 123456</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment"><code>tail -f</code> lets you watch progress without opening an interactive session</li>
 <li class="fragment">After each step confirms <code>State: COMPLETED</code> (not <code>OUT_OF_MEMORY</code>/<code>TIMEOUT</code>), move to the next</li>
@@ -1455,11 +1756,16 @@ Bill Cresko
 <section id="key-takeaways" class="slide level2">
 <h2>Key takeaways</h2>
 <ul>
+<li class="fragment">Connect with <strong>VS Code Remote-SSH</strong> (Duck ID + Duo) — green banner = you’re on Talapas.</li>
+<li class="fragment">The <strong>VS Code integrated terminal</strong> (<code>Ctrl/Cmd+`</code>) is a shell on the login node — <code>hostname</code> confirms it. Shell skills from <a href="../Resources_Folder/Chapter_P1_Computer_Systems.html">P1</a> all apply here.</li>
+<li class="fragment"><strong>Edit in the editor, run in the terminal</strong> — both operate on the same remote filesystem.</li>
+<li class="fragment">Files live in <strong>home</strong> (backed up, small), <strong>projects</strong> (lab-shared), and <strong>scratch</strong> (large, 90-day purge).</li>
+<li class="fragment">Load software with <strong><code>module load</code></strong>; always <code>module purge</code> first in batch scripts.</li>
 <li class="fragment">A scheduler exists because the cluster is <strong>shared</strong> — declare what you need.</li>
 <li class="fragment"><strong>Login nodes edit and submit; compute nodes compute.</strong></li>
 <li class="fragment"><strong>Interactive</strong> to watch, <strong>batch</strong> to walk away.</li>
 <li class="fragment"><code>sbatch</code> → <code>squeue</code> → <code>seff</code>, then <strong>right-size</strong> the next run.</li>
-<li class="fragment">Size honestly, clean up after yourself, back up your data.</li>
+<li class="fragment">Lock dependencies with <strong>renv</strong> (or Apptainer) for reproducible results.</li>
 </ul>
 
 
@@ -1467,7 +1773,7 @@ Bill Cresko
     </div>
   <div class="quarto-auto-generated-content" style="display: none;">
 <div class="footer footer-default">
-<p>Single Cell RNA-seq Workshop · Lecture 09 — SLURM Basics on Talapas</p>
+<p>Single Cell RNA-seq Workshop · Lecture 09 — VS Code &amp; SLURM Basics on Talapas</p>
 </div>
 </div></div>
 
