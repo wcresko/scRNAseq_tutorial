@@ -1,0 +1,617 @@
+---
+title: "Appendix H - Core R Commands Reference"
+author: "Bill Cresko"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(knitr)
+
+theme_set(theme_minimal(base_size = 14))
+set.seed(2026)
+```
+
+# Appendix H: Core R Commands Reference
+
+## Overview
+
+::: {.callout-tip title="How to use this appendix"}
+This is a **look-it-up reference**, not a tutorial. If you have never written R before, work through the [P2 — R & RStudio](Chapter_P2_R_and_CommandLine.html) Day 0 module first; this appendix is the page you keep open in a second tab while you do the tutorials, when you need to remember *exactly* how to subset a data frame, read a TSV, or pivot a table. Commands are grouped by task and every block ends with a short interpretation of the pieces that matter. For the one-page printable versions, see the [Cheat Sheets](../Cheat_Sheets.html) tab.
+:::
+
+# The console & getting help
+
+::: panel-tabset
+### Commands
+
+``` r
+# Run a line: put the cursor on it and press Ctrl/Cmd + Enter in RStudio
+2 + 2
+
+# Help on a function — three equivalent forms
+?mean
+help("mean")
+example("mean")        # run the examples from the help page
+
+# Fuzzy search when you don't know the exact name
+??"linear model"
+apropos("read")        # every visible object whose name contains "read"
+
+# What is this thing?
+class(x)               # high-level type: "numeric", "data.frame", "Seurat"
+str(x)                 # structure: types, dims, first few values — your #1 tool
+summary(x)             # a quick numeric / factor summary
+typeof(x)              # low-level storage type
+length(x)              # number of elements
+dim(x)                 # rows × cols (NULL for a plain vector)
+names(x)               # element / column names
+
+# Where am I, what's loaded?
+getwd()                # current working directory
+list.files()           # files in the working directory
+ls()                   # objects in your workspace
+sessionInfo()          # R version + every attached package version
+```
+
+### Interpretation
+
+-   `str()` is the single most useful inspection command --- it tells you the type, the dimensions, and a preview all at once. Reach for it whenever an object surprises you.
+-   `?fun` opens the help page; `??term` searches *across* packages when you only half-remember the name.
+-   `class()` vs `typeof()`: `class()` is what you almost always want (it reports `"data.frame"`, `"Seurat"`, `"dgCMatrix"`); `typeof()` exposes the underlying storage and is rarely needed.
+-   `sessionInfo()` belongs at the bottom of every analysis report --- it is the record of *which* package versions produced your results.
+:::
+
+# Assignment & operators
+
+::: panel-tabset
+### Commands
+
+``` r
+# Assignment — `<-` is idiomatic R; `=` also works but reserve it for arguments
+x <- 10
+counts <- c(3, 0, 12, 5)
+
+# Arithmetic
+5 + 2; 5 - 2; 5 * 2; 5 / 2
+5 %% 2        # modulo (remainder) -> 1
+5 %/% 2       # integer division   -> 2
+2 ^ 10        # exponent           -> 1024
+
+# Comparison — return TRUE/FALSE (logical)
+x == 10; x != 5; x > 3; x <= 10
+
+# Logical operators
+TRUE & FALSE        # element-wise AND
+TRUE | FALSE        # element-wise OR
+!TRUE               # NOT
+a && b              # scalar AND (single value, short-circuits) — used in `if`
+xor(TRUE, FALSE)    # exclusive or
+
+# Membership and ranges
+3 %in% counts       # is 3 one of the elements? -> TRUE
+```
+
+### Interpretation
+
+-   Use `<-` for assignment and `=` for naming function arguments --- keeping them distinct makes code easier to read and is the community convention.
+-   `==` tests equality and returns a logical; a single `=` would (accidentally) assign. This is one of the most common beginner bugs.
+-   `&`/`|` work element-by-element over vectors; `&&`/`||` collapse to a single TRUE/FALSE and are what you use inside an `if()`.
+-   `%in%` is the readable way to ask "is this value in that set?" --- you will use it constantly to filter metadata (`cluster %in% c("0","3","7")`).
+:::
+
+# Vectors — the fundamental R object
+
+::: panel-tabset
+### Creating & combining
+
+``` r
+# c() combines values into a vector
+genes  <- c("Cd3d", "Cd8a", "Ms4a1", "Lyz2")
+counts <- c(120, 88, 0, 305)
+
+# Sequences
+1:10                       # 1 2 3 ... 10
+seq(0, 1, by = 0.25)       # 0.00 0.25 0.50 0.75 1.00
+seq_len(4)                 # 1 2 3 4   (safe for length 0)
+seq_along(genes)           # 1 2 3 4   (one index per element)
+rep(c(0, 1), times = 3)    # 0 1 0 1 0 1
+rep(c("A","B"), each = 2)  # "A" "A" "B" "B"
+
+# Named vectors — a lightweight lookup table
+named <- c(a = 1, b = 2, c = 3)
+named["b"]                 # 2
+```
+
+### Operations & summaries
+
+``` r
+# Vectorised math — applied element by element, no loop needed
+counts * 2
+log1p(counts)              # log(1 + x) — the scRNA-seq workhorse transform
+
+# Summaries
+sum(counts); mean(counts); median(counts)
+min(counts); max(counts); range(counts)
+sd(counts); var(counts)
+length(counts)
+quantile(counts, c(0.25, 0.5, 0.75))
+
+# Order & rank
+sort(counts)               # values, ascending
+sort(counts, decreasing = TRUE)
+order(counts)              # the indices that would sort it — use to reorder rows
+which.max(counts)          # index of the maximum
+rev(counts)                # reverse
+```
+
+### Missing values
+
+``` r
+v <- c(1, 2, NA, 4)
+is.na(v)                   # FALSE FALSE  TRUE FALSE
+sum(v)                     # NA — NA propagates!
+sum(v, na.rm = TRUE)       # 7  — drop NAs in the summary
+mean(v, na.rm = TRUE)      # 2.333
+v[!is.na(v)]               # keep only the non-missing values
+na.omit(v)                 # same idea, drops NA rows
+```
+
+### Interpretation
+
+-   Almost every operation in R is **vectorised**: `counts * 2` multiplies every element at once. Writing explicit loops to do this is slower and harder to read --- let the vector do the work.
+-   `seq_len()` and `seq_along()` are safer than `1:n` because `1:0` surprisingly gives `c(1, 0)`; the `seq_*` helpers give an empty sequence for length-0 inputs.
+-   `NA` is contagious: any summary touching an `NA` returns `NA` unless you pass `na.rm = TRUE`. Real data has missing values, so this argument appears everywhere.
+-   `order()` returns *positions*, not values --- it is how you sort one column and carry the rest of the rows along (`df[order(df$x), ]`).
+:::
+
+# Indexing & subsetting
+
+::: panel-tabset
+### Vectors
+
+``` r
+x <- c(10, 20, 30, 40, 50)
+
+x[1]              # 10        — R is 1-indexed (NOT 0)
+x[c(2, 4)]        # 20 40     — multiple positions
+x[-1]             # 20 30 40 50 — drop the first
+x[2:4]            # 20 30 40  — a range
+x[x > 25]         # 30 40 50  — logical / conditional subset
+x[c(TRUE, FALSE)] # recycled mask -> 10 30 50
+```
+
+### Conditional selection
+
+``` r
+x <- c(5, 12, 0, 8, 25)
+
+which(x > 10)              # 2 5   — positions where condition is TRUE
+x[which(x > 10)]           # 12 25
+any(x > 20)                # TRUE  — is at least one TRUE?
+all(x > 0)                 # FALSE — are they all TRUE?
+
+# ifelse() — vectorised if/else, returns a vector the same length
+ifelse(x > 10, "high", "low")
+
+# Recode with case_when() (dplyr) — multi-way ifelse
+dplyr::case_when(
+  x > 20            ~ "very high",
+  x > 10            ~ "high",
+  TRUE              ~ "low"        # the default / catch-all
+)
+```
+
+### Interpretation
+
+-   **R indexes from 1**, and `x[-1]` means "everything *except* position 1" (negative indices drop, they do not count from the end as in Python).
+-   Logical subsetting --- `x[x > 25]` --- is the most common pattern: build a TRUE/FALSE mask, then keep the TRUEs. The same mask filters metadata columns to subset cells.
+-   `which()` converts a logical mask into the integer positions; you need it when you want the *index* rather than the value.
+-   `ifelse()` is vectorised and element-wise (use it on columns); a plain `if()` takes a single condition and controls program flow. Mixing them up is a classic error.
+:::
+
+# Data frames & tibbles
+
+::: panel-tabset
+### Building & inspecting
+
+``` r
+df <- data.frame(
+  cell    = c("c1", "c2", "c3"),
+  cluster = c(0, 1, 0),
+  nCount  = c(4210, 8800, 1500),
+  stringsAsFactors = FALSE
+)
+
+# A tibble — the tidyverse data frame (prints nicer, never silently
+# converts strings to factors)
+tb <- tibble::tibble(
+  cell    = c("c1", "c2", "c3"),
+  cluster = c(0, 1, 0)
+)
+
+head(df, 3)        # first rows
+tail(df)           # last rows
+nrow(df); ncol(df) # dimensions
+colnames(df)       # column names
+rownames(df)       # row names
+glimpse(df)        # tidyverse str() — transposed, very readable
+```
+
+### Indexing `df[row, col]`
+
+``` r
+df[1, ]            # first row, all columns
+df[, "nCount"]     # the nCount column (as a vector)
+df$nCount          # same — $ is the everyday accessor
+df[["nCount"]]     # same — [[ ]] when the name is in a variable
+df[1:2, c("cell", "cluster")]      # rows 1–2, two columns
+
+# Conditional row subset (base R)
+df[df$cluster == 0, ]              # rows where cluster is 0
+df[df$nCount > 2000, "cell"]       # cells passing a count threshold
+
+# Add / modify a column
+df$log_count <- log1p(df$nCount)
+df$pass <- df$nCount > 2000
+```
+
+### Interpretation
+
+-   A data frame is the rectangular table at the centre of almost every analysis: columns can be different types (character, numeric, factor), but every column has the same length.
+-   `df[row, col]` is the base-R two-index accessor; leaving a slot blank means "all of them" (`df[, "x"]` = all rows of column x).
+-   `$` is the quick way to grab one column by name; `[[ ]]` does the same but accepts a name held in a variable (`df[[var]]`).
+-   Prefer **tibbles** in new code (`tibble()`, or any tidyverse import): they print only the first 10 rows, show column types, and never silently turn strings into factors --- the source of many subtle bugs.
+:::
+
+# Reading & writing data
+
+::: panel-tabset
+### Read
+
+``` r
+# Tidyverse readers (return tibbles, fast, sensible defaults) — recommended
+library(readr)
+dat <- read_csv("counts.csv")            # comma-separated
+dat <- read_tsv("metadata.tsv")          # tab-separated
+dat <- read_delim("file.txt", delim = "|")
+
+# Base R equivalents
+dat <- read.csv("counts.csv")
+dat <- read.delim("metadata.tsv")        # tab-separated by default
+dat <- read.table("file.txt", header = TRUE, sep = "\t")
+
+# Excel (readxl) and R's native binary format
+dat <- readxl::read_excel("samples.xlsx", sheet = 1)
+obj <- readRDS("seurat_object.rds")      # one R object, exactly as saved
+```
+
+### Write
+
+``` r
+write_csv(dat, "results.csv")            # readr — no row names, UTF-8
+write_tsv(dat, "results.tsv")
+write.csv(dat, "results.csv", row.names = FALSE)   # base R
+
+saveRDS(obj, "seurat_object.rds")        # save any single R object
+save(a, b, file = "workspace.RData")     # save several named objects
+```
+
+### Interpretation
+
+-   Prefer the **`readr`** functions (`read_csv`, `read_tsv`): they are faster, report the column types they guessed, and return a tibble. The base-R `read.csv`/`read.table` family still works and is what you will see in older scripts.
+-   `.rds` (`saveRDS`/`readRDS`) stores **one** object with its exact structure --- the standard way to checkpoint a Seurat object between tutorial steps. `.RData` (`save`/`load`) stores several *named* objects and restores them under those same names.
+-   When writing CSVs with base R, pass `row.names = FALSE` --- otherwise you get a phantom first column of row numbers that breaks the next tool that reads the file.
+-   Always check the import with `glimpse()` or `str()` immediately: silently-misparsed columns (a number read as text) cause errors three steps later.
+:::
+
+# Control flow
+
+::: panel-tabset
+### if / for / while
+
+``` r
+# if / else if / else
+x <- 12
+if (x > 10) {
+  message("high")
+} else if (x > 5) {
+  message("medium")
+} else {
+  message("low")
+}
+
+# for loop
+for (g in c("Cd3d", "Cd8a", "Ms4a1")) {
+  cat("checking", g, "\n")
+}
+
+for (i in seq_len(3)) {
+  cat("iteration", i, "\n")
+}
+
+# while loop
+n <- 1
+while (n <= 3) {
+  cat("n =", n, "\n")
+  n <- n + 1
+}
+
+# break / next
+for (i in 1:10) {
+  if (i == 3) next     # skip this iteration
+  if (i == 6) break    # stop the loop
+  print(i)
+}
+```
+
+### Interpretation
+
+-   `if ()` takes a **single** TRUE/FALSE; to choose element-by-element across a vector use `ifelse()` or `case_when()` instead (see the indexing section).
+-   Iterate over the *values* directly (`for (g in genes)`) when you need each element, or over `seq_len(n)` / `seq_along(x)` when you need the index. Avoid `1:length(x)`, which misbehaves for empty inputs.
+-   In R you rarely need an explicit loop for data transformation --- vectorised operations and the apply / `purrr::map` family (next section) are usually clearer and faster. Reserve loops for genuinely sequential work.
+-   `next` skips to the next iteration; `break` exits the loop entirely.
+:::
+
+# The apply / map family
+
+::: panel-tabset
+### Base R apply
+
+``` r
+m <- matrix(1:12, nrow = 3)
+
+apply(m, 1, sum)        # apply over ROWS    (margin 1) -> row sums
+apply(m, 2, mean)       # apply over COLUMNS (margin 2) -> column means
+
+# Over a list/vector -> a list
+lapply(1:3, function(i) i^2)        # list(1, 4, 9)
+
+# Over a list/vector -> simplified to a vector/matrix
+sapply(1:3, function(i) i^2)        # 1 4 9
+vapply(1:3, function(i) i^2, numeric(1))   # type-safe sapply
+
+# Apply a function within groups
+tapply(mtcars$mpg, mtcars$cyl, mean)       # mean mpg per cylinder count
+```
+
+### Tidyverse purrr
+
+``` r
+library(purrr)
+
+map(1:3, ~ .x^2)             # always returns a list
+map_dbl(1:3, ~ .x^2)         # returns a double vector: 1 4 9
+map_chr(letters[1:3], toupper)
+map2_dbl(1:3, 4:6, ~ .x + .y)        # iterate over two inputs in parallel
+
+# Read many files into one table
+files <- list.files("data", pattern = "\\.tsv$", full.names = TRUE)
+all <- map_dfr(files, read_tsv, .id = "source")   # row-bind into one tibble
+```
+
+### Interpretation
+
+-   The apply family replaces loops with a single expression: "run this function over every row / column / element." `apply(m, 1, ...)` works over rows, `apply(m, 2, ...)` over columns (remember: **1 = rows, 2 = columns**).
+-   `sapply` tries to simplify the result to a vector/matrix; `lapply` always returns a list. When you need a guaranteed type, `vapply` (base) or the typed `map_*` (purrr) protect you from a surprise list.
+-   **purrr's** `map_*` functions are the tidyverse version: the suffix names the output type (`map_dbl` -> double, `map_chr` -> character, `map_dfr` -> row-bound data frame). `~ .x^2` is shorthand for `function(.x) .x^2`.
+-   `map_dfr(files, read_tsv)` is the idiomatic one-liner for reading a folder of files into a single tidy table.
+:::
+
+# Writing functions
+
+::: panel-tabset
+### Commands
+
+``` r
+# A function that computes the coefficient of variation
+cv <- function(x, na.rm = TRUE) {
+  sd(x, na.rm = na.rm) / mean(x, na.rm = na.rm)
+}
+
+cv(c(4, 9, 12, 5))            # call it
+cv(x = c(4, 9, 12, 5))       # name the argument — order-independent
+
+# Multiple arguments, with a default
+qc_flag <- function(n_genes, min_genes = 200) {
+  n_genes >= min_genes       # the last expression is the return value
+}
+
+# Explicit return() for an early exit
+safe_log <- function(x) {
+  if (any(x < 0)) return(NA_real_)
+  log1p(x)
+}
+```
+
+### Interpretation
+
+-   A function is `name <- function(args) { body }`. The value of the **last expression** is returned automatically --- `return()` is only needed for an early exit.
+-   Give sensible **defaults** (`min_genes = 200`) so callers can omit common arguments. Defaults are evaluated only if the caller does not supply the argument.
+-   Call with **named arguments** for anything past the first one or two --- `CreateSeuratObject(counts = mat, min.cells = 3, min.features = 200)` is far clearer than relying on position, which matters because Seurat/Bioconductor signatures are long.
+-   Variables created inside a function are **local**: they do not leak into your workspace, which keeps analyses clean and reproducible.
+:::
+
+# Strings, factors & dates
+
+::: panel-tabset
+### Strings (stringr)
+
+``` r
+library(stringr)
+
+str_length("Cd8a")                       # 4
+str_c("sample", 1:3, sep = "_")          # "sample_1" "sample_2" "sample_3"
+str_sub("barcode-1", 1, 7)               # "barcode"
+str_detect(c("Cd3d","Lyz2"), "^Cd")      # TRUE FALSE  — regex match
+str_replace("AAACCTG-1", "-1$", "")      # strip the 10x lane suffix
+str_split("a,b,c", ",")                  # list("a","b","c")
+toupper("cd8a"); tolower("CD8A")
+trimws("  spaced  ")                     # remove leading/trailing whitespace
+paste0("chr", 1:3)                       # base R: "chr1" "chr2" "chr3"
+```
+
+### Factors (forcats)
+
+``` r
+f <- factor(c("CTRL","STIM","CTRL"), levels = c("CTRL","STIM"))
+levels(f)                                 # "CTRL" "STIM" — CTRL is the reference
+table(f)                                  # counts per level
+
+library(forcats)
+fct_relevel(f, "STIM")                    # make STIM the reference level
+fct_infreq(f)                             # order levels by frequency
+droplevels(f[f == "CTRL"])                # drop unused levels after subsetting
+```
+
+### Interpretation
+
+-   **stringr** functions all start with `str_` and take the string first, the pattern second --- consistent and pipe-friendly. They accept regular expressions (see [Appendix C](Appendix_C_GREP_Regex_Shell.html)), e.g. `str_detect(genes, "^Cd")` for "starts with Cd".
+-   `str_replace("AAACCTG-1", "-1$", "")` is the everyday trick for cleaning the `-1` lane suffix off 10x cell barcodes.
+-   A **factor** is a categorical variable with a fixed set of ordered `levels`; the *first* level is the reference that DE models and plots treat as baseline. Use `fct_relevel()`/`relevel()` to set which condition is the control.
+-   After subsetting cells, unused factor levels linger and clutter plots/tables --- `droplevels()` removes them.
+:::
+
+# Data wrangling with dplyr
+
+::: panel-tabset
+### The core verbs
+
+``` r
+library(dplyr)
+
+# meta: one row per cell — barcode, sample, cluster, nCount_RNA, nFeature_RNA
+meta %>%
+  filter(nFeature_RNA > 200) %>%          # keep rows matching a condition
+  mutate(log_count = log1p(nCount_RNA)) %>%  # add / change columns
+  select(barcode, sample, cluster, log_count) %>%  # keep / reorder columns
+  arrange(desc(log_count)) %>%            # sort rows
+  slice_head(n = 5)                       # first 5 rows
+
+# Group-wise summaries — the heart of dplyr
+meta %>%
+  group_by(sample, cluster) %>%
+  summarise(
+    n_cells   = n(),                      # rows per group
+    med_count = median(nCount_RNA),
+    .groups   = "drop"
+  )
+
+# Counting and joining
+count(meta, cluster)                      # quick frequency table
+left_join(meta, cluster_labels, by = "cluster")   # add a label column
+```
+
+### Interpretation
+
+-   The pipe `%>%` (or base R `|>`) reads left-to-right: "take `meta`, **then** filter, **then** mutate..." --- each verb takes a data frame and returns a data frame, so they chain cleanly.
+-   The five verbs cover most work: `filter()` (rows by condition), `select()` (columns by name), `mutate()` (new/changed columns), `arrange()` (sort), `summarise()` (collapse to one row per group).
+-   `group_by()` + `summarise()` is the split-apply-combine pattern --- "median UMI count per sample per cluster" is exactly the pseudobulk-style aggregation you do before DE. Remember `.groups = "drop"` to avoid a lingering grouping.
+-   `left_join()` attaches information from a second table (e.g. human-readable cell-type labels) by a shared key column, keeping every row of the first.
+:::
+
+# Plotting with ggplot2
+
+::: panel-tabset
+### The grammar
+
+``` r
+library(ggplot2)
+
+# One point per cell, coloured by cluster
+ggplot(meta, aes(x = nCount_RNA, y = nFeature_RNA, colour = cluster)) +
+  geom_point(size = 0.4, alpha = 0.5) +
+  scale_x_log10() +
+  labs(x = "UMIs per cell", y = "Genes per cell", colour = "Cluster") +
+  theme_minimal()
+
+# Distribution per group + faceting
+ggplot(meta, aes(x = cluster, y = nFeature_RNA, fill = cluster)) +
+  geom_violin() +
+  facet_wrap(~ sample) +
+  theme(legend.position = "none")
+
+# Save the last (or a named) plot
+ggsave("qc_scatter.png", width = 6, height = 4, dpi = 300)
+```
+
+### Interpretation
+
+-   A ggplot is built in layers joined by **`+`**: `ggplot(data, aes(...))` sets the data and the *aesthetic mapping* (which column drives x, y, colour), then each `geom_*` draws a layer.
+-   Map a variable **inside** `aes()` (`colour = cluster`) to let it vary with the data; set a constant **outside** `aes()` (`size = 0.4`) to fix it for every point. Confusing the two is the most common ggplot mistake.
+-   `facet_wrap(~ var)` splits one plot into a small-multiple grid --- one panel per sample is the standard way to compare conditions side by side.
+-   `scale_*` transforms or relabels an axis/legend (e.g. `scale_x_log10()` for the heavily skewed count distributions), and `ggsave()` writes the figure at a publication DPI.
+:::
+
+# Packages & the environment
+
+::: panel-tabset
+### Commands
+
+``` r
+# Install once (per machine), from CRAN
+install.packages("tidyverse")
+
+# Bioconductor packages (Seurat deps, DESeq2, SingleCellExperiment …)
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+BiocManager::install("DESeq2")
+
+# Load every session
+library(Seurat)
+library(tidyverse)
+
+# Use one function without attaching the whole package
+dplyr::filter(meta, cluster == 0)
+
+# What version am I running?
+packageVersion("Seurat")
+sessionInfo()
+```
+
+### Interpretation
+
+-   `install.packages()` downloads a package **once** onto the machine; `library()` loads it into **every** R session where you use it. New users often try to `library()` something they never installed --- that is the "there is no package called ..." error.
+-   Bioinformatics packages live on **Bioconductor**, not CRAN: install them with `BiocManager::install("name")`. Seurat itself is on CRAN.
+-   `pkg::function()` calls one function without attaching the whole package --- it documents exactly where a function comes from and avoids name clashes (e.g. `dplyr::filter` vs `stats::filter`).
+-   End scripts with `sessionInfo()` so the exact package versions are recorded with the results. For fully reproducible environments across machines, use `renv` (covered in [Module 09](Chapter_09_SLURM_Basics.html)).
+:::
+
+# Common gotchas
+
+::: {.callout-warning title="Things that bite everyone"}
+-   **1-indexing.** R counts from 1, and `x[-1]` *drops* the first element (it does not mean "the last" as in Python).
+-   **`=` vs `==`.** `=` assigns/names an argument; `==` tests equality. Using `=` where you meant `==` is a silent logic bug.
+-   **`NA` propagates.** `mean(c(1, NA, 3))` is `NA`; add `na.rm = TRUE` to ignore missing values.
+-   **Strings → factors.** Old base-R readers and `data.frame()` could coerce text to factors; tibbles and modern R (>= 4.0) do not. If a character column behaves oddly, check its `class()`.
+-   **Floating-point equality.** `0.1 + 0.2 == 0.3` is `FALSE`; compare with `all.equal()` or a tolerance, never `==`, on decimals.
+-   **`&` vs `&&`.** Use `&`/`|` on vectors (element-wise filtering) and `&&`/`||` on single scalars inside `if()`.
+-   **Recycling.** Operating on vectors of different lengths silently recycles the shorter one; a warning only appears if lengths are not multiples. Check `length()` when results look wrong.
+:::
+
+## See also
+
+-   [P2 — R & RStudio](Chapter_P2_R_and_CommandLine.html) --- the Day 0 module that teaches this material from scratch.
+-   [Appendix I — Quarto & Markdown Syntax](Appendix_I_Quarto_Markdown.html) --- writing up R analyses in reproducible documents.
+-   [Cheat Sheets](../Cheat_Sheets.html) --- the printable one-page Base R, dplyr, and ggplot2 references.
+
+## References
+
+::: {#refs}
+:::
