@@ -1,5 +1,5 @@
 ---
-title: "P1 — Computer System Fundamentals"
+title: "Chapter P1 — Computer Systems & the Command Line"
 author: "Single Cell RNA-seq Workshop"
 format:
   html:
@@ -17,18 +17,17 @@ execute:
 editor: visual
 ---
 
-Single-cell RNA-seq analysis pushes against the limits of a laptop almost immediately: datasets are large, the software stack is deep, and many steps run faster (or only run at all) on shared research computing infrastructure. This chapter builds the mental model you need — how a computer actually executes work, how an operating system manages resources, and how to use VS Code as a local editor and integrated development environment. The University of Oregon's Talapas HPC cluster, SSH login, modules, and SLURM scheduling are covered in [Chapter 9 — VS Code & SLURM Basics on Talapas](Chapter_09_SLURM_Basics.html) (the Friday track).
+Single-cell RNA-seq analysis pushes against the limits of a laptop almost immediately: datasets are large, the software stack is deep, and many steps run faster (or only run at all) on shared research computing infrastructure. This chapter builds the mental model you need — how a computer actually executes work, how an operating system manages resources, how to use VS Code as a local editor, and how to navigate and manipulate the file system from the command line. The University of Oregon's Talapas HPC cluster, SSH login, modules, and SLURM scheduling are covered in [Chapter 9 — VS Code & SLURM Basics on Talapas](Chapter_09_SLURM_Basics.html) (the Friday track).
 
 ::: {.callout-tip title="P1 reading"}
-This is the reading for **P1 — Computer System Fundamentals**, the first hour of the optional two-hour Tuesday refresher. It pairs with the Module 1 lecture slides. Nothing here is single-cell-specific yet; it is the computing foundation that the rest of the workshop assumes. Connecting to and working on Talapas — VS Code Remote-SSH, Lmod modules, file systems, interactive sessions, and reproducible environments — is covered on Friday in [Chapter 9](Chapter_09_SLURM_Basics.html).
+This is the reading for **P1 — Computer Systems & the Command Line**, the first hour of the optional two-hour Tuesday refresher. It pairs with the Module P1 lecture slides. Nothing here is single-cell-specific yet; it is the computing foundation that the rest of the workshop assumes. Connecting to and working on Talapas — VS Code Remote-SSH, Lmod modules, file systems, interactive sessions, and reproducible environments — is covered on Friday in [Chapter 9](Chapter_09_SLURM_Basics.html).
+:::
+
+::: callout-tip
+**Keep a cheat sheet open.** The [Cheat Sheets](../Cheat_Sheets.html) tab collects one-page Unix shell and VS Code references that pair with this chapter; you will lean on the Unix shell sheet again every time you work in a terminal — locally now, and on Talapas during the Friday track ([Modules 09–10](../Materials.html)). See also the [Software Setup](../Software_Setup.html) page for installation instructions if you have not yet installed VS Code, R, or the workshop repository.
 :::
 
 # How computers and operating systems work
-
-
-::: callout-tip
-**Keep a cheat sheet open.** The [Cheat Sheets](../Cheat_Sheets.html) tab collects one-page SLURM, Unix, and Git references that pair with this module; you will lean on the Unix and SLURM sheets again in the Friday Talapas track ([Modules 09–10](../Materials.html)).
-:::
 
 ## What is a computer system?
 
@@ -140,6 +139,16 @@ Every operation a computer performs reduces to a small cycle repeated billions o
 :::
 :::::
 
+::: {.callout-note .key-concept title="🔑 Key concept — CPU, RAM, and disk are three different resources"}
+These three are often confused but serve entirely different roles:
+
+- **CPU (processor)**: does the actual computation — arithmetic, logic, calling functions. More cores = more things happening in parallel; higher clock speed = each thing happens faster.
+- **RAM (memory)**: holds the data and code the CPU is actively working with. Fast but small and *volatile* — it empties when you power off. A Seurat object for 50,000 cells can easily occupy 8–16 GB of RAM.
+- **Disk (storage)**: holds files permanently. Much slower than RAM but far larger and persistent. Reading a `.rds` file moves data from disk into RAM; saving it moves data from RAM back to disk.
+
+The most common reason a single-cell analysis crashes on a laptop is **running out of RAM**, not disk space or CPU. Knowing which resource is the bottleneck guides every decision about whether to work locally or on a cluster.
+:::
+
 Input/output (I/O) systems connect the computer to the outside world: keyboards, mice, touchscreens, cameras and sensors on the input side; monitors, printers, speakers and actuators on the output side; and network interfaces in both directions.
 
 ## Operating systems
@@ -240,41 +249,378 @@ A laptop is fine for learning and for small single-cell datasets, but it runs ou
 
 ## Installing VS Code
 
-Install it from <https://code.visualstudio.com/download>. On first launch, allow any requested permissions; from the main interface you can browse and open folders on your local computer.
+Install it from <https://code.visualstudio.com/download>. Run the installer for your operating system (Windows, macOS, or Linux). On first launch, allow any requested permissions.
+
+Take a moment to find the **Activity Bar** down the left edge — the icons there switch between the Explorer, Search, Source Control, Extensions, and (after the next step) Remote Explorer panels. The **Command Palette** (`Ctrl+Shift+P` on Windows/Linux, `Cmd+Shift+P` on macOS) searches every VS Code command by name; you will use it constantly.
 
 ## Useful extensions
 
-In the left sidebar, click the **Extensions** tab and search for the following:
+In the left sidebar, click the **Extensions** tab (the four-squares icon) and search for the following:
 
--   **Quarto** — for editing and previewing `.qmd` files like the workshop chapters.
--   **R** — syntax highlighting, code lens, and integration with the R language server.
--   **PDF Viewer** and **CSV Editor/Viewer** — open plots and tables your scripts produce without leaving VS Code.
+-   **Quarto** — edit, preview, and run `.qmd` files (the workshop chapters and tutorials). With this extension installed, a **Preview** button appears in the editor's top-right corner; clicking it (or pressing `Ctrl+Shift+K` / `Cmd+Shift+K`) renders a live HTML preview in a split pane that refreshes on save.
+-   **R** — syntax highlighting, autocompletion, and integration with the R language server.
+-   **vscode-pdf** (PDF Viewer) — open plots and rendered documents without leaving the editor.
+-   **Excel Viewer** (CSV Editor/Viewer) — renders `.csv` files as a formatted table.
 -   **GitLens** or **Git Graph** — visualize the repository history alongside your code.
 
-The **Remote — SSH** and **Remote Explorer** extensions (for connecting VS Code to Talapas) are installed and configured in [Chapter 9](Chapter_09_SLURM_Basics.html).
+After installing, restart VS Code if prompted. The **Remote — SSH** and **Remote Explorer** extensions (for connecting VS Code to Talapas) are installed and configured in [Chapter 9](Chapter_09_SLURM_Basics.html) — no need to install them today.
 
-## Using VS Code as a local editor
+## Opening a project folder
 
-Once you have a project folder open (**File → Open Folder**), VS Code behaves as a full local IDE:
+VS Code is folder-centric: almost everything works better when you open the root folder of a project rather than individual files.
+
+1.  Download or clone the workshop repository so it is somewhere on your laptop (e.g. `~/scRNAseq_tutorial`).
+2.  In VS Code choose **File → Open Folder…** (macOS: **File → Open…**) and navigate to that folder.
+3.  The **Explorer** panel on the left now shows the directory tree. Click on any file to open it.
+4.  VS Code may ask if you trust the authors of the files in this folder — click **Yes, I trust the authors** to enable full functionality.
+
+::: {.callout-tip title="Workspace vs. folder"}
+A **folder** opened directly is the simplest way to work. A **workspace** (`.code-workspace` file) lets you group multiple root folders — handy when a project spans several directories, but unnecessary for this workshop. Stick with **Open Folder** for now.
+:::
+
+## Using VS Code as a local IDE
+
+Once you have a project folder open, VS Code behaves as a full local IDE:
 
 -   The **Explorer** panel (left sidebar) shows the directory tree; click a file to open it in the editor.
--   The **integrated terminal** (**Terminal → New Terminal**) opens a shell in the project directory — use it to run R scripts, Git commands, or any shell command without leaving VS Code.
+-   The **integrated terminal** (**Terminal → New Terminal**, or `` Ctrl+` ``) opens a shell in the project directory — use it to run R scripts, shell commands, or Git commands without leaving VS Code. Press `` Ctrl+` `` to toggle it open and closed.
 -   **Comment / uncomment** selected lines with `Ctrl + /` (macOS `Cmd + /`).
 -   **Search across all files** in the folder with `Ctrl + Shift + F` (macOS `Cmd + Shift + F`).
--   Split-pane editing lets you view a script and its output log side by side.
+-   Split-pane editing lets you view a script and its output log side by side (`Ctrl+\` / `Cmd+\`).
 -   Add more terminal tabs with the **+** at the top-right of the terminal pane; you can have multiple shells open simultaneously.
+-   **Run R locally**: the integrated terminal is a full shell — start an interactive R session with `R`, or run a script with `Rscript my_script.R`, exactly as you would in any terminal.
+
+## Useful VS Code shortcuts
+
+| What | How (Win/Linux) | How (macOS) |
+|---|---|---|
+| Toggle word wrap | Alt+Z | Alt+Z |
+| Find in current file | Ctrl+F | Cmd+F |
+| Find across all files | Ctrl+Shift+F | Cmd+Shift+F |
+| Go to a line number | Ctrl+G | Cmd+G |
+| Format a file | Shift+Alt+F | Shift+Option+F |
+| Toggle integrated terminal | Ctrl+` | Ctrl+` |
+| Open new terminal | Ctrl+Shift+` | Cmd+Shift+` |
+| Split editor pane | Ctrl+\ | Cmd+\ |
+| Open Command Palette | Ctrl+Shift+P | Cmd+Shift+P |
+| Preview Quarto document | Ctrl+Shift+K | Cmd+Shift+K |
 
 ::: {.callout-tip title="Laptop workflow tip"}
 For the early modules (Modules 01–08) you work entirely locally — open the workshop repository folder in VS Code and run everything from the integrated terminal or from RStudio. When you move to the Friday Talapas modules, VS Code's Remote-SSH extension connects the same editor interface directly to the cluster; the experience feels nearly identical, but your files and terminal are on Talapas. That setup is in [Chapter 9](Chapter_09_SLURM_Basics.html).
 :::
 
+# The command line
+
+The **shell** is a text-based interface to your computer's operating system. You type a command, the shell passes it to the OS, the OS executes it, and the result comes back as text. This is not a workaround for an absence of GUI tools — it is a deliberate design: small, focused programs that each do one thing well, combined in flexible ways.
+
+::: {.callout-note .key-concept title="🔑 Key concept — what the shell is and why it matters"}
+The shell is both a **command interpreter** (it reads what you type and runs the corresponding programs) and a **scripting language** (you can save a sequence of commands in a file and run it repeatedly). Every bioinformatics tool you will encounter — Cell Ranger, STAR, samtools, salmon — is run from the shell. Seurat workflows on a cluster are submitted as shell scripts. Knowing the shell is not optional for serious genomics work.
+
+The most common shell on macOS and Linux is **bash** (Bourne-Again SHell); modern macOS defaults to **zsh**, which is nearly identical for interactive use. On Windows, **WSL (Windows Subsystem for Linux)** gives a full Linux environment; the **RStudio Terminal** tab also works for the commands in this chapter. All examples here run the same on macOS, Linux, and WSL.
+:::
+
+## Where am I? Navigating the file system
+
+Open a terminal (the VS Code integrated terminal, or your system Terminal app) and orient yourself.
+
+A shell command is a **command** plus optional **flags/options** (like `-l`) and **arguments** (what to act on):
+
+```bash
+command  -flag  argument
+ls       -l     ~/Documents
+```
+
+The foundational navigation commands:
+
+```bash
+pwd                 # "print working directory" — the absolute path you are in right now
+ls                  # list files and folders in the current directory
+ls -F               # mark directories with /, executables with *
+ls -l               # long format: permissions, owner, size, modified date
+ls -la              # long format + hidden (dot-)files like .bashrc
+cd ~                # go to your home directory (~ is shorthand for home)
+pwd                 # confirm you moved
+```
+
+::: {.callout-note .key-concept title="🔑 Key concept — the working directory"}
+Every shell session has a **current working directory** (CWD) — the folder the shell is "standing in" right now. `pwd` prints it. Relative paths are interpreted from the CWD, so the CWD determines what `ls` shows, what `./script.sh` runs, and where files are written when you give a bare filename like `output.csv`. Keeping track of your CWD is the single most important habit for avoiding "file not found" errors.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — ls flags"}
+| Flag | Effect |
+|------|--------|
+| `-l` | Long listing: permissions, owner, size, modification date |
+| `-a` | Show all files including hidden dotfiles (names starting with `.`) |
+| `-h` | Human-readable file sizes (1K, 5M, 2G) — use with `-l` |
+| `-t` | Sort by modification time, newest first |
+| `-r` | Reverse sort order |
+
+Flags can be combined: `ls -lah` gives a long, human-readable listing of all files.
+:::
+
+## Absolute vs relative paths
+
+Every file on a Unix-like system has an **absolute path** — the full address from the root `/` of the file system — and you can also refer to files by a **relative path** from wherever you currently are.
+
+```bash
+cd /                    # jump to the root of the whole file system (absolute)
+ls                      # the top-level directories of the machine
+cd ~                    # back home (absolute, via the ~ shortcut)
+cd ..                   # up one level (relative — .. means "parent directory")
+cd -                    # back to where you just were (toggles between last two dirs)
+cd ~/Desktop            # absolute path built from home; adjust if Desktop does not exist
+pwd
+```
+
+::: {.callout-note .key-concept title="🔑 Key concept — absolute vs relative paths"}
+An **absolute path** starts at the filesystem root `/` and is unambiguous from anywhere on the machine: `/home/wcresko/projects/scrnaseq/data/sample01.csv`. A **relative path** is interpreted from the current working directory: `../data/sample01.csv` means "go up one level, then into `data/`."
+
+Special path shortcuts:
+
+| Shortcut | Meaning |
+|----------|---------|
+| `.` | The current directory |
+| `..` | The parent directory (one level up) |
+| `~` | Your home directory |
+| `-` | The previous directory (where you just were) |
+
+Relative paths are shorter and survive moving an entire project to a new location; absolute paths are unambiguous but brittle if anything above them moves. In analysis scripts, **relative paths anchored to the project root** (e.g. `data/raw/sample01.fastq.gz`) are best for reproducibility.
+:::
+
+## Making, moving, copying, and removing files
+
+Create a scratch workspace and practice the core file operations.
+
+```bash
+cd ~
+mkdir p1_practice            # make a new directory
+cd p1_practice
+
+touch notes.txt              # create an empty file
+echo "single cell RNA-seq" > notes.txt    # write one line (> overwrites)
+echo "day 0 refresher" >> notes.txt       # append a second line (>> appends)
+
+cp notes.txt notes_backup.txt   # copy a file
+mv notes.txt readme.txt          # rename (move within the same directory)
+mkdir archive
+mv notes_backup.txt archive/     # move a file into a subdirectory
+
+ls -F                            # see what you have made
+ls archive/
+```
+
+Now clean up selectively:
+
+```bash
+rm archive/notes_backup.txt      # remove a single file
+rmdir archive                    # remove an *empty* directory
+# rm -r somedir                  # remove a directory AND everything inside it
+```
+
+A few rules the shell enforces that can surprise newcomers: the shell **trusts you** — it deletes what you tell it to and overwrites same-named files without asking. There is no Recycle Bin. Avoid spaces in filenames; stick to letters, numbers, `.`, `-`, and `_`.
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — rm and cp flags"}
+| Command | Effect |
+|---------|--------|
+| `rm file` | Delete a single file (irreversible — no Recycle Bin) |
+| `rm -r dir/` | Delete a directory **and all its contents** recursively |
+| `rm -i file` | Interactive: ask before each deletion |
+| `cp src dst` | Copy a single file |
+| `cp -r src/ dst/` | Copy a directory and all its contents recursively |
+| `mv src dst` | Move or rename a file or directory |
+
+`rm -r` is powerful and irreversible. Always double-check the path before pressing Enter, and never combine it with wildcards (`rm -r *`) without careful thought.
+:::
+
+## Viewing file contents
+
+You rarely open genomics data files in a GUI; you inspect them directly in the shell. Build a test file, then look at it several ways:
+
+```bash
+cd ~/p1_practice
+# write 100 numbered lines into a file
+for i in {1..100}; do echo "line $i"; done > big.txt
+
+cat readme.txt          # dump an entire (small) file to the screen
+head big.txt            # first 10 lines (default)
+head -n 3 big.txt       # first 3 lines
+tail big.txt            # last 10 lines
+tail -n 3 big.txt       # last 3 lines
+wc -l big.txt           # count lines in a file
+less big.txt            # page through interactively (SPACE=down, b=up, /pattern=search, q=quit)
+```
+
+::: {.callout-warning title="Do not use cat on large files"}
+`cat` dumps the **entire file** to the screen. That is fine for a 10-line README, but a 3 GB genome FASTA or a 50,000-cell expression matrix will flood your terminal and can stall your session. For big files always use `head`, `tail`, `less`, or streaming tools — they never load the whole file into memory at once.
+:::
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — file-viewing commands"}
+| Command | What it does |
+|---------|-------------|
+| `cat file` | Print entire file to stdout |
+| `head -n N file` | Print first N lines (default 10) |
+| `tail -n N file` | Print last N lines (default 10) |
+| `wc -l file` | Count lines; `-w` = words, `-c` = bytes |
+| `less file` | Interactive pager: scroll, search, quit with `q` |
+| `zcat file.gz` | Stream a gzip-compressed file without unpacking |
+| `zless file.gz` | Page through a gzip-compressed file |
+:::
+
+## Wildcards
+
+Wildcards let one command act on many files at once. The shell expands them before passing the result to the command.
+
+```bash
+cd ~/p1_practice
+touch sample_01.fastq sample_02.fastq sample_03.fastq control.fastq notes.md
+
+ls *.fastq              # everything ending in .fastq
+ls sample_*.fastq       # the three sample files (prefix match)
+ls sample_0?.fastq      # ? matches exactly one character
+ls sample_0[12].fastq   # character class: only sample_01 and sample_02
+ls *.{fastq,md}         # brace expansion: match .fastq OR .md
+```
+
+::: {.callout-note .key-concept title="🔑 Key concept — shell wildcards"}
+| Pattern | Matches |
+|---------|---------|
+| `*` | Any string of characters (including none) |
+| `?` | Exactly one character |
+| `[abc]` | Any single character in the set |
+| `[a-z]` | Any single character in the range |
+| `{foo,bar}` | Either `foo` or `bar` (brace expansion, not a true wildcard) |
+
+Wildcards are expanded by the **shell** before the command receives them. If no file matches, many shells pass the literal pattern to the command, which will usually error — a useful signal that your pattern is wrong or you are in the wrong directory.
+:::
+
+## Pipes and redirection
+
+Two mechanisms power most command-line work:
+
+**Redirection** routes a command's input or output to/from a file:
+
+- `>` writes stdout to a file (overwrites if it exists)
+- `>>` appends stdout to a file
+- `<` reads stdin from a file
+- `2>` redirects stderr (error messages) to a file
+
+**Pipes** (`|`) connect the stdout of one command directly to the stdin of the next — no temporary file needed. This is the Unix philosophy: small tools that each do one thing well, chained together into powerful pipelines.
+
+```bash
+cd ~/p1_practice
+
+# --- redirection ---
+ls -l > listing.txt                     # write a directory listing to a file (overwrites)
+echo "generated $(date)" >> listing.txt # append a timestamp line
+wc -l < big.txt                         # feed big.txt as stdin; counts its lines
+
+# --- pipes ---
+cat big.txt | wc -l                     # count lines via a pipe (same result)
+head -n 50 big.txt | tail -n 5          # lines 46–50: take first 50, then last 5 of those
+ls *.fastq | wc -l                      # how many .fastq files are there?
+
+# --- a longer pipeline ---
+# count and rank the most common words in readme.txt
+cat readme.txt | tr ' ' '\n' | sort | uniq -c | sort -rn | head
+```
+
+Every program has three standard streams: **stdin** (0, input), **stdout** (1, normal output), and **stderr** (2, error messages). You can redirect each independently — for example, `command 2> errors.log` keeps error messages out of your results file.
+
+::: {.callout-note .key-concept title="🔑 Key concept — pipes and the Unix philosophy"}
+A **pipe** `|` makes the output of one program the input of the next — all in memory, with no temporary files written to disk. This lets you chain simple, specialized tools into powerful one-liners. For example:
+
+```bash
+grep "^>" sequences.fasta | sort | uniq | wc -l
+```
+
+reads a FASTA file, keeps only header lines (starting with `>`), sorts them, removes duplicates, and counts the result — four operations in one readable command.
+
+Pipes and redirection can be combined freely: `ls | wc -l > count.txt` pipes the listing into a counter, then saves the count to a file.
+
+For deeper treatment of `grep`, regular expressions, and shell scripting see [Appendix C — grep, regex & shell scripting](Appendix_C_GREP_Regex_Shell.html).
+:::
+
+## Downloading data with wget and curl
+
+Genomic references, annotation files, and datasets are usually distributed by URL. `wget` and `curl` fetch them directly to your machine or the cluster — no browser required.
+
+```bash
+cd ~/p1_practice
+
+# wget: download a file to the current directory
+wget https://raw.githubusercontent.com/githubtraining/hellogitworld/master/README.txt
+
+# curl: -o specifies the output filename
+curl -o readme_copy.txt \
+  https://raw.githubusercontent.com/githubtraining/hellogitworld/master/README.txt
+
+ls -lh README.txt     # -h = human-readable size (e.g. 1.2K instead of 1234)
+head README.txt
+```
+
+::: {.callout-note .key-parameter title="⚙️ Key parameter — wget and curl flags"}
+| Flag | Tool | Effect |
+|------|------|--------|
+| `-O filename` | wget | Save to a specific filename instead of the URL's basename |
+| `-q` | wget | Quiet mode — suppress progress output |
+| `-o filename` | curl | Write output to a named file |
+| `-L` | curl | Follow HTTP redirects (important for some data portals) |
+| `-C -` | wget | Resume a partially downloaded file |
+
+The backslash `\` at the end of a line continues the command on the next line — useful for long URLs or multi-flag commands. Compressed files ending in `.gz` can be streamed without unpacking: `wget -qO- url | zcat | head` pipes the download straight into `zcat` for inspection.
+:::
+
+When you finish practicing, clean up the scratch folder:
+
+```bash
+cd ~
+rm -r p1_practice   # deletes the folder and everything in it — intentional here
+```
+
+## Quick reference: the most-used shell commands
+
+| Category | Command | What it does |
+|----------|---------|-------------|
+| Navigation | `pwd` | Print current directory |
+| | `ls [-la]` | List directory contents |
+| | `cd path` | Change directory |
+| File ops | `touch file` | Create empty file |
+| | `cp src dst` | Copy file or directory (`-r` for directories) |
+| | `mv src dst` | Move or rename |
+| | `rm file` | Delete file (`-r` for directories) |
+| | `mkdir dir` | Create directory |
+| Viewing | `cat file` | Print file contents |
+| | `head / tail` | First/last lines |
+| | `less file` | Page through interactively |
+| | `wc -l file` | Count lines |
+| Streams | `>` / `>>` | Redirect stdout (overwrite / append) |
+| | `\|` | Pipe stdout to next command's stdin |
+| | `2>` | Redirect stderr |
+| Download | `wget url` | Download file from URL |
+| | `curl -o file url` | Download to named file |
+
+For advanced shell topics — `grep` pattern matching, regular expressions, `sed`, `awk`, loops, and writing shell scripts — see [Appendix C — grep, regex & shell scripting](Appendix_C_GREP_Regex_Shell.html). The [Cheat Sheets](../Cheat_Sheets.html) page has a printable one-page Unix shell reference.
+
 # Best practices and getting help
+
+## Getting help in the shell
+
+The shell has several built-in ways to learn about a command:
+
+```bash
+man ls          # the full manual page (q to quit)
+ls --help       # brief usage summary (works on Linux; not all macOS tools support it)
+whatis ls       # one-line description
+```
+
+Most commands follow the pattern `command --help` or `man command`. Reading a man page for any command you are about to use on production data is a good habit.
 
 ## Getting help with VS Code
 
 -   **Command Palette**: `Ctrl + Shift + P` (macOS `Cmd + Shift + P`) searches all available VS Code commands by name.
 -   **Official docs**: [code.visualstudio.com/docs](https://code.visualstudio.com/docs) — thorough reference for every feature and extension.
 -   **Extension pages**: each extension's page in the Marketplace explains its keybindings and settings.
+-   **Settings Sync**: if you use VS Code on multiple machines, **File → Preferences → Turn on Settings Sync…** keeps your extensions and keybindings in sync automatically.
 
 ## Getting help with Talapas
 
@@ -283,6 +629,13 @@ Everything Talapas-related — accounts, SSH login, modules, SLURM, file systems
 -   **Knowledge Base**: [uoracs.github.io/talapas2-knowledge-base](https://uoracs.github.io/talapas2-knowledge-base/)
 -   **Service Desk**: [hpcrcf.atlassian.net/servicedesk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1)
 -   **Email**: racs\@uoregon.edu
+
+## Additional resources
+
+-   [Appendix C — grep, regex & shell scripting](Appendix_C_GREP_Regex_Shell.html) — deeper treatment of pattern matching, sed, awk, and writing reusable shell scripts.
+-   [Cheat Sheets](../Cheat_Sheets.html) — one-page Unix shell and VS Code references.
+-   [Software Setup](../Software_Setup.html) — step-by-step installation instructions for VS Code, R, and RStudio.
+-   [Software Carpentry — The Unix Shell](https://swcarpentry.github.io/shell-novice/) — a well-regarded self-paced introduction that covers everything in this chapter and more with hands-on exercises.
 
 ## References
 
