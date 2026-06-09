@@ -110,6 +110,49 @@ ssh <duckid>@login.talapas.uoregon.edu
 Multi-factor authentication (Duo) is required for every connection — have your phone handy.
 :::
 
+## The integrated terminal is a shell on Talapas
+
+::: incremental
+-   Open it: **Terminal → New Terminal** (or `` Ctrl/Cmd+` ``).
+-   This is **not** your laptop's terminal — it is a shell running on the Talapas login node.
+-   The green `SSH: login.talapas.uoregon.edu` banner in the status bar confirms you're remote. Verify with:
+:::
+
+``` bash
+hostname   # e.g. login1.talapas.uoregon.edu
+whoami     # your Duck ID
+```
+
+::: incremental
+-   All the shell commands from [P1 (Computer Systems & the Command Line)](../Resources_Folder/Chapter_P1_Computer_Systems.html) — `pwd`, `ls`, `cd`, pipes — work here, now on the cluster.
+-   `module load`, `srun`, and `sbatch` are all typed in this terminal.
+:::
+
+::: {.callout-note .key-concept title="🔑 Key concept — the integrated terminal is a remote shell"}
+When VS Code is connected via Remote-SSH, its integrated terminal opens a shell **on the Talapas login node**, not on your laptop. You edit files in the VS Code editor (left) while running commands in the terminal (bottom) — both operating on the same remote files.
+:::
+
+## The edit-in-editor / run-in-terminal loop
+
+::: incremental
+-   **Editor pane** (left/top): open and edit `.R`, `.qmd`, or `.sbatch` files on Talapas — changes are saved directly on the cluster filesystem.
+-   **Terminal pane** (bottom): run the file, submit the job, or tail the log — all on the same machine.
+-   This is the core workflow for scRNA-seq analysis on Talapas:
+:::
+
+``` bash
+# In the integrated terminal (on the login node):
+module load R/4.3.2
+Rscript scripts/01_qc_preprocessing.R   # quick smoke-test on login
+sbatch run_rscript.sbatch 01_qc_preprocessing.R  # or submit as a batch job
+tail -f logs/seurat_qc_*.out            # watch the job as it runs
+```
+
+::: incremental
+-   For anything real (full data, long runs): always use `sbatch` — the job survives you closing the laptop.
+-   For `.qmd` rendering on the cluster: `quarto render my_analysis.qmd` in the terminal.
+:::
+
 ## Open OnDemand — browser alternative
 
 ::: incremental
@@ -136,6 +179,8 @@ Scratch purges files older than 90 days automatically and is **never backed up**
 ## Navigating on login
 
 ::: incremental
+-   All commands run in the **VS Code integrated terminal** — the shell on the login node.
+-   Shell basics (`pwd`, `ls`, `cd`, pipes) were covered in [P1 — Computer Systems & the Command Line](../Resources_Folder/Chapter_P1_Computer_Systems.html); the focus here is what's **different** on the cluster.
 -   Check your quotas: `df -h /home/$USER` and `df -h /projects/<PIRG>`.
 -   Your first visit: `ls /projects/<PIRG>` and `ls /scratch/<PIRG>/` to see the lab space.
 -   Workshop data lives in `/projects/<PIRG>/` — copy or symlink it into your working directory.
@@ -474,6 +519,8 @@ seff 123456
 
 ::: incremental
 -   Connect with **VS Code Remote-SSH** (Duck ID + Duo) — green banner = you're on Talapas.
+-   The **VS Code integrated terminal** (`` Ctrl/Cmd+` ``) is a shell on the login node — `hostname` confirms it. Shell skills from [P1](../Resources_Folder/Chapter_P1_Computer_Systems.html) all apply here.
+-   **Edit in the editor, run in the terminal** — both operate on the same remote filesystem.
 -   Files live in **home** (backed up, small), **projects** (lab-shared), and **scratch** (large, 90-day purge).
 -   Load software with **`module load`**; always `module purge` first in batch scripts.
 -   A scheduler exists because the cluster is **shared** — declare what you need.
