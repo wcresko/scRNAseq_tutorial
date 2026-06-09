@@ -112,10 +112,12 @@ log(1000, base = 10) # named argument — clearer and order-independent
 ``` r
 counts <- c(8, 3, 0, 12, 5, 1, 0, 9)   # c() = concatenate
 counts * 2           # every element doubled — no loop needed
-sum(counts); mean(counts); sd(counts)
+counts + counts      # element-wise addition
+
+sum(counts); mean(counts); median(counts)
+sd(counts); max(counts); min(counts)
 length(counts)       # how many elements
 
-# sequences
 seq(0, 10, by = 2)   # 0 2 4 6 8 10
 1:10                 # shorthand integer sequence
 ```
@@ -123,7 +125,7 @@ seq(0, 10, by = 2)   # 0 2 4 6 8 10
 ::: incremental
 -   A **vector** holds values of a **single type**: `dbl`, `int`, `chr`, `lgl`, or `fctr`
 -   Math applies **element-wise** — this is how R processes thousands of cells at once
--   `NA` marks a missing value
+-   `NA` marks a missing value; most summary functions accept `na.rm = TRUE`
 :::
 
 ## Vectors of other types
@@ -156,12 +158,14 @@ cells <- data.frame(
 
 str(cells)                           # structure: columns, types, values
 summary(cells)                       # per-column summary stats
+nrow(cells); ncol(cells)             # dimensions
+colnames(cells)                      # column names
 ```
 
 ::: incremental
 -   The workhorse for tabular data — columns are vectors, can be **different types**
 -   Seurat stores per-cell QC metrics in a data frame (`obj@meta.data`)
--   `str()` and `summary()` are your first-look tools
+-   `str()` and `summary()` are your first-look tools; `nrow()` / `ncol()` give dimensions
 :::
 
 ## Indexing & subsetting
@@ -330,24 +334,24 @@ meta |>
 ## Reading & writing tabular data
 
 ``` r
-# Write
+# write our data frame, then read it back
 write_csv(cells, "cells_demo.csv")          # tidyverse — no row names
-write.csv(cells, "cells_demo.csv",          # base R equivalent
-          row.names = FALSE)
+back <- read_csv("cells_demo.csv")          # returns a tibble
+back
 
-# Read
-df  <- read_csv("data.csv")                 # tidyverse — returns a tibble
-df2 <- read_tsv("data.txt")                 # tab-separated
-df3 <- read.csv("data.csv")                 # base R equivalent
+# base R equivalents
+write.csv(cells, "cells_demo.csv", row.names = FALSE)
+back2 <- read.csv("cells_demo.csv")
 
-# Other formats
+# other separators and formats
+df_tsv <- read_tsv("data.txt")              # tab-separated
 # library(readxl); xl <- read_excel("file.xlsx")
 ```
 
 ::: incremental
 -   `read_csv()` / `write_csv()` (tidyverse) return **tibbles** and are faster and friendlier
 -   Store data in **plain text** (`.csv`, `.tsv`) — it outlasts any software version
--   Keep an **untouched original**; write results to a new file
+-   Keep an **untouched original**; always write results to a **new file**
 -   One column = one data type
 :::
 
