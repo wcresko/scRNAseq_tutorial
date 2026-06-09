@@ -28,7 +28,7 @@ editor: visual
 ::: incremental
 -   **Day 0 (optional Tuesday refresher)** — a relaxed primer before the workshop proper begins on Day 1.
 -   This is **Module 1 of 2**:
-    -   **Module 1 (now):** Computer System Fundamentals — hardware, OS, HPC, Talapas.
+    -   **Module 1 (now):** Computer System Fundamentals — hardware, OS, and VS Code on your laptop.
     -   **Module 2 (next):** [R & the Command Line](Lecture_P2_R_and_CommandLine.html).
 -   Pairs with the reading: [P1 — Computer System Fundamentals](../Resources_Folder/Chapter_P1_Computer_Systems.html).
 -   Goal: build a shared mental model so the analysis days (Day 1+) make sense.
@@ -39,10 +39,8 @@ editor: visual
 ::: incremental
 -   Know the parts of a computer that matter for data analysis: **CPU, RAM, disk**.
 -   Understand what an **operating system** does for you.
--   Know what an **HPC cluster** is and *when you actually need one*.
--   Be able to **log in to Talapas** and find your way around.
--   Understand **modules** and the **SLURM** scheduler at a high level.
--   See how **VS Code** and **reproducible environments** make this comfortable.
+-   Set up and use **VS Code** as a local editor and interactive coding environment.
+-   Know that an HPC cluster exists and **when you'll need one** — details on Friday.
 :::
 
 # How computers & operating systems work {background-color="#2c3e50"}
@@ -102,207 +100,65 @@ Most of this workshop runs on the **CPU**. GPUs matter for deep-learning steps a
 -   Unix/Linux is the lingua franca of scientific computing — the same commands work on your laptop and on Talapas.
 :::
 
-# What is an HPC cluster? {background-color="#2c3e50"}
+# Working locally with VS Code {background-color="#2c3e50"}
 
-## A cluster, in one picture
+## What is VS Code?
 
 ::: incremental
--   A **cluster** is many computers ("nodes") wired together to act as one big system.
--   **Login (head) node** — where you land; for light work only (editing, submitting jobs).
--   **Compute nodes** — the workhorses where your jobs actually run.
--   **Shared storage** — a parallel filesystem every node can see.
--   **Scheduler** (SLURM) — decides whose job runs where and when.
+-   **Visual Studio Code** is a free, open-source editor/IDE from Microsoft — runs on macOS, Windows, and Linux.
+-   Think of it as a smart text editor that understands code: syntax highlighting, autocomplete, Git integration, and a built-in terminal.
+-   Lightweight enough for quick edits; powerful enough to replace a full IDE.
+-   Download from [code.visualstudio.com](https://code.visualstudio.com) — free, no account required.
 :::
 
-## When do you actually need one?
+## Key extensions for this workshop
 
-::::: columns
-::: {.column width="50%"}
-**Laptop is fine when...**
-
--   Data fits in your RAM
--   One sample / small dataset
--   Quick exploration & plotting
+::: incremental
+-   **Quarto** — renders `.qmd` documents, live preview in the editor.
+-   **R** (Posit) — R language support, inline output, variable explorer.
+-   **R Debugger** — step-through debugging for R scripts.
+-   Install from the Extensions panel (`Ctrl/Cmd + Shift + X`), or from the command line: `code --install-extension quarto.quarto`.
 :::
 
-::: {.column width="50%"}
-**Reach for HPC when...**
+## The integrated terminal
 
--   Data exceeds laptop RAM (many samples)
--   Long-running jobs (hours/days)
--   Many jobs in parallel
--   You need GPUs or huge memory nodes
+::: incremental
+-   Open with `` Ctrl/Cmd + ` `` — a full shell inside the editor window.
+-   Run R scripts, shell commands, Git — without switching applications.
+-   The terminal **inherits the current workspace folder** as its working directory.
+-   Multiple terminals in the same window: shell + R REPL side by side.
 :::
-:::::
+
+## Editing and running code locally
+
+::: incremental
+-   Open a folder as a **workspace** (`File → Open Folder`) — VS Code tracks all files in the project.
+-   `.qmd` files: edit prose and code chunks side by side; click **Preview** or `Ctrl/Cmd + Shift + K` to render.
+-   `.R` files: send lines to an R terminal with `Ctrl/Cmd + Enter` — exactly like RStudio.
+-   **Source control panel** shows changed files; stage and commit without leaving VS Code.
+:::
+
+## Prototyping locally before scaling up
+
+::: incremental
+-   Start every new analysis on your laptop: explore, plot, confirm the code runs.
+-   Laptop RAM is the limiting factor for single-cell work — once your dataset outgrows it, it's time for the cluster.
+-   The code you write locally runs *unchanged* on the cluster — only the execution environment changes.
+:::
+
+# Coming on Friday: the HPC cluster {background-color="#2c3e50"}
+
+## When your laptop isn't enough
+
+::: incremental
+-   Large datasets, long-running jobs, and parallel pipelines call for an **HPC cluster**.
+-   UO's cluster is **Talapas** — thousands of CPU cores, GPUs, and petabytes of storage.
+-   **Friday morning (Modules 09–10):** you'll log in, explore the file system, and submit the full analysis pipeline as SLURM batch jobs.
+-   See [Lecture 09 — VS Code & SLURM Basics on Talapas](Lecture_09_SLURM_Basics.html) and [Tutorial 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) for the step-by-step.
+:::
 
 ::: {.callout-tip}
-Rule of thumb: prototype small on your laptop, then scale the *same* workflow up on Talapas.
-:::
-
-# UO Talapas {background-color="#2c3e50"}
-
-## Meet Talapas
-
-::: incremental
--   UO's flagship HPC cluster, run by **Research Advanced Computing Services (RACS)**.
--   Named from the Chinook word for *coyote* — educator and keeper of knowledge.
--   Scale: **~14,500 CPU cores, 129 TB RAM, ~89 GPUs (A40–H100), ~3 PB storage.**
--   Docs: [Talapas Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/).
-:::
-
-## Getting access: a PIRG + an account
-
-::: incremental
--   Access is tied to a **PIRG** (Principal Investigator Research Group).
--   Ask your **PI** to add you, or have RACS create a new PIRG.
--   Request access at [racs.uoregon.edu/request-access](https://racs.uoregon.edu/request-access).
--   Your **username = your Duck ID**; your **password = your UO password**.
-:::
-
-## Logging in: SSH + Duo
-
-``` bash
-# Connect with SSH (off campus: connect to UO VPN first)
-ssh yourduckid@login.talapas.uoregon.edu
-```
-
-::: incremental
--   No characters appear while you type your password — that's normal.
--   Logins require **Duo** two-factor: type `1` and Enter for a push.
--   You land on a **login node** — light tasks only. Heavy jobs there get killed.
-:::
-
-## File systems: where things go
-
-| Location | Quota | Purpose |
-|--------------------------|-----------|------------------------------------|
-| `/home/<duckid>` | 250 GB | Config files, scripts, small installs |
-| `/projects/<PIRG>` | 2 TB | Shared project data & analysis |
-| `/scratch/<PIRG>` | 20 TB | High-throughput working space — **purged after 90 days idle** |
-
-::: {.callout-warning}
-**Talapas is NOT backed up.** You are responsible for your own backups. Keep large data in `/projects`; clean up `/scratch`.
-:::
-
-## Software: modules (Lmod)
-
-Talapas software is loaded on demand with **Lmod** — per shell, so reload it in every session/job.
-
-``` bash
-module spider R          # search for software
-module avail             # list loadable modules
-module load R/4.4.1      # load a specific version (reproducible!)
-module list              # what's loaded now
-module purge             # unload everything
-```
-
-::: {.callout-note}
-Always pin a version (`R/4.4.1`, not just `R`) so your analysis is reproducible later.
-:::
-
-## Partitions & SLURM
-
-Jobs go to **partitions** (queues) via the **SLURM** scheduler. Every job must name its **`--account`** (your PIRG).
-
-| Partition | Typical use | Max wall time |
-|-----------------------------|--------------------------------|---------------|
-| `compute` | Standard CPU jobs | 1 day |
-| `computelong` | Long CPU jobs | 14 days |
-| `gpu` / `gpulong` | GPU jobs (short / long) | 1 day / 14 d |
-| `memory` / `memorylong` | High-memory CPU (up to 4 TB) | 1 day / 14 d |
-| `interactive` / `interactivegpu` | Short interactive sessions | 12 h / 8 h |
-| `preempt` | All nodes; may be preempted | Variable |
-
-## Submitting work to SLURM
-
-``` bash
-# Batch job (the normal way to run real work)
-sbatch my_script.sh
-
-# Interactive session (testing / debugging)
-srun --pty --partition=interactive --account=myPIRG \
-     --time=2:00:00 --cpus-per-task=4 --mem=8G /bin/bash
-
-squeue -u $USER     # your jobs in the queue
-scancel JOBID       # cancel a job
-```
-
-::: {.callout-tip}
-Golden rule: **never run heavy computation on a login node.** Anything longer than a few seconds belongs in `srun` or `sbatch`.
-:::
-
-## Anatomy of a batch script
-
-``` bash
-#!/bin/bash
-#SBATCH --job-name=my_analysis   # name
-#SBATCH --partition=compute      # queue
-#SBATCH --account=myPIRG         # your PIRG (required)
-#SBATCH --time=04:00:00          # HH:MM:SS
-#SBATCH --cpus-per-task=4        # cores
-#SBATCH --mem=16G                # memory
-#SBATCH --output=out_%j.log      # %j = job ID
-
-module load R/4.4.1              # load modules AFTER #SBATCH lines
-Rscript my_analysis.R            # do the work
-```
-
-::: incremental
--   `#SBATCH` lines are scheduler directives, not run by bash.
--   Request only what you need — smaller jobs start sooner.
-:::
-
-# Working interactively {background-color="#2c3e50"}
-
-## VS Code + Remote-SSH
-
-::: incremental
--   **VS Code** is a free editor that can connect *into* Talapas over SSH.
--   Install the **Remote – SSH** and **Remote Explorer** extensions.
--   Add the host `login.talapas.uoregon.edu`, connect (password + Duo), and a green banner confirms you're on Talapas.
--   Browse remote files, edit scripts, and use the **integrated terminal** — all in one window.
--   The **Quarto extension** lets you edit and render `.qmd` documents right there.
-:::
-
-## Open OnDemand (browser, no SSH)
-
-::: incremental
--   Web portal: [ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu) — Chrome or Firefox.
--   No SSH client needed; great for beginners.
--   File browser for uploads/downloads.
--   Launch **interactive apps**: JupyterLab, RStudio, MATLAB, remote desktop.
--   Easiest way to get an RStudio or Jupyter session on Talapas.
-:::
-
-# Reproducible environments {background-color="#2c3e50"}
-
-## Why pin your environment?
-
-::: incremental
--   So you can **reproduce a result six months later**.
--   So a co-author runs the **same package versions**.
--   So you avoid days of dependency debugging on Talapas.
--   Two layers cover most cases: **`renv`** (R packages) and **containers** (everything).
-:::
-
-## renv + containers (brief)
-
-``` r
-# renv: pin exact R-package versions (reads renv.lock)
-install.packages("renv")
-renv::restore()
-```
-
-``` bash
-# Container: a self-contained image (R + Bioconductor + system deps)
-# Laptop uses Docker; Talapas uses Apptainer (Docker isn't allowed there)
-module load apptainer
-apptainer pull docker://ghcr.io/wcresko/scrnaseq_tutorial:latest
-apptainer exec scrnaseq_tutorial_latest.sif R
-```
-
-::: {.callout-note}
-**Docker** on your laptop, **Apptainer** on Talapas — same image, reproducible either way.
+Rule of thumb: prototype small on your laptop (today), then scale the *same* workflow up on Talapas (Friday).
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
@@ -312,24 +168,8 @@ apptainer exec scrnaseq_tutorial_latest.sif R
 ::: incremental
 -   **CPU / RAM / disk** — RAM is usually the limiting resource for single-cell work.
 -   The **OS** manages processes, memory, files, and security for you.
--   An **HPC cluster** = many nodes + shared storage + a scheduler; use it when your laptop runs out of room or time.
--   On **Talapas**: PIRG + account, SSH + Duo, mind your file systems, `module load`, and submit jobs with **SLURM** — never on the login node.
--   **VS Code / Open OnDemand** make remote work comfortable; **renv + containers** make it reproducible.
-:::
-
-## Skills you'll use again — and when
-
-| Skill (today) | First used in |
-|---|---|
-| SSH login · login vs compute nodes | [Tutorial P1](../Exercise_Folder/Tutorial_P1_Computer_Systems.html) · [Module 00](../Exercise_Folder/Tutorial_00_Setup_RStudio_Packages.html) §6 |
-| `srun --pty bash` interactive session | [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §5 |
-| `module load R` (pin the version) | Every `sbatch` script in [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §6 |
-| `sbatch`, `#SBATCH` directives | [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §6–7 |
-| `/projects` vs `/scratch` | [Module 10](../Exercise_Folder/Tutorial_10_Talapas_Pipeline.html): `.rds` outputs + `logs/` directory |
-| `renv::restore()` / Apptainer | [Modules 09–10](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) batch workflow |
-
-::: {.callout-note}
-One detail for Friday: **create `logs/` before your first `sbatch`** — SLURM rejects jobs whose log directory doesn't exist (`mkdir -p logs`). See [Module 09](../Exercise_Folder/Tutorial_09_SLURM_Basics.html) §6.
+-   **VS Code** on your laptop: cross-platform editor, Quarto + R extensions, integrated terminal — your daily coding environment.
+-   When your data outgrows the laptop, **Talapas** (Module 09) is next — SLURM, batch jobs, and the full pipeline await on Friday.
 :::
 
 ## What's next
@@ -337,7 +177,6 @@ One detail for Friday: **create `logs/` before your first `sbatch`** — SLURM r
 ::: incremental
 -   **Module 2 (next):** [R & the Command Line](Lecture_P2_R_and_CommandLine.html) — the tools you'll type into every day.
 -   **Day 1 onward:** the single-cell analysis workflow itself.
--   **Friday (Modules 09–10):** SLURM batch scripts, `sbatch`/`squeue`/`seff`, and the full analysis pipeline on Talapas — all building directly on today's skills.
+-   **Friday (Modules 09–10):** connecting to Talapas with VS Code Remote-SSH, SLURM batch scripts, and the full analysis pipeline — all in [Lecture 09](Lecture_09_SLURM_Basics.html) and [Lecture 10](Lecture_10_Talapas_Pipeline.html).
 -   Optional refresher reading: [P1 — Computer System Fundamentals](../Resources_Folder/Chapter_P1_Computer_Systems.html).
--   Need help on Talapas? [Knowledge Base](https://uoracs.github.io/talapas2-knowledge-base/) · [Service Desk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) · racs@uoregon.edu.
 :::

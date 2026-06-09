@@ -1,9 +1,9 @@
 ---
-title: "Lecture 09 — SLURM Basics on Talapas"
+title: "Lecture 09 — VS Code & SLURM Basics on Talapas"
 author: "Bill Cresko"
 format:
   revealjs:
-    footer: "Single Cell RNA-seq Workshop · Lecture 09 — SLURM Basics on Talapas"
+    footer: "Single Cell RNA-seq Workshop · Lecture 09 — VS Code & SLURM Basics on Talapas"
     transition: fade
     transition-speed: slow
     theme: default
@@ -21,7 +21,7 @@ execute:
 editor: visual
 ---
 
-# Lecture 09: SLURM Basics on Talapas {background-color="#2c3e50"}
+# Lecture 09: VS Code & SLURM Basics on Talapas {background-color="#2c3e50"}
 
 ## Where this fits
 
@@ -36,12 +36,149 @@ editor: visual
 ## Goals of this lecture
 
 ::: incremental
+-   Connect to **Talapas** with VS Code Remote-SSH (Duck ID + Duo)
+-   Navigate the **Talapas file systems** — home, projects, scratch
+-   Load software with **Lmod** (`module load`)
 -   Understand **why** a shared cluster needs a scheduler at all
 -   Tell apart **login nodes** and **compute nodes** — and why it matters
 -   Choose between **interactive** and **batch** work
 -   Read the **key SLURM flags** and **partitions** you'll use constantly
 -   Submit, monitor, and right-size jobs with `sbatch` / `squeue` / `seff`
 -   Be a **good cluster citizen** at UO
+:::
+
+# What is an HPC cluster? {background-color="#2c3e50"}
+
+## Many nodes, one scheduler
+
+::: incremental
+-   An **HPC cluster** is a network of computers (nodes) that share storage and are managed as a single system.
+-   You interact with a **login node** — a lightweight gateway machine. Heavy work runs on **compute nodes** you request from the scheduler.
+-   Nodes share a **parallel file system** so your files look the same from every node.
+-   The scheduler (**SLURM** at UO) queues and routes jobs fairly among all users.
+:::
+
+## Meet Talapas — UO's cluster
+
+::: incremental
+-   **Talapas** is managed by UO Research Advanced Computing Services (RACS).
+-   Thousands of CPU cores, GPUs, high-memory nodes, and petabytes of storage.
+-   Access is through a **PIRG** (PI Research Group) — your PI requests an account for the lab.
+-   Once you have an account your Duck ID grants access via SSH and Open OnDemand.
+:::
+
+::: {.callout-tip}
+Run `groups` after logging in to see your PIRG name — you'll need it for every SLURM job.
+:::
+
+# Connecting to Talapas with VS Code {background-color="#2c3e50"}
+
+## VS Code Remote-SSH overview
+
+::: incremental
+-   The **Remote-SSH** extension (Microsoft) turns VS Code into a full remote IDE.
+-   You edit, browse, and run code **on Talapas** — but the interface lives on your laptop.
+-   One-time setup: add Talapas as an SSH host; after that, one click connects you.
+-   Install the extension: `Ctrl/Cmd + Shift + X` → search "Remote - SSH" → Install.
+:::
+
+## Add the SSH host
+
+::: incremental
+-   Press `F1` → **Remote-SSH: Add New SSH Host** → enter:
+:::
+
+``` bash
+ssh <duckid>@login.talapas.uoregon.edu
+```
+
+::: incremental
+-   Save to `~/.ssh/config` when prompted.
+-   The host then appears in the **Remote Explorer** panel on the left sidebar.
+:::
+
+## Connect with Duck ID + Duo
+
+::: incremental
+-   Click the host in Remote Explorer (or `F1` → **Remote-SSH: Connect to Host**).
+-   Enter your **Duck ID password** when prompted, then approve the **Duo push**.
+-   The bottom-left status bar turns green and shows `SSH: login.talapas.uoregon.edu` — you're in.
+-   Open a folder (`File → Open Folder`) to browse the Talapas file system in the sidebar.
+:::
+
+::: {.callout-note}
+Multi-factor authentication (Duo) is required for every connection — have your phone handy.
+:::
+
+## Open OnDemand — browser alternative
+
+::: incremental
+-   **Open OnDemand** ([ondemand.talapas.uoregon.edu](https://ondemand.talapas.uoregon.edu)) gives a full HPC portal in the browser — no SSH client needed.
+-   Launches interactive apps: RStudio Server, Jupyter, a desktop session.
+-   Useful when VS Code Remote-SSH isn't an option or for one-off interactive work.
+-   For this workshop, VS Code Remote-SSH is the primary workflow.
+:::
+
+# Talapas file systems {background-color="#2c3e50"}
+
+## Three places to put files
+
+| Location | Path | Quota | Backed up? | Use for |
+|---|---|---|---|---|
+| Home | `/home/<duckid>/` | ~20 GB | Yes | scripts, configs, small results |
+| Projects | `/projects/<PIRG>/` | shared lab quota | Yes | shared data, final outputs |
+| Scratch | `/scratch/<PIRG>/<duckid>/` | large | **No** (purged 90 d) | large intermediates |
+
+::: {.callout-warning}
+Scratch purges files older than 90 days automatically and is **never backed up**. Keep only transient intermediates there; copy results to `/projects/`.
+:::
+
+## Navigating on login
+
+::: incremental
+-   Check your quotas: `df -h /home/$USER` and `df -h /projects/<PIRG>`.
+-   Your first visit: `ls /projects/<PIRG>` and `ls /scratch/<PIRG>/` to see the lab space.
+-   Workshop data lives in `/projects/<PIRG>/` — copy or symlink it into your working directory.
+:::
+
+# Loading software with Lmod {background-color="#2c3e50"}
+
+## What are modules?
+
+::: incremental
+-   Talapas does not have R (or most tools) in your default `PATH`.
+-   **Lmod** is the module system that adds software to your environment on demand.
+-   Each `module load` command sets `PATH`, `LD_LIBRARY_PATH`, etc. for one piece of software.
+-   Modules are **temporary** — they must be loaded at the start of every session and inside every batch script.
+:::
+
+## Common module commands
+
+``` bash
+module avail              # list all available modules
+module avail R            # filter by name
+module load R/4.3.2       # load a specific version
+module list               # see what is currently loaded
+module purge              # unload everything (good start for scripts)
+```
+
+::: incremental
+-   Always load a **specific version** (e.g. `R/4.3.2`) — `module load R` picks whatever is default today, which may change.
+-   `module purge` at the top of every batch script ensures a clean, reproducible environment.
+:::
+
+::: {.callout-tip}
+Add `module purge && module load R/4.3.2` to your `~/.bash_profile` if you want R ready on every login — but always put explicit loads inside batch scripts too.
+:::
+
+# Working interactively on Talapas {background-color="#2c3e50"}
+
+## Explore before you batch
+
+::: incremental
+-   Use an **interactive session** (`srun --pty bash`) to prototype, debug, and explore.
+-   VS Code Remote-SSH works seamlessly in interactive sessions: open your folder, run code in the integrated terminal.
+-   Prototype interactively on a small slice of data → then submit the same script as a batch job for the full run.
 :::
 
 # Why a scheduler? {background-color="#2c3e50"}
