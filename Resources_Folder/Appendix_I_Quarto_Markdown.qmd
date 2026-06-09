@@ -1,0 +1,484 @@
+---
+title: "Appendix I - Quarto & Markdown Syntax"
+author: "Bill Cresko"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    code-fold: false
+    code-overflow: wrap
+    highlight-style: github
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(knitr)
+```
+
+# Appendix I: Quarto & Markdown Syntax
+
+## Overview
+
+::: {.callout-tip title="What this appendix is"}
+Every page in this workshop --- these appendices, the chapters, the tutorials, this whole website --- is written in **Quarto** (`.qmd`) files: plain-text Markdown with executable code chunks. This is a look-it-up reference for the syntax: headings and emphasis, code chunks and their options, figures and tables, callouts and tabsets, math and citations. If you have written R Markdown before, Quarto will feel familiar --- it is the modern successor. For the canonical, always-current documentation, see the [Quarto guide](https://quarto.org/docs/guide/); the [printable one-pager](../Cheat_Sheets.html) is on the Cheat Sheets tab.
+:::
+
+# Anatomy of a `.qmd` file
+
+A Quarto document has three kinds of content: a **YAML header**, **Markdown** prose, and **code chunks**.
+
+```` markdown
+---
+title: "My Analysis"
+author: "Your Name"
+format: html
+---
+
+## A section heading
+
+Ordinary prose written in **Markdown**.
+
+```{r}
+# An executable code chunk
+summary(cars)
+```
+
+More prose, and an *inline* result: `r nrow(cars)` rows.
+````
+
+::: panel-tabset
+### The pieces
+
+-   The block between the `---` fences at the very top is the **YAML header** (front matter): document-level settings --- title, author, output format, options.
+-   Everything else is **Markdown** prose, with the formatting shown in the sections below.
+-   Triple-backtick blocks tagged with a language (` ```{r} `) are **executable code chunks**: Quarto runs them and inserts the results when it renders.
+-   `` `r ... ` `` embeds an inline result in a sentence.
+
+### Interpretation
+
+-   YAML is **indentation-sensitive** (two spaces, never tabs) and the `---` fences must be the first thing in the file. A stray tab or a missing fence is the most common "my document won't render" cause.
+-   The file extension is `.qmd`. Rendering turns it into HTML (this site), PDF, Word, slides, or a dashboard --- the *same* source, many outputs.
+:::
+
+# The YAML header
+
+::: panel-tabset
+### Common keys
+
+``` yaml
+---
+title: "Single-Cell QC Report"
+subtitle: "10x PBMC dataset"
+author: "Your Name"
+date: "2026-06-09"
+format:
+  html:
+    toc: true              # table of contents
+    toc-depth: 3           # include H1–H3 in the TOC
+    toc-location: left
+    code-fold: true        # collapse code behind a toggle
+    code-tools: true       # add a "show all code" menu
+    number-sections: true
+    embed-resources: true  # one self-contained .html file
+    theme: cerulean
+execute:
+  echo: true               # show the code
+  warning: false           # hide warnings
+  message: false           # hide messages
+  cache: true              # cache slow chunks
+bibliography: references.bib
+csl: nature.csl
+---
+```
+
+### Interpretation
+
+-   `format:` chooses the output. `html`, `pdf`, `docx`, `revealjs` (slides), and `gfm` (GitHub Markdown) are the common ones; nested keys under it (`toc`, `theme`, ...) configure that format.
+-   `execute:` sets **defaults for every code chunk** --- e.g. `echo: false` to hide all code in a report, `warning: false` to suppress noise. Individual chunks can override these.
+-   `embed-resources: true` bundles images, CSS, and JavaScript into a **single** `.html` file you can email or post --- the setting this whole site uses.
+-   `bibliography:` + `csl:` wire up citations (see the citations section). Indentation matters: two spaces per level.
+:::
+
+# Markdown basics
+
+::: panel-tabset
+### Source
+
+``` markdown
+# Heading level 1 (page title — usually one per doc)
+## Heading level 2
+### Heading level 3
+
+Plain paragraph. Separate paragraphs with a **blank line** —
+a single line break does *not* start a new paragraph.
+
+*italic*  or  _italic_
+**bold**  or  __bold__
+***bold italic***
+~~strikethrough~~
+`inline code`  (monospace, e.g. a gene name like `Cd8a`)
+H~2~O  and  E = mc^2^   (sub/superscript)
+
+> A blockquote — pulled-out text,
+> often a definition or a caution.
+
+Three or more dashes on their own line make a horizontal rule:
+
+---
+```
+
+### Interpretation
+
+-   Headings are `#` symbols; the number of `#` sets the level (1–6). Each heading becomes an entry in the table of contents and a linkable anchor.
+-   **Blank lines matter.** A new paragraph requires a blank line between blocks; a single newline is treated as a continuation of the same paragraph.
+-   Wrap code, file names, and gene symbols in single backticks (`` `Cd8a` ``) so they render in monospace and stand out from prose.
+-   Emphasis: one marker = italic, two = bold. `~sub~` and `^super^` give H~2~O and x^2^.
+:::
+
+# Lists
+
+::: panel-tabset
+### Source
+
+``` markdown
+Unordered list:
+
+-   First item
+-   Second item
+    -   Nested item (indent four spaces)
+    -   Another nested item
+-   Third item
+
+Ordered list:
+
+1.  Load the data
+2.  Run QC
+3.  Cluster
+    a.  sub-step
+    b.  sub-step
+
+Task list:
+
+-   [x] Done
+-   [ ] Not done yet
+
+Definition list:
+
+UMI
+:   Unique Molecular Identifier — a barcode that tags one captured molecule.
+```
+
+### Interpretation
+
+-   Use `-` (or `*`) for bullets and `1.` for numbers. Quarto re-numbers ordered lists automatically, so you can write `1.` on every line and still get 1, 2, 3.
+-   **Nesting requires indentation** --- four spaces (or one tab) under the parent item. Under-indenting is the usual reason a sub-list renders flat.
+-   Leave a blank line before a list starts, or it may glue onto the preceding paragraph.
+-   Definition lists (`Term` then `:   definition`) are how the [Glossary](Glossary.html) is built.
+:::
+
+# Links & images
+
+::: panel-tabset
+### Source
+
+``` markdown
+# Links
+[Quarto docs](https://quarto.org)                     external
+[the QC chapter](Chapter_01_Preprocessing.html)        another page on this site
+[jump to a heading](#markdown-basics)                  same-page anchor
+<https://quarto.org>                                   bare URL, auto-linked
+
+# Images
+![A UMAP of clustered cells](images/umap.png)
+
+# Image with a caption, size, and alt text (figure attributes)
+![Clusters on a UMAP](images/umap.png){#fig-umap width=80%
+  fig-alt="UMAP coloured by Leiden cluster"}
+```
+
+### Interpretation
+
+-   Link syntax is `[visible text](target)`. The target can be an external URL, another rendered page (`Chapter_01_Preprocessing.html` --- note the `.html`, not `.qmd`), or a `#heading-anchor` on the current page.
+-   Heading anchors are the heading text, lower-cased with spaces turned into hyphens (`## Markdown basics` -> `#markdown-basics`).
+-   Images use the same syntax with a leading `!`. The text in brackets is the **alt text / caption** --- always fill it in for accessibility (see [Accessibility](../Accessibility.html)).
+-   The `{...}` after an image sets attributes: `#fig-umap` gives it a cross-reference label, `width=80%` sizes it, `fig-alt=` sets the screen-reader description.
+:::
+
+# Code chunks
+
+This is what makes Quarto more than a Markdown previewer: chunks of R (or Python, Bash, ...) are **executed** when the document renders.
+
+::: panel-tabset
+### A chunk & its options
+
+```` markdown
+```{r}
+#| label: qc-plot
+#| echo: true
+#| warning: false
+#| fig-cap: "Genes detected per cell, by sample."
+#| fig-width: 6
+#| fig-height: 4
+
+library(ggplot2)
+ggplot(meta, aes(sample, nFeature_RNA)) + geom_violin()
+```
+````
+
+### Common options
+
+| Option | Effect |
+|--------|--------|
+| `echo: false` | Run the code but **hide it**; show only output |
+| `eval: false` | Show the code but **do not run it** |
+| `include: false` | Run it but show **neither** code nor output (setup chunks) |
+| `output: false` | Show the code, hide its output |
+| `warning: false` / `message: false` | Suppress warnings / messages |
+| `fig-cap:` / `tbl-cap:` | Caption a figure / table |
+| `fig-width:` / `fig-height:` | Figure size in inches |
+| `cache: true` | Cache results so slow chunks don't re-run |
+| `label:` | Name the chunk (also the cross-ref id) |
+
+### Interpretation
+
+-   Chunk options use the **hash-pipe** `#|` comment syntax at the top of the chunk, one option per line, written as YAML (`option: value`). This is the Quarto style; older R Markdown put options in the `{r, ...}` header.
+-   The four you reach for constantly: `echo` (show the code?), `eval` (run the code?), `include` (show *anything*?), and `warning`/`message` (silence noise). A hidden setup chunk at the top is typically `#| include: false`.
+-   `label:` names a chunk so you can cross-reference its figure (`@fig-...`) and so error messages tell you *which* chunk failed.
+-   Set project-wide defaults in the YAML `execute:` block and override per-chunk only where needed.
+:::
+
+# Figures, tables & cross-references
+
+::: panel-tabset
+### Source
+
+```` markdown
+A Markdown table (pipes and dashes; colons set alignment):
+
+| Gene  | Cluster | Avg log2FC |
+|:------|:-------:|-----------:|
+| Cd8a  |    3    |       2.41 |
+| Ms4a1 |    7    |       3.02 |
+
+: Top markers per cluster {#tbl-markers}
+
+Cross-references — refer to a labelled figure or table:
+
+As @fig-umap shows, the clusters separate cleanly.
+The markers are listed in @tbl-markers.
+See @sec-code-chunks for the chunk options.
+
+A code chunk that produces a referenceable figure:
+
+```{r}
+#| label: fig-umap
+#| fig-cap: "UMAP coloured by cluster."
+plot(1:10)
+```
+````
+
+### Interpretation
+
+-   Tables are pipes (`|`) and a `---` separator row; colons in the separator set alignment (`:---` left, `:--:` centre, `---:` right). Add a caption + id with the `: caption {#tbl-id}` line underneath.
+-   **Cross-references** turn a label into an auto-numbered, hyperlinked "Figure 3" / "Table 1". The label *prefix* matters: `fig-` for figures, `tbl-` for tables, `sec-` for sections, `eq-` for equations. Reference it with `@fig-umap`.
+-   A code chunk becomes a referenceable figure when its `label:` starts with `fig-` *and* it has a `fig-cap:`. Quarto handles the numbering, so inserting a figure renumbers everything automatically.
+-   For big or styled tables generated in R, use `knitr::kable()` or the `gt` package inside a chunk rather than hand-writing Markdown.
+:::
+
+# Callout blocks
+
+The coloured boxes throughout these appendices are Quarto **callouts**.
+
+::: panel-tabset
+### Source
+
+``` markdown
+::: {.callout-note}
+General information worth flagging.
+:::
+
+::: {.callout-tip title="Pro tip"}
+A suggestion or shortcut — with a custom title.
+:::
+
+::: {.callout-warning}
+Something that commonly trips people up.
+:::
+
+::: {.callout-important}
+Don't-skip-this material.
+:::
+
+::: {.callout-caution collapse="true"}
+A collapsible box — starts folded, click to open.
+:::
+```
+
+### Rendered
+
+::: callout-note
+General information worth flagging.
+:::
+
+::: {.callout-tip title="Pro tip"}
+A suggestion or shortcut --- with a custom title.
+:::
+
+::: callout-warning
+Something that commonly trips people up.
+:::
+
+### Interpretation
+
+-   A callout is a **fenced div**: three or more colons, then `{.callout-TYPE}`, your content, then a closing `:::`. The five types --- `note`, `tip`, `warning`, `important`, `caution` --- each get a distinct colour and icon.
+-   Add `title="..."` for a custom heading and `collapse="true"` to make it start folded (handy for optional detail or answers to exercises).
+-   The opening and closing fences must each be on their **own line** with a blank line around the block, or the div won't close and the rest of the page renders inside the box.
+:::
+
+# Tabsets & layout
+
+::: panel-tabset
+### Source
+
+```` markdown
+# Tabset — the tabbed panels used all over these appendices
+::: panel-tabset
+## R
+```{r}
+mean(1:10)
+```
+
+## Python
+```{python}
+sum(range(1, 11)) / 10
+```
+:::
+
+# Multi-column layout
+::: {layout-ncol=2}
+![First](images/a.png)
+
+![Second](images/b.png)
+:::
+````
+
+### Interpretation
+
+-   A **tabset** is a fenced div marked `::: panel-tabset`; every level-2 heading (`##`) inside it becomes a tab. This appendix uses tabsets to put "Source" and "Interpretation" side by side without doubling the page length.
+-   Generic fenced divs `::: {.class}` are the all-purpose layout tool: `{layout-ncol=2}` arranges its children in two columns, `{.column-margin}` pushes content into the margin, and any CSS class in `styles.css` can be targeted this way.
+-   Nesting works, but each level needs *more* colons than the one outside it (`::::` around `:::`) so Quarto can tell which fence closes which block.
+:::
+
+# Math, citations & footnotes
+
+::: panel-tabset
+### Math (LaTeX)
+
+``` markdown
+Inline math: the dispersion is $\phi$ and the mean is $\mu$.
+
+Display math (centred, its own line):
+
+$$
+\text{Var}(Y) = \mu + \phi\,\mu^{2}
+$$
+
+A labelled, referenceable equation:
+
+$$
+y_{gc} \sim \text{NB}(\mu_{gc}, \phi_g)
+$$ {#eq-nb}
+
+As @eq-nb states, counts follow a negative binomial.
+```
+
+### Citations & footnotes
+
+``` markdown
+Single-cell methods are reviewed elsewhere [@luecken2019].
+Seurat introduced this workflow [@satija2015; @stuart2019].
+As @hafemeister2019 showed, ... (in-text, author becomes the subject).
+
+A footnote inline^[Like this one, defined right here.]
+
+Or a referenced footnote.[^longnote]
+
+[^longnote]: The note's text, defined anywhere in the document.
+```
+
+### Interpretation
+
+-   Math is **LaTeX** between dollar signs: `$...$` inline, `$$...$$` for a centred display block. Add `{#eq-label}` after a display equation to cross-reference it with `@eq-label`. The [LaTeX math cheat sheet](../Cheat_Sheets.html) lists the symbols.
+-   **Citations** use `[@key]`, where `key` matches an entry in the `references.bib` file named in the YAML `bibliography:`. Multiple keys separate with `;`. Quarto formats them and builds the reference list in the style set by `csl:` (this site uses Nature superscripts).
+-   `@key` *without* brackets puts the author in the sentence ("As @satija2015 showed..."); `[@key]` puts the whole citation in parentheses/superscript.
+-   Where the reference list lands is controlled by a `::: {#refs} :::` div --- every citing page ends with a `## References` heading above one.
+-   Footnotes: inline with `^[...]` or referenced with `[^name]` plus a `[^name]: ...` definition elsewhere.
+:::
+
+# Rendering
+
+::: panel-tabset
+### Commands
+
+``` bash
+# Render a single document to its default format
+quarto render Appendix_I_Quarto_Markdown.qmd
+
+# Render to a specific format
+quarto render report.qmd --to pdf
+quarto render report.qmd --to docx
+
+# Render the whole project / website (uses _quarto.yml)
+quarto render
+
+# Live preview — re-renders in the browser as you save
+quarto preview report.qmd
+```
+
+### Interpretation
+
+-   In **RStudio** you usually click **Render** (or press Ctrl/Cmd+Shift+K); on the command line `quarto render` does the same. `quarto preview` opens a live-reloading browser tab --- the fastest way to write.
+-   `quarto render` with no file renders the **whole project** according to `_quarto.yml` (for this site, every page into `docs/`). A single filename renders just that document.
+-   `--to FORMAT` overrides the YAML to produce a one-off PDF or Word version from the same source. PDF output needs a LaTeX engine (`quarto install tinytex` provides one).
+-   This workshop's full build is wrapped in `render_all.sh`, which also copies the tutorial sources for the download links --- run that, not a bare `quarto render`, when rebuilding the site.
+:::
+
+# Quick reference
+
+| Want to... | Syntax |
+|---|---|
+| Heading | `## Section` |
+| Bold / italic | `**bold**` / `*italic*` |
+| Inline code / gene name | `` `Cd8a` `` |
+| Link to another page | `[text](Chapter_01_Preprocessing.html)` |
+| Image with alt text | `![alt](img.png){fig-alt="..."}` |
+| Bullet / numbered list | `-  item` / `1.  item` |
+| Run R, hide the code | chunk option `#| echo: false` |
+| Show R, don't run it | chunk option `#| eval: false` |
+| Caption a figure | `#| fig-cap: "..."` |
+| Callout box | `::: {.callout-tip} ... :::` |
+| Tabbed panels | `::: panel-tabset ... :::` |
+| Inline math | `$\mu$` |
+| Citation | `[@satija2015]` |
+| Cross-reference a figure | `@fig-umap` |
+
+## See also
+
+-   [Appendix H — Core R Commands](Appendix_H_Core_R_Commands.html) --- the R that runs inside the code chunks.
+-   [Appendix D — Git & GitHub](Appendix_D_Git_GitHub.html) --- version-controlling and publishing your `.qmd` sources.
+-   [Cheat Sheets](../Cheat_Sheets.html) --- the printable Quarto/Markdown one-pager and the RStudio Quarto PDF.
+-   [Quarto documentation](https://quarto.org/docs/guide/) --- the authoritative, always-current reference.
+
+## References
+
+::: {#refs}
+:::
