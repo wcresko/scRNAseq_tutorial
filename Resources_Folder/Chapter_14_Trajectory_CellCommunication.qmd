@@ -176,6 +176,21 @@ Ambient correction with SoupX, DecontX, or CellBender ([Chapter 1, §1.5](Chapte
 
 Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell which splice variant a cell uses. Pairing single-cell barcoding with **long-read** sequencing (PacBio Iso-Seq, ONT; e.g. scISO-seq) recovers full-length, isoform-resolved transcripts per cell. This connects back to the 3′ UTR annotation problem (Chapter 0 / Lecture 0): long reads both improve the annotations that short-read quantification depends on and enable per-cell isoform analysis — particularly valuable in non-model systems where alternative splicing is less well characterized.
 
+## 14.8 Common errors
+
+@tbl-ch14-errors collects the errors most commonly encountered in trajectory, velocity, and cell–cell communication workflows, their causes, and the fix.
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| RNA velocity arrows are flat / random | The object has only spliced counts; no spliced/unspliced layers | Re-quantify with `velocyto` or `kb count --workflow lamanno` to produce both matrices |
+| Pseudotime runs "backwards" | The root cell/cluster was chosen at the wrong end of the trajectory | Set the root explicitly from a known progenitor marker; don't accept the default |
+| `order_cells()` blocks a batch script | Monocle 3's root selection is interactive by default | Pass the root programmatically (`root_cells=` / `root_pr_nodes=`), not via the GUI |
+| Slingshot lineages look implausible | Cluster labels or the starting cluster (`start.clus`) are wrong | Fix the clustering/annotation first; trajectory inference inherits its errors |
+| A "strong" ligand–receptor hit on an ambient gene | Ambient contamination inflates broadly-expressed L–R pairs | Decontaminate first (SoupX/DecontX, [§1.5](Chapter_01_Preprocessing.html)); treat lone hits skeptically |
+| Cell–cell communication "signal" with tiny clusters | Per-cell L–R tests are underpowered and pseudoreplicated for small groups | Require a minimum cell count per cluster; validate across samples, not cells |
+
+: Common errors in trajectory, RNA velocity, and cell–cell communication analysis, their causes, and fixes. {#tbl-ch14-errors}
+
 ## Cross-references
 
 - **Lecture:** [Lecture 14 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)
@@ -185,7 +200,7 @@ Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell
 - **Spatial pairing for communication:** [Chapter 16 — Spatial Transcriptomics](Chapter_16_Spatial.html)
 - **Benchmark:** Saelens *et al.* 2019, *Nat Biotechnol* (trajectory methods); Armingol *et al.* 2021, *Nat Rev Genet* (cell–cell communication)
 
-## 14.8 Going further
+## 14.9 Going further
 
 **Trajectory:** the benchmark of 45 methods [@saelens2019comparison] is the place to start, then the two tools the tutorial uses — Slingshot [@street2018slingshot] and Monocle [@trapnell2014monocle; @cao2019monocle3] — and the RNA-velocity papers, velocyto [@lamanno2018rnavelocity] and scVelo [@bergen2020scvelo]. **Cell–cell communication:** the two review articles [@armingol2021deciphering; @armingol2024diversifying] frame the field, CellChat [@jin2021cellchat] is the common R tool, and LIANA [@dimitrov2022comparison] both compares methods and provides a consensus. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
 
