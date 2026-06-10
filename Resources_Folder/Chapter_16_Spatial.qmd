@@ -83,7 +83,7 @@ The bioinformatic pipeline:
 
 1. **Load** the `spaceranger` output into Seurat. The resulting object's `@images` slot holds a `VisiumV1` object containing four things: the **histology image** (low-resolution JPEG), the **per-spot tissue coordinates** (which pixel each spot maps to in the image), the **scale factors** (ratios between the full-res, low-res, and hi-res coordinate systems), and a flag for which barcodes are "in tissue". `SpatialFeaturePlot` uses all four to draw expression over the H&E.
 2. **QC** per spot — same metrics as scRNA (UMI count, gene count, percent.mt) plus **always plot them on the tissue**, because spatial outliers are tissue artifacts (folds, bubbles), not random noise.
-3. **Normalize** with `SCTransform` — preferred over `LogNormalize` for spatial because each spot captures the transcriptome of 1–15 cells rather than one. This wider dynamic range means count distributions are further from the Poisson assumption that `LogNormalize` implicitly relies on; `SCTransform`'s regularized negative binomial model adjusts per-spot dispersion and handles outlier spots more robustly.
+3. **Normalize** with `SCTransform` — preferred over `LogNormalize` for spatial because each spot captures the transcriptome of ~1–10 cells (tissue-dependent) rather than one. This wider dynamic range means count distributions are further from the Poisson assumption that `LogNormalize` implicitly relies on; `SCTransform`'s regularized negative binomial model adjusts per-spot dispersion and handles outlier spots more robustly.
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — SCTransform for spatial (spatial-specific considerations)"}
 `SCTransform(brain, assay = "Spatial", verbose = FALSE)` runs the regularized negative-binomial regression on Visium counts. **Default behavior**: estimates per-gene overdispersion parameters (θ) by pooling information across genes, then extracts Pearson residuals as the normalized values. For Visium, the key difference from scRNA-seq is that the `assay` argument must be `"Spatial"` (not `"RNA"`). Visium spots have systematically wider count distributions than single cells because each spot aggregates multiple cells — `SCTransform` handles this by fitting per-spot size factors. A common warning, "iteration limit reached," is usually safe to ignore for Visium: it occurs when an outlier spot causes the NB regression to converge slowly, but the result is still usable. Unlike scRNA-seq, `SCTransform` for Visium also accounts for the spatial variation in sequencing depth that arises from tissue-section-edge effects, making it more robust than `LogNormalize` for spatial data.
@@ -167,13 +167,13 @@ These produce smoother, more biologically interpretable spatial domains. Worth u
 
 ## 16.9 Common errors
 
-@tbl-ch16-errors collects the errors most commonly encountered in a Seurat/Signac Visium workflow, their causes, and the fix.
+@tbl-ch16-errors collects the errors most commonly encountered in a Seurat Visium workflow, their causes, and the fix.
 
 | You see | What's wrong | What to do |
 |---|---|---|
 | `SeuratData::InstallData("stxBrain")` is slow | First-time download (~50 MB) | Subsequent runs are instant |
 | `SCTransform` warns "iteration limit reached" | NB regression hits its iteration limit on outlier spots | Usually safe to ignore; results are still usable |
-| `SpatialFeaturePlot` shows nothing on the tissue | The `images` slot wasn't loaded | `Read10X_Image(dirname(seu@tools$Staffli@imgs[1]))` to re-attach |
+| `SpatialFeaturePlot` shows nothing on the tissue | The `images` slot wasn't loaded | Re-run `Load10X_Spatial()`, or attach the image with `Read10X_Image()` pointing at the Space Ranger `spatial/` folder |
 | Section integration OOMs | SCT-anchor integration is RAM-hungry on Visium | Downsample spots first, or use Harmony on SCT residuals |
 | Deconvolution returns flat per-cell-type fractions | Your reference doesn't match the tissue | Use a tissue-matched single-cell reference |
 

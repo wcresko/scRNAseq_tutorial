@@ -94,10 +94,10 @@ The deepest pitfall is more fundamental: **the algorithm will return a trajector
 
 Pseudotime supplies an ordering but not an arrow. **RNA velocity** recovers the direction of cellular movement by splitting reads into **unspliced** (intron-containing, newly transcribed) and **spliced** (mature, processed) counts per gene. A gene with a high unspliced-to-spliced ratio is being actively induced: the cell is producing more pre-mRNA than its current steady-state level predicts, meaning it is moving toward a higher-expression state for that gene. Conversely, a gene with a low unspliced-to-spliced ratio is being downregulated. The per-gene signals are combined into a per-cell velocity vector that can be projected onto the UMAP embedding as an arrow, giving each cell an estimated direction of travel.
 
-The original implementation is **velocyto** [@lamanno2018rnavelocity], which introduced the steady-state model: at steady state, the ratio of unspliced to spliced counts is constant per gene, so deviations from that ratio indicate induction or repression. The current default is the **scVelo** dynamical model [@bergen2020scvelo], which relaxes the steady-state assumption by estimating gene-specific kinetic parameters (transcription rate, splicing rate, degradation rate) directly from the data. The dynamical model is more accurate for genes undergoing rapid kinetic changes but is also more computationally demanding.
+The original implementation is **velocyto** [@lamanno2018rnavelocity], which introduced the steady-state model: at steady state, the ratio of unspliced to spliced counts is constant per gene, so deviations from that ratio indicate induction or repression. The current state-of-the-art is the **scVelo** dynamical model [@bergen2020scvelo], which relaxes the steady-state assumption by estimating gene-specific kinetic parameters (transcription rate, splicing rate, degradation rate) directly from the data. The dynamical model is more accurate for genes undergoing rapid kinetic changes but is also more computationally demanding.
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — scVelo / mode (velocity estimation model)"}
-`scv.tl.velocity(adata, mode = "dynamical")` selects the kinetic model used to estimate velocities. **Default: `"stochastic"`** in older scVelo versions; the recommended current default is `"dynamical"`. The `"stochastic"` mode uses the original steady-state model with an added noise term — faster but less accurate for genes with rapid kinetics. The `"dynamical"` mode estimates per-gene transcription, splicing, and degradation rates from the data — more accurate but requires `scv.tl.recover_dynamics(adata)` first and is computationally expensive. For standard trajectory validation use `"dynamical"`; for quick exploratory runs on large datasets use `"stochastic"`. The `"deterministic"` mode is the original velocyto steady-state model without a noise term — fastest but most assumption-bound.
+`scv.tl.velocity(adata, mode = "dynamical")` selects the kinetic model used to estimate velocities. **The function default is `"stochastic"`**; `"dynamical"` is the *recommended* mode but is not the default — you must select it explicitly (and run `scv.tl.recover_dynamics(adata)` first). The `"stochastic"` mode uses the original steady-state model with an added noise term — faster but less accurate for genes with rapid kinetics. The `"dynamical"` mode estimates per-gene transcription, splicing, and degradation rates from the data — more accurate but requires `scv.tl.recover_dynamics(adata)` first and is computationally expensive. For standard trajectory validation use `"dynamical"`; for quick exploratory runs on large datasets use `"stochastic"`. The `"deterministic"` mode is the original velocyto steady-state model without a noise term — fastest but most assumption-bound.
 :::
 
 Velocity analysis requires a spliced/unspliced count matrix produced by `velocyto run` (command-line) or `kallisto | bustools` — *not* the standard filtered-feature-bc-matrix that most downstream analyses use. The spliced/unspliced counts are stored in a `loom` file or an AnnData object and must be aligned to the same barcode set as your RNA analysis.
@@ -176,6 +176,21 @@ Ambient correction with SoupX, DecontX, or CellBender ([Chapter 1, §1.5](Chapte
 
 Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell which splice variant a cell uses. Pairing single-cell barcoding with **long-read** sequencing (PacBio Iso-Seq, ONT; e.g. scISO-seq) recovers full-length, isoform-resolved transcripts per cell. This connects back to the 3′ UTR annotation problem (Chapter 0 / Lecture 0): long reads both improve the annotations that short-read quantification depends on and enable per-cell isoform analysis — particularly valuable in non-model systems where alternative splicing is less well characterized.
 
+## 14.8 Common errors
+
+@tbl-ch14-errors collects the errors most commonly encountered in trajectory, velocity, and cell–cell communication workflows, their causes, and the fix.
+
+| You see | What's wrong | What to do |
+|---|---|---|
+| RNA velocity arrows are flat / random | The object has only spliced counts; no spliced/unspliced layers | Re-quantify with `velocyto` or `kb count --workflow lamanno` to produce both matrices |
+| Pseudotime runs "backwards" | The root cell/cluster was chosen at the wrong end of the trajectory | Set the root explicitly from a known progenitor marker; don't accept the default |
+| `order_cells()` blocks a batch script | Monocle 3's root selection is interactive by default | Pass the root programmatically (`root_cells=` / `root_pr_nodes=`), not via the GUI |
+| Slingshot lineages look implausible | Cluster labels or the starting cluster (`start.clus`) are wrong | Fix the clustering/annotation first; trajectory inference inherits its errors |
+| A "strong" ligand–receptor hit on an ambient gene | Ambient contamination inflates broadly-expressed L–R pairs | Decontaminate first (SoupX/DecontX, [§1.5](Chapter_01_Preprocessing.html)); treat lone hits skeptically |
+| Cell–cell communication "signal" with tiny clusters | Per-cell L–R tests are underpowered and pseudoreplicated for small groups | Require a minimum cell count per cluster; validate across samples, not cells |
+
+: Common errors in trajectory, RNA velocity, and cell–cell communication analysis, their causes, and fixes. {#tbl-ch14-errors}
+
 ## Cross-references
 
 - **Lecture:** [Lecture 14 — Trajectory Inference & Cell–Cell Communication](../Lecture_Folder/Lecture_14_Trajectory_CellCommunication.html)
@@ -185,7 +200,7 @@ Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell
 - **Spatial pairing for communication:** [Chapter 16 — Spatial Transcriptomics](Chapter_16_Spatial.html)
 - **Benchmark:** Saelens *et al.* 2019, *Nat Biotechnol* (trajectory methods); Armingol *et al.* 2021, *Nat Rev Genet* (cell–cell communication)
 
-## 14.8 Going further
+## 14.9 Going further
 
 **Trajectory:** the benchmark of 45 methods [@saelens2019comparison] is the place to start, then the two tools the tutorial uses — Slingshot [@street2018slingshot] and Monocle [@trapnell2014monocle; @cao2019monocle3] — and the RNA-velocity papers, velocyto [@lamanno2018rnavelocity] and scVelo [@bergen2020scvelo]. **Cell–cell communication:** the two review articles [@armingol2021deciphering; @armingol2024diversifying] frame the field, CellChat [@jin2021cellchat] is the common R tool, and LIANA [@dimitrov2022comparison] both compares methods and provides a consensus. The full curated list is on [Key Papers, Reviews & Benchmarks](../Key_Papers.html).
 

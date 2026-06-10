@@ -77,7 +77,7 @@ The three reference names you will encounter are collected in @tbl-ch12-referenc
 | Reference bundle | Tool | Genome | When to use |
 |---|---|---|---|
 | `refdata-gex-GRCh38-2024-A` | `cellranger` (RNA only) | hg38 | scRNA-seq only — **never** pass to `cellranger-atac` |
-| `refdata-cellranger-arc-GRCh38-2024-A` | `cellranger-atac`, `cellranger-arc` | hg38 | New scATAC-seq and multiome work; recommended default |
+| `refdata-cellranger-arc-GRCh38-2020-A-2.0.0` | `cellranger-atac`, `cellranger-arc` | hg38 | New scATAC-seq and multiome work; recommended default |
 | `refdata-cellranger-atac-GRCh37-1.2.0` | `cellranger-atac` (legacy) | hg19 | Only when downstream annotation is pinned to hg19 (e.g. Chapter 15's `EnsDb.Hsapiens.v75`) |
 
 : Cell Ranger reference bundles for human ATAC and multiome experiments. The arc bundle is the recommended choice for all new work; the GEX bundle cannot be used with `cellranger-atac` even though its subdirectory structure looks similar. {#tbl-ch12-references}
@@ -86,8 +86,8 @@ Reading @tbl-ch12-references: the "arc" reference bundle deserves a short explan
 
 ```bash
 cd /projects/<PIRG>/<user>/refs
-wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-arc-GRCh38-2024-A.tar.gz
-tar -xzf refdata-cellranger-arc-GRCh38-2024-A.tar.gz
+wget https://cf.10xgenomics.com/supp/cell-atac/refdata-cellranger-arc-GRCh38-2020-A-2.0.0.tar.gz
+tar -xzf refdata-cellranger-arc-GRCh38-2020-A-2.0.0.tar.gz
 ```
 
 The same storage discipline as Chapter 11 applies: the reference is large, belongs in shared project space, and may already exist as a cluster module — check `module avail cellranger-atac` before downloading.
@@ -165,10 +165,10 @@ The single most common transit error is losing the `.tbi` index. `fragments.tsv.
 
 ## 12.7b Design consideration: re-calling peaks per cluster
 
-The peak set produced by `cellranger-atac count` is called on the aggregate of all cells. For a first pass this is sufficient, but it misses **cell-type-specific peaks** that are open in only one cell type and therefore pile up too little signal in the bulk-equivalent to exceed the calling threshold. The recommended approach for publication-quality analysis is to cluster the cells using the Cell Ranger peak set, then re-call peaks within each cluster using MACS2 or MACS3 and re-quantify fragments against the merged cluster-specific peak set. Signac's `CallPeaks()` automates this pattern. The cost is additional compute time; the payoff is a feature set that captures cell-type regulatory elements the initial call missed — this matters most for motif enrichment and differential accessibility analyses.
+The peak set produced by `cellranger-atac count` is called on the aggregate of all cells. For a first pass this is sufficient, but it misses **cell-type-specific peaks** that are open in only one cell type and therefore pile up too little signal in the bulk-equivalent to exceed the calling threshold. The recommended approach for publication-quality analysis is to cluster the cells using the Cell Ranger peak set, then re-call peaks within each cluster using MACS3 (the maintained release; the older MACS2 also works) and re-quantify fragments against the merged cluster-specific peak set. Signac's `CallPeaks()` automates this pattern. The cost is additional compute time; the payoff is a feature set that captures cell-type regulatory elements the initial call missed — this matters most for motif enrichment and differential accessibility analyses.
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — `--reference` (cellranger-atac)"}
-**No default — required.** The path to the pre-built ATAC/arc reference directory, e.g. `--reference=/projects/<PIRG>/<user>/refs/refdata-cellranger-arc-GRCh38-2024-A`. This is the single most common failure point: passing an RNA reference (`refdata-gex-...`) to `cellranger-atac` will cause the job to fail at startup, but the error message is often cryptic. The flag name is `--reference` (not `--transcriptome` as in the RNA pipeline) — another source of copy-paste errors. For downstream Signac compatibility, the reference genome build (hg38 vs hg19) must match the genome annotation used in the Signac analysis: `refdata-cellranger-arc-GRCh38-2024-A` pairs with `EnsDb.Hsapiens.v86`; `refdata-cellranger-atac-GRCh37-1.2.0` pairs with `EnsDb.Hsapiens.v75`.
+**No default — required.** The path to the pre-built ATAC/arc reference directory, e.g. `--reference=/projects/<PIRG>/<user>/refs/refdata-cellranger-arc-GRCh38-2020-A-2.0.0`. This is the single most common failure point: passing an RNA reference (`refdata-gex-...`) to `cellranger-atac` will cause the job to fail at startup, but the error message is often cryptic. The flag name is `--reference` (not `--transcriptome` as in the RNA pipeline) — another source of copy-paste errors. For downstream Signac compatibility, the reference genome build (hg38 vs hg19) must match the genome annotation used in the Signac analysis: `refdata-cellranger-arc-GRCh38-2020-A-2.0.0` pairs with `EnsDb.Hsapiens.v86`; `refdata-cellranger-atac-GRCh37-1.2.0` pairs with `EnsDb.Hsapiens.v75`.
 :::
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — `--localcores` and `--localmem` (cellranger-atac)"}
@@ -176,7 +176,7 @@ The peak set produced by `cellranger-atac count` is called on the aggregate of a
 :::
 
 ::: {.callout-note .key-parameter title="⚙️ Key parameter — MACS peak calling thresholds (re-calling in Signac)"}
-**Default within `cellranger-atac`: internal MACS2-style parameters, not user-adjustable directly.** When re-calling peaks per cluster in Signac (`CallPeaks()` with MACS2/MACS3), the most important parameter is the q-value cutoff (`macs2 -q 0.05` by default in Signac). Lowering the q-value (more stringent) produces fewer, higher-confidence peaks and a sparser count matrix. Raising it (less stringent) produces more peaks but increases false-positive open regions, particularly in low-depth samples. For motif enrichment and differential accessibility analyses, a more conservative peak set (lower q-value) is generally preferable. The `--min-length` parameter in MACS (default 200 bp) sets the minimum peak width; peaks shorter than this are merged or discarded, which affects how well the peak set captures narrow nucleosome-free regions.
+**Default within `cellranger-atac`: internal MACS2-style parameters, not user-adjustable directly.** When re-calling peaks per cluster in Signac (`CallPeaks()`, which drives MACS3 or the legacy MACS2 binary), the most important parameter is the q-value cutoff (`-q 0.05` by default in Signac). Lowering the q-value (more stringent) produces fewer, higher-confidence peaks and a sparser count matrix. Raising it (less stringent) produces more peaks but increases false-positive open regions, particularly in low-depth samples. For motif enrichment and differential accessibility analyses, a more conservative peak set (lower q-value) is generally preferable. The `--min-length` parameter in MACS (default 200 bp) sets the minimum peak width; peaks shorter than this are merged or discarded, which affects how well the peak set captures narrow nucleosome-free regions.
 :::
 
 ## 12.8 Pitfalls and the multiome note

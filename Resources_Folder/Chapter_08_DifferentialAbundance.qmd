@@ -192,9 +192,9 @@ The fix is to build the graph on the **integrated reduction** — the Harmony em
 milo <- buildGraph(milo, k = 30, d = 20, reduced.dim = "HARMONY")
 ```
 
-If integration was done in PCA space (e.g. via `IntegrateLayers` in Seurat v5 using CCA), pass `reduced.dim = "PCA"`. The key requirement is that the reduction used for graph construction is the batch-corrected one.
+If you used the Seurat-anchor path instead (`RunPCA` on the integrated assay, as in Tutorial 05), the integrated reduction is `"PCA"`, so pass `reduced.dim = "PCA"`. The key requirement is that the reduction used for graph construction is the batch-corrected one — with Harmony that is `"HARMONY"`, not `"PCA"`.
 
-Two further consequences of the integration dependency: (a) over-integration ([Chapter 5 §5.X](Chapter_05_Integration.html)) will cause neighborhoods to be artificially mixed across biological groups, reducing DA sensitivity; (b) under-integration will leave batch structure in the graph and inflate DA false positives. Running the Chapter 5 integration diagnostics before DA is strongly recommended.
+Two further consequences of the integration dependency: (a) over-integration ([Chapter 5](Chapter_05_Integration.html)) will cause neighborhoods to be artificially mixed across biological groups, reducing DA sensitivity; (b) under-integration will leave batch structure in the graph and inflate DA false positives. Running the Chapter 5 integration diagnostics before DA is strongly recommended.
 
 ## 8.10 Reading the output
 
@@ -255,18 +255,17 @@ Use the annotation to:
 
 For experiments with high-quality, well-separated cluster annotations and a need for fast, publication-ready cluster-level DA results, **propeller** [@phipson2022propeller] provides a linear-model test on logit-transformed cell-type proportions. The transformation partially addresses the compositional constraint by moving proportions from the [0,1] simplex to an unconstrained real-valued scale before fitting the linear model.
 
-The workflow is minimal:
+The workflow is minimal. The high-level `propeller()` wrapper logit-transforms the per-sample proportions and runs the appropriate test automatically — a moderated t-test for two groups, ANOVA for more:
 
 ```r
 library(speckle)
-props <- getTransformedProps(clusters = seu$seurat_annotations,
-                             sample   = seu$donor,
-                             transform = "logit")
-results <- propeller.ttest(props, covariates = seu@meta.data,
-                           design = ~ stim,
-                           contrast = makeContrasts(stimSTIM - stimCTRL,
-                                                    levels = design))
+
+results <- propeller(clusters = seu$seurat_annotations,
+                     sample   = seu$donor,
+                     group    = seu$stim)
 ```
+
+If you need to adjust for additional covariates (e.g. sex or batch), call the lower-level pair directly: `getTransformedProps()` to build the transformed proportions, then `propeller.ttest()` with a `design` matrix (non-intercept format) and a `contrasts` vector identifying the two groups — see the speckle vignette for the design-matrix construction. `propeller.ttest()` has no `covariates` argument; covariates enter as extra columns of `design`.
 
 The output is a table of cluster-level p-values, log-fold-changes in transformed proportion, and BH-adjusted p-values. propeller's limitation is that it is cluster-level: it inherits all the boundary-sensitivity problems described in §8.2. Its advantage is speed and interpretability: reviewers who find neighborhood graphs confusing may find a cluster-level table straightforward. Use it for validation and for producing the "cell-type composition summary" that many journals require in a methods table.
 

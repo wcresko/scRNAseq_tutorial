@@ -284,7 +284,7 @@ Report your platform **and** chemistry (3′ vs 5′ vs Flex, cells vs nuclei, m
 
 -   Each mRNA is tagged with a unique UMI **before** PCR
 -   After sequencing, reads sharing a cell barcode **and** UMI collapse to one molecule
--   UMIs help detect **nucleotide substitutions** during PCR/sequencing and resolve **multi-mapping** reads
+-   This lets you count **original molecules** instead of reads, removing PCR amplification bias (a few molecules over-amplified would otherwise masquerade as high expression)
 
 ::: callout-tip
 **Rule of thumb on capture:** typical 10x 3' v3 captures \~5–20% of mRNA molecules per cell. That's *why* the count matrix is sparse even when biology isn't.
@@ -362,7 +362,7 @@ adata
 :::
 
 ::: callout-note
-**`min.cells = 3` and `min.features = 200`** are *defaults*, not gospel. They drop genes seen in fewer than 3 cells and droplets with fewer than 200 detected genes — sensible for whole-tissue 10x data, sometimes too aggressive for very rare cell types or shallow protocols.
+**`min.cells = 3` and `min.features = 200`** are *defaults*, not gospel. They drop genes seen in fewer than 3 cells and barcodes (putative cells) with fewer than 200 detected genes — sensible for whole-tissue 10x data, sometimes too aggressive for very rare cell types or shallow protocols.
 :::
 
 ## The downstream workflow at a glance
@@ -427,7 +427,9 @@ Connecting VS Code to Talapas over **Remote-SSH**, exploring the cluster interac
 -   Per-cell **donor IDs** (`ind`) are carried in metadata — enabling proper pseudobulk DE (Tutorial 06) and differential abundance (Tutorial 08) with real biological replicates.
 
 ::: callout-note
-The older `SeuratData` `ifnb` has \~14k cells. The `muscData` build used here is larger (\~24k) because it retains all eight donors. After the QC filters in Tutorial 01 (`nFeature_RNA > 200 & < 2500`, `percent.mt < 5`, `scDblFinder` singlets) you'll retain **\~23,000 post-QC cells**.
+The older `SeuratData` `ifnb` has \~14k cells. The `muscData` build used here loads the full \~29,000-cell object (no filtering applied), of which \~24,000 are demuxlet-annotated singlets across all eight donors. After the QC filters in Tutorial 01 (`nFeature_RNA > 200 & < 2500`, `percent.mt < 5`, `scDblFinder` singlets) you'll retain **\~23,000 post-QC cells**.
+
+This dataset comes from early (3' v1) 10x chemistry, so its per-cell depth and capture are lower than the generic 3' v3 figures used in the capture/sparsity examples above — expect fewer UMIs and genes per cell than a current run.
 :::
 
 ## Further reading

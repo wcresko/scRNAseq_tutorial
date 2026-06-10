@@ -218,7 +218,9 @@ gridExtra::grid.arrange(p1, p2, nrow = 1)
 
 ``` r
 seu <- FindNeighbors(seu, dims = 1:30) |>
-  FindClusters(resolution = 0.5)   # Louvain (Seurat default); add algorithm = 4 for Leiden
+  FindClusters(resolution = 0.5)   # Louvain (Seurat's default algorithm); resolution 0.5
+                                   # is our choice — Seurat's own default is 0.8. Add
+                                   # algorithm = 4 for Leiden.
 ```
 
 ``` python
@@ -326,7 +328,7 @@ This asymmetry is *the* most important property of t-SNE. It is why t-SNE preser
 -   **Perplexity** (default 30) sets the effective number of neighbours each cell "considers"
 -   **Low perplexity (5–15):** very local focus → real clusters can fragment into substructure
 -   **High perplexity (50+):** broader patterns → fine subtypes wash out
--   Hard limit: perplexity $< n/3$. For 5,000 cells, anything above \~1500 will fail.
+-   Must be smaller than the cell count ($< n$), but in practice you keep it $\le \sim 50$ regardless of dataset size — far below any technical ceiling
 
 ::: callout-tip
 **Always run t-SNE at multiple perplexities** (e.g. 10, 30, 50). If the same clusters appear at all settings you can trust them; if they shift, the structure you're seeing is fragile.
@@ -356,10 +358,12 @@ $$CE = -\sum_{i,j} \left[ w_{ij} \log v_{ij} + (1 - w_{ij}) \log(1 - v_{ij}) \ri
 
 ## n_neighbors and min_dist, in practice
 
-| Parameter      | Default | Effect                                                       |
-|----------------|--------:|--------------------------------------------------------------|
-| `n_neighbors`  | 15      | Soft "k" — local vs. global balance, like t-SNE's perplexity |
-| `min_dist`     | 0.1     | Minimum distance between points in the embedding             |
+| Parameter        | Seurat default | Effect                                                       |
+|------------------|---------------:|--------------------------------------------------------------|
+| `n.neighbors`    | 30             | Soft "k" — local vs. global balance, like t-SNE's perplexity |
+| `min.dist`       | 0.3            | Minimum distance between points in the embedding             |
+
+(Seurat's `RunUMAP` defaults; the underlying Python `umap-learn` uses different defaults of 15 and 0.1, so don't be surprised if other tutorials quote those.)
 
 -   **Small `n_neighbors` (5–10):** very local detail; clusters fragment more. **Large (30–50):** broader topology; subtypes may merge.
 -   **Small `min_dist` (≤ 0.1):** tight clusters with clear gaps — good for discrete cell types. **Large (0.4–0.8):** spread-out — good for continuous gradients (development, pseudotime).
