@@ -26,21 +26,18 @@ Every code chunk here is tagged with `#| eval: false`, so the published page sho
 - **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
 :::
 
-
 ## About this tutorial
 
-The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, ~24,000 cells, no 10x click-through.
-
+The first hands-on tutorial walking the standard **Seurat** scRNA-seq workflow on a **laptop-friendly** dataset. We use the **`ifnb`** dataset (Kang *et al.* 2017) — peripheral blood mononuclear cells (PBMCs) from eight lupus patients, split into a **control** sample and an **interferon-β-stimulated** sample. Two samples, \~24,000 cells, no 10x click-through.
 
 ::: callout-note
 **Companion lecture:** [Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs](../Lecture_Folder/Lecture_01_Preprocessing.html) · **Companion book chapter:** [Chapter 1 — Preprocessing](../Resources_Folder/Chapter_01_Preprocessing.html) — the long-form prose treatment of this tutorial's material, with cross-references to the prerequisite appendices. · **HPC version (Talapas):** [Talapas analysis pipeline — `01_qc_preprocessing.R`](Tutorial_10_Talapas_Pipeline.html)
 :::
 
-
 Why two samples from the start? Because Tutorial 05 will teach **integration** — and integration only makes sense if you've already loaded, QC-filtered, and clustered samples that come from different conditions / batches. We carry both `STIM` and `CTRL` cells through every step.
 
 ::: callout-tip
-**Want to run this on the cluster, or scale up later?** The **[Talapas HPC track](Tutorial_10_Talapas_Pipeline.html)** runs this *same* `ifnb` workflow as R + SLURM scripts — see [Tutorial — SLURM Basics](Tutorial_09_SLURM_Basics.html). To go all the way from **raw FASTQs** on a larger real dataset, see the optional [Full Talapas run from raw FASTQs](../Resources_Folder/Talapas_FullRun_FromFASTQs.html) (a self-paced bonus track).
+**Want to run this on the cluster, or scale up later?** The [**Talapas HPC track**](Tutorial_10_Talapas_Pipeline.html) runs this *same* `ifnb` workflow as R + SLURM scripts — see [Tutorial — SLURM Basics](Tutorial_09_SLURM_Basics.html). To go all the way from **raw FASTQs** on a larger real dataset, see the optional [Full Talapas run from raw FASTQs](../Resources_Folder/Talapas_FullRun_FromFASTQs.html) (a self-paced bonus track).
 :::
 
 ::: {.callout-tip title="How to use this page"}
@@ -55,15 +52,15 @@ The rendered HTML shows the code but does **not** execute it (chunks default to 
 
 **What it is.** Peripheral blood mononuclear cells (PBMCs) from eight lupus patients. Each donor's PBMCs were split into two aliquots:
 
--   **`CTRL`** — control (no stimulation), \~12,000 cells
--   **`STIM`** — treated with interferon-β for 6 hours, \~12,000 cells
+- **`CTRL`** — control (no stimulation), \~12,000 cells
+- **`STIM`** — treated with interferon-β for 6 hours, \~12,000 cells
 
 Together \~24,000 annotated singlets across two samples on the **10x Chromium 3' v1** assay (the `muscData` build of `ifnb` is larger than the older SeuratData `ifnb` you may have seen quoted at \~14k). **Cell-type labels** (e.g. `CD14+ Monocytes`, `CD4 T cells`, `B cells`, `NK cells`, `Dendritic cells`) are bundled in the metadata so you can sanity-check clustering and integration without doing your own annotation.
 
--   **Reference:** Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94. [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
--   **Origin:** GEO accession [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
--   **Distributed via:** the Bioconductor [`muscData`](https://bioconductor.org/packages/muscData/) package as `Kang18_8vs8()` — cached locally through `ExperimentHub` on first download
--   **Used in:** Tutorials 01 → 04 of this workshop, and the official [Seurat integration vignette](https://satijalab.org/seurat/articles/integration_introduction.html)
+- **Reference:** Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94. [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042)
+- **Origin:** GEO accession [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
+- **Distributed via:** the Bioconductor [`muscData`](https://bioconductor.org/packages/muscData/) package as `Kang18_8vs8()` — cached locally through `ExperimentHub` on first download
+- **Used in:** Tutorials 01 → 04 of this workshop, and the official [Seurat integration vignette](https://satijalab.org/seurat/articles/integration_introduction.html)
 
 ::: callout-note
 **Why this dataset for teaching.** It's small enough to run on a laptop, it has a clean two-condition structure (so integration is meaningful), and the cell types are PBMCs — well-known, well-marked, and easy to reason about. The interferon response is a strong, biologically real signal that drives both batch-style separation (use case for integration) **and** condition-level differential expression (use case for pseudobulk DE in Tutorial 06).
@@ -71,10 +68,10 @@ Together \~24,000 annotated singlets across two samples on the **10x Chromium 3'
 
 ### Disk-space budget
 
-| Item | Size |
-|---|---|
-| `ifnb` raw counts (compressed cache) | \~25 MB |
-| `ifnb` Seurat object in memory | \~600 MB |
+| Item                                     | Size          |
+|------------------------------------------|---------------|
+| `ifnb` raw counts (compressed cache)     | \~25 MB       |
+| `ifnb` Seurat object in memory           | \~600 MB      |
 | `.rds` snapshots saved between tutorials | \~500 MB each |
 
 Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01–08.
@@ -82,7 +79,7 @@ Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01
 ### Data dictionary — what's in the loaded `ifnb` Seurat object
 
 | Slot | Class | Contents |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | `ifnb@assays$RNA@counts` | `dgCMatrix` | Raw UMI counts. \~35,000 genes × \~24,000 cells (sparse). |
 | `ifnb@meta.data$stim` | factor | `"CTRL"` or `"STIM"` — the **sample-of-origin** label. This becomes the integration covariate. |
 | `ifnb@meta.data$seurat_annotations` | factor | Author-curated cell-type labels from the original paper. Useful as ground truth in Tutorial 03. |
@@ -92,13 +89,12 @@ Plan for **\~1.5 GB total** including intermediate `.rds` files for Tutorials 01
 
 By the end of this tutorial you will be able to:
 
--   Fetch a published scRNA-seq dataset from Bioconductor's `muscData` package and assemble it as a Seurat object
--   Inspect a multi-sample Seurat object and split it by sample
--   Add per-cell QC metrics (`percent.mt`, `percent.rb`) and visualize them per sample
--   Choose filtering thresholds that are defensible for *your* dataset
--   Run `NormalizeData` → `FindVariableFeatures` → `ScaleData` and understand what each does
--   Save the QC'd object so Tutorial 02 can pick it up
-
+- Fetch a published scRNA-seq dataset from Bioconductor's `muscData` package and assemble it as a Seurat object
+- Inspect a multi-sample Seurat object and split it by sample
+- Add per-cell QC metrics (`percent.mt`, `percent.rb`) and visualize them per sample
+- Choose filtering thresholds that are defensible for *your* dataset
+- Run `NormalizeData` → `FindVariableFeatures` → `ScaleData` and understand what each does
+- Save the QC'd object so Tutorial 02 can pick it up
 
 ::: {.callout-warning title="Common errors / things that bite"}
 **`library(muscData)` errors with "there is no package called 'muscData'"** — it should already be installed from the [Tutorial 00 setup](Tutorial_00_Setup_RStudio_Packages.html); if it's missing, re-run that setup block.
@@ -114,12 +110,11 @@ By the end of this tutorial you will be able to:
 **Gene names look like `SYMBOL_ENSG…` / `SYMBOL-ENSG…`** — `muscData`'s `Kang18_8vs8()` stores each feature as `SYMBOL_ENSEMBLID` (e.g. `ISG15_ENSG00000187608`). The loader strips the trailing Ensembl-ID suffix so only the gene symbol remains (`ISG15`), which is what canonical markers, Azimuth, and `org.Hs.eg.db` match on. It strips *only* the Ensembl suffix — not everything after the first dash — so real dashed symbols (`HLA-A`, `MT-CO1`) are preserved, and it reports how many names it simplified.
 :::
 
-
 ::: {.callout-tip title="Solutions / instructor copy"}
 The *Think about it* prompts on this page have inline answers (click "Show answer" / "Click for answer" to expand). For the full **runnable instructor copy** with every chunk pre-evaluated and outputs shown:
 
 - **For students:** the same `.qmd` you downloaded already contains every solution inline — just expand the collapsed answers
-- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_01_QC_Preprocessing.html`. See [Exercise_Folder/_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
+- **For instructors:** render with `quarto render --profile solutions` from the `Exercise_Folder/` directory. The fully-evaluated HTML is written to `docs/Exercise_Folder/_solutions/Tutorial_01_QC_Preprocessing.html`. See [Exercise_Folder/\_quarto-solutions.yml](https://github.com/wcresko/scRNAseq_tutorial/blob/main/Exercise_Folder/_quarto-solutions.yml) for the build profile
 :::
 
 ## Setup {#setup}
@@ -127,7 +122,7 @@ The *Think about it* prompts on this page have inline answers (click "Show answe
 ::: {.callout-important title="Set up your project folder first — read this once"}
 These tutorials assume a simple **project layout**. Make a project folder, put a **`scripts/`** subfolder inside it, and save every downloaded tutorial `.qmd` into `scripts/`:
 
-```
+```         
 my_scrnaseq_project/
 ├── scripts/      ← put the downloaded Tutorial_*.qmd files here, and run them from here
 ├── data/         ← auto-created on first run: the .rds objects passed between tutorials
@@ -136,8 +131,8 @@ my_scrnaseq_project/
 
 Run each tutorial **from `scripts/`** (open the `.qmd` in RStudio from there). The setup chunk below then creates `data/` and `output/` as **siblings of `scripts/`** — i.e. at the project root — using the paths `../data` and `../output/Mod1`. (The `..` is "one level up from `scripts/`".) Two practical rules:
 
-1. **`data/` is the hand-off.** Tutorial 01 writes `../data/ifnb_preprocessed.rds`; Tutorial 02 reads it back from the same `../data/`. Keep all the `.qmd` files together in `scripts/` so they share one project `data/`.
-2. **Can't find a file?** The setup chunk prints the exact absolute path (`This module writes its figures & tables to: …`). If it's not where you expect, check `getwd()` — it should be your `scripts/` folder. See the downloadable **README** (linked on the [Materials](../Materials.html) page) for the full layout.
+1.  **`data/` is the hand-off.** Tutorial 01 writes `../data/ifnb_preprocessed.rds`; Tutorial 02 reads it back from the same `../data/`. Keep all the `.qmd` files together in `scripts/` so they share one project `data/`.
+2.  **Can't find a file?** The setup chunk prints the exact absolute path (`This module writes its figures & tables to: …`). If it's not where you expect, check `getwd()` — it should be your `scripts/` folder. See the downloadable **README** (linked on the [Materials](../Materials.html) page) for the full layout.
 :::
 
 ```{r}
@@ -346,8 +341,6 @@ The `ifnb` raw matrix uses HUGO gene symbols, so `^MT-` matches the 13 protein-c
 
 ## Step 4 — Visualize QC, per sample
 
-[]{#lst-M1-qc_plots}
-
 ```{r}
 #| label: M1-qc_plots
 
@@ -422,8 +415,6 @@ In a 10x droplet experiment, lysed-cell debris in the bulk solution leaks **ambi
 
 *Optional reference pattern — left `#| eval: false` because it needs a raw Cell Ranger matrix (not shipped with `ifnb`). You don't need to change anything here; use it on your own 10x data.*
 
-[]{#lst-M1-soupx}
-
 ```{r}
 #| label: M1-soupx
 #| eval: false
@@ -487,8 +478,6 @@ adj <- adjustCounts(sc, roundToInt = TRUE)
 A **doublet** is one barcode's worth of counts that came from two cells getting trapped in the same droplet. They show up as cells with anomalously high `nCount_RNA` and `nFeature_RNA` and a mixed expression profile (e.g. T-cell markers AND B-cell markers in the same cell). The simple `nFeature_RNA < 2500` filter applied later ([code](#lst-M1-filter)) catches some, but doublets that pair two *different* cell types of similar size will pass that filter — you need a model.
 
 `scDblFinder` simulates artificial doublets, trains a classifier to distinguish them from singletons, and returns a per-cell score and class. Critically, **doublets form within a sample, not across samples**, so we run it per sample.
-
-[]{#lst-M1-dbl}
 
 ```{r}
 #| label: M1-dbl
@@ -571,8 +560,6 @@ The `table()` is a 2×2 of sample × class: the key number is the **doublet frac
 
 ## Step 7 — Filter low-quality cells
 
-[]{#lst-M1-filter}
-
 ```{r}
 #| label: M1-filter
 
@@ -639,8 +626,6 @@ dim_after_normalize <- dim(ifnb)
 
 ## Step 9 — Highly variable features
 
-[]{#lst-M1-hvgs}
-
 ```{r}
 #| label: M1-hvgs
 
@@ -676,7 +661,7 @@ tibble::tibble(rank = seq_along(top10), gene = top10) |>
 ```
 
 ::: {.callout-tip title="Reading the output"}
-Each dot is a gene: x-axis = **average expression** (log scale), y-axis = **standardized variance** (how much more variable the gene is than expected for its mean). The ~2,000 genes coloured/highlighted as variable are the ones that rise above the fitted mean–variance curve — these are the only genes PCA will use in Tutorial 02. The labelled top-10 are the most variable of all; in `ifnb` they're dominated by **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT1`…) because the STIM half of the data switches them on and the CTRL half doesn't. Seeing ISGs at the top here is your first preview of the batch-style split you'll visualize in Tutorial 02 and correct in Tutorial 05.
+Each dot is a gene: x-axis = **average expression** (log scale), y-axis = **standardized variance** (how much more variable the gene is than expected for its mean). The \~2,000 genes coloured/highlighted as variable are the ones that rise above the fitted mean–variance curve — these are the only genes PCA will use in Tutorial 02. The labelled top-10 are the most variable of all; in `ifnb` they're dominated by **interferon-stimulated genes** (`ISG15`, `IFI6`, `IFIT1`…) because the STIM half of the data switches them on and the CTRL half doesn't. Seeing ISGs at the top here is your first preview of the batch-style split you'll visualize in Tutorial 02 and correct in Tutorial 05.
 :::
 
 ::: {.callout-important title="Think about it"}
@@ -701,7 +686,7 @@ Each dot is a gene: x-axis = **average expression** (log scale), y-axis = **stan
 ifnb <- ScaleData(ifnb)
 ```
 
-By default `ScaleData` only scales the variable features identified in Step 9 (~2,000 HVGs) — that's all PCA needs, and it keeps the `scale.data` slot (and the saved `.rds`) small. If you later need scaled values for a specific non-HVG gene (e.g. to draw it on a heatmap), re-run `ScaleData(ifnb, features = <those genes>)` at that point.
+By default `ScaleData` only scales the variable features identified in Step 9 (\~2,000 HVGs) — that's all PCA needs, and it keeps the `scale.data` slot (and the saved `.rds`) small. If you later need scaled values for a specific non-HVG gene (e.g. to draw it on a heatmap), re-run `ScaleData(ifnb, features = <those genes>)` at that point.
 
 ::: {.callout-important title="Think about it"}
 1.  What does `ScaleData` do to each gene numerically?
@@ -739,10 +724,10 @@ readr::write_csv(dim_summary, file.path(out_dir, "Mod1_C12_dimension_progression
 You should see roughly:
 
 | Step | Features after | Barcodes after |
-|---|---:|---:|
-| Step 1 — `Kang18_8vs8` (singlets, annotated)                    | ~35,635 | ~24,500 |
-| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`)    | ~35,635 | ~23,000 |
-| Step 8 — `NormalizeData` (no dimension change)                  | ~35,635 | ~23,000 |
+|--------------------|-------------------------:|-------------------------:|
+| Step 1 — `Kang18_8vs8` (singlets, annotated) | \~35,635 | \~24,500 |
+| Step 7 — `subset()` QC filter (`nFeature_RNA`, `percent.mt`) | \~35,635 | \~23,000 |
+| Step 8 — `NormalizeData` (no dimension change) | \~35,635 | \~23,000 |
 
 (Numbers will vary by a few hundred depending on package versions.)
 
@@ -763,6 +748,6 @@ The saved `.rds` is the starting point for **Tutorial 02 — Dimensionality redu
 
 ## Credits
 
--   Dataset: Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042) — fetched via Bioconductor's [`muscData::Kang18_8vs8()`](https://bioconductor.org/packages/muscData/)
--   Reference vignettes: [Seurat integration tutorial](https://satijalab.org/seurat/articles/integration_introduction.html) · [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
--   Inspiration for the multi-step QC pacing: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) (Sengupta lab)
+- Dataset: Kang *et al.* (2017) *Nat Biotechnol* 36: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042) — fetched via Bioconductor's [`muscData::Kang18_8vs8()`](https://bioconductor.org/packages/muscData/)
+- Reference vignettes: [Seurat integration tutorial](https://satijalab.org/seurat/articles/integration_introduction.html) · [Seurat PBMC 3k tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial.html)
+- Inspiration for the multi-step QC pacing: [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) (Sengupta lab)
