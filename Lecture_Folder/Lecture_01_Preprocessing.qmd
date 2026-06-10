@@ -1,6 +1,6 @@
 ---
-title: "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs"
-author: "Bill Cresko"
+title: "L01 — Pre-processing: QC, doublets, normalization, HVGs"
+author: ""
 format:
   revealjs:
     footer: Single Cell RNA-seq Workshop · Lecture 01
@@ -33,64 +33,172 @@ theme_set(theme_minimal(base_size = 14))
 set.seed(2026)
 ```
 
-# Lecture 01: Pre-processing {background-color="#2c3e50"}
-
 ## Where this lecture fits
 
--   Previous: [Lec 00 — Tools and Foundational Concepts](Lecture_00_Tools_Found_Concepts.html)
--   **You are here:** Lec 01 — *turning a raw count matrix into a clean, normalized object*
--   Next: [Lec 02 — Dim Reduction & Clustering](Lecture_02_DimReduction_Clustering.html)
--   **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
--   **Companion book chapter:** [Chapter 1 — Preprocessing: From Counts Matrix to Filtered Object](../Resources_Folder/Chapter_01_Preprocessing.html)
--   **Parallel reading:** [scNotebooks Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html) (QC + clustering + annotation in a single Jupyter notebook)
+- Previous: [Lec 00 — Tools and Foundational Concepts](Lecture_00_Tools_Found_Concepts.html)
+- **You are here:** Lec 01 — *turning a raw count matrix into a clean, normalized object*
+- Next: [Lec 02 — Dim Reduction & Clustering](Lecture_02_DimReduction_Clustering.html)
+- **Companion tutorial:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
+- **Companion book chapter:** [Chapter 1: From Counts Matrix to Filtered Object](../Resources_Folder/Chapter_01_Preprocessing.html)
 
 ## Goals of this lecture
 
-::: incremental
--   See where pre-processing sits in the canonical pipeline
--   Learn the three core QC metrics, **what they mean**, and **what counts as normal**
--   Recognize ambient-RNA contamination and droplet doublets — and how to handle each
--   Pick a normalization + feature-selection strategy that fits your data
-:::
+- See where pre-processing sits in the canonical pipeline
+- Learn the three core QC metrics, **what they mean**, and **what counts as normal**
+- Recognize and handle ambient-RNA contamination and droplet doublets
+- Pick a normalization + feature-selection strategy that fits your data
 
 ::: callout-note
-**Why this matters.** Every downstream geometric step (PCA, clustering, UMAP) treats the post-QC matrix as ground truth. Garbage in → confidently-wrong clusters out. There is no "fix the clustering" — you have to fix the QC.
+**Why this matters.**
+
+- Every downstream geometric step (PCA, clustering, UMAP) treats the post-QC matrix as ground truth.
+
+- Garbage in → confidently-wrong clusters out.
+
+- There is no "fix the clustering" — you have to fix the QC.
 :::
 
-# The full picture {background-color="#2c3e50"}
+## 
 
-## scRNA-seq pipeline at a glance
+### What is the same about scRNA-seq
 
-![The full scRNA-seq analysis workflow at a glance](images/lec01_scrnaseq_workflow.svg){fig-align="center" width="98%"}
+::: incremental
+- Same core measurement: **count of reads / UMIs per gene**
+- Same statistical concerns: normalization, [**batch effects**](../Resources_Folder/Glossary.html#b), multiple testing, replication
+- Many downstream questions (DE, enrichment, co-expression) are the **same questions at a new resolution** — and reuse bulk tools (DESeq2, limma, WGCNA) after **pseudobulk aggregation** (Lecture 06)
+:::
 
-## The Seurat workflow in eight steps
+### What is genuinely new about scRNA-seq
 
-![The Seurat workflow in 8 numbered steps](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="97%"}
+::: incremental
+- [**Sparsity**](../Resources_Folder/Glossary.html#s): \~90–95% zeros in typical droplet data — partly real biology, partly technical [**dropout**](../Resources_Folder/Glossary.html#d)
+- **Cells are not replicates**: cells from one subject are not statistically independent — using `n = cells` is the most common mistake in the field
+- **Cell type is a latent variable** you have to recover from the data
+- **Integration** across samples is a first-class problem, not an afterthought
+:::
 
--   This lecture covers steps **1–4**: QC, normalization, scaling, feature extraction
--   Steps 5–8 come in Lec 02–04
+## Sparsity
 
-# Step 1 — Per-cell QC {background-color="#2c3e50"}
+```{r}
+#| label: sparsity-illustration
+#| echo: false
+#| fig-width: 16
+#| fig-height: 4
 
-## Why QC, in one sentence
+set.seed(2026)
+# Three regimes: bulk (dense), Smart-seq (intermediate), 10x v3 (sparse)
+make_panel <- function(p_zero, label) {
+  m <- matrix(rbinom(40 * 60, 1, prob = 1 - p_zero), nrow = 40, ncol = 60)
+  m[m == 1] <- rpois(sum(m == 1), 4)
+  expand.grid(gene = seq_len(40), cell = seq_len(60)) |>
+    mutate(count = as.vector(m),
+           panel = paste0(label, "\n(", round(p_zero * 100), "% zeros)"))
+}
 
-A droplet that "looks like a cell" in your matrix may actually be **(a)** an empty droplet with ambient soup, **(b)** a dying cell leaking cytoplasm, **(c)** two cells in one droplet, or **(d)** a real cell. QC is how we triage them.
+dat <- bind_rows(
+  make_panel(0.05, "Bulk RNA-seq"),
+  make_panel(0.55, "Smart-seq2"),
+  make_panel(0.92, "10x 3' v3 droplet")
+)
+
+dat$panel <- factor(dat$panel, levels = unique(dat$panel))
+
+ggplot(dat, aes(cell, gene, fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "#2c3e50", name = "count") +
+  facet_wrap(~ panel, nrow = 1) +
+  labs(x = "Cells (or samples)", y = "Genes",
+       title = "") +
+  theme_minimal(base_size = 12) +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(),
+        strip.text = element_text(face = "bold"),
+        panel.grid = element_blank())
+```
+
+- **Bulk:** nearly every gene is detected in every sample (\~5% zeros)
+
+- **Smart-seq2**: \~50–60% zeros — moderate dropout but rich per-cell signal
+
+- **10x 3' v3** droplet: \~90–95% zeros — most (cell, gene) pairs are zero
+
+- The implication for analysis: every step has to handle counts that are *mostly* zero.
+
+- That's why we have specialized normalisation (`SCTransform`), HVG selection, and graph-based clustering instead of the bulk RNA-seq toolkit.
+
+
+## Bulk vs. single-cell — the tools
+
+![](images/lec01_bulk_vs_sc_toolchain.svg){alt="Bulk vs. single-cell toolchain comparison" fig-align="center" width="92%"}
+
+
+## Raw data processing (which we don't do)
+
+![](images/lec01_use_raw_data_processing.svg){fig-align="center" width="96%"}
+
+## Raw data processing (which we don't do)
+
+- Common tools:
+  - **Cell Ranger** (10x, official)
+  - **STARsolo** (STAR-based, fast, flexible)
+  - **alevin-fry / salmon** (selective alignment, very fast)
+  - **kb-python (kallisto \| bustools)** (pseudoalignment)
+- Final product: a **barcode(cell) × feature(gene) count matrix**
+- We will start with the **count matrix**
+
+## The downstream workflow at a glance
+
+![](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="92%"}
+
+- That cell × gene matrix is the **input** to every analytical step the rest of the workshop covers
+- The eight steps fall naturally into four chunks, each with a dedicated lecture:
+  - **Pre-processing** (Lec 01 / Tut 01): QC → doublets → normalisation → HVGs
+  - **Geometry** (Lec 02 + 05 / Tut 02 + 05): scale → PCA → neighbour graph → Leiden → t-SNE/UMAP → integration
+  - **Annotation** (Lec 03, Lec 04 / Tut 03, Tut 04): markers, manual annotation, reference-based annotation (Azimuth)
+  - **Differential expression & function** (Lec 06–07 / Tut 06–07): pseudobulk DESeq2 → functional enrichment
+  - **Differential abundance** (Lec 08)
+- \*Bonus modules\*\* extend the same conceptual toolkit to other data modalities
+
+::: callout-tip
+**A 4-step mental compression.** From here on out, every chunk of the pipeline (a) cleans something, (b) puts things on a sensible scale, (c) finds structure, (d) names that structure with biology.
+:::
+
+## Generic scRNA-seq pipeline at a glance
+
+![](images/lec01_scrnaseq_workflow.svg){fig-align="center" width="98%"}
+
+## Specific Seurat workflow
+
+![](images/lec01_seurat_8step_workflow.svg){fig-align="center" width="97%"}
+
+# Quality control of the feature by barcode matrix
+
+## Why Quality Control?
+
+\
+\
+A droplet that "looks like a cell" in your matrix may actually be
+
+- an empty droplet with ambient soup
+
+- a dying cell leaking cytoplasm
+
+- two (or more) cells in one droplet
+
+- **a real cell**
+
+QC is how we triage them.
+
+## Why Quality Control?
+
+![](images/quality_control.jpeg){alt="Quality control — raster reference" fig-align="center" width="92%"}
 
 ## Three core metrics
 
-![Three core QC metrics: nCount, nFeature, percent.mt](images/lec01_qc_metrics.svg){fig-align="center" width="85%"}
+- `nFeature_RNA`: **genes detected per cell** — proxy for capture quality
+- `nCount_RNA`: **total UMI counts per cell** — proxy for sequencing depth in that cell
+- `percent.mt`: **% reads mapping to mitochondrial genes** — proxy for stress / dying cells (cytoplasmic mRNA leaks before mitochondrial mRNA)
 
--   `nFeature_RNA`: **genes detected per cell** — proxy for capture quality
--   `nCount_RNA`: **total UMI counts per cell** — proxy for sequencing depth in that cell
--   `percent.mt`: **% reads mapping to mitochondrial genes** — proxy for stress / dying cells (cytoplasmic mRNA leaks before mitochondrial mRNA)
-
-## What each metric catches
-
-![Common per-cell QC metrics and their interpretation](images/lec01_use_common_qc_metrics.svg){fig-align="center" width="85%"}
-
--   **Low** gene / molecule counts → empty / dying / poorly captured cells
--   **Very high** gene counts for the tissue → likely **[doublets / multiplets](../Resources_Folder/Glossary.html#d)**
--   **High mitochondrial %** → cells that were dying when loaded
+![](images/lec01_qc_metrics.svg){fig-align="center" width="85%"}
 
 ## Normal ranges — a starting cheat sheet
 
@@ -98,7 +206,7 @@ A droplet that "looks like a cell" in your matrix may actually be **(a)** an emp
 **Typical "healthy" thresholds for 10x 3' v3 on dissociated tissue.** These are starting points, not rules — *always look at the distributions first.*
 
 | Metric | Typical lower | Typical upper | Notes |
-|----|----|----|----|
+|------------------|------------------|------------------|------------------|
 | `nFeature_RNA` (genes/cell) | 200–500 | 2,500–6,000 | Upper bound is dataset-specific; doublets push past it |
 | `nCount_RNA` (UMIs/cell) | 500–1,000 | \~50,000 | Very high counts often = doublets, very low = empty |
 | `percent.mt` | — | 5–10% (PBMC), 15–20% (tumor / fragile tissue) | Nuclei (snRNA) should be \< \~1–2% |
@@ -106,40 +214,10 @@ A droplet that "looks like a cell" in your matrix may actually be **(a)** an emp
 
 ::: callout-warning
 **Watch-outs.**
--   Brain / muscle / cardiomyocytes naturally have **high mitochondrial content** — a 5% threshold will throw away your biology.
--   **snRNA-seq** should have almost no mitochondrial reads; if it does, your nuclei prep contaminated cytoplasm.
--   A **bimodal `nCount_RNA`** distribution often means two cell sizes (e.g., lymphocytes + neutrophils), *not* doublets — don't gate it away.
-:::
 
-## QC in practice
-
-::: panel-tabset
-### Seurat
-
-``` r
-seu[["percent.mt"]] <- PercentageFeatureSet(seu, pattern = "^MT-")
-VlnPlot(seu, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3)
-
-# Inspect distributions BEFORE choosing thresholds
-seu <- subset(seu,
-              nFeature_RNA > 200 & nFeature_RNA < 2500 &
-              percent.mt   < 5)
-```
-
-### scanpy
-
-``` python
-adata.var["mt"] = adata.var_names.str.startswith("MT-")
-sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"],
-                           inplace=True, percent_top=None)
-adata = adata[(adata.obs.n_genes_by_counts > 200) &
-              (adata.obs.n_genes_by_counts < 2500) &
-              (adata.obs.pct_counts_mt < 5)].copy()
-```
-:::
-
-::: callout-tip
-**Pattern for the mitochondrial regex:** human = `^MT-`, mouse = `^mt-`. Get this wrong silently and `percent.mt` will be all zeros.
+- Brain / muscle / cardiomyocytes naturally have **high mitochondrial content** — a 5% threshold will throw away your biology.
+- **snRNA-seq** should have almost no mitochondrial reads; if it does, your nuclei prep contaminated cytoplasm.
+- A **bimodal `nCount_RNA`** distribution often means two cell sizes (e.g., lymphocytes + neutrophils), *not* doublets — don't gate it away.
 :::
 
 ## What QC distributions actually look like
@@ -211,90 +289,60 @@ p_mt   <- ggplot(qc, aes(x = "", y = percent.mt, fill = kind)) +
 gridExtra::grid.arrange(p_feat, p_umi, p_mt, nrow = 1, widths = c(1, 1, 1.3))
 ```
 
--   Each violin shows what each "category" of barcode looks like in a typical 10x v3 dataset
--   **Real cells** form the central bulk you want to keep; **doublets** sit at the high end; **dying** cells sit at the low-feature / high-mt corner; **empty** droplets pile up at very low feature counts
--   The right cutoffs aren't universal — they depend on your tissue and protocol — but the *shapes* of these distributions are what your QC plots should look like before you choose thresholds
-
-## The barcode-rank (knee) plot
-
-```{r}
-#| label: knee-plot
-#| echo: false
-#| fig-width: 7
-#| fig-height: 4
-
-set.seed(2026)
-# Simulate a knee plot — many empty droplets, knee around rank ~10000
-ranks <- 1:50000
-counts <- sort(c(round(exp(rnorm(8000, log(8000), 0.7))),       # real cells
-                 round(exp(rnorm(2000, log(800), 0.4))),        # ambient/borderline
-                 round(exp(rnorm(40000, log(40), 0.6)))),       # empty droplets
-               decreasing = TRUE)[ranks]
-
-plot(ranks, counts, log = "xy", type = "l", lwd = 2, col = "#2c3e50",
-     xlab = "Barcode rank (sorted by UMI count)", ylab = "UMIs per barcode (log)",
-     main = "Barcode rank ('knee') plot — typical 10x run")
-abline(v = 8500, lty = 2, col = "red"); text(9500, 5e3, "knee", col = "red", pos = 4)
-abline(v = 20000, lty = 2, col = "darkorange"); text(22000, 60, "ambient soup", col = "darkorange", pos = 4, cex = 0.9)
-```
-
--   Sort all observed barcodes by UMI count, plot rank vs. count on log–log axes
--   **Above the knee:** real cells. **At the knee:** ambiguous droplets (some real, some ambient). **Below the knee:** empty droplets carrying mostly ambient mRNA.
--   Cell Ranger's filtered matrix uses an EmptyDrops-style algorithm to draw this line for you — but it's worth re-plotting it yourself when results look off
--   `DropletUtils::barcodeRanks()` / `emptyDrops()` (R) let you re-derive the knee and call cells statistically
+- Each violin shows what each "category" of barcode looks like in a typical 10x v3 dataset
+- **Real cells** form the central bulk you want to keep;
+  - **doublets** sit at the high end;
+  - **dying** cells sit at the low-feature / high-mt corner;
+  - **empty** droplets pile up at very low feature counts
+- The correct cutoffs aren't universal — they depend on your tissue and protocol
 
 ## Droplets can also be empty — or contaminated
 
-![Ambient RNA contamination from lysed-cell debris](images/lec01_ambient_rna.svg){fig-align="center" width="92%"}
+![Ambient RNA — raster reference](images/ambient_rna.jpeg){fig-align="center" width="92%"}
 
--   Many barcodes correspond to **empty droplets** with only ambient RNA — filter with `EmptyDrops` or the Cell Ranger knee-point
--   Even real cells are contaminated by **ambient RNA soup**; estimate and subtract with `SoupX`, `DecontX`, or `CellBender`
+- Many barcodes correspond to **empty droplets** with only ambient RNA — filter with `EmptyDrops` or the Cell Ranger knee-point
+- Even real cells are contaminated by **ambient RNA soup**; estimate and subtract with `SoupX`, `DecontX`, or `CellBender`
 
-## Ambient mRNA — before and after lysis
+# Doublet detection {background-color="#2c3e50"}
 
-![How SoupX corrects ambient RNA contamination](images/lec01_use_ambient_rna.svg){fig-align="center" width="95%"}
+## Doublets
 
--   Before lysis: each droplet contains (ideally) one cell + one bead, plus trace **ambient mRNA**
--   After lysis: the bead captures its cell's mRNA *and* any ambient mRNA → **cross-cell contamination** in the final counts
+- Droplets sometimes capture **two cells**
+- Run doublet detection on each sample **before** integration
+- Expected doublet rate scales with loading: \~0.8–1% per 1,000 cells loaded on 10x Chromium → \~8% at 10k cells, \~16% at 20k
 
-::: callout-tip
-**When ambient correction matters most:** highly hemorrhagic samples (lots of free hemoglobin), cells dissociated from frozen tissue, or any time you see a marker gene "expressed" in clusters where it shouldn't be (a classic SoupX trigger).
-:::
+## Doublets
 
-# Step 2 — Doublet detection {background-color="#2c3e50"}
+![](images/doublet_detection.png){fig-align="center" width="92%"}
 
-## Doublets in one slide
+- **Simulate** artificial doublets by averaging random pairs of real cells
+- Project real + simulated cells together in **reduced dimensions**
+- Real cells that sit close to many simulated doublets are **flagged** as likely doublets
 
--   Droplets sometimes capture **two cells** → artificial "hybrid" profiles
--   Run doublet detection on each sample **before** integration
--   Expected doublet rate scales with loading: \~0.8–1% per 1,000 cells loaded on 10x Chromium → \~8% at 10k cells, \~16% at 20k
--   **Experimental trick:** pooling samples with distinct **genotypes or species** lets you *detect* cross-sample doublets directly — genetic demultiplexing (`demuxlet` / `souporcell` / `Vireo`) or a human–mouse "barnyard" mix — and measure your true multiplet rate
-
-![Doublet formation: two cells in one droplet](images/lec01_doublet_detection.svg){fig-align="center" width="95%"}
+## Doublets
 
 | Tool            | Ecosystem | Notes                          |
 |-----------------|-----------|--------------------------------|
 | `scDblFinder`   | R / Bioc  | Fast, recommended default      |
-| `DoubletFinder` | R         | Used in Patel's tutorial; needs pK sweep |
+| `DoubletFinder` | R         | Needs pK sweep                 |
 | `Scrublet`      | Python    | Classic choice in scanpy flows |
 
-## Doublet detection — how it actually works
-
-![Doublet detection: scDblFinder workflow](images/lec01_use_doublet_detection.svg){fig-align="center" width="98%"}
-
--   **Simulate** artificial doublets by averaging random pairs of real cells
--   Project real + simulated cells together in **reduced dimensions**
--   Real cells that sit close to many simulated doublets are **flagged** as likely doublets
-
 ::: callout-warning
-**Doublet detection runs *per sample*, not on a merged object.** Inter-sample mixtures are not doublets — they're integration noise, and pretending they are will silently drop real cells.
+**Doublet detection runs *per sample*, not on a merged object.**
+
+- Inter-sample mixtures are not doublets — they're integration noise
+- Pretending they are will silently drop real cells.
 :::
 
 ::: callout-note
-**Seurat v5 note.** After `merge()` in Seurat v5, the RNA assay stores *split layers* (`counts.CTRL`, `counts.STIM`, …). Run `JoinLayers()` after merging the per-sample objects so that downstream steps (`FindMarkers`, normalization) see a single layer. The tutorial does this automatically after the doublet-detection merge.
+**Seurat v5 note.**
+
+- After `merge()` in Seurat v5, the RNA assay stores *split layers* (`counts.CTRL`, `counts.STIM`, …).
+- Run `JoinLayers()` after merging the per-sample objects so that downstream steps see a single layer.
+- The tutorial does this automatically after the doublet-detection merge.
 :::
 
-## What a doublet-score distribution looks like
+## Doublet Score Distribution
 
 ```{r}
 #| label: doublet-score
@@ -323,21 +371,31 @@ ggplot(df, aes(score, fill = truth)) +
   theme_minimal(base_size = 13) + theme(legend.position = "bottom")
 ```
 
--   Doublet detectors output a continuous **score** per cell — high = "looks like a simulated doublet"
--   In a healthy run the distribution is **bimodal**: a tall left peak (real cells) and a small right shoulder (likely doublets)
--   The threshold is set at the *expected doublet rate* implied by your loading concentration (e.g. 8% at 10k cells loaded on Chromium)
--   If the distribution is **unimodal**, your sample either has no detectable doublets (rare in a 10k-cell run) or your simulator parameters need tuning
+## Doublet Score Distribution
 
-# Step 3 — Normalization {background-color="#2c3e50"}
+\
+\
+
+- Doublet detectors output a continuous **score** per cell — high = "looks like a simulated doublet"
+- In a healthy run the distribution is **bimodal**: a tall left peak (real cells) and a small right shoulder (likely doublets)
+- The threshold is set at the *expected doublet rate* implied by your loading concentration (e.g. 8% at 10k cells loaded on Chromium)
+- If the distribution is **unimodal**, your sample either has no detectable doublets (rare in a 10k-cell run) or your simulator parameters need tuning
+
+# Normalization {background-color="#2c3e50"}
 
 ## Why normalize?
 
-Cells are sequenced to wildly different depths (factor-of-10 spread is common). Without correction, a "highly expressed" gene in a deeply sequenced cell looks the same as a moderately expressed one in a shallow cell. Normalization puts cells on a comparable scale before downstream math.
+\
+\
+
+- Cells are sequenced to wildly different depths (factor-of-10 spread is common).
+- Without correction, a "highly expressed" gene in a deeply sequenced cell looks the same as a moderately expressed one in a shallow cell.
+- Normalization puts cells on a comparable scale before downstream math.
 
 ## Two dominant approaches
 
--   **Log-normalization** (`NormalizeData` / `sc.pp.normalize_total` + `log1p`) — fast, simple, the default in most tutorials
--   **Variance-stabilizing** (`SCTransform` in Seurat) — models the negative-binomial mean–variance relationship; often better for low-count cells; slower
+- **Log-normalization** (`NormalizeData` in Seurat) — fast, simple, the default in most tutorials
+- **Variance-stabilizing** (`SCTransform` in Seurat) — models the negative-binomial mean–variance relationship; often better for low-count cells but slower
 
 ``` r
 # Seurat — log-normalization
@@ -357,73 +415,29 @@ seu <- SCTransform(seu, verbose = FALSE)
 **Don't normalize twice.** SCTransform replaces `NormalizeData` + `ScaleData`. Running both on the same object stacks transforms and breaks downstream assumptions.
 :::
 
-## What normalization actually does
+## Log-norm vs SCTransform
 
-```{r}
-#| label: normalization-before-after
-#| echo: false
-#| fig-width: 11
-#| fig-height: 4
+![.](images/lec01_hope_norm_compare.svg){fig-align="center" width="96%"}
 
-set.seed(2026)
-n_cells <- 1500
-# Simulate per-cell sequencing depth — wide spread
-total_umi <- round(exp(rnorm(n_cells, log(5000), 0.55)))
-# A "typical" gene's count in each cell scales with total
-gene_raw  <- rpois(n_cells, lambda = 0.0012 * total_umi)
+- Log-normalization removes depth but leaves a mean–variance trend for medium/high-expression genes
+- SCTransform's regularized NB-GLM residuals stay flat across expression levels
 
-# Log-normalize: log1p( gene/total * 10000 )
-gene_log <- log1p(gene_raw / total_umi * 1e4)
+# Feature selection (HVGs) {background-color="#2c3e50"}
 
-dat <- tibble::tibble(total_umi, gene_raw, gene_log)
+## Why Highly Variable Genes (HVGs)?
 
-p_raw <- ggplot(dat, aes(total_umi, gene_raw)) +
-  geom_point(alpha = 0.35, size = 1.2, color = "#3498db") +
-  geom_smooth(method = "lm", se = FALSE, color = "#e74c3c", linewidth = 0.8) +
-  scale_x_log10(labels = scales::comma) +
-  labs(x = "Total UMIs / cell (log)", y = "Raw gene count",
-       title = "Before — raw counts ride sequencing depth") +
-  theme_minimal(base_size = 12)
-
-p_norm <- ggplot(dat, aes(total_umi, gene_log)) +
-  geom_point(alpha = 0.35, size = 1.2, color = "#27ae60") +
-  geom_smooth(method = "lm", se = FALSE, color = "#e74c3c", linewidth = 0.8) +
-  scale_x_log10(labels = scales::comma) +
-  labs(x = "Total UMIs / cell (log)", y = "log1p(CPM10k)",
-       title = "After log-normalization — depth dependence is gone") +
-  theme_minimal(base_size = 12)
-
-gridExtra::grid.arrange(p_raw, p_norm, nrow = 1)
-```
-
--   **Left:** raw counts for a typical gene scale with each cell's sequencing depth — a high-depth cell looks "more highly expressed" purely because it was sequenced more
--   **Right:** after `NormalizeData()` (log1p of CPM-scaled counts), the depth correlation is gone — same biological signal, comparable across cells
--   This is the *minimum* you need before PCA. **SCTransform** does this *and* models gene-specific overdispersion, which is why it shines on low-depth or noisy data.
-
-## Log-norm vs SCTransform — alternative schematic
-
-![Log-normalization removes depth but leaves a mean–variance trend for medium/high-expression genes; SCTransform's regularized NB-GLM residuals stay flat across expression levels — recreated in our style.](images/lec01_hope_norm_compare.svg){fig-align="center" width="96%"}
-
-::: callout-note
-**Alternative to the normalization slides above.** Original figure: **Hafemeister & Satija 2019**, *Genome Biology* — [doi.org/10.1186/s13059-019-1874-1](https://doi.org/10.1186/s13059-019-1874-1).
-:::
-
-# Step 4 — Feature selection (HVGs) {background-color="#2c3e50"}
-
-## Why HVGs?
-
--   Use the \~1,000–3,000 most variable genes for downstream geometry
--   Dramatically reduces noise from ubiquitously-expressed housekeeping genes
--   Seurat: `FindVariableFeatures()`; scanpy: `sc.pp.highly_variable_genes()`
+- Use the \~1,000–3,000 most variable genes for downstream geometry
+- Dramatically reduces noise from ubiquitously-expressed housekeeping genes
+- Functions
+  - Seurat: `FindVariableFeatures()`
+  - scanpy: `sc.pp.highly_variable_genes()`
 
 ::: callout-note
 **Typical settings:** `nfeatures = 2000` is the Seurat default and a defensible choice for most datasets. Bump to 3,000–5,000 for atlas-scale or highly heterogeneous data; drop to 1,000 only if your dataset is small and unimodal.
 :::
 
 ::: callout-warning
-**Pitfalls in HVG selection.**
--   Including **mitochondrial / ribosomal genes** as HVGs lets technical variation drive your PCs — many pipelines exclude these patterns by default.
--   If you regress out cell-cycle scores, do it *before* HVG selection, otherwise cycling genes dominate the variable list.
+**Pitfalls in HVG selection.** - Including **mitochondrial / ribosomal genes** as HVGs lets technical variation drive your PCs — Many pipelines exclude these patterns by default. - If you regress out cell-cycle scores, do it *before* HVG selection, otherwise cycling genes dominate the variable list.
 :::
 
 ## What the HVG (variable feature) plot shows
@@ -479,48 +493,40 @@ ggplot(genes, aes(mean, variance)) +
   theme(legend.position = "bottom")
 ```
 
--   Every gene gets a (mean, variance) pair. The **grey curve** is the expected mean–variance relationship for technical / housekeeping genes (roughly Poisson with overdispersion).
--   Genes that sit **well above the trend** are over-dispersed — their variance can't be explained by sampling noise alone, so they're carrying biological signal. Those are your HVGs.
--   `FindVariableFeatures(seu, selection.method = "vst", nfeatures = 2000)` returns the top 2,000 such genes, ranked by *standardized residual variance*. `VariableFeaturePlot()` is exactly this picture.
--   Marker labels in the corner are the exact reason you do this: in a PBMC run the top HVGs include the genes you'd already expect (`LYZ`, `S100A9`, `CD74`, `MS4A1`, …) — you should recognise them.
+## What the HVG (variable feature) plot shows
 
-# Recap & what's next {background-color="#2c3e50"}
+- Every gene gets a (mean, variance) pair. The **grey curve** is the expected mean–variance relationship for technical / housekeeping genes (roughly Poisson with overdispersion).
+- Genes that sit **well above the trend** are over-dispersed — their variance can't be explained by sampling noise alone, so they're carrying biological signal. Those are your HVGs.
+- `FindVariableFeatures(seu, selection.method = "vst", nfeatures = 2000)` returns the top 2,000 such genes, ranked by *standardized residual variance*. `VariableFeaturePlot()` is exactly this picture.
+- Marker labels in the corner are the exact reason you do this: in a PBMC run the top HVGs include the genes you'd already expect (`LYZ`, `S100A9`, `CD74`, `MS4A1`, …) — you should recognise them.
 
-## What to remember from Lecture 01
+# Let's Get Started
 
-::: incremental
--   QC = filtering bad **cells** *and* bad **droplets** — both matter
--   Thresholds are **dataset-specific**; always plot before you cut
--   Ambient RNA is real and can be subtracted (`SoupX`, `DecontX`, `CellBender`)
--   Doublets are detected by simulation; do it **per-sample** before integration
--   Normalization choice is less important than *consistency* between training and downstream steps
--   HVGs give you the gene-space PCA will operate on
-:::
+## The `ifnb` dataset
 
-## The `ifnb` dataset — what you'll see
+- The workshop dataset — the Kang *et al.* PBMCs we call "`ifnb`"
 
-The workshop dataset — the Kang *et al.* PBMCs we call "`ifnb`", loaded via `muscData::Kang18_8vs8()` (not the smaller SeuratData `ifnb`) — starts at **\~24,500 annotated singlets** across CTRL and STIM. After the QC filters in Tutorial 01 (`nFeature_RNA > 200 & < 2500`, `percent.mt < 5`, `scDblFinder.class == "singlet"`) you should retain **\~23,000 cells**.
+- Single-cell RNA-seq data of human peripheral blood mononuclear cells (PBMCs).
 
-| Stage | Cells |
-|---|---|
-| Loaded (`Kang18_8vs8`, annotated singlets) | \~24,500 |
-| After `subset()` QC filter | \~23,000 |
-| After `NormalizeData` (no cell loss) | \~23,000 |
+- Two conditions: resting (CONTROL) and interferon-beta (IFN-β) stimulated (STIM) cells
+
+- Loaded via `muscData::Kang18_8vs8()`\
+
+- Starts at **\~24,500 annotated singlets** across CTRL and STIM.
+
+- After the QC filters in Tutorial 01 you should retain **\~23,000 cells**.
 
 ::: callout-tip
-**Doublet detection in this tutorial runs *per sample* (CTRL then STIM separately)** with `scDblFinder`. The two per-sample objects are then merged back with `merge()` and `JoinLayers()` before the final filter. Running doublet detection on the merged object would treat cross-sample cell pairs as doublets — they are not.
+**Doublet detection in this tutorial runs *per sample* (CTRL then STIM separately)** with `scDblFinder`.
+
+- The two per-sample objects are then merged back with `merge()` and `JoinLayers()` before the final filter.
+- Running doublet detection on the merged object would treat cross-sample cell pairs as doublets — they are not.
 :::
 
-## Design consideration — `percent.rb` and when to use it
+## NOTE — `percent.rb` and when to use it
 
 Tutorial 01 also computes `percent.rb` (ribosomal-protein fraction). It is **not** a standard QC filter; rather:
 
--   A very high `percent.rb` (\>50%) in a cluster often signals a *metabolically active* or *activated* state, not a low-quality cell.
--   Monitor it per sample: if one sample has dramatically higher `percent.rb`, check whether library prep differed.
--   Do **not** filter on `percent.rb` by default — just note it.
-
-## Coming up next
-
--   **Lec 02** — [Dim reduction, integration, clustering](Lecture_02_DimReduction_Clustering.html)
--   **Hands-on:** [Tutorial 01 — QC & Preprocessing](../Exercise_Folder/Tutorial_01_QC_Preprocessing.html)
--   **Companion book chapter:** [Chapter 1 — Preprocessing](../Resources_Folder/Chapter_01_Preprocessing.html)
+- A very high `percent.rb` (\>50%) in a cluster often signals a *metabolically active* or *activated* state, not a low-quality cell.
+- Monitor it per sample: if one sample has dramatically higher `percent.rb`, check whether library prep differed.
+- Do **not** filter on `percent.rb` by default — just note it.

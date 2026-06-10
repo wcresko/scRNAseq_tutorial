@@ -2984,191 +2984,191 @@
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#where-this-lecture-fits",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#where-this-lecture-fits",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Where this lecture fits",
     "text": "Where this lecture fits\n\nPrevious: Lec 01 — Pre-processing\nYou are here: Lec 02 — PCA, neighbour graph, graph-based clustering, t-SNE/UMAP on a single sample\nNext: Lec 03 — Markers & Manual Annotation\nCompanion tutorial: Tutorial 02 — Dim Reduction & Clustering\nMulti-sample integration has its own lecture and tutorial — see Lec 05 — Integration.\nCompanion book chapter: Chapter 2 — Dimensionality Reduction & Clustering"
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#goals-of-this-lecture",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#goals-of-this-lecture",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Goals of this lecture",
-    "text": "Goals of this lecture\n\nSee why PCA always comes before anything else “geometric”\nRead a scree plot and interpret PC loadings in scRNA-seq terms\nBuild the SNN graph and pick a clustering resolution defensibly\nUnderstand what t-SNE and UMAP actually do — and what they don’t\nRead a UMAP without over-interpreting it\n\n\n\n\n\n\n\nNote\n\n\nMental model. Cells live in a ~20,000-D gene-expression space. PCA collapses that to 20–50 signal dimensions; the neighbour graph translates those distances into “who is similar to whom”; clustering carves the graph into groups; UMAP makes a 2D picture of all of it. Every step compresses information — get any of them wrong and you can’t see what’s there."
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#pca-in-one-slide",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#pca-in-one-slide",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "PCA in one slide",
-    "text": "PCA in one slide\n\nPCA on scaled HVG expression gives a low-dimensional, denoised representation\nFirst 20–50 PCs are the substrate for all downstream neighbour-graph steps\nChoose the number of PCs with ElbowPlot() (visual) or JackStraw() / variance-explained curve (statistical)\n\nseu &lt;- RunPCA(seu, npcs = 50)\nElbowPlot(seu, ndims = 50)"
+    "text": "Goals of this lecture\n\nSee why PCA always comes before anything else “geometric”\nRead a scree plot and interpret PC loadings in scRNA-seq terms\nBuild the SNN graph and pick a clustering resolution defensibly\nUnderstand what t-SNE and UMAP actually do — and what they don’t\nRead a UMAP without over-interpreting it\n\n\n\n\n\n\n\nNote\n\n\nMental model.\n\nCells live in a ~20,000-D gene-expression space.\nPCA collapses that to 20–50 signal dimensions; the neighbour graph translates those distances into “who is similar to whom”\nClustering carves the graph into groups\nUMAP makes a 2D picture of all of it.\nEvery step compresses information — get any of them wrong and you can’t see what’s there."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#dimensionality-reduction-the-intuition",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#dimensionality-reduction-the-intuition",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Dimensionality reduction — the intuition",
     "text": "Dimensionality reduction — the intuition\n\nDimensionality reduction projects high-dimensional data into 2-3D\nCells live in a very high-dimensional space (thousands of genes)\nDimensionality reduction projects them into 2–50 dimensions while preserving the main structure\nDifferent projections emphasize different axes — the full signal isn’t visible in any single 2D view"
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#why-pca-before-everything-else",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#why-pca-before-everything-else",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Why PCA before everything else?",
     "text": "Why PCA before everything else?\n\nThe HVG-scaled matrix has ~2,000 genes × tens of thousands of cells. Most pairs of cells are nearly equidistant in that space — the curse of dimensionality at work.\nPCA does three jobs simultaneously:\n\nCompresses the data: 2,000 genes → ~50 PCs that explain most of the structured variance\nDenoises by discarding low-variance directions dominated by technical noise\nDecorrelates the axes — PCs are orthogonal, so distances in PC space behave well for the neighbour-graph and clustering steps that follow\n\nEverything downstream — Harmony, FindNeighbors, clustering, UMAP — operates on the PC matrix, not the gene matrix\n\n\n\n\n\n\n\nWarning\n\n\nDon’t skip PCA and run UMAP on raw gene expression. UMAP/t-SNE on tens of thousands of genes is slow, noisy, and produces visibly worse embeddings. PCA is doing real statistical work, not just bookkeeping."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#pca-finds-axes-of-maximum-variance",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#pca-finds-axes-of-maximum-variance",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "PCA finds axes of maximum variance",
-    "text": "PCA finds axes of maximum variance\n\nPCA finds axes of maximum variance in the data\nPC1 = direction in gene space along which the data spread the most. PC2 = next-most variance, orthogonal to PC1. PC3 perpendicular to both, etc.\nSame algebraic object two ways: eigendecomposition of the covariance matrix, or SVD of the centered data matrix \\(\\tilde X = U \\Sigma V^T\\)\n\nRight singular vectors \\(V\\) → loadings (PC directions in gene space)\n\\(U \\Sigma\\) → scores (each cell’s coordinates in PC space)\n\\(\\sigma_i^2 / \\sum \\sigma_j^2\\) → proportion of variance explained by PC \\(i\\)\n\nRunPCA(), sc.tl.pca(), and prcomp() all call SVD under the hood — it scales better than eigendecomposition when the gene count exceeds the cell count"
+    "text": "PCA finds axes of maximum variance"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#pca-finds-axes-of-maximum-variance-1",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#pca-finds-axes-of-maximum-variance-1",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "PCA finds axes of maximum variance",
+    "text": "PCA finds axes of maximum variance\n\nThe PCs are ordered latent variables\n\nPC1 = direction in gene space along which the data spread the most.\nPC2 = next-most variance, orthogonal to PC1.\nPC3 perpendicular to both, etc.\n\nSame algebraic object two ways: eigendecomposition of the covariance matrix, or SVD of the centered data matrix \\(\\tilde X = U \\Sigma V^T\\)\n\nRight singular vectors \\(V\\) → loadings (PC directions in gene space)\n\\(U \\Sigma\\) → scores (each cell’s coordinates in PC space)\n\\(\\sigma_i^2 / \\sum \\sigma_j^2\\) → proportion of variance explained by PC \\(i\\)\n\nRunPCA(), sc.tl.pca(), and prcomp()\n\nall call SVD under the hood\nit scales better than eigendecomposition when the gene count exceeds the cell count"
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#in-scrna-seq-what-does-each-pc-capture",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#in-scrna-seq-what-does-each-pc-capture",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "In scRNA-seq: what does each PC capture?",
-    "text": "In scRNA-seq: what does each PC capture?\n\nPC1–PC10 typically separate major cell-type axes (T vs B vs myeloid; epithelial vs stromal vs immune)\nPC10–PC30 resolve subtypes and states (CD4 vs CD8, naïve vs memory, cycling vs resting)\nPC30–PC50 capture finer biology + a growing share of noise — keep them only if your downstream clustering still benefits\nBeyond PC50 is overwhelmingly noise\n\n\n\n\n\n\n\nTip\n\n\nA PC dominated by mitochondrial or ribosomal genes is a red flag. It usually means your QC let stressed cells through, or your HVG step picked up technical genes. Inspect VizDimLoadings() for PC1 and PC2 before you trust the embedding."
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "In scRNA-seq what does each PC capture?",
+    "text": "In scRNA-seq what does each PC capture?\n\nPC1–PC10 typically separate major cell-type axes (T vs B vs myeloid; epithelial vs stromal vs immune)\nPC10–PC30 resolve subtypes and states (CD4 vs CD8, naïve vs memory, cycling vs resting)\nPC30–PC50 capture finer biology + a growing share of noise — keep them only if your downstream clustering still benefits\nBeyond PC50 is overwhelmingly noise\n\n\n\n\n\n\n\nTip\n\n\nA PC dominated by mitochondrial or ribosomal genes is a red flag.\n\nIt usually means your QC let stressed cells through, or your HVG step picked up technical genes.\nInspect VizDimLoadings() for PC1 and PC2 before you trust the embedding."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#center-then-scale-and-why-this-matters",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#center-then-scale-and-why-this-matters",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Center, then scale — and why this matters",
     "text": "Center, then scale — and why this matters\n\n\n\n\n\n\n\n\nSetting\nResult\nWhen to use\n\n\n\n\ncenter = TRUE, scale = FALSE\nPCA on the covariance matrix\nAll variables on the same scale\n\n\ncenter = TRUE, scale = TRUE\nPCA on the correlation matrix\nVariables on different scales (default for HVGs)\n\n\n\n\nIn Seurat, ScaleData() z-scores each gene across cells (mean 0, SD 1) before RunPCA(). In scanpy, sc.pp.scale() does the same.\nWithout scaling, a few high-mean / high-variance genes (MALAT1, ribosomal proteins, some lncRNAs) dominate every PC simply because they have larger raw variance — not because they are biologically informative.\nThis is why the canonical order HVG → ScaleData → RunPCA is fixed: HVGs select genes that carry biology, ScaleData puts them on equal footing, then PCA finds the structure.\n\n\n\n\n\n\n\nNote\n\n\nUsing SCTransform? You can skip the separate center/scale step. Seurat’s SCTransform() replaces the NormalizeData → FindVariableFeatures → ScaleData trio with a single variance-stabilizing transformation (regularized NB regression). Its Pearson residuals are already variance-stabilized and effectively centered, so you go straight from SCTransform() to RunPCA() — no separate ScaleData() / explicit center-and-scale is needed (Hafemeister & Satija 2019)."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#reading-the-scree-plot",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#reading-the-scree-plot",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Reading the scree plot",
-    "text": "Reading the scree plot\n\n\nThe elbow is where each additional PC stops adding meaningful variance — usually between PC15 and PC30 for 10x runs\nCumulative variance is a sanity check, not a goal: a “90% rule” is misleading because the noise floor is high in scRNA-seq\nElbowPlot(seu, ndims = 50) is the visual; JackStraw() is a permutation-based statistical alternative when you want a defensible cutoff\n\n\n\n\n\n\n\nTip\n\n\nWhen in doubt, lean high. Going from 20 PCs to 30 PCs rarely hurts clustering and often recovers a subtype that 20 PCs collapses. Going from 30 to 50 mostly costs runtime."
+    "text": "Reading the scree plot"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#reading-the-scree-plot-1",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#reading-the-scree-plot-1",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "Reading the scree plot",
+    "text": "Reading the scree plot\n\nThe elbow is where each additional PC stops adding meaningful variance — usually between PC15 and PC30 for 10x runs\nCumulative variance is a sanity check, not a goal: a “90% rule” is misleading because the noise floor is high in scRNA-seq\nElbowPlot(seu, ndims = 50) is the visual; JackStraw() is a permutation-based statistical alternative when you want a defensible cutoff\n\n\n\n\n\n\n\nTip\n\n\nWhen in doubt, lean high. Going from 20 PCs to 30 PCs rarely hurts clustering and often recovers a subtype that 20 PCs collapses. Going from 30 to 50 mostly costs runtime."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#loadings-which-genes-drive-each-pc",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#loadings-which-genes-drive-each-pc",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Loadings — which genes drive each PC?",
-    "text": "Loadings — which genes drive each PC?\n\n\nLoadings are the weights that mix each gene into a PC. Big positive (or negative) loadings = genes moving cells along that axis.\nIn this cartoon: PC1 separates T-cell markers (CD3D, CD3E, TRAC) from B-cell markers (CD79A, MS4A1); PC2 separates myeloid markers (LYZ, S100A8, S100A9) from lymphoid.\nWorkflow tools: VizDimLoadings(seu, dims = 1:4) for bar plots, DimHeatmap(seu, dims = 1:9, balanced = TRUE) for a per-cell heatmap of the top loaders.\nThis is the step where PCA earns its reputation as interpretable: t-SNE and UMAP cannot tell you which genes drive a separation — PCA can."
+    "text": "Loadings — which genes drive each PC?"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#loadings-which-genes-drive-each-pc-1",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#loadings-which-genes-drive-each-pc-1",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "Loadings — which genes drive each PC?",
+    "text": "Loadings — which genes drive each PC?\n\nLoadings are the weights that mix each gene into a PC. Big positive (or negative) loadings = genes moving cells along that axis.\nIn the previous cartoon:\n\nPC1 separates T-cell markers (CD3D, CD3E, TRAC) from B-cell markers (CD79A, MS4A1);\nPC2 separates myeloid markers (LYZ, S100A8, S100A9) from lymphoid.\n\nWorkflow tools:\n\nVizDimLoadings(seu, dims = 1:4) for bar plots,\nDimHeatmap(seu, dims = 1:9, balanced = TRUE) for a per-cell heatmap of the top loaders.\n\nThis is the step where PCA earns its reputation as interpretable: t-SNE and UMAP cannot tell you which genes drive a separation — PCA can."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#snn-graph-clusters-louvain-leiden",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#snn-graph-clusters-louvain-leiden",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "SNN graph → clusters (Louvain / Leiden)",
-    "text": "SNN graph → clusters (Louvain / Leiden)\n\nBuild a shared nearest-neighbor (SNN) graph from the integrated PCs — each cell connects to its \\(k\\) nearest neighbours, weighted by how many of those neighbours are shared\nCluster the graph at a chosen resolution — with Seurat’s default Louvain, or the modern Leiden (preferred, but needs a Python dependency)\nThe graph (not the gene matrix, not the UMAP) is the object the clustering actually runs on\n\nseu &lt;- FindNeighbors(seu, dims = 1:30) |&gt;\n  FindClusters(resolution = 0.5)   # Louvain (Seurat's default algorithm); resolution 0.5\n                                   # is our choice — Seurat's own default is 0.8. Add\n                                   # algorithm = 4 for Leiden.\nsc.pp.neighbors(adata, n_pcs=30)\nsc.tl.leiden(adata, resolution=0.5)   # scanpy uses Leiden out of the box\n\n\n\n\n\n\nNote\n\n\nLouvain (default) vs. Leiden. Seurat’s FindClusters() defaults to Louvain (algorithm = 1), and that is what the workshop tutorials run — for portability. Leiden (algorithm = 4) is the modern preferred refinement (it guarantees well-connected communities) but needs the leidenalg Python package via reticulate. Switching is the one-line algorithm = 4 change once that dependency is installed."
+    "text": "SNN graph → clusters (Louvain / Leiden)\n\nBuild a shared nearest-neighbor (SNN) graph from the integrated PCs — each cell connects to its \\(k\\) nearest neighbours, weighted by how many of those neighbours are shared\nCluster the graph at a chosen resolution — with Seurat’s default Louvain, or the modern Leiden (preferred, but needs a Python dependency)\nThe graph (not the gene matrix nor UMAP) is the object the clustering actually runs on\n\n\n\n\n\n\n\nNote\n\n\nLouvain (default) vs. Leiden.\n\nSeurat’s FindClusters() defaults to Louvain (algorithm = 1), and that is what the workshop tutorials run — for portability.\nLeiden (algorithm = 4) is the modern preferred refinement (it guarantees well-connected communities) but needs the leidenalg Python package via reticulate.\nSwitching is the one-line algorithm = 4 change once that dependency is installed."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#knn-the-building-block",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#knn-the-building-block",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "KNN — the building block",
-    "text": "KNN — the building block\n\nKNN concept — k-nearest neighbours over cells in PCA space\nEach cell’s identity is set by the cells it is closest to in PC space\nThe KNN graph is the substrate the SNN refinement and Leiden/Louvain modularity all run on top of"
+    "text": "KNN — the building block\n\n\nEach cell’s identity is set by the cells it is closest to in PC space\nThe KNN graph is the substrate the SNN refinement and Leiden/Louvain modularity all run on top of"
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#why-graph-based-clustering-instead-of-k-means",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#why-graph-based-clustering-instead-of-k-means",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Why graph-based clustering instead of K-means?",
     "text": "Why graph-based clustering instead of K-means?\n\nK-means assumes clusters are roughly spherical and equally sized — a poor match for scRNA-seq, where rare cell types coexist with abundant ones and clusters have irregular shapes in PC space\nK-means also requires you to know k in advance; for scRNA-seq the whole point is often discovering how many populations there are\nGraph-based methods (Louvain, Leiden) discover clusters as densely-connected communities, naturally handle uneven cluster sizes, and let resolution control granularity instead of \\(k\\)\n\n\n\n\n\n\n\nNote\n\n\nThis is the same reason single-cell pipelines have largely abandoned hierarchical clustering on raw expression: graph methods scale to millions of cells, run in minutes, and respect the local geometry that PCA preserved."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#graph-based-clustering-step-by-step",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#graph-based-clustering-step-by-step",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Graph-based clustering — step by step",
-    "text": "Graph-based clustering — step by step\n\nLeiden clustering: KNN graph -&gt; communities -&gt; aggregation -&gt; refinement\nStart with the KNN graph over cells in PCA space\nFind communities → initial partition; refine merges/splits based on modularity\nAggregate the network, refine again → final partition (better-connected communities than Louvain)"
+    "text": "Graph-based clustering — step by step\n\n\nStart with the KNN graph over cells in PCA space\nFind communities → initial partition; refine merges/splits based on modularity\nAggregate the network, refine again → final partition"
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#choosing-a-resolution",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#choosing-a-resolution",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Choosing a resolution",
-    "text": "Choosing a resolution\n\nNo single “right” resolution exists — the question is what cell types you want to resolve\nTypical starting range: 0.4 – 1.2 for Louvain/Leiden on a 10–30k cell dataset\nUse clustree to visualize cluster stability across a sweep of resolutions\nCross-check by inspecting markers of merged vs. split clusters\n\n\n\n\n\n\n\nTip\n\n\nWorkflow. Sweep resolutions, pick one where (a) clustree shows stable splits, (b) every cluster has at least a few defensible markers, (c) you can name biology for each. If you can’t name a cluster, it’s probably noise or technical.\n\n\n\n\n\n\n\n\n\nImportant\n\n\nTutorial 02 runs deliberately un-integrated. The ifnb dataset has two conditions (CTRL and STIM). Tutorial 02 runs PCA and clustering without integration — so your UMAP will show CTRL and STIM cells splitting into mirror-image islands rather than mixing by cell type. This is the expected, intentional outcome of Step 6 (“Diagnose the batch effect”). You will count those islands and interpret what drives the split before integration is introduced in Tutorial 05 / Lecture 05. On unintegrated data, resolution ≈ 0.5 typically yields ~15–20 clusters — more than the ~13 annotatable cell types — because each cell type appears as a CTRL island and a STIM island."
+    "text": "Choosing a resolution\n\nA lower resolution means fewer clusters, higher means more\nNo single “right” resolution exists — the question is what cell types you want to resolve\nTypical starting range: 0.4 – 1.2 for Louvain/Leiden on a 10–30k cell dataset\nUse clustree to visualize cluster stability across a sweep of resolutions\nCross-check by inspecting markers of merged vs. split clusters\n\n\n\n\n\n\n\nTip\n\n\nWorkflow. Sweep resolutions, pick one where\n\n\nclustree shows stable splits,\n\n\nevery cluster has at least a few defensible markers,\n\n\nyou can name biology for each. If you can’t name a cluster, it’s probably noise or technical.\n\n\n\n\n\n\n\n\n\n\n\nImportant\n\n\nTutorial 02 runs deliberately un-integrated. The ifnb dataset has two conditions (CTRL and STIM). Tutorial 02 runs PCA and clustering without integration — so your UMAP will show CTRL and STIM cells splitting into mirror-image islands rather than mixing by cell type. This is the expected, intentional outcome of Step 6 (“Diagnose the batch effect”). You will count those islands and interpret what drives the split before integration is introduced in Tutorial 05 / Lecture 05. On unintegrated data, resolution ≈ 0.5 typically yields ~15–20 clusters — more than the ~13 annotatable cell types — because each cell type appears as a CTRL island and a STIM island."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#from-pcs-to-a-2d-picture",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#from-pcs-to-a-2d-picture",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "From PCs to a 2D picture",
-    "text": "From PCs to a 2D picture\n\nPCA gave us a denoised ~30-D space; clustering already happened on the SNN graph in that space. What’s left is a picture — a 2D embedding so we can show clusters, gradients, and trajectories on a slide.\nTwo non-linear methods dominate: t-SNE (van der Maaten & Hinton 2008) and UMAP (McInnes, Healy & Melville 2018)\nBoth share the same philosophy:\n\nIn high-D: “for each cell, who are its neighbours, and how similar?”\nIn low-D: “place points in 2D so those neighbour relationships are preserved”\n\nCrucially, t-SNE/UMAP are visualizations, not analyses. They don’t replace PCA or clustering — they sit on top of them.\n\nseu &lt;- RunUMAP(seu, dims = 1:30)\nDimPlot(seu, reduction = \"umap\", label = TRUE)\nsc.tl.umap(adata)\nsc.pl.umap(adata, color=\"leiden\", legend_loc=\"on data\")"
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#from-pcs-to-a-2d-picture-for-human-consumption",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#from-pcs-to-a-2d-picture-for-human-consumption",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "From PCs to a 2D picture for human consumption",
+    "text": "From PCs to a 2D picture for human consumption\n\nPCA gave us a denoised ~30-D space; clustering already happened on the SNN graph in that space. What’s left is a picture — a 2D embedding so we can show clusters, gradients, and trajectories on a slide.\nTwo non-linear methods dominate:\n\nt-SNE (van der Maaten & Hinton 2008) and\nUMAP (McInnes, Healy & Melville 2018)\n\nBoth share the same philosophy:\n\nIn high-D: “for each cell, who are its neighbours, and how similar?”\nIn low-D: “place points in 2D so those neighbour relationships are preserved”\n\nCrucially, t-SNE/UMAP are visualizations, not analyses. They don’t replace PCA or clustering — they sit on top of them."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#t-sne-model-neighbours-as-probabilities",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#t-sne-model-neighbours-as-probabilities",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "t-SNE: model neighbours as probabilities",
-    "text": "t-SNE: model neighbours as probabilities\n\nKL divergence on probabilistic neighbour distances (t-SNE)\nFor each cell \\(i\\), t-SNE turns distances to all other cells into a probability distribution \\(p_{j|i}\\) — Gaussian in high-D, with bandwidth \\(\\sigma_i\\) chosen per cell so the effective neighbourhood size matches the user’s perplexity\nIn the 2D embedding, the same idea gives \\(q_{j|i}\\) from the current 2D positions\nt-SNE then moves the 2D points to minimize the Kullback–Leibler divergence\n\n\\[D_{KL}(P \\| Q) = \\sum_{i \\neq j} p_{ij} \\log \\frac{p_{ij}}{q_{ij}}\\]"
+    "text": "t-SNE: model neighbours as probabilities"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#kl-divergence-is-asymmetric-and-thats-the-point",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#kl-divergence-is-asymmetric-and-thats-the-point",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "KL divergence is asymmetric — and that’s the point",
-    "text": "KL divergence is asymmetric — and that’s the point\n\nHeavily penalised: \\(p_{ij}\\) large but \\(q_{ij}\\) small → “you put true neighbours far apart” → strong attractive gradient pulls them together\nWeakly penalised: \\(p_{ij}\\) small but \\(q_{ij}\\) large → “you put unrelated cells nearby” → near-zero contribution to the loss\n\n\n\n\n\n\n\nImportant\n\n\nThis asymmetry is the most important property of t-SNE. It is why t-SNE preserves local neighbourhoods beautifully — and why distances between clusters in a t-SNE plot are not meaningful. Two clusters drawn far apart could be biologically very similar, and vice versa."
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#t-sne-model-neighbours-as-probabilities-1",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#t-sne-model-neighbours-as-probabilities-1",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "t-SNE: model neighbours as probabilities",
+    "text": "t-SNE: model neighbours as probabilities\n\nFor each cell \\(i\\), t-SNE turns distances to all other cells into a probability distribution \\(p_{j|i}\\) — Gaussian in high-D, with bandwidth \\(\\sigma_i\\) chosen per cell so the effective neighbourhood size matches the user’s perplexity\nIn the 2D embedding, the same idea gives \\(q_{j|i}\\) from the current 2D positions\nt-SNE then moves the 2D points to minimize the Kullback–Leibler divergence\n\n\\[D_{KL}(P \\| Q) = \\sum_{i \\neq j} p_{ij} \\log \\frac{p_{ij}}{q_{ij}}\\]\n\nKL divergence is asymmetric — and that’s the point\nHeavily penalised: \\(p_{ij}\\) large but \\(q_{ij}\\) small → “you put true neighbours far apart” → strong attractive gradient pulls them together\nWeakly penalised: \\(p_{ij}\\) small but \\(q_{ij}\\) large → “you put unrelated cells nearby” → near-zero contribution to the loss\n\n\n\n\n\n\n\nImportant\n\n\nThis asymmetry is the most important property of t-SNE. It is why t-SNE preserves local neighbourhoods beautifully — and why distances between clusters in a t-SNE plot are not meaningful. Two clusters drawn far apart could be biologically very similar, and vice versa."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#the-crowding-problem-students-t-in-low-d",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#the-crowding-problem-students-t-in-low-d",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "The crowding problem → Student’s t in low-D",
-    "text": "The crowding problem → Student’s t in low-D\n\nFrom SNE to t-SNE: heavy-tailed Student-t distribution in low-D\nIn high-D space there’s a lot of “room”: each cell can have many moderately-distant neighbours\nWhen you collapse to 2D with Gaussians, those moderately-distant neighbours all get squashed onto each other — the crowding problem that broke the original SNE\nt-SNE swaps the low-D Gaussian for a Student’s t-distribution with 1 df — its heavy tails let moderately-distant points sit much further apart in 2D, freeing up room for clusters to separate cleanly\nThe “t” in t-SNE refers to this Student’s t — same distribution as a t-test, used for an entirely different reason"
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umap",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umap",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "UMAP",
+    "text": "UMAP"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#perplexity-a-soft-k-for-neighbours",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#perplexity-a-soft-k-for-neighbours",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "Perplexity = a soft “k” for neighbours",
-    "text": "Perplexity = a soft “k” for neighbours\n\nPerplexity (default 30) sets the effective number of neighbours each cell “considers”\nLow perplexity (5–15): very local focus → real clusters can fragment into substructure\nHigh perplexity (50+): broader patterns → fine subtypes wash out\nMust be smaller than the cell count (\\(&lt; n\\)), but in practice you keep it \\(\\le \\sim 50\\) regardless of dataset size — far below any technical ceiling\n\n\n\n\n\n\n\nTip\n\n\nAlways run t-SNE at multiple perplexities (e.g. 10, 30, 50). If the same clusters appear at all settings you can trust them; if they shift, the structure you’re seeing is fragile."
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umap-a-fuzzy-graph-cross-entropy",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umap-a-fuzzy-graph-cross-entropy",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "UMAP: a fuzzy graph + cross-entropy",
-    "text": "UMAP: a fuzzy graph + cross-entropy\n\nUMAP’s local fuzzy graph + global layout optimization\nFor each cell, UMAP builds a local weighted graph out to its \\(k\\) nearest neighbours, but normalises distances per cell — so points in sparse and dense regions of the data are still connected to their own local neighbours\nThe local graphs are merged into one global fuzzy weighted graph (\\(w_{ij} = a + b - a \\cdot b\\))\nThe 2D embedding starts from a spectral initialization (or random) and is optimised by stochastic gradient descent"
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umap-1",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umap-1",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "UMAP",
+    "text": "UMAP\n\nFor each cell\n\nUMAP builds a local weighted graph out to its \\(k\\) nearest neighbours, but normalises distances per cell\nso points in sparse and dense regions of the data are still connected to their own local neighbours\n\nThe local graphs are merged into one global fuzzy weighted graph (\\(w_{ij} = a + b - a \\cdot b\\))\nThe 2D embedding starts from a spectral initialization (or random) and is optimised by stochastic gradient descent"
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umaps-cross-entropy-preserves-more-global-structure",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umaps-cross-entropy-preserves-more-global-structure",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "UMAP’s cross-entropy preserves more global structure",
-    "text": "UMAP’s cross-entropy preserves more global structure\n\nUMAP’s cross-entropy optimization preserves more global structure\\[CE = -\\sum_{i,j} \\left[ w_{ij} \\log v_{ij} + (1 - w_{ij}) \\log(1 - v_{ij}) \\right]\\]\n\nAttraction term \\(w_{ij} \\log v_{ij}\\): connected cells should stay close\nRepulsion term \\((1 - w_{ij}) \\log(1 - v_{ij})\\): unconnected cells should stay apart\nUnlike KL, both errors are penalised → cluster positions and approximate inter-cluster distances are more faithful than t-SNE’s\n\n\n\n\n\n\n\nNote\n\n\n“More faithful” is not “fully faithful.” UMAP still warps global geometry; you should not measure trajectory length or biological similarity from UMAP coordinates alone."
+    "text": "UMAP’s cross-entropy preserves more global structure"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umaps-cross-entropy-preserves-more-global-structure-1",
+    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#umaps-cross-entropy-preserves-more-global-structure-1",
+    "title": "L2 — Dimensionality Reduction & Clustering",
+    "section": "UMAP’s cross-entropy preserves more global structure",
+    "text": "UMAP’s cross-entropy preserves more global structure\n\\[CE = -\\sum_{i,j} \\left[ w_{ij} \\log v_{ij} + (1 - w_{ij}) \\log(1 - v_{ij}) \\right]\\]\n\nAttraction term \\(w_{ij} \\log v_{ij}\\): connected cells should stay close\nRepulsion term \\((1 - w_{ij}) \\log(1 - v_{ij})\\): unconnected cells should stay apart\nUnlike KL, both errors are penalised → cluster positions and approximate inter-cluster distances are more faithful than t-SNE’s\n\n\n\n\n\n\n\nNote\n\n\n“More faithful” is not “fully faithful.” UMAP still warps global geometry; you should not measure trajectory length or biological similarity from UMAP coordinates alone."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#n_neighbors-and-min_dist-in-practice",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#n_neighbors-and-min_dist-in-practice",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "n_neighbors and min_dist, in practice",
     "text": "n_neighbors and min_dist, in practice\n\n\n\n\n\n\n\n\nParameter\nSeurat default\nEffect\n\n\n\n\nn.neighbors\n30\nSoft “k” — local vs. global balance, like t-SNE’s perplexity\n\n\nmin.dist\n0.3\nMinimum distance between points in the embedding\n\n\n\n(Seurat’s RunUMAP defaults; the underlying Python umap-learn uses different defaults of 15 and 0.1, so don’t be surprised if other tutorials quote those.)\n\nSmall n_neighbors (5–10): very local detail; clusters fragment more. Large (30–50): broader topology; subtypes may merge.\nSmall min_dist (≤ 0.1): tight clusters with clear gaps — good for discrete cell types. Large (0.4–0.8): spread-out — good for continuous gradients (development, pseudotime).\nUMAP is noticeably more stable across n_neighbors than t-SNE is across perplexity — usually one well-chosen UMAP is enough; with t-SNE you really do want to sweep."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#t-sne-vs-umap-at-a-glance",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#t-sne-vs-umap-at-a-glance",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "t-SNE vs UMAP — at a glance",
-    "text": "t-SNE vs UMAP — at a glance\n\nt-SNE vs UMAP — local vs global structure trade-offs\n\n\n\n\n\n\n\nFeature\nt-SNE\nUMAP\n\n\n\n\nLocal neighbourhoods\nExcellent\nExcellent\n\n\nInter-cluster distances\nNot meaningful\nMore meaningful (still warped)\n\n\nSpeed\nSlow (\\(O(n \\log n)\\) Barnes-Hut)\nFast (~\\(O(n)\\) with negative sampling)\n\n\nBehaviour at scale (&gt;50k cells)\nSlow, sensitive to perplexity\nDefault for atlas-scale data\n\n\nTheory\nHeuristic\nFuzzy simplicial sets / topology\n\n\n\n\n\n\n\n\n\nTip\n\n\nDefault in scRNA-seq today: UMAP. Use t-SNE when you specifically want fine-grained local structure (e.g. resolving subtypes inside a tight cluster), or when you want a sanity check by sweeping perplexity."
-  },
-  {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#reading-a-umap-responsibly",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#reading-a-umap-responsibly",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "Reading a UMAP responsibly",
-    "text": "Reading a UMAP responsibly\n\n\n\n\n\n\nWarning\n\n\nThree things a UMAP plot does NOT tell you:\n\nInter-cluster distance — two clusters drawn far apart are not necessarily more dissimilar than two drawn close\nCluster density — apparent point density is heavily affected by min_dist and is not biological cell density\nTrajectory direction — apparent gradients can be optimisation artefacts; use trajectory tools (Slingshot, Monocle, scVelo) for that question\n\n\n\n\n\nWhat a UMAP is good for: showing the cluster solution from Step 7, mapping a known marker onto the cells (FeaturePlot), and spotting batch effects (color by sample after integration)\nWhat a UMAP is not good for: differential testing, distance-based statistics, conclusions about lineage relationships\n\n\n\n\n\n\n\nTip\n\n\nBuild the intuition yourself. Google PAIR’s interactive Understanding UMAP lets you turn n_neighbors/min_dist and watch what the embedding does (and doesn’t) preserve; DataCamp’s Understanding UMAP guide is a written walkthrough. Highly recommended if these plots ever made your head spin."
+    "text": "Reading a UMAP responsibly\n\nWhat a UMAP is good for:\n\nshowing the cluster solution\nmapping a known marker onto the cells (FeaturePlot)\nspotting batch effects (color by sample after integration)\n\nWhat a UMAP is not good for\n\ndifferential testing\ndistance-based statistics\nconclusions about lineage relationships\n\n\n\n\n\n\n\n\nWarning\n\n\nThree things a UMAP plot does NOT tell you:\n\nInter-cluster distance — two clusters drawn far apart are not necessarily more dissimilar than two drawn close\nCluster density — apparent point density is heavily affected by min_dist and is not biological cell density\nTrajectory direction — apparent gradients can be optimisation artefacts; use trajectory tools (Slingshot, Monocle, scVelo) for that question\n\n\n\n\n\n\n\n\n\n\nTip\n\n\nBuild the intuition yourself. Google PAIR’s interactive Understanding UMAP lets you turn n_neighbors/min_dist and watch what the embedding does (and doesn’t) preserve; DataCamp’s Understanding UMAP guide is a written walkthrough. Highly recommended if these plots ever made your head spin."
   },
   {
     "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#what-to-remember-from-lecture-02",
     "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#what-to-remember-from-lecture-02",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
+    "title": "L2 — Dimensionality Reduction & Clustering",
     "section": "What to remember from Lecture 02",
     "text": "What to remember from Lecture 02\n\nPCA on HVGs is the substrate every downstream step builds on — read the scree, read the loadings before you trust the embedding\nBuild the SNN graph on the PCs, then cluster with Louvain/Leiden — graph-based methods beat K-means for scRNA-seq\nt-SNE preserves local neighbourhoods via KL divergence + the t-distribution; cluster distances in t-SNE are not meaningful\nUMAP preserves more global topology via cross-entropy on a fuzzy graph; today it’s the default\nBoth are visualizations, not analyses — they sit on top of PCA + clustering, never replace them"
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#coming-up-next",
-    "href": "Lecture_Folder/Lecture_02_DimReduction_Clustering.html#coming-up-next",
-    "title": "Lecture 02 — Dimensionality Reduction & Clustering",
-    "section": "Coming up next",
-    "text": "Coming up next\n\nLec 03 — Markers & Manual Annotation — naming the clusters you just built\nLec 05 — Multi-Sample Integration — what to do when you have more than one sample and the geometry above falls apart\nHands-on: Tutorial 02 — Dim Reduction & Clustering — includes Step 6: Diagnose the batch effect (the CTRL/STIM split you are meant to see and characterize on un-integrated data)\nCompanion book chapter: Chapter 2 — Dimensionality Reduction & Clustering"
   },
   {
     "objectID": "Lecture_Folder/Lecture_00_Tools_Found_Concepts.html#where-this-lecture-fits",
@@ -3470,48 +3470,6 @@
     "title": "DupLec 07 — alternative slides for Lecture 07",
     "section": "Why functional analysis — gene regulation in context (alt)",
     "text": "Why functional analysis — gene regulation in context (alt)\nLive deck uses: images/lec01_use_gene_regulation_mechanisms.svg\n\n\n\nMechanisms overview — raster reference"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_02.html#what-this-deck-is",
-    "href": "Lecture_Folder/DupLec_02.html#what-this-deck-is",
-    "title": "DupLec 02 — alternative slides for Lecture 02",
-    "section": "What this deck is",
-    "text": "What this deck is\nThis is a holding deck, not part of the workshop. It collects the alternative / duplicate figure renderings that were pulled out of Lecture 02 — Dim Reduction & Clustering so the main deck stays tight (~15–20 min).\n\nEach slide below is an alternative version of a figure that already appears in the live Lecture 02.\nUnder each one, “Live deck uses:” names the figure currently shown in Lecture 02 for that concept.\nThis file is not linked from the Materials page. To swap one in, move the slide back into Lecture_02_DimReduction_Clustering.qmd."
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_02.html#dimensionality-reduction-the-intuition-alt",
-    "href": "Lecture_Folder/DupLec_02.html#dimensionality-reduction-the-intuition-alt",
-    "title": "DupLec 02 — alternative slides for Lecture 02",
-    "section": "Dimensionality reduction — the intuition (alt)",
-    "text": "Dimensionality reduction — the intuition (alt)\nLive deck uses: images/lec01_use_dimensionality_reduction.svg\n\nDimensionality reduction — raster reference"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_02.html#graph-based-clustering-step-by-step-alt-1",
-    "href": "Lecture_Folder/DupLec_02.html#graph-based-clustering-step-by-step-alt-1",
-    "title": "DupLec 02 — alternative slides for Lecture 02",
-    "section": "Graph-based clustering — step by step (alt 1)",
-    "text": "Graph-based clustering — step by step (alt 1)\nLive deck uses: images/lec01_use_leiden_clustering.svg\n\nClustering methods overview — alternative svg rendering"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_02.html#graph-based-clustering-step-by-step-alt-2",
-    "href": "Lecture_Folder/DupLec_02.html#graph-based-clustering-step-by-step-alt-2",
-    "title": "DupLec 02 — alternative slides for Lecture 02",
-    "section": "Graph-based clustering — step by step (alt 2)",
-    "text": "Graph-based clustering — step by step (alt 2)\nLive deck uses: images/lec01_use_leiden_clustering.svg\n\nClustering — raster reference"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_02.html#how-many-pcs-30-vs-40-alternative-schematic",
-    "href": "Lecture_Folder/DupLec_02.html#how-many-pcs-30-vs-40-alternative-schematic",
-    "title": "DupLec 02 — alternative slides for Lecture 02",
-    "section": "How many PCs? 30 vs 40 — alternative schematic",
-    "text": "How many PCs? 30 vs 40 — alternative schematic\nLive deck uses: the “Choosing a resolution” / scree-plot slides (no separate figure).\n\nGoing from 30 to 40 PCs in clustering can split out an additional, biologically real cell type — but more clusters isn’t automatically better; confirm markers — recreated in our style.\n\n\n\n\n\nNote\n\n\nCompanion to “Choosing a resolution”. Original figure: Filippov et al. 2024 (on Hope Healey’s Lecture 2, slide ~35)."
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_02.html#t-sne-model-neighbours-as-probabilities-alt",
-    "href": "Lecture_Folder/DupLec_02.html#t-sne-model-neighbours-as-probabilities-alt",
-    "title": "DupLec 02 — alternative slides for Lecture 02",
-    "section": "t-SNE: model neighbours as probabilities (alt)",
-    "text": "t-SNE: model neighbours as probabilities (alt)\nLive deck uses: images/week_10_S43_kl_divergence_distances.svg\n\n\n\nKL divergence — 1D optimization view"
   },
   {
     "objectID": "Key_Papers.html",
@@ -5565,55 +5523,6 @@
     "text": "Workshop logistics\n\nWhere do I download the tutorials?\nMaterials page → Download the tutorials. Each link is a raw .qmd file you open in RStudio.\n\n\nCan I work in Python / scanpy instead of R / Seurat?\nYes — the lectures are framework-agnostic, and most tutorials include a Python equivalent in a panel-tabset block. The tutorials assume Seurat by default, but a working scanpy equivalent that produces the same output is perfectly fine.\n\n\nI don’t have a Talapas account — can I still attend?\nYes. Everything except the SLURM Basics tutorial runs on a laptop. Talapas is recommended for the integration / large-dataset stretch goals but isn’t required.\n\n\nAre recordings available?\nSee About for the recording policy and link."
   },
   {
-    "objectID": "Lecture_Folder/DupLec_01.html#what-this-deck-is",
-    "href": "Lecture_Folder/DupLec_01.html#what-this-deck-is",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "What this deck is",
-    "text": "What this deck is\nThis is a holding deck, not part of the workshop. It collects the alternative / duplicate figure renderings that were pulled out of Lecture 01 — Pre-processing so the main deck stays tight (~15–20 min).\n\nEach slide below is an alternative version of a figure that already appears in the live Lecture 01.\nUnder each one, “Live deck uses:” names the figure currently shown in Lecture 01 for that concept.\nThis file is not linked from the Materials page. To swap one in, move the slide back into Lecture_01_Preprocessing.qmd."
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_01.html#the-seurat-workflow-in-eight-steps-alt-1",
-    "href": "Lecture_Folder/DupLec_01.html#the-seurat-workflow-in-eight-steps-alt-1",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "The Seurat workflow in eight steps (alt 1)",
-    "text": "The Seurat workflow in eight steps (alt 1)\nLive deck uses: images/lec01_seurat_8step_workflow.svg\n\nSeurat 8-step — alternative svg rendering"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_01.html#the-seurat-workflow-in-eight-steps-alt-2",
-    "href": "Lecture_Folder/DupLec_01.html#the-seurat-workflow-in-eight-steps-alt-2",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "The Seurat workflow in eight steps (alt 2)",
-    "text": "The Seurat workflow in eight steps (alt 2)\nLive deck uses: images/lec01_seurat_8step_workflow.svg\n\nSeurat pipeline — raster reference"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_01.html#three-core-metrics-alt-1",
-    "href": "Lecture_Folder/DupLec_01.html#three-core-metrics-alt-1",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "Three core metrics (alt 1)",
-    "text": "Three core metrics (alt 1)\nLive deck uses: images/lec01_qc_metrics.svg\n\nQC overview — alternative svg rendering"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_01.html#three-core-metrics-alt-2",
-    "href": "Lecture_Folder/DupLec_01.html#three-core-metrics-alt-2",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "Three core metrics (alt 2)",
-    "text": "Three core metrics (alt 2)\nLive deck uses: images/lec01_qc_metrics.svg\n\nQuality control — raster reference"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_01.html#droplets-can-also-be-empty-or-contaminated-alt",
-    "href": "Lecture_Folder/DupLec_01.html#droplets-can-also-be-empty-or-contaminated-alt",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "Droplets can also be empty — or contaminated (alt)",
-    "text": "Droplets can also be empty — or contaminated (alt)\nLive deck uses: images/lec01_ambient_rna.svg\n\nAmbient RNA — raster reference"
-  },
-  {
-    "objectID": "Lecture_Folder/DupLec_01.html#doublets-in-one-slide-alt",
-    "href": "Lecture_Folder/DupLec_01.html#doublets-in-one-slide-alt",
-    "title": "DupLec 01 — alternative slides for Lecture 01",
-    "section": "Doublets in one slide (alt)",
-    "text": "Doublets in one slide (alt)\nLive deck uses: images/lec01_doublet_detection.svg\n\n\n\nDoublet detection — raster reference"
-  },
-  {
     "objectID": "Lecture_Folder/DupLec_05.html#what-this-deck-is",
     "href": "Lecture_Folder/DupLec_05.html#what-this-deck-is",
     "title": "DupLec 05 — alternative slides for Lecture 05",
@@ -5665,184 +5574,205 @@
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#where-this-lecture-fits",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#where-this-lecture-fits",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Where this lecture fits",
-    "text": "Where this lecture fits\n\nPrevious: Lec 00 — Tools and Foundational Concepts\nYou are here: Lec 01 — turning a raw count matrix into a clean, normalized object\nNext: Lec 02 — Dim Reduction & Clustering\nCompanion tutorial: Tutorial 01 — QC & Preprocessing\nCompanion book chapter: Chapter 1 — Preprocessing: From Counts Matrix to Filtered Object\nParallel reading: scNotebooks Module 04 (QC + clustering + annotation in a single Jupyter notebook)"
+    "text": "Where this lecture fits\n\nPrevious: Lec 00 — Tools and Foundational Concepts\nYou are here: Lec 01 — turning a raw count matrix into a clean, normalized object\nNext: Lec 02 — Dim Reduction & Clustering\nCompanion tutorial: Tutorial 01 — QC & Preprocessing\nCompanion book chapter: Chapter 1: From Counts Matrix to Filtered Object"
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#goals-of-this-lecture",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#goals-of-this-lecture",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Goals of this lecture",
-    "text": "Goals of this lecture\n\nSee where pre-processing sits in the canonical pipeline\nLearn the three core QC metrics, what they mean, and what counts as normal\nRecognize ambient-RNA contamination and droplet doublets — and how to handle each\nPick a normalization + feature-selection strategy that fits your data\n\n\n\n\n\n\n\nNote\n\n\nWhy this matters. Every downstream geometric step (PCA, clustering, UMAP) treats the post-QC matrix as ground truth. Garbage in → confidently-wrong clusters out. There is no “fix the clustering” — you have to fix the QC."
+    "text": "Goals of this lecture\n\nSee where pre-processing sits in the canonical pipeline\nLearn the three core QC metrics, what they mean, and what counts as normal\nRecognize and handle ambient-RNA contamination and droplet doublets\nPick a normalization + feature-selection strategy that fits your data\n\n\n\n\n\n\n\nNote\n\n\nWhy this matters.\n\nEvery downstream geometric step (PCA, clustering, UMAP) treats the post-QC matrix as ground truth.\nGarbage in → confidently-wrong clusters out.\nThere is no “fix the clustering” — you have to fix the QC."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#scrna-seq-pipeline-at-a-glance",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#scrna-seq-pipeline-at-a-glance",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "scRNA-seq pipeline at a glance",
-    "text": "scRNA-seq pipeline at a glance\n\nThe full scRNA-seq analysis workflow at a glance"
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#section",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#section",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "",
+    "text": "What is the same about scRNA-seq\n\nSame core measurement: count of reads / UMIs per gene\nSame statistical concerns: normalization, batch effects, multiple testing, replication\nMany downstream questions (DE, enrichment, co-expression) are the same questions at a new resolution — and reuse bulk tools (DESeq2, limma, WGCNA) after pseudobulk aggregation (Lecture 06)\n\nWhat is genuinely new about scRNA-seq\n\nSparsity: ~90–95% zeros in typical droplet data — partly real biology, partly technical dropout\nCells are not replicates: cells from one subject are not statistically independent — using n = cells is the most common mistake in the field\nCell type is a latent variable you have to recover from the data\nIntegration across samples is a first-class problem, not an afterthought"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#the-seurat-workflow-in-eight-steps",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#the-seurat-workflow-in-eight-steps",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "The Seurat workflow in eight steps",
-    "text": "The Seurat workflow in eight steps\n\nThe Seurat workflow in 8 numbered steps\nThis lecture covers steps 1–4: QC, normalization, scaling, feature extraction\nSteps 5–8 come in Lec 02–04"
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#sparsity",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#sparsity",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Sparsity",
+    "text": "Sparsity\n\n\nBulk: nearly every gene is detected in every sample (~5% zeros)\nSmart-seq2: ~50–60% zeros — moderate dropout but rich per-cell signal\n10x 3’ v3 droplet: ~90–95% zeros — most (cell, gene) pairs are zero\nThe implication for analysis: every step has to handle counts that are mostly zero.\nThat’s why we have specialized normalisation (SCTransform), HVG selection, and graph-based clustering instead of the bulk RNA-seq toolkit."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#why-qc-in-one-sentence",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#why-qc-in-one-sentence",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Why QC, in one sentence",
-    "text": "Why QC, in one sentence\nA droplet that “looks like a cell” in your matrix may actually be (a) an empty droplet with ambient soup, (b) a dying cell leaking cytoplasm, (c) two cells in one droplet, or (d) a real cell. QC is how we triage them."
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#bulk-vs.-single-cell-the-tools",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#bulk-vs.-single-cell-the-tools",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Bulk vs. single-cell — the tools",
+    "text": "Bulk vs. single-cell — the tools"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#raw-data-processing-which-we-dont-do",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#raw-data-processing-which-we-dont-do",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Raw data processing (which we don’t do)",
+    "text": "Raw data processing (which we don’t do)"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#raw-data-processing-which-we-dont-do-1",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#raw-data-processing-which-we-dont-do-1",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Raw data processing (which we don’t do)",
+    "text": "Raw data processing (which we don’t do)\n\nCommon tools:\n\nCell Ranger (10x, official)\nSTARsolo (STAR-based, fast, flexible)\nalevin-fry / salmon (selective alignment, very fast)\nkb-python (kallisto | bustools) (pseudoalignment)\n\nFinal product: a barcode(cell) × feature(gene) count matrix\nWe will start with the count matrix"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#the-downstream-workflow-at-a-glance",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#the-downstream-workflow-at-a-glance",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "The downstream workflow at a glance",
+    "text": "The downstream workflow at a glance\n\n\nThat cell × gene matrix is the input to every analytical step the rest of the workshop covers\nThe eight steps fall naturally into four chunks, each with a dedicated lecture:\n\nPre-processing (Lec 01 / Tut 01): QC → doublets → normalisation → HVGs\nGeometry (Lec 02 + 05 / Tut 02 + 05): scale → PCA → neighbour graph → Leiden → t-SNE/UMAP → integration\nAnnotation (Lec 03, Lec 04 / Tut 03, Tut 04): markers, manual annotation, reference-based annotation (Azimuth)\nDifferential expression & function (Lec 06–07 / Tut 06–07): pseudobulk DESeq2 → functional enrichment\nDifferential abundance (Lec 08)\n\n*Bonus modules** extend the same conceptual toolkit to other data modalities\n\n\n\n\n\n\n\nTip\n\n\nA 4-step mental compression. From here on out, every chunk of the pipeline (a) cleans something, (b) puts things on a sensible scale, (c) finds structure, (d) names that structure with biology."
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#generic-scrna-seq-pipeline-at-a-glance",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#generic-scrna-seq-pipeline-at-a-glance",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Generic scRNA-seq pipeline at a glance",
+    "text": "Generic scRNA-seq pipeline at a glance"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#specific-seurat-workflow",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#specific-seurat-workflow",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Specific Seurat workflow",
+    "text": "Specific Seurat workflow"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#why-quality-control",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#why-quality-control",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Why Quality Control?",
+    "text": "Why Quality Control?\n\n\nA droplet that “looks like a cell” in your matrix may actually be\n\nan empty droplet with ambient soup\na dying cell leaking cytoplasm\ntwo (or more) cells in one droplet\na real cell\n\nQC is how we triage them."
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#why-quality-control-1",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#why-quality-control-1",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Why Quality Control?",
+    "text": "Why Quality Control?"
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#three-core-metrics",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#three-core-metrics",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Three core metrics",
-    "text": "Three core metrics\n\nThree core QC metrics: nCount, nFeature, percent.mt\nnFeature_RNA: genes detected per cell — proxy for capture quality\nnCount_RNA: total UMI counts per cell — proxy for sequencing depth in that cell\npercent.mt: % reads mapping to mitochondrial genes — proxy for stress / dying cells (cytoplasmic mRNA leaks before mitochondrial mRNA)"
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-each-metric-catches",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-each-metric-catches",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "What each metric catches",
-    "text": "What each metric catches\n\nCommon per-cell QC metrics and their interpretation\nLow gene / molecule counts → empty / dying / poorly captured cells\nVery high gene counts for the tissue → likely doublets / multiplets\nHigh mitochondrial % → cells that were dying when loaded"
+    "text": "Three core metrics\n\nnFeature_RNA: genes detected per cell — proxy for capture quality\nnCount_RNA: total UMI counts per cell — proxy for sequencing depth in that cell\npercent.mt: % reads mapping to mitochondrial genes — proxy for stress / dying cells (cytoplasmic mRNA leaks before mitochondrial mRNA)"
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#normal-ranges-a-starting-cheat-sheet",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#normal-ranges-a-starting-cheat-sheet",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Normal ranges — a starting cheat sheet",
-    "text": "Normal ranges — a starting cheat sheet\n\n\n\n\n\n\nNote\n\n\nTypical “healthy” thresholds for 10x 3’ v3 on dissociated tissue. These are starting points, not rules — always look at the distributions first.\n\n\n\n\n\n\n\n\n\nMetric\nTypical lower\nTypical upper\nNotes\n\n\n\n\nnFeature_RNA (genes/cell)\n200–500\n2,500–6,000\nUpper bound is dataset-specific; doublets push past it\n\n\nnCount_RNA (UMIs/cell)\n500–1,000\n~50,000\nVery high counts often = doublets, very low = empty\n\n\npercent.mt\n—\n5–10% (PBMC), 15–20% (tumor / fragile tissue)\nNuclei (snRNA) should be &lt; ~1–2%\n\n\n\n\n\n\n\n\n\n\n\n\nWarning\n\n\nWatch-outs. - Brain / muscle / cardiomyocytes naturally have high mitochondrial content — a 5% threshold will throw away your biology. - snRNA-seq should have almost no mitochondrial reads; if it does, your nuclei prep contaminated cytoplasm. - A bimodal nCount_RNA distribution often means two cell sizes (e.g., lymphocytes + neutrophils), not doublets — don’t gate it away."
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#qc-in-practice",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#qc-in-practice",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "QC in practice",
-    "text": "QC in practice\n\nSeuratscanpy\n\n\nseu[[\"percent.mt\"]] &lt;- PercentageFeatureSet(seu, pattern = \"^MT-\")\nVlnPlot(seu, features = c(\"nFeature_RNA\", \"nCount_RNA\", \"percent.mt\"), ncol = 3)\n\n# Inspect distributions BEFORE choosing thresholds\nseu &lt;- subset(seu,\n              nFeature_RNA &gt; 200 & nFeature_RNA &lt; 2500 &\n              percent.mt   &lt; 5)\n\n\nadata.var[\"mt\"] = adata.var_names.str.startswith(\"MT-\")\nsc.pp.calculate_qc_metrics(adata, qc_vars=[\"mt\"],\n                           inplace=True, percent_top=None)\nadata = adata[(adata.obs.n_genes_by_counts &gt; 200) &\n              (adata.obs.n_genes_by_counts &lt; 2500) &\n              (adata.obs.pct_counts_mt &lt; 5)].copy()\n\n\n\n\n\n\n\n\n\nTip\n\n\nPattern for the mitochondrial regex: human = ^MT-, mouse = ^mt-. Get this wrong silently and percent.mt will be all zeros."
+    "text": "Normal ranges — a starting cheat sheet\n\n\n\n\n\n\nNote\n\n\nTypical “healthy” thresholds for 10x 3’ v3 on dissociated tissue. These are starting points, not rules — always look at the distributions first.\n\n\n\n\n\n\n\n\n\nMetric\nTypical lower\nTypical upper\nNotes\n\n\n\n\nnFeature_RNA (genes/cell)\n200–500\n2,500–6,000\nUpper bound is dataset-specific; doublets push past it\n\n\nnCount_RNA (UMIs/cell)\n500–1,000\n~50,000\nVery high counts often = doublets, very low = empty\n\n\npercent.mt\n—\n5–10% (PBMC), 15–20% (tumor / fragile tissue)\nNuclei (snRNA) should be &lt; ~1–2%\n\n\n\n\n\n\n\n\n\n\n\n\nWarning\n\n\nWatch-outs.\n\nBrain / muscle / cardiomyocytes naturally have high mitochondrial content — a 5% threshold will throw away your biology.\nsnRNA-seq should have almost no mitochondrial reads; if it does, your nuclei prep contaminated cytoplasm.\nA bimodal nCount_RNA distribution often means two cell sizes (e.g., lymphocytes + neutrophils), not doublets — don’t gate it away."
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-qc-distributions-actually-look-like",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-qc-distributions-actually-look-like",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "What QC distributions actually look like",
-    "text": "What QC distributions actually look like\n\n\nEach violin shows what each “category” of barcode looks like in a typical 10x v3 dataset\nReal cells form the central bulk you want to keep; doublets sit at the high end; dying cells sit at the low-feature / high-mt corner; empty droplets pile up at very low feature counts\nThe right cutoffs aren’t universal — they depend on your tissue and protocol — but the shapes of these distributions are what your QC plots should look like before you choose thresholds"
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#the-barcode-rank-knee-plot",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#the-barcode-rank-knee-plot",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "The barcode-rank (knee) plot",
-    "text": "The barcode-rank (knee) plot\n\n\nSort all observed barcodes by UMI count, plot rank vs. count on log–log axes\nAbove the knee: real cells. At the knee: ambiguous droplets (some real, some ambient). Below the knee: empty droplets carrying mostly ambient mRNA.\nCell Ranger’s filtered matrix uses an EmptyDrops-style algorithm to draw this line for you — but it’s worth re-plotting it yourself when results look off\nDropletUtils::barcodeRanks() / emptyDrops() (R) let you re-derive the knee and call cells statistically"
+    "text": "What QC distributions actually look like\n\n\nEach violin shows what each “category” of barcode looks like in a typical 10x v3 dataset\nReal cells form the central bulk you want to keep;\n\ndoublets sit at the high end;\ndying cells sit at the low-feature / high-mt corner;\nempty droplets pile up at very low feature counts\n\nThe correct cutoffs aren’t universal — they depend on your tissue and protocol"
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#droplets-can-also-be-empty-or-contaminated",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#droplets-can-also-be-empty-or-contaminated",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Droplets can also be empty — or contaminated",
-    "text": "Droplets can also be empty — or contaminated\n\nAmbient RNA contamination from lysed-cell debris\nMany barcodes correspond to empty droplets with only ambient RNA — filter with EmptyDrops or the Cell Ranger knee-point\nEven real cells are contaminated by ambient RNA soup; estimate and subtract with SoupX, DecontX, or CellBender"
+    "text": "Droplets can also be empty — or contaminated\n\nAmbient RNA — raster reference\nMany barcodes correspond to empty droplets with only ambient RNA — filter with EmptyDrops or the Cell Ranger knee-point\nEven real cells are contaminated by ambient RNA soup; estimate and subtract with SoupX, DecontX, or CellBender"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#ambient-mrna-before-and-after-lysis",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#ambient-mrna-before-and-after-lysis",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Ambient mRNA — before and after lysis",
-    "text": "Ambient mRNA — before and after lysis\n\nHow SoupX corrects ambient RNA contamination\nBefore lysis: each droplet contains (ideally) one cell + one bead, plus trace ambient mRNA\nAfter lysis: the bead captures its cell’s mRNA and any ambient mRNA → cross-cell contamination in the final counts\n\n\n\n\n\n\n\nTip\n\n\nWhen ambient correction matters most: highly hemorrhagic samples (lots of free hemoglobin), cells dissociated from frozen tissue, or any time you see a marker gene “expressed” in clusters where it shouldn’t be (a classic SoupX trigger)."
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Doublets",
+    "text": "Doublets\n\nDroplets sometimes capture two cells\nRun doublet detection on each sample before integration\nExpected doublet rate scales with loading: ~0.8–1% per 1,000 cells loaded on 10x Chromium → ~8% at 10k cells, ~16% at 20k"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets-in-one-slide",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets-in-one-slide",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Doublets in one slide",
-    "text": "Doublets in one slide\n\nDroplets sometimes capture two cells → artificial “hybrid” profiles\nRun doublet detection on each sample before integration\nExpected doublet rate scales with loading: ~0.8–1% per 1,000 cells loaded on 10x Chromium → ~8% at 10k cells, ~16% at 20k\nExperimental trick: pooling samples with distinct genotypes or species lets you detect cross-sample doublets directly — genetic demultiplexing (demuxlet / souporcell / Vireo) or a human–mouse “barnyard” mix — and measure your true multiplet rate\n\n\nDoublet formation: two cells in one droplet\n\n\n\n\n\n\n\nTool\nEcosystem\nNotes\n\n\n\n\nscDblFinder\nR / Bioc\nFast, recommended default\n\n\nDoubletFinder\nR\nUsed in Patel’s tutorial; needs pK sweep\n\n\nScrublet\nPython\nClassic choice in scanpy flows"
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets-1",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets-1",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Doublets",
+    "text": "Doublets\n\n\nSimulate artificial doublets by averaging random pairs of real cells\nProject real + simulated cells together in reduced dimensions\nReal cells that sit close to many simulated doublets are flagged as likely doublets"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublet-detection-how-it-actually-works",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublet-detection-how-it-actually-works",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Doublet detection — how it actually works",
-    "text": "Doublet detection — how it actually works\n\nDoublet detection: scDblFinder workflow\nSimulate artificial doublets by averaging random pairs of real cells\nProject real + simulated cells together in reduced dimensions\nReal cells that sit close to many simulated doublets are flagged as likely doublets\n\n\n\n\n\n\n\nWarning\n\n\nDoublet detection runs per sample, not on a merged object. Inter-sample mixtures are not doublets — they’re integration noise, and pretending they are will silently drop real cells.\n\n\n\n\n\n\n\n\n\nNote\n\n\nSeurat v5 note. After merge() in Seurat v5, the RNA assay stores split layers (counts.CTRL, counts.STIM, …). Run JoinLayers() after merging the per-sample objects so that downstream steps (FindMarkers, normalization) see a single layer. The tutorial does this automatically after the doublet-detection merge."
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets-2",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublets-2",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Doublets",
+    "text": "Doublets\n\n\n\nTool\nEcosystem\nNotes\n\n\n\n\nscDblFinder\nR / Bioc\nFast, recommended default\n\n\nDoubletFinder\nR\nNeeds pK sweep\n\n\nScrublet\nPython\nClassic choice in scanpy flows\n\n\n\n\n\n\n\n\n\nWarning\n\n\nDoublet detection runs per sample, not on a merged object.\n\nInter-sample mixtures are not doublets — they’re integration noise\nPretending they are will silently drop real cells.\n\n\n\n\n\n\n\n\n\n\nNote\n\n\nSeurat v5 note.\n\nAfter merge() in Seurat v5, the RNA assay stores split layers (counts.CTRL, counts.STIM, …).\nRun JoinLayers() after merging the per-sample objects so that downstream steps see a single layer.\nThe tutorial does this automatically after the doublet-detection merge."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-a-doublet-score-distribution-looks-like",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-a-doublet-score-distribution-looks-like",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "What a doublet-score distribution looks like",
-    "text": "What a doublet-score distribution looks like\n\n\nDoublet detectors output a continuous score per cell — high = “looks like a simulated doublet”\nIn a healthy run the distribution is bimodal: a tall left peak (real cells) and a small right shoulder (likely doublets)\nThe threshold is set at the expected doublet rate implied by your loading concentration (e.g. 8% at 10k cells loaded on Chromium)\nIf the distribution is unimodal, your sample either has no detectable doublets (rare in a 10k-cell run) or your simulator parameters need tuning"
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublet-score-distribution",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublet-score-distribution",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Doublet Score Distribution",
+    "text": "Doublet Score Distribution"
+  },
+  {
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#doublet-score-distribution-1",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#doublet-score-distribution-1",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Doublet Score Distribution",
+    "text": "Doublet Score Distribution\n\n\n\n\nDoublet detectors output a continuous score per cell — high = “looks like a simulated doublet”\nIn a healthy run the distribution is bimodal: a tall left peak (real cells) and a small right shoulder (likely doublets)\nThe threshold is set at the expected doublet rate implied by your loading concentration (e.g. 8% at 10k cells loaded on Chromium)\nIf the distribution is unimodal, your sample either has no detectable doublets (rare in a 10k-cell run) or your simulator parameters need tuning"
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#why-normalize",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#why-normalize",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Why normalize?",
-    "text": "Why normalize?\nCells are sequenced to wildly different depths (factor-of-10 spread is common). Without correction, a “highly expressed” gene in a deeply sequenced cell looks the same as a moderately expressed one in a shallow cell. Normalization puts cells on a comparable scale before downstream math."
+    "text": "Why normalize?\n\n\n\n\nCells are sequenced to wildly different depths (factor-of-10 spread is common).\nWithout correction, a “highly expressed” gene in a deeply sequenced cell looks the same as a moderately expressed one in a shallow cell.\nNormalization puts cells on a comparable scale before downstream math."
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#two-dominant-approaches",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#two-dominant-approaches",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "Two dominant approaches",
-    "text": "Two dominant approaches\n\nLog-normalization (NormalizeData / sc.pp.normalize_total + log1p) — fast, simple, the default in most tutorials\nVariance-stabilizing (SCTransform in Seurat) — models the negative-binomial mean–variance relationship; often better for low-count cells; slower\n\n# Seurat — log-normalization\nseu &lt;- NormalizeData(seu) |&gt;\n  FindVariableFeatures(nfeatures = 2000) |&gt;\n  ScaleData()\n\n# Seurat — SCTransform (alternative, replaces the three calls above)\nseu &lt;- SCTransform(seu, verbose = FALSE)\n\n\n\n\n\n\nTip\n\n\nWhen to reach for SCTransform: noisy or very low-depth data (~3,000 UMIs/cell median), or when you can see depth artefacts in your UMAP. For typical 10x v3 data, log-normalization is fine.\n\n\n\n\n\n\n\n\n\nWarning\n\n\nDon’t normalize twice. SCTransform replaces NormalizeData + ScaleData. Running both on the same object stacks transforms and breaks downstream assumptions."
+    "text": "Two dominant approaches\n\nLog-normalization (NormalizeData in Seurat) — fast, simple, the default in most tutorials\nVariance-stabilizing (SCTransform in Seurat) — models the negative-binomial mean–variance relationship; often better for low-count cells but slower\n\n# Seurat — log-normalization\nseu &lt;- NormalizeData(seu) |&gt;\n  FindVariableFeatures(nfeatures = 2000) |&gt;\n  ScaleData()\n\n# Seurat — SCTransform (alternative, replaces the three calls above)\nseu &lt;- SCTransform(seu, verbose = FALSE)\n\n\n\n\n\n\nTip\n\n\nWhen to reach for SCTransform: noisy or very low-depth data (~3,000 UMIs/cell median), or when you can see depth artefacts in your UMAP. For typical 10x v3 data, log-normalization is fine.\n\n\n\n\n\n\n\n\n\nWarning\n\n\nDon’t normalize twice. SCTransform replaces NormalizeData + ScaleData. Running both on the same object stacks transforms and breaks downstream assumptions."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-normalization-actually-does",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-normalization-actually-does",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "What normalization actually does",
-    "text": "What normalization actually does\n\n\nLeft: raw counts for a typical gene scale with each cell’s sequencing depth — a high-depth cell looks “more highly expressed” purely because it was sequenced more\nRight: after NormalizeData() (log1p of CPM-scaled counts), the depth correlation is gone — same biological signal, comparable across cells\nThis is the minimum you need before PCA. SCTransform does this and models gene-specific overdispersion, which is why it shines on low-depth or noisy data."
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#log-norm-vs-sctransform",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#log-norm-vs-sctransform",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Log-norm vs SCTransform",
+    "text": "Log-norm vs SCTransform\n\n.\nLog-normalization removes depth but leaves a mean–variance trend for medium/high-expression genes\nSCTransform’s regularized NB-GLM residuals stay flat across expression levels"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#log-norm-vs-sctransform-alternative-schematic",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#log-norm-vs-sctransform-alternative-schematic",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Log-norm vs SCTransform — alternative schematic",
-    "text": "Log-norm vs SCTransform — alternative schematic\n\nLog-normalization removes depth but leaves a mean–variance trend for medium/high-expression genes; SCTransform’s regularized NB-GLM residuals stay flat across expression levels — recreated in our style.\n\n\n\n\n\nNote\n\n\nAlternative to the normalization slides above. Original figure: Hafemeister & Satija 2019, Genome Biology — doi.org/10.1186/s13059-019-1874-1."
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#why-hvgs",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#why-hvgs",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Why HVGs?",
-    "text": "Why HVGs?\n\nUse the ~1,000–3,000 most variable genes for downstream geometry\nDramatically reduces noise from ubiquitously-expressed housekeeping genes\nSeurat: FindVariableFeatures(); scanpy: sc.pp.highly_variable_genes()\n\n\n\n\n\n\n\nNote\n\n\nTypical settings: nfeatures = 2000 is the Seurat default and a defensible choice for most datasets. Bump to 3,000–5,000 for atlas-scale or highly heterogeneous data; drop to 1,000 only if your dataset is small and unimodal.\n\n\n\n\n\n\n\n\n\nWarning\n\n\nPitfalls in HVG selection. - Including mitochondrial / ribosomal genes as HVGs lets technical variation drive your PCs — many pipelines exclude these patterns by default. - If you regress out cell-cycle scores, do it before HVG selection, otherwise cycling genes dominate the variable list."
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#why-highly-variable-genes-hvgs",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#why-highly-variable-genes-hvgs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "Why Highly Variable Genes (HVGs)?",
+    "text": "Why Highly Variable Genes (HVGs)?\n\nUse the ~1,000–3,000 most variable genes for downstream geometry\nDramatically reduces noise from ubiquitously-expressed housekeeping genes\nFunctions\n\nSeurat: FindVariableFeatures()\nscanpy: sc.pp.highly_variable_genes()\n\n\n\n\n\n\n\n\nNote\n\n\nTypical settings: nfeatures = 2000 is the Seurat default and a defensible choice for most datasets. Bump to 3,000–5,000 for atlas-scale or highly heterogeneous data; drop to 1,000 only if your dataset is small and unimodal.\n\n\n\n\n\n\n\n\n\nWarning\n\n\nPitfalls in HVG selection. - Including mitochondrial / ribosomal genes as HVGs lets technical variation drive your PCs — Many pipelines exclude these patterns by default. - If you regress out cell-cycle scores, do it before HVG selection, otherwise cycling genes dominate the variable list."
   },
   {
     "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-the-hvg-variable-feature-plot-shows",
     "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-the-hvg-variable-feature-plot-shows",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
     "section": "What the HVG (variable feature) plot shows",
-    "text": "What the HVG (variable feature) plot shows\n\n\nEvery gene gets a (mean, variance) pair. The grey curve is the expected mean–variance relationship for technical / housekeeping genes (roughly Poisson with overdispersion).\nGenes that sit well above the trend are over-dispersed — their variance can’t be explained by sampling noise alone, so they’re carrying biological signal. Those are your HVGs.\nFindVariableFeatures(seu, selection.method = \"vst\", nfeatures = 2000) returns the top 2,000 such genes, ranked by standardized residual variance. VariableFeaturePlot() is exactly this picture.\nMarker labels in the corner are the exact reason you do this: in a PBMC run the top HVGs include the genes you’d already expect (LYZ, S100A9, CD74, MS4A1, …) — you should recognise them."
+    "text": "What the HVG (variable feature) plot shows"
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-to-remember-from-lecture-01",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-to-remember-from-lecture-01",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "What to remember from Lecture 01",
-    "text": "What to remember from Lecture 01\n\nQC = filtering bad cells and bad droplets — both matter\nThresholds are dataset-specific; always plot before you cut\nAmbient RNA is real and can be subtracted (SoupX, DecontX, CellBender)\nDoublets are detected by simulation; do it per-sample before integration\nNormalization choice is less important than consistency between training and downstream steps\nHVGs give you the gene-space PCA will operate on"
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#what-the-hvg-variable-feature-plot-shows-1",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#what-the-hvg-variable-feature-plot-shows-1",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "What the HVG (variable feature) plot shows",
+    "text": "What the HVG (variable feature) plot shows\n\nEvery gene gets a (mean, variance) pair. The grey curve is the expected mean–variance relationship for technical / housekeeping genes (roughly Poisson with overdispersion).\nGenes that sit well above the trend are over-dispersed — their variance can’t be explained by sampling noise alone, so they’re carrying biological signal. Those are your HVGs.\nFindVariableFeatures(seu, selection.method = \"vst\", nfeatures = 2000) returns the top 2,000 such genes, ranked by standardized residual variance. VariableFeaturePlot() is exactly this picture.\nMarker labels in the corner are the exact reason you do this: in a PBMC run the top HVGs include the genes you’d already expect (LYZ, S100A9, CD74, MS4A1, …) — you should recognise them."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#the-ifnb-dataset-what-youll-see",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#the-ifnb-dataset-what-youll-see",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "The ifnb dataset — what you’ll see",
-    "text": "The ifnb dataset — what you’ll see\nThe workshop dataset — the Kang et al. PBMCs we call “ifnb”, loaded via muscData::Kang18_8vs8() (not the smaller SeuratData ifnb) — starts at ~24,500 annotated singlets across CTRL and STIM. After the QC filters in Tutorial 01 (nFeature_RNA &gt; 200 & &lt; 2500, percent.mt &lt; 5, scDblFinder.class == \"singlet\") you should retain ~23,000 cells.\n\n\n\nStage\nCells\n\n\n\n\nLoaded (Kang18_8vs8, annotated singlets)\n~24,500\n\n\nAfter subset() QC filter\n~23,000\n\n\nAfter NormalizeData (no cell loss)\n~23,000\n\n\n\n\n\n\n\n\n\nTip\n\n\nDoublet detection in this tutorial runs per sample (CTRL then STIM separately) with scDblFinder. The two per-sample objects are then merged back with merge() and JoinLayers() before the final filter. Running doublet detection on the merged object would treat cross-sample cell pairs as doublets — they are not."
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#the-ifnb-dataset",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#the-ifnb-dataset",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "The ifnb dataset",
+    "text": "The ifnb dataset\n\nThe workshop dataset — the Kang et al. PBMCs we call “ifnb”\nSingle-cell RNA-seq data of human peripheral blood mononuclear cells (PBMCs).\nTwo conditions: resting (CONTROL) and interferon-beta (IFN-β) stimulated (STIM) cells\nLoaded via muscData::Kang18_8vs8()\n\nStarts at ~24,500 annotated singlets across CTRL and STIM.\nAfter the QC filters in Tutorial 01 you should retain ~23,000 cells.\n\n\n\n\n\n\n\nTip\n\n\nDoublet detection in this tutorial runs per sample (CTRL then STIM separately) with scDblFinder.\n\nThe two per-sample objects are then merged back with merge() and JoinLayers() before the final filter.\nRunning doublet detection on the merged object would treat cross-sample cell pairs as doublets — they are not."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#design-consideration-percent.rb-and-when-to-use-it",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#design-consideration-percent.rb-and-when-to-use-it",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Design consideration — percent.rb and when to use it",
-    "text": "Design consideration — percent.rb and when to use it\nTutorial 01 also computes percent.rb (ribosomal-protein fraction). It is not a standard QC filter; rather:\n\nA very high percent.rb (&gt;50%) in a cluster often signals a metabolically active or activated state, not a low-quality cell.\nMonitor it per sample: if one sample has dramatically higher percent.rb, check whether library prep differed.\nDo not filter on percent.rb by default — just note it."
-  },
-  {
-    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#coming-up-next",
-    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#coming-up-next",
-    "title": "Lecture 01 — Pre-processing: QC, doublets, normalization, HVGs",
-    "section": "Coming up next",
-    "text": "Coming up next\n\nLec 02 — Dim reduction, integration, clustering\nHands-on: Tutorial 01 — QC & Preprocessing\nCompanion book chapter: Chapter 1 — Preprocessing"
+    "objectID": "Lecture_Folder/Lecture_01_Preprocessing.html#note-percent.rb-and-when-to-use-it",
+    "href": "Lecture_Folder/Lecture_01_Preprocessing.html#note-percent.rb-and-when-to-use-it",
+    "title": "L01 — Pre-processing: QC, doublets, normalization, HVGs",
+    "section": "NOTE — percent.rb and when to use it",
+    "text": "NOTE — percent.rb and when to use it\nTutorial 01 also computes percent.rb (ribosomal-protein fraction). It is not a standard QC filter; rather:\n\nA very high percent.rb (&gt;50%) in a cluster often signals a metabolically active or activated state, not a low-quality cell.\nMonitor it per sample: if one sample has dramatically higher percent.rb, check whether library prep differed.\nDo not filter on percent.rb by default — just note it."
   },
   {
     "objectID": "Lecture_Folder/Lecture_03_Markers_Annotation.html#where-this-lecture-fits",
