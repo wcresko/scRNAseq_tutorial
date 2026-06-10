@@ -59,7 +59,7 @@ Six metrics characterize scATAC cell quality; none has a universal threshold, bu
 | `nCount_peaks` | Total fragments per cell | ≥ 5,000 | Very active chromatin or doublet | Empty or lysed nucleus |
 | `nFeature_peaks` | Distinct peaks with ≥ 1 fragment | ≥ 1,000 | Doublet (two cells' accessibility) | Low-complexity or dead cell |
 | TSS enrichment score | Enrichment of fragments at ±2 kb of TSS | > 4 | Strong signal, high-quality cell | Poor cell quality; ambient chromatin dominates |
-| Nucleosome signal | Ratio of mono-nucleosomal to sub-nucleosomal fragments | 0–4 (mono-nuc peak present) | Over-digestion or poor library quality | Normal; near-zero is expected for NFR-dominant libraries |
+| Nucleosome signal | Ratio of mono-nucleosomal to sub-nucleosomal fragments | < 4 (lower is better) | Over-digestion or poor library quality | Normal; near-zero is expected for NFR-dominant libraries |
 | Blacklist ratio | Fragments overlapping ENCODE blacklist regions | < 0.05 | Artifactual signal from repetitive elements | Expected; very low is good |
 | FRiP (Reads in Peaks) | Fraction of fragments inside called peaks | > 0.4 | High signal-to-background | Background noise dominates; poor enrichment |
 
@@ -142,7 +142,7 @@ For a quick analysis the pre-called peaks are fine. For publication-quality cell
 
 ChromVAR [@schep2017chromvar] computes per-cell **motif accessibility** scores: for each known TF binding motif, how enriched is its presence in this cell's peaks vs the genome-wide expectation? The score is per-cell, so you can plot it on UMAP, do DE on it, etc.
 
-An alternative for motif enrichment is **HOMER** (`findMotifsGenome.pl`) — a command-line tool that takes a BED file of peaks (or a subset of peaks such as a cluster's differential peaks) and reports known motif enrichment against a background. HOMER is not per-cell (it works on a peak set, not individual cells), making it better suited to the question "which TF motifs are enriched in this cluster's peaks relative to all other peaks?" rather than the per-cell question chromVAR answers. Input to HOMER is a tab-separated BED-format file with `chr / start / end / strand` columns; the `-size` flag should be set to roughly the width of a typical peak (~200 bp for `-size given` is appropriate for ATAC peaks that average 500–1000 bp). The genome assembly specified to HOMER must match the alignment build of your peaks.
+An alternative for motif enrichment is **HOMER** (`findMotifsGenome.pl`) — a command-line tool that takes a BED file of peaks (or a subset of peaks such as a cluster's differential peaks) and reports known motif enrichment against a background. HOMER is not per-cell (it works on a peak set, not individual cells), making it better suited to the question "which TF motifs are enriched in this cluster's peaks relative to all other peaks?" rather than the per-cell question chromVAR answers. Input to HOMER is a tab-separated BED-format file with `chr / start / end / strand` columns; the `-size` flag controls the scan window — use `-size given` to score each peak's actual width, or a fixed window such as `-size 200` centered on each peak summit (use one or the other, not both). The genome assembly specified to HOMER must match the alignment build of your peaks.
 
 The ATAC pipeline often ends with:
 
