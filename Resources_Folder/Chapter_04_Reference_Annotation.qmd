@@ -39,7 +39,7 @@ The workshop tutorial uses **Azimuth** as its reference-based method: it ships c
 
 | Method | Approach | Reference needed | Confidence metric | Best for |
 |---|---|---|---|---|
-| **Azimuth** | Anchor-based mapping (CCA + MNN) into a precomputed reference manifold | Pre-built atlas references (single-cell) | `mapping.score` per cell | PBMC, brain, lung, fetal: tissues with curated Seurat refs |
+| **Azimuth** | Anchor-based mapping that *projects* the query onto the reference's precomputed (s)PCA structure (`pcaproject`/`spca`), not a joint CCA | Pre-built atlas references (single-cell) | `mapping.score` per cell | PBMC, brain, lung, fetal: tissues with curated Seurat refs |
 | **SingleR** | Per-cell Spearman correlation against per-label reference profiles | Bulk or single-cell; `celldex` library | `delta` (top score − median); prune with `pruneScores()` | When only a bulk reference exists; Bioconductor-native workflows |
 | **CellTypist** | Logistic-regression classifier trained on atlas data | Pre-trained models (Python package) | Per-label probability (multi-label aware) | Python / Scanpy workflows; multi-label / ambiguous cells |
 
@@ -49,7 +49,7 @@ The workshop tutorial uses **Azimuth** as its reference-based method: it ships c
 
 ## 4.2 Azimuth — anchor-based reference mapping
 
-Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same method as Seurat integration, applied with a query → reference orientation). The key design advantage is that the reference UMAP and cell labels are precomputed once from a large atlas dataset; at query time, your cells are projected *into* that manifold rather than re-computing everything jointly. This is fundamentally different from methods that require both the query and reference to be processed together: because Azimuth's reference is frozen at publication time and its UMAP is precomputed, mapping a new query to it is fast (minutes on a laptop), consistent across queries, and does not require re-running the reference-side integration every time. The shared feature space between query and reference is determined by finding mutual nearest neighbors across the two datasets after projecting both into a common CCA subspace — the same anchor-finding machinery used for multi-sample integration in Chapter 5. Pre-built atlas-quality references are available:
+Azimuth wraps Seurat's anchor-based mapping [@hao2021integrated] (the same method as Seurat integration, applied with a query → reference orientation). The key design advantage is that the reference UMAP and cell labels are precomputed once from a large atlas dataset; at query time, your cells are projected *into* that manifold rather than re-computing everything jointly. This is fundamentally different from methods that require both the query and reference to be processed together: because Azimuth's reference is frozen at publication time and its UMAP is precomputed, mapping a new query to it is fast (minutes on a laptop), consistent across queries, and does not require re-running the reference-side integration every time. The shared feature space is determined by finding mutual nearest neighbors across the two datasets after **projecting the query onto the reference's precomputed (supervised) PCA** (`pcaproject`/`spca`) — note this differs from the *de novo* CCA used for multi-sample integration in Chapter 5: here the reference structure is fixed and the query is mapped onto it, not learned jointly. Pre-built atlas-quality references are available:
 
 | Reference | Tissue | Source |
 |---|---|---|
