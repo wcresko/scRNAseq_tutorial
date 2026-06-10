@@ -1201,7 +1201,7 @@ Bill Cresko and Shannon Snyder
 <h2>Why R for single-cell analysis?</h2>
 <ul>
 <li class="fragment"><strong>Free, open-source, cross-platform</strong> — runs the same on Mac, Linux, and Windows</li>
-<li class="fragment">The <strong>Bioconductor</strong> ecosystem — 2,000+ packages for genomics, including Seurat, DESeq2, scran</li>
+<li class="fragment">The <strong>Bioconductor</strong> ecosystem — 2,000+ packages for genomics (DESeq2, scran, scater, …); Seurat itself is on CRAN</li>
 <li class="fragment">Superb data wrangling, statistics, and publication-quality graphics with <strong>ggplot2</strong></li>
 <li class="fragment"><strong>Reproducibility</strong> — your scripts are a complete record of every step</li>
 <li class="fragment"><strong>Quarto</strong> turns those scripts into the rendered tutorials you’ll work through</li>
@@ -1382,7 +1382,7 @@ Bill Cresko and Shannon Snyder
 <span id="cb8-5"><a></a>}</span>
 <span id="cb8-6"><a></a></span>
 <span id="cb8-7"><a></a><span class="fu">cv</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>))         <span class="co"># 0.527</span></span>
-<span id="cb8-8"><a></a><span class="fu">cv</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="cn">NA</span>, <span class="dv">4</span>, <span class="dv">5</span>))        <span class="co"># NA dropped first</span></span>
+<span id="cb8-8"><a></a><span class="fu">cv</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="cn">NA</span>, <span class="dv">4</span>, <span class="dv">5</span>))        <span class="co"># 0.609 (NA dropped via na.rm)</span></span>
 <span id="cb8-9"><a></a></span>
 <span id="cb8-10"><a></a><span class="co"># named vs positional arguments</span></span>
 <span id="cb8-11"><a></a><span class="fu">round</span>(<span class="fl">3.14159</span>, <span class="dv">2</span>)             <span class="co"># positional — order matters</span></span>
@@ -1513,24 +1513,46 @@ Bill Cresko and Shannon Snyder
 </ul>
 </section></section>
 <section>
+<section id="plotting-with-ggplot2" class="title-slide slide level1 center" data-background-color="#2c3e50">
+<h1>Plotting with ggplot2</h1>
+
+</section>
+<section id="ggplot2-the-grammar-of-graphics" class="slide level2">
+<h2>ggplot2 — the grammar of graphics</h2>
+<p>Almost every figure in this workshop is a <code>ggplot</code>. You build a plot in layers: data → aesthetic mapping (<code>aes</code>) → geoms → scales/themes.</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb12-2"><a></a></span>
+<span id="cb12-3"><a></a><span class="fu">ggplot</span>(meta, <span class="fu">aes</span>(<span class="at">x =</span> nCount_RNA, <span class="at">y =</span> nFeature_RNA, <span class="at">colour =</span> condition)) <span class="sc">+</span></span>
+<span id="cb12-4"><a></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="fl">0.4</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb12-5"><a></a>  <span class="fu">scale_x_log10</span>() <span class="sc">+</span></span>
+<span id="cb12-6"><a></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">&quot;UMIs per cell&quot;</span>, <span class="at">y =</span> <span class="st">&quot;Genes per cell&quot;</span>) <span class="sc">+</span></span>
+<span id="cb12-7"><a></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<ul>
+<li class="fragment"><code>aes()</code> <strong>maps columns to visual properties</strong>; <code>geom_*()</code> adds a layer (points, violins, bars)</li>
+<li class="fragment"><code>+</code> chains layers — the same additive idea as the <code>|&gt;</code> pipe, but for graphics</li>
+<li class="fragment">Seurat’s <code>DimPlot</code>/<code>FeaturePlot</code>/<code>VlnPlot</code> all return <code>ggplot</code> objects you can extend with <code>+</code></li>
+<li class="fragment">The <a href="../Resources_Folder/Chapter_P2_R_and_CommandLine.html">P2 chapter</a> has the full ggplot2 walkthrough (scales, facets, themes)</li>
+</ul>
+</section></section>
+<section>
 <section id="reading-writing-data" class="title-slide slide level1 center" data-background-color="#2c3e50">
 <h1>Reading &amp; Writing Data</h1>
 
 </section>
 <section id="reading-writing-tabular-data" class="slide level2">
 <h2>Reading &amp; writing tabular data</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a></a><span class="co"># write our data frame, then read it back</span></span>
-<span id="cb12-2"><a></a><span class="fu">write_csv</span>(cells, <span class="st">&quot;cells_demo.csv&quot;</span>)          <span class="co"># tidyverse — no row names</span></span>
-<span id="cb12-3"><a></a>back <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;cells_demo.csv&quot;</span>)          <span class="co"># returns a tibble</span></span>
-<span id="cb12-4"><a></a>back</span>
-<span id="cb12-5"><a></a></span>
-<span id="cb12-6"><a></a><span class="co"># base R equivalents</span></span>
-<span id="cb12-7"><a></a><span class="fu">write.csv</span>(cells, <span class="st">&quot;cells_demo.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb12-8"><a></a>back2 <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;cells_demo.csv&quot;</span>)</span>
-<span id="cb12-9"><a></a></span>
-<span id="cb12-10"><a></a><span class="co"># other separators and formats</span></span>
-<span id="cb12-11"><a></a>df_tsv <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="st">&quot;data.txt&quot;</span>)              <span class="co"># tab-separated</span></span>
-<span id="cb12-12"><a></a><span class="co"># library(readxl); xl &lt;- read_excel(&quot;file.xlsx&quot;)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a></a><span class="co"># write our data frame, then read it back</span></span>
+<span id="cb13-2"><a></a><span class="fu">write_csv</span>(cells, <span class="st">&quot;cells_demo.csv&quot;</span>)          <span class="co"># tidyverse — no row names</span></span>
+<span id="cb13-3"><a></a>back <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">&quot;cells_demo.csv&quot;</span>)          <span class="co"># returns a tibble</span></span>
+<span id="cb13-4"><a></a>back</span>
+<span id="cb13-5"><a></a></span>
+<span id="cb13-6"><a></a><span class="co"># base R equivalents</span></span>
+<span id="cb13-7"><a></a><span class="fu">write.csv</span>(cells, <span class="st">&quot;cells_demo.csv&quot;</span>, <span class="at">row.names =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb13-8"><a></a>back2 <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">&quot;cells_demo.csv&quot;</span>)</span>
+<span id="cb13-9"><a></a></span>
+<span id="cb13-10"><a></a><span class="co"># other separators and formats</span></span>
+<span id="cb13-11"><a></a>df_tsv <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="st">&quot;data.txt&quot;</span>)              <span class="co"># tab-separated</span></span>
+<span id="cb13-12"><a></a><span class="co"># library(readxl); xl &lt;- read_excel(&quot;file.xlsx&quot;)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <ul>
 <li class="fragment"><code>read_csv()</code> / <code>write_csv()</code> (tidyverse) return <strong>tibbles</strong> and are faster and friendlier</li>
 <li class="fragment">Store data in <strong>plain text</strong> (<code>.csv</code>, <code>.tsv</code>) — it outlasts any software version</li>

@@ -1191,13 +1191,10 @@ Bill Cresko
 <h2>Goals of this lecture</h2>
 <ul>
 <li class="fragment">Understand the <strong>negative-binomial GLM</strong> at the heart of DESeq2 in plain terms</li>
-<li class="fragment">Read DESeq2 output: <code>baseMean</code>, <code>log2FoldChange</code>, <code>lfcSE</code>, <code>pvalue</code>, <code>padj</code></li>
-<li class="fragment">Set the reference level so the sign of LFC means what you think it means</li>
-<li class="fragment">Know <strong>why and when to shrink</strong> log-fold-changes (<code>lfcShrink</code> + <code>apeglm</code>)</li>
+<li class="fragment">Read and correctly interpret DESeq2 output — the sign of <code>log2FoldChange</code> (set by the reference level), <code>padj</code>, and when to shrink with <code>lfcShrink</code>/<code>apeglm</code></li>
 <li class="fragment">Run DESeq2 end to end on a real bulk RNA-seq dataset (<code>airway</code>)</li>
 <li class="fragment">Understand <strong>why per-cell DE is statistically wrong</strong> for condition contrasts</li>
-<li class="fragment">Aggregate single-cell counts to a <em>(sample × cell type)</em> pseudobulk matrix</li>
-<li class="fragment">Run DESeq2 <em>per cell type</em> with the right design and contrast</li>
+<li class="fragment">Aggregate single cells to a <em>(sample × cell type)</em> <strong>pseudobulk</strong> matrix and run DESeq2 per cell type with the right design and contrast</li>
 </ul>
 <div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
@@ -1441,27 +1438,28 @@ Bill Cresko
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(Seurat); <span class="fu">library</span>(DESeq2)</span>
 <span id="cb3-2"><a></a></span>
 <span id="cb3-3"><a></a>pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(seu, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>,</span>
-<span id="cb3-4"><a></a>                          <span class="at">group.by =</span> <span class="fu">c</span>(<span class="st">&quot;sample_id&quot;</span>, <span class="st">&quot;celltype&quot;</span>),</span>
-<span id="cb3-5"><a></a>                          <span class="at">return.seurat =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>RNA</span>
-<span id="cb3-6"><a></a></span>
-<span id="cb3-7"><a></a>meta <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb3-8"><a></a>  <span class="at">sample_id =</span> <span class="fu">sub</span>(<span class="st">&quot;_.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb)),</span>
-<span id="cb3-9"><a></a>  <span class="at">celltype  =</span> <span class="fu">sub</span>(<span class="st">&quot;^[^_]+_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
-<span id="cb3-10"><a></a>) <span class="sc">|&gt;</span></span>
-<span id="cb3-11"><a></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sample_meta, <span class="at">by =</span> <span class="st">&quot;sample_id&quot;</span>)</span>
-<span id="cb3-12"><a></a></span>
-<span id="cb3-13"><a></a>run_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct) {</span>
-<span id="cb3-14"><a></a>  keep <span class="ot">&lt;-</span> meta<span class="sc">$</span>celltype <span class="sc">==</span> ct</span>
-<span id="cb3-15"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> pb[, keep],</span>
-<span id="cb3-16"><a></a>                                 <span class="at">colData   =</span> meta[keep, ],</span>
-<span id="cb3-17"><a></a>                                 <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
-<span id="cb3-18"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb3-19"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-20"><a></a>    <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb3-21"><a></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">celltype =</span> ct)</span>
-<span id="cb3-22"><a></a>}</span>
-<span id="cb3-23"><a></a></span>
-<span id="cb3-24"><a></a>de_all <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(<span class="fu">unique</span>(meta<span class="sc">$</span>celltype), run_de)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb3-4"><a></a>                          <span class="at">slot =</span> <span class="st">&quot;counts&quot;</span>,   <span class="co"># sum raw counts, not log-normalized data</span></span>
+<span id="cb3-5"><a></a>                          <span class="at">group.by =</span> <span class="fu">c</span>(<span class="st">&quot;sample_id&quot;</span>, <span class="st">&quot;celltype&quot;</span>),</span>
+<span id="cb3-6"><a></a>                          <span class="at">return.seurat =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>RNA</span>
+<span id="cb3-7"><a></a></span>
+<span id="cb3-8"><a></a>meta <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb3-9"><a></a>  <span class="at">sample_id =</span> <span class="fu">sub</span>(<span class="st">&quot;_.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb)),</span>
+<span id="cb3-10"><a></a>  <span class="at">celltype  =</span> <span class="fu">sub</span>(<span class="st">&quot;^[^_]+_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
+<span id="cb3-11"><a></a>) <span class="sc">|&gt;</span></span>
+<span id="cb3-12"><a></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sample_meta, <span class="at">by =</span> <span class="st">&quot;sample_id&quot;</span>)</span>
+<span id="cb3-13"><a></a></span>
+<span id="cb3-14"><a></a>run_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct) {</span>
+<span id="cb3-15"><a></a>  keep <span class="ot">&lt;-</span> meta<span class="sc">$</span>celltype <span class="sc">==</span> ct</span>
+<span id="cb3-16"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> pb[, keep],</span>
+<span id="cb3-17"><a></a>                                 <span class="at">colData   =</span> meta[keep, ],</span>
+<span id="cb3-18"><a></a>                                 <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
+<span id="cb3-19"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
+<span id="cb3-20"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb3-21"><a></a>    <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb3-22"><a></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">celltype =</span> ct)</span>
+<span id="cb3-23"><a></a>}</span>
+<span id="cb3-24"><a></a></span>
+<span id="cb3-25"><a></a>de_all <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(<span class="fu">unique</span>(meta<span class="sc">$</span>celltype), run_de)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </section>
 <section id="deseq2-on-pseudobulk-in-python" class="slide level2">
 <h2>DESeq2 on pseudobulk in Python</h2>

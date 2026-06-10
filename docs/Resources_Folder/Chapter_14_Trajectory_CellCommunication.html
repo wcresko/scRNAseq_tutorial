@@ -4341,8 +4341,9 @@ display: none;
   </ul></li>
   <li><a href="#ambient-rna-contamination-and-cellcell-communication" id="toc-ambient-rna-contamination-and-cellcell-communication" class="nav-link" data-scroll-target="#ambient-rna-contamination-and-cellcell-communication">14.6 Ambient-RNA contamination and cell–cell communication</a></li>
   <li><a href="#a-note-on-long-reads-and-isoforms" id="toc-a-note-on-long-reads-and-isoforms" class="nav-link" data-scroll-target="#a-note-on-long-reads-and-isoforms">14.7 A note on long reads and isoforms</a></li>
+  <li><a href="#common-errors" id="toc-common-errors" class="nav-link" data-scroll-target="#common-errors">14.8 Common errors</a></li>
   <li><a href="#cross-references" id="toc-cross-references" class="nav-link" data-scroll-target="#cross-references">Cross-references</a></li>
-  <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">14.8 Going further</a></li>
+  <li><a href="#going-further" id="toc-going-further" class="nav-link" data-scroll-target="#going-further">14.9 Going further</a></li>
   <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">References</a></li>
   </ul>
 </nav>
@@ -4539,7 +4540,7 @@ Table 1: Major trajectory inference tools, their algorithmic approaches, and tr
 <section id="rna-velocity-adding-direction" class="level2">
 <h2 class="anchored" data-anchor-id="rna-velocity-adding-direction">14.3 RNA velocity — adding direction</h2>
 <p>Pseudotime supplies an ordering but not an arrow. <strong>RNA velocity</strong> recovers the direction of cellular movement by splitting reads into <strong>unspliced</strong> (intron-containing, newly transcribed) and <strong>spliced</strong> (mature, processed) counts per gene. A gene with a high unspliced-to-spliced ratio is being actively induced: the cell is producing more pre-mRNA than its current steady-state level predicts, meaning it is moving toward a higher-expression state for that gene. Conversely, a gene with a low unspliced-to-spliced ratio is being downregulated. The per-gene signals are combined into a per-cell velocity vector that can be projected onto the UMAP embedding as an arrow, giving each cell an estimated direction of travel.</p>
-<p>The original implementation is <strong>velocyto</strong><span class="citation" data-cites="lamanno2018rnavelocity"><sup><a href="#ref-lamanno2018rnavelocity" role="doc-biblioref">6</a></sup></span>, which introduced the steady-state model: at steady state, the ratio of unspliced to spliced counts is constant per gene, so deviations from that ratio indicate induction or repression. The current default is the <strong>scVelo</strong> dynamical model<span class="citation" data-cites="bergen2020scvelo"><sup><a href="#ref-bergen2020scvelo" role="doc-biblioref">7</a></sup></span>, which relaxes the steady-state assumption by estimating gene-specific kinetic parameters (transcription rate, splicing rate, degradation rate) directly from the data. The dynamical model is more accurate for genes undergoing rapid kinetic changes but is also more computationally demanding.</p>
+<p>The original implementation is <strong>velocyto</strong><span class="citation" data-cites="lamanno2018rnavelocity"><sup><a href="#ref-lamanno2018rnavelocity" role="doc-biblioref">6</a></sup></span>, which introduced the steady-state model: at steady state, the ratio of unspliced to spliced counts is constant per gene, so deviations from that ratio indicate induction or repression. The current state-of-the-art is the <strong>scVelo</strong> dynamical model<span class="citation" data-cites="bergen2020scvelo"><sup><a href="#ref-bergen2020scvelo" role="doc-biblioref">7</a></sup></span>, which relaxes the steady-state assumption by estimating gene-specific kinetic parameters (transcription rate, splicing rate, degradation rate) directly from the data. The dynamical model is more accurate for genes undergoing rapid kinetic changes but is also more computationally demanding.</p>
 <div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — scVelo / mode (velocity estimation model)">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -4550,7 +4551,7 @@ Table 1: Major trajectory inference tools, their algorithmic approaches, and tr
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><code>scv.tl.velocity(adata, mode = &quot;dynamical&quot;)</code> selects the kinetic model used to estimate velocities. <strong>Default: <code>&quot;stochastic&quot;</code></strong> in older scVelo versions; the recommended current default is <code>&quot;dynamical&quot;</code>. The <code>&quot;stochastic&quot;</code> mode uses the original steady-state model with an added noise term — faster but less accurate for genes with rapid kinetics. The <code>&quot;dynamical&quot;</code> mode estimates per-gene transcription, splicing, and degradation rates from the data — more accurate but requires <code>scv.tl.recover_dynamics(adata)</code> first and is computationally expensive. For standard trajectory validation use <code>&quot;dynamical&quot;</code>; for quick exploratory runs on large datasets use <code>&quot;stochastic&quot;</code>. The <code>&quot;deterministic&quot;</code> mode is the original velocyto steady-state model without a noise term — fastest but most assumption-bound.</p>
+<p><code>scv.tl.velocity(adata, mode = &quot;dynamical&quot;)</code> selects the kinetic model used to estimate velocities. <strong>The function default is <code>&quot;stochastic&quot;</code></strong>; <code>&quot;dynamical&quot;</code> is the <em>recommended</em> mode but is not the default — you must select it explicitly (and run <code>scv.tl.recover_dynamics(adata)</code> first). The <code>&quot;stochastic&quot;</code> mode uses the original steady-state model with an added noise term — faster but less accurate for genes with rapid kinetics. The <code>&quot;dynamical&quot;</code> mode estimates per-gene transcription, splicing, and degradation rates from the data — more accurate but requires <code>scv.tl.recover_dynamics(adata)</code> first and is computationally expensive. For standard trajectory validation use <code>&quot;dynamical&quot;</code>; for quick exploratory runs on large datasets use <code>&quot;stochastic&quot;</code>. The <code>&quot;deterministic&quot;</code> mode is the original velocyto steady-state model without a noise term — fastest but most assumption-bound.</p>
 </div>
 </div>
 <p>Velocity analysis requires a spliced/unspliced count matrix produced by <code>velocyto run</code> (command-line) or <code>kallisto | bustools</code> — <em>not</em> the standard filtered-feature-bc-matrix that most downstream analyses use. The spliced/unspliced counts are stored in a <code>loom</code> file or an AnnData object and must be aligned to the same barcode set as your RNA analysis.</p>
@@ -4676,6 +4677,60 @@ Table 2: Cell–cell communication inference tools and their principal approach
 <h2 class="anchored" data-anchor-id="a-note-on-long-reads-and-isoforms">14.7 A note on long reads and isoforms</h2>
 <p>Standard 3′ short-read scRNA-seq counts genes, not isoforms — it cannot tell which splice variant a cell uses. Pairing single-cell barcoding with <strong>long-read</strong> sequencing (PacBio Iso-Seq, ONT; e.g. scISO-seq) recovers full-length, isoform-resolved transcripts per cell. This connects back to the 3′ UTR annotation problem (Chapter 0 / Lecture 0): long reads both improve the annotations that short-read quantification depends on and enable per-cell isoform analysis — particularly valuable in non-model systems where alternative splicing is less well characterized.</p>
 </section>
+<section id="common-errors" class="level2">
+<h2 class="anchored" data-anchor-id="common-errors">14.8 Common errors</h2>
+<p><a href="#tbl-ch14-errors" class="quarto-xref">Table 3</a> collects the errors most commonly encountered in trajectory, velocity, and cell–cell communication workflows, their causes, and the fix.</p>
+<div id="tbl-ch14-errors" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-ch14-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table 3: Common errors in trajectory, RNA velocity, and cell–cell communication analysis, their causes, and fixes.
+</figcaption>
+<div aria-describedby="tbl-ch14-errors-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th>You see</th>
+<th>What’s wrong</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RNA velocity arrows are flat / random</td>
+<td>The object has only spliced counts; no spliced/unspliced layers</td>
+<td>Re-quantify with <code>velocyto</code> or <code>kb count --workflow lamanno</code> to produce both matrices</td>
+</tr>
+<tr class="even">
+<td>Pseudotime runs “backwards”</td>
+<td>The root cell/cluster was chosen at the wrong end of the trajectory</td>
+<td>Set the root explicitly from a known progenitor marker; don’t accept the default</td>
+</tr>
+<tr class="odd">
+<td><code>order_cells()</code> blocks a batch script</td>
+<td>Monocle 3’s root selection is interactive by default</td>
+<td>Pass the root programmatically (<code>root_cells=</code> / <code>root_pr_nodes=</code>), not via the GUI</td>
+</tr>
+<tr class="even">
+<td>Slingshot lineages look implausible</td>
+<td>Cluster labels or the starting cluster (<code>start.clus</code>) are wrong</td>
+<td>Fix the clustering/annotation first; trajectory inference inherits its errors</td>
+</tr>
+<tr class="odd">
+<td>A “strong” ligand–receptor hit on an ambient gene</td>
+<td>Ambient contamination inflates broadly-expressed L–R pairs</td>
+<td>Decontaminate first (SoupX/DecontX, <a href="Chapter_01_Preprocessing.html">§1.5</a>); treat lone hits skeptically</td>
+</tr>
+<tr class="even">
+<td>Cell–cell communication “signal” with tiny clusters</td>
+<td>Per-cell L–R tests are underpowered and pseudoreplicated for small groups</td>
+<td>Require a minimum cell count per cluster; validate across samples, not cells</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+</section>
 <section id="cross-references" class="level2">
 <h2 class="anchored" data-anchor-id="cross-references">Cross-references</h2>
 <ul>
@@ -4688,7 +4743,7 @@ Table 2: Cell–cell communication inference tools and their principal approach
 </ul>
 </section>
 <section id="going-further" class="level2">
-<h2 class="anchored" data-anchor-id="going-further">14.8 Going further</h2>
+<h2 class="anchored" data-anchor-id="going-further">14.9 Going further</h2>
 <p><strong>Trajectory:</strong> the benchmark of 45 methods<span class="citation" data-cites="saelens2019comparison"><sup><a href="#ref-saelens2019comparison" role="doc-biblioref">2</a></sup></span> is the place to start, then the two tools the tutorial uses — Slingshot<span class="citation" data-cites="street2018slingshot"><sup><a href="#ref-street2018slingshot" role="doc-biblioref">3</a></sup></span> and Monocle<span class="citation" data-cites="trapnell2014monocle cao2019monocle3"><sup><a href="#ref-trapnell2014monocle" role="doc-biblioref">1</a>,<a href="#ref-cao2019monocle3" role="doc-biblioref">4</a></sup></span> — and the RNA-velocity papers, velocyto<span class="citation" data-cites="lamanno2018rnavelocity"><sup><a href="#ref-lamanno2018rnavelocity" role="doc-biblioref">6</a></sup></span> and scVelo<span class="citation" data-cites="bergen2020scvelo"><sup><a href="#ref-bergen2020scvelo" role="doc-biblioref">7</a></sup></span>. <strong>Cell–cell communication:</strong> the two review articles<span class="citation" data-cites="armingol2021deciphering armingol2024diversifying"><sup><a href="#ref-armingol2021deciphering" role="doc-biblioref">9</a>,<a href="#ref-armingol2024diversifying" role="doc-biblioref">10</a></sup></span> frame the field, CellChat<span class="citation" data-cites="jin2021cellchat"><sup><a href="#ref-jin2021cellchat" role="doc-biblioref">11</a></sup></span> is the common R tool, and LIANA<span class="citation" data-cites="dimitrov2022comparison"><sup><a href="#ref-dimitrov2022comparison" role="doc-biblioref">13</a></sup></span> both compares methods and provides a consensus. The full curated list is on <a href="../Key_Papers.html">Key Papers, Reviews &amp; Benchmarks</a>.</p>
 </section>
 <section id="references" class="level2">

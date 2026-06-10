@@ -4639,8 +4639,8 @@ Table 3: Common <code>cellranger count</code> pitfalls and fixes. The wrong-ref
 <td>Set <code>--localmem</code> ~10% below the SLURM <code>--mem</code> ceiling to absorb brief I/O spikes</td>
 </tr>
 <tr class="odd">
-<td>OOM kill mid-write produces a corrupt <code>.rds</code></td>
-<td>Downstream <code>readRDS()</code> fails with a confusing error</td>
+<td>OOM kill mid-write produces a truncated <code>.h5</code> / incomplete <code>outs/</code></td>
+<td>Downstream loaders (<code>Read10X_h5</code>, <code>Read10X</code>) fail or read partial data</td>
 <td>Check <code>seff</code> for <code>OUT_OF_MEMORY</code>; increase <code>--mem</code> and re-run from scratch</td>
 </tr>
 <tr class="even">
@@ -4676,7 +4676,7 @@ Table 3: Common <code>cellranger count</code> pitfalls and fixes. The wrong-ref
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>Default: 3,000.</strong> This parameter tells Cell Ranger approximately how many cells to expect, which influences the knee-based component of cell calling. It is not a hard cutoff — Cell Ranger adjusts its algorithm around this expectation rather than truncating exactly at it. Providing an accurate value (or a reasonable estimate) is most important when the knee is soft or ambiguous. If you loaded 5,000 cells, set <code>--expect-cells=5000</code>; if you loaded 10,000, set it to 10,000. Using the default 3,000 for a high-loading experiment that actually produced 12,000 cells can cause over-conservative cell calling, where Cell Ranger under-calls cells because it did not expect so many. The “Estimated number of cells” in <code>web_summary.html</code> is the diagnostic: if it is far below your expected target, re-run with a more accurate <code>--expect-cells</code>.</p>
+<p><strong>Optional — auto-estimated by default.</strong> Since Cell Ranger 7, cell calling is automatic (EmptyDrops-based) and you normally do <strong>not</strong> set this flag; there is no fixed default cell number. <code>--expect-cells</code> is an optional hint that nudges the knee-based component of cell calling, useful mainly when the knee is soft/ambiguous or when you want to reproduce an older analysis. It is not a hard cutoff — Cell Ranger adjusts its algorithm around the expectation rather than truncating at it. If you do supply it, match your actual loading (e.g. <code>--expect-cells=10000</code>). To <em>override</em> automatic calling entirely and force an exact count, use <code>--force-cells</code> instead — but only when the automatic call clearly disagrees with the barcode-rank plot. The “Estimated number of cells” in <code>web_summary.html</code> is the diagnostic: if it diverges badly from your expected target, inspect the knee plot before reaching for either flag.</p>
 </div>
 </div>
 <div class="key-parameter callout callout-style-default callout-note callout-titled" title="⚙️ Key parameter — `--localcores` and `--localmem`">

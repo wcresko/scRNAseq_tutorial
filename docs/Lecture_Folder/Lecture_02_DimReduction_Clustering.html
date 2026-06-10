@@ -1388,7 +1388,9 @@ Bill Cresko
 <li>The graph (not the gene matrix, not the UMAP) is the object the clustering actually runs on</li>
 </ul>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a></a>seu <span class="ot">&lt;-</span> <span class="fu">FindNeighbors</span>(seu, <span class="at">dims =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">30</span>) <span class="sc">|&gt;</span></span>
-<span id="cb2-2"><a></a>  <span class="fu">FindClusters</span>(<span class="at">resolution =</span> <span class="fl">0.5</span>)   <span class="co"># Louvain (Seurat default); add algorithm = 4 for Leiden</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-2"><a></a>  <span class="fu">FindClusters</span>(<span class="at">resolution =</span> <span class="fl">0.5</span>)   <span class="co"># Louvain (Seurat&#39;s default algorithm); resolution 0.5</span></span>
+<span id="cb2-3"><a></a>                                   <span class="co"># is our choice — Seurat&#39;s own default is 0.8. Add</span></span>
+<span id="cb2-4"><a></a>                                   <span class="co"># algorithm = 4 for Leiden.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a></a>sc.pp.neighbors(adata, n_pcs<span class="op">=</span><span class="dv">30</span>)</span>
 <span id="cb3-2"><a></a>sc.tl.leiden(adata, resolution<span class="op">=</span><span class="fl">0.5</span>)   <span class="co"># scanpy uses Leiden out of the box</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="callout callout-note callout-titled callout-style-default">
@@ -1546,7 +1548,7 @@ Bill Cresko
 <li><strong>Perplexity</strong> (default 30) sets the effective number of neighbours each cell “considers”</li>
 <li><strong>Low perplexity (5–15):</strong> very local focus → real clusters can fragment into substructure</li>
 <li><strong>High perplexity (50+):</strong> broader patterns → fine subtypes wash out</li>
-<li>Hard limit: perplexity <span class="math inline">\(&lt; n/3\)</span>. For 5,000 cells, anything above ~1500 will fail.</li>
+<li>Must be smaller than the cell count (<span class="math inline">\(&lt; n\)</span>), but in practice you keep it <span class="math inline">\(\le \sim 50\)</span> regardless of dataset size — far below any technical ceiling</li>
 </ul>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
@@ -1599,29 +1601,30 @@ Bill Cresko
 <table class="caption-top">
 <colgroup>
 <col style="width: 18%">
-<col style="width: 10%">
-<col style="width: 71%">
+<col style="width: 16%">
+<col style="width: 64%">
 </colgroup>
 <thead>
 <tr class="header">
 <th>Parameter</th>
-<th style="text-align: right;">Default</th>
+<th style="text-align: right;">Seurat default</th>
 <th>Effect</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
-<td><code>n_neighbors</code></td>
-<td style="text-align: right;">15</td>
+<td><code>n.neighbors</code></td>
+<td style="text-align: right;">30</td>
 <td>Soft “k” — local vs. global balance, like t-SNE’s perplexity</td>
 </tr>
 <tr class="even">
-<td><code>min_dist</code></td>
-<td style="text-align: right;">0.1</td>
+<td><code>min.dist</code></td>
+<td style="text-align: right;">0.3</td>
 <td>Minimum distance between points in the embedding</td>
 </tr>
 </tbody>
 </table>
+<p>(Seurat’s <code>RunUMAP</code> defaults; the underlying Python <code>umap-learn</code> uses different defaults of 15 and 0.1, so don’t be surprised if other tutorials quote those.)</p>
 <ul>
 <li><strong>Small <code>n_neighbors</code> (5–10):</strong> very local detail; clusters fragment more. <strong>Large (30–50):</strong> broader topology; subtypes may merge.</li>
 <li><strong>Small <code>min_dist</code> (≤ 0.1):</strong> tight clusters with clear gaps — good for discrete cell types. <strong>Large (0.4–0.8):</strong> spread-out — good for continuous gradients (development, pseudotime).</li>
