@@ -162,7 +162,7 @@ Because both panes operate on the same filesystem, there is no copy-step between
 # -- In the integrated terminal (on the login node) --
 
 # 1. Load R (must be done each session — modules do not persist)
-module load R/4.3.2
+module load R/4.4.1
 
 # 2. Quick smoke-test on the login node (small input only)
 Rscript scripts/01_qc_preprocessing.R
@@ -240,7 +240,7 @@ Talapas uses [Lmod](https://lmod.readthedocs.io/) to manage centrally installed 
 module spider blast        # search for software by name
 module spider R            # find available versions
 module avail               # list modules loadable right now
-module load R/4.3.3        # load a specific version
+module load R/4.4.1        # load a specific version
 module load samtools       # load a module (default version)
 module list                # show currently loaded modules
 module unload samtools     # unload a module
@@ -253,7 +253,7 @@ module purge               # unload everything; reset to defaults
 -   In batch scripts, always load modules **after** the `#SBATCH` directives.
 -   Use `module spider` to find available versions.
 -   `module purge` resets your environment to defaults.
--   Specify version numbers for reproducibility (e.g., `R/4.3.3`, not just `R`).
+-   Specify version numbers for reproducibility (e.g., `R/4.4.1`, not just `R`).
 :::
 :::
 
@@ -271,7 +271,7 @@ A pinned environment lets you reproduce a tutorial output exactly six months fro
 
 ### Layer 1 — `renv` lockfile (R level)
 
-`renv` records the exact version of every R package used in a project. The workshop ships an `renv.lock` at the repository root.
+`renv` records the exact version of every R package used in a project in an `renv.lock` at the repository root — the recommended pattern for a reproducible analysis. (If you adopt it for your own project, the steps below are how you would use it.)
 
 **First-time setup** in a fresh clone:
 
@@ -341,7 +341,7 @@ If you would rather use Talapas's centrally installed software, the modules used
 
 ``` bash
 module purge
-module load R/4.4.1            # matches the workshop's renv.lock R version
+module load R/4.4.1            # the R version the workshop standardizes on
 module load gcc/13.2.0         # for source builds
 module load hdf5/1.14.2        # for HDF5 files (used by some Bioconductor pkgs)
 module load apptainer          # only if you'll use the container layer
@@ -364,7 +364,7 @@ Then `install.packages()` and `BiocManager::install()` will write into `$HOME/Rl
 | "Skip installing anything"              | Docker image (Layer 2)                                              |
 | "Run the tutorials on Talapas"          | Apptainer + `renv::restore()` (Layers 2 + 1), or `module load` (Layer 3) |
 
-Files in the repository that support this: `renv.lock` (Layer 1), `Dockerfile` (Layer 2), and `.github/workflows/build-image.yml` (the CI that rebuilds the image on a schedule). For the data these environments are built around, see [Datasets](../Datasets.html).
+The files that implement this pattern in a fully reproducible project are an `renv.lock` (Layer 1), a `Dockerfile` (Layer 2), and a CI workflow such as `.github/workflows/build-image.yml` that rebuilds the image on a schedule. For the data these environments are built around, see [Datasets](../Datasets.html).
 
 ## 9.7 What a cluster is, and why it needs a scheduler
 
@@ -484,7 +484,7 @@ A batch script is an ordinary shell script with a header of `#SBATCH` directives
 #SBATCH --mem=64G
 
 module purge
-module load R/4.3.2
+module load R/4.4.1
 Rscript scripts/01_qc_preprocessing.R
 ```
 
@@ -506,7 +506,7 @@ The most useful `#SBATCH` flags map directly onto the resource contract:
 
 A related pair of flags controls behavior near maintenance windows: `--time-min=<HH:MM:SS>` tells SLURM the minimum time your job actually needs, allowing it to start the job in a shorter gap even if it cannot guarantee the full `--time`. This is the recommended fix for jobs sitting in the queue with reason `ReqNodeNotAvail, Reserved for maintenance`.
 
-One additional point on environment setup: every batch script should include `set -euo pipefail` as the first non-comment command. This trio of shell options makes the script exit immediately if any command fails (`-e`), treats unset variables as errors (`-u`), and propagates errors through pipes (`-o pipefail`). Without it, a script can silently continue past a failed step — writing a corrupt output, loading the wrong module, or producing nothing at all — with no indication anything went wrong until a confusing downstream error surfaces. For example: if `module load R/4.3.2` silently fails because the module name changed, and `set -euo pipefail` is absent, the script proceeds to run `Rscript ...` with no R loaded, producing a mysterious "command not found" or, worse, using a system R that has none of your packages. With `set -euo pipefail`, the failed `module load` terminates the script immediately and the `.err` log shows exactly where it stopped.
+One additional point on environment setup: every batch script should include `set -euo pipefail` as the first non-comment command. This trio of shell options makes the script exit immediately if any command fails (`-e`), treats unset variables as errors (`-u`), and propagates errors through pipes (`-o pipefail`). Without it, a script can silently continue past a failed step — writing a corrupt output, loading the wrong module, or producing nothing at all — with no indication anything went wrong until a confusing downstream error surfaces. For example: if `module load R/4.4.1` silently fails because the module name changed, and `set -euo pipefail` is absent, the script proceeds to run `Rscript ...` with no R loaded, producing a mysterious "command not found" or, worse, using a system R that has none of your packages. With `set -euo pipefail`, the failed `module load` terminates the script immediately and the `.err` log shows exactly where it stopped.
 
 @tbl-ch09-sbatch-directives summarizes the most-used `#SBATCH` directives in a quick-reference form.
 
