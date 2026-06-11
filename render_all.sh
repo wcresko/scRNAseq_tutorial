@@ -34,6 +34,15 @@ cd ..
 echo "=== Rendering course website (pages + Resources_Folder) ==="
 quarto render
 
+# Disable Jekyll on the published GitHub Pages site. Pages serves docs/ through
+# Jekyll by default, and Jekyll strips the YAML front matter from any file that
+# begins with `---` — which silently mangles the downloadable Tut_run .qmd.txt
+# tutorials (they lose their header). An empty .nojekyll turns Jekyll off so
+# every file is served verbatim. Recreated here because the website render
+# above rewrites docs/ and would otherwise drop it.
+echo "=== Writing docs/.nojekyll (serve files verbatim, keep .qmd YAML headers) ==="
+touch docs/.nojekyll
+
 # Build the downloadable .rds datasets (ifnb_raw.rds, airway_raw.rds) in the
 # BACKGROUND so the (slow, network-bound) muscData download overlaps the rest
 # of the render instead of blocking it. Output lands in docs/rds/ so the files
