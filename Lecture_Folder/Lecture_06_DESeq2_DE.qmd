@@ -1,5 +1,5 @@
 ---
-title: "Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE"
+title: "L6 — DESeq2: Bulk Fundamentals + Pseudobulk DE"
 author: "Bill Cresko"
 format:
   revealjs:
@@ -28,25 +28,23 @@ library(tidyverse); library(knitr)
 theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ```
 
-# Lecture 06: DESeq2 — Bulk Fundamentals + Pseudobulk DE {background-color="#2c3e50"}
-
 ## Where this lecture fits
 
--   Previous: [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
--   **You are here:** Lec 06 — *the DESeq2 model on bulk RNA-seq, then applied to scRNA-seq pseudobulk*
--   Next: [Lec 07 — Functional Analysis](Lecture_07_FunctionalAnalysis.html)
--   **Companion tutorial:** [Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](../Exercise_Folder/Tutorial_06_DESeq2_DE.html)
--   **Companion book chapter:** [Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_06_DESeq2_DE.html)
--   **Statistical background:** [Appendix B — Statistical Foundations](../Resources_Folder/Appendix_B_Statistical_Foundations.html)
+- Previous: [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
+- **You are here:** Lec 06 — *the DESeq2 model on bulk RNA-seq, then applied to scRNA-seq pseudobulk*
+- Next: [Lec 07 — Functional Analysis](Lecture_07_FunctionalAnalysis.html)
+- **Companion tutorial:** [Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](../Exercise_Folder/Tutorial_06_DESeq2_DE.html)
+- **Companion book chapter:** [Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_06_DESeq2_DE.html)
+- **Statistical background:** [Appendix B — Statistical Foundations](../Resources_Folder/Appendix_B_Statistical_Foundations.html)
 
 ## Goals of this lecture
 
 ::: incremental
--   Understand the **negative-binomial GLM** at the heart of DESeq2 in plain terms
--   Read and correctly interpret DESeq2 output — the sign of `log2FoldChange` (set by the reference level), `padj`, and when to shrink with `lfcShrink`/`apeglm`
--   Run DESeq2 end to end on a real bulk RNA-seq dataset (`airway`)
--   Understand **why per-cell DE is statistically wrong** for condition contrasts
--   Aggregate single cells to a *(sample × cell type)* **pseudobulk** matrix and run DESeq2 per cell type with the right design and contrast
+- Understand the **negative-binomial GLM** at the heart of DESeq2 in plain terms
+- Read and correctly interpret DESeq2 output — the sign of `log2FoldChange` (set by the reference level), `padj`, and when to shrink with `lfcShrink`/`apeglm`
+- Run DESeq2 end to end on a real bulk RNA-seq dataset (`airway`)
+- Understand **why per-cell DE is statistically wrong** for condition contrasts
+- Aggregate single cells to a *(sample × cell type)* **pseudobulk** matrix and run DESeq2 per cell type with the right design and contrast
 :::
 
 ::: callout-note
@@ -58,10 +56,10 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ## What DESeq2 actually does
 
 ::: incremental
--   Models **integer counts** per gene with a **negative binomial** distribution
--   Estimates a **size factor** per sample (depth normalization), independent of the design
--   **Shrinks** per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)
--   Tests each gene's coefficient with a **Wald test** (default) or LRT
+- Models **integer counts** per gene with a **negative binomial** distribution
+- Estimates a **size factor** per sample (depth normalization), independent of the design
+- **Shrinks** per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)
+- Tests each gene's coefficient with a **Wald test** (default) or LRT
 :::
 
 ::: callout-note
@@ -97,11 +95,11 @@ summary(res)
 ## Reading DESeq2 output
 
 | Column | What it is | Watch-out |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | `baseMean` | mean of normalized counts across all samples | Very low values = unstable estimates |
 | `log2FoldChange` | effect size on log~2~ scale | Use **shrunk** values for ranking |
-| `lfcSE` | standard error of the LFC | |
-| `stat` | Wald statistic | |
+| `lfcSE` | standard error of the LFC |  |
+| `stat` | Wald statistic |  |
 | `pvalue` | raw p-value | Don't filter on this directly |
 | `padj` | BH-adjusted p-value | This is your FDR — filter on `padj < 0.05` |
 
@@ -134,10 +132,10 @@ res_shrunk <- lfcShrink(dds,
 ## Why naïve per-cell tests fail
 
 ::: incremental
--   Cells from one subject share genetics, library prep, batch, treatment — they are **not independent**
--   Treating each cell as an independent replicate inflates the effective N by 100×–10,000×
--   Result: **anti-conservative p-values** — thousands of spurious "significant" genes
--   Documented in benchmarks: Squair et al. 2021 (*Nat Commun*), Zimmerman et al. 2021
+- Cells from one subject share genetics, library prep, batch, treatment — they are **not independent**
+- Treating each cell as an independent replicate inflates the effective N by 100×–10,000×
+- Result: **anti-conservative p-values** — thousands of spurious "significant" genes
+- Documented in benchmarks: Squair et al. 2021 (*Nat Commun*), Zimmerman et al. 2021
 :::
 
 ::: callout-important
@@ -148,8 +146,8 @@ If your experimental unit is the **subject**, your statistical unit should be th
 
 Pseudobulk is our default, but a second family models **each cell** while still respecting non-independence:
 
--   **Mixed-effects / GLMM methods** (`nebula`, `glmmTMB`, MAST with a random effect) add a **per-sample random effect**, so the subject remains the unit of replication even though the model fits at cell level
--   **MAST** uses a two-part (hurdle) model tailored to scRNA-seq zero-inflation
+- **Mixed-effects / GLMM methods** (`nebula`, `glmmTMB`, MAST with a random effect) add a **per-sample random effect**, so the subject remains the unit of replication even though the model fits at cell level
+- **MAST** uses a two-part (hurdle) model tailored to scRNA-seq zero-inflation
 
 The literature is genuinely split — some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).
 
@@ -161,11 +159,11 @@ The literature is genuinely split — some benchmarks favour pseudobulk (Squair 
 
 ## What pseudobulk does
 
-![Pseudobulk aggregation: cells -> per-sample-per-celltype](images/lec01_pseudobulk_concept.svg){fig-align="center" width="95%"}
+![Pseudobulk aggregation: cells -\> per-sample-per-celltype](images/lec01_pseudobulk_concept.svg){fig-align="center" width="95%"}
 
--   **Aggregate** (sum) UMI counts per *(sample, cell type)* → a classic bulk-looking matrix
--   One column per (sample × cell type) replicate, one row per gene
--   Run a separate DE test **per cell type** with DESeq2 / edgeR / limma-voom
+- **Aggregate** (sum) UMI counts per *(sample, cell type)* → a classic bulk-looking matrix
+- One column per (sample × cell type) replicate, one row per gene
+- Run a separate DE test **per cell type** with DESeq2 / edgeR / limma-voom
 
 ## DESeq2 on pseudobulk in R
 
@@ -224,11 +222,11 @@ DeseqStats(dds, contrast=["condition", "treated", "control"]).summary()
 ::: callout-warning
 **Common pitfalls.**
 
--   **Filter low-cell groups** — drop (sample × cell type) combos with `< 10` cells before DE; the pseudobulk profile is too noisy.
--   **Include covariates** in the design (batch, sex, age) just like bulk RNA-seq.
--   **Need ≥ 3 samples per condition.** With 1–2 samples per group, no test is honest — say so in the paper.
--   Prefer **shrinkage LFCs** (`lfcShrink()` with `apeglm`) for ranking.
--   Apply BH / IHW **within** each cell-type run, not across all results pooled — the null distributions differ.
+- **Filter low-cell groups** — drop (sample × cell type) combos with `< 10` cells before DE; the pseudobulk profile is too noisy.
+- **Include covariates** in the design (batch, sex, age) just like bulk RNA-seq.
+- **Need ≥ 3 samples per condition.** With 1–2 samples per group, no test is honest — say so in the paper.
+- Prefer **shrinkage LFCs** (`lfcShrink()` with `apeglm`) for ranking.
+- Apply BH / IHW **within** each cell-type run, not across all results pooled — the null distributions differ.
 :::
 
 ::: callout-note
@@ -237,9 +235,9 @@ DeseqStats(dds, contrast=["condition", "treated", "control"]).summary()
 
 ## When *not* to use pseudobulk
 
--   Questions about **within-cell-type heterogeneity** (subpopulations defined by a marker)
--   Samples with only one or two biological replicates per condition — no test will save you
--   Rare cell types with too few cells per sample to aggregate meaningfully
+- Questions about **within-cell-type heterogeneity** (subpopulations defined by a marker)
+- Samples with only one or two biological replicates per condition — no test will save you
+- Rare cell types with too few cells per sample to aggregate meaningfully
 
 # Part 4 — Where DE lands in the bigger picture {background-color="#2c3e50"}
 
@@ -247,37 +245,37 @@ DeseqStats(dds, contrast=["condition", "treated", "control"]).summary()
 
 ![Downstream analysis hub: from annotated object to claims](images/lec01_downstream_hub.svg){fig-align="center" width="95%"}
 
--   **Within-cluster:** marker genes, signatures, module scores
--   **Between conditions:** pseudobulk DE per cell type *(this lecture)*
--   **Across cells:** gene modules → WGCNA (bonus), trajectory inference, ligand-receptor
--   **Across samples:** composition shifts (scCODA, propeller, milo)
+- **Within-cluster:** marker genes, signatures, module scores
+- **Between conditions:** pseudobulk DE per cell type *(this lecture)*
+- **Across cells:** gene modules → WGCNA (bonus), trajectory inference, ligand-receptor
+- **Across samples:** composition shifts (scCODA, propeller, milo)
 
 ## Pathway / enrichment follow-up
 
 After DE, summarize gene lists into pathways:
 
--   **Over-representation** (hypergeometric): `enrichR`, `clusterProfiler`
--   **Rank-based GSEA**: `fgsea`, `clusterProfiler::gseGO`
--   **Per-cell scoring** (alternative to gene lists): `decoupleR`, `AUCell`, `AddModuleScore`
+- **Over-representation** (hypergeometric): `enrichR`, `clusterProfiler`
+- **Rank-based GSEA**: `fgsea`, `clusterProfiler::gseGO`
+- **Per-cell scoring** (alternative to gene lists): `decoupleR`, `AUCell`, `AddModuleScore`
 
 # Recap & what's next {background-color="#2c3e50"}
 
 ## What to remember from Lecture 06
 
 ::: incremental
--   DESeq2 models **integer counts** with a **negative binomial** distribution and **shrinks** dispersion estimates toward a fitted trend
--   `relevel()` your factor before running `DESeq` — the reference level determines the **sign** of the log-fold-change
--   For ranking and visualization, **shrink** LFCs with `lfcShrink(dds, type = "apeglm")` — but the `pvalue` / `padj` come from the **unshrunken** estimates (shrinkage is not part of the test since 2016)
--   `padj` is the **FDR** — filter on `padj < 0.05`, not on raw `pvalue`
--   For **condition-level DE**, default to **pseudobulk** + DESeq2/edgeR/limma-voom; never run per-cell DE for condition contrasts
--   Aggregate counts per *(sample × cell type)* with `AggregateExpression`, then test each cell type separately
--   Drop cell-type × sample combinations with **fewer than \~10 cells**
--   You need real biological replicates (≥ 3 per group) — there is no shortcut
+- DESeq2 models **integer counts** with a **negative binomial** distribution and **shrinks** dispersion estimates toward a fitted trend
+- `relevel()` your factor before running `DESeq` — the reference level determines the **sign** of the log-fold-change
+- For ranking and visualization, **shrink** LFCs with `lfcShrink(dds, type = "apeglm")` — but the `pvalue` / `padj` come from the **unshrunken** estimates (shrinkage is not part of the test since 2016)
+- `padj` is the **FDR** — filter on `padj < 0.05`, not on raw `pvalue`
+- For **condition-level DE**, default to **pseudobulk** + DESeq2/edgeR/limma-voom; never run per-cell DE for condition contrasts
+- Aggregate counts per *(sample × cell type)* with `AggregateExpression`, then test each cell type separately
+- Drop cell-type × sample combinations with **fewer than \~10 cells**
+- You need real biological replicates (≥ 3 per group) — there is no shortcut
 :::
 
 ## Coming up next
 
--   **Lec 07** — [Functional Analysis](Lecture_07_FunctionalAnalysis.html) — turning a pseudobulk DE list into biological themes
--   **Lec 08** — [Differential Abundance](Lecture_08_DifferentialAbundance.html) — the *complement*: do cell-type proportions change?
--   **Hands-on:** [Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](../Exercise_Folder/Tutorial_06_DESeq2_DE.html)
--   **Companion book chapter:** [Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_06_DESeq2_DE.html)
+- **Lec 07** — [Functional Analysis](Lecture_07_FunctionalAnalysis.html) — turning a pseudobulk DE list into biological themes
+- **Lec 08** — [Differential Abundance](Lecture_08_DifferentialAbundance.html) — the *complement*: do cell-type proportions change?
+- **Hands-on:** [Tutorial 06 — DESeq2: Bulk Primer + Pseudobulk DE](../Exercise_Folder/Tutorial_06_DESeq2_DE.html)
+- **Companion book chapter:** [Chapter 6 — DESeq2: Bulk Fundamentals + Pseudobulk DE](../Resources_Folder/Chapter_06_DESeq2_DE.html)
