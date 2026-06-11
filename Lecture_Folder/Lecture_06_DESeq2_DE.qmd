@@ -1,5 +1,5 @@
 ---
-title: "L6 — DESeq2: Bulk Fundamentals + Pseudobulk DE"
+title: "L6 — DESeq2: Bulk & Pseudobulk DE"
 author: "Bill Cresko"
 format:
   revealjs:
@@ -48,28 +48,33 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 :::
 
 ::: callout-note
-**Why bulk DESeq2 first?** Pseudobulk DE in scRNA-seq is *just bulk DESeq2 applied to per-cell-type aggregated counts*. So learn the bulk model cleanly first (Part 1); the single-cell scaffolding around it (Part 2) is then a small, well-defined wrapper.
-:::
+**Why bulk DESeq2 first?** 
 
-# Part 1 — DESeq2 fundamentals on bulk RNA-seq {background-color="#2c3e50"}
+- Pseudobulk DE in scRNA-seq is *just bulk DESeq2 applied to per-cell-type aggregated counts*. 
+- So learn the bulk model cleanly first (Part 1); the single-cell scaffolding around it (Part 2) is then a small, well-defined wrapper.
+:::
 
 ## What DESeq2 actually does
 
-::: incremental
+
 - Models **integer counts** per gene with a **negative binomial** distribution
 - Estimates a **size factor** per sample (depth normalization), independent of the design
 - **Shrinks** per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)
 - Tests each gene's coefficient with a **Wald test** (default) or LRT
-:::
 
 ::: callout-note
-**Why negative binomial, not Poisson?** RNA-seq counts are **over-dispersed**: variance \> mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.
+**Why negative binomial, not Poisson?** 
+
+- RNA-seq counts are **over-dispersed**: variance \> mean. 
+- Poisson would underestimate variance and inflate Type-I error. 
+- The NB adds a per-gene dispersion parameter.
 :::
 
 ## A canonical bulk DESeq2 run (`airway` data)
 
 ``` r
-library(DESeq2); library(airway)
+library(DESeq2)
+library(airway)
 data(airway)
 
 dds <- DESeqDataSetFromMatrix(
@@ -89,13 +94,16 @@ summary(res)
 ```
 
 ::: callout-tip
-**`relevel()` matters.** The reference level becomes the *denominator* in `log2FoldChange`. If you forget, your "up-regulated" and "down-regulated" labels can be backwards.
+**`relevel()` matters.** 
+
+- The reference level becomes the *denominator* in `log2FoldChange`. 
+- If you forget, your "up-regulated" and "down-regulated" labels can be backwards.
 :::
 
 ## Reading DESeq2 output
 
 | Column | What it is | Watch-out |
-|------------------------|------------------------|------------------------|
+|-------------------|--------------------------|--------------------------|
 | `baseMean` | mean of normalized counts across all samples | Very low values = unstable estimates |
 | `log2FoldChange` | effect size on log~2~ scale | Use **shrunk** values for ranking |
 | `lfcSE` | standard error of the LFC |  |
@@ -104,7 +112,10 @@ summary(res)
 | `padj` | BH-adjusted p-value | This is your FDR — filter on `padj < 0.05` |
 
 ::: callout-warning
-**`NA` in `padj`?** DESeq2 sets `padj = NA` for genes filtered by independent filtering or with extreme outliers (Cook's distance). That's intentional, not a bug.
+**`NA` in `padj`?** 
+
+- DESeq2 sets `padj = NA` for genes filtered by independent filtering or with extreme outliers (Cook's distance). 
+- That's intentional, not a bug.
 :::
 
 ## Shrink LFCs for ranking & visualization — *not* for testing
@@ -116,30 +127,36 @@ res_shrunk <- lfcShrink(dds,
 ```
 
 ::: callout-tip
-**Why shrink?** Weakly expressed genes have huge, noisy raw LFCs from sampling noise. Shrinkage (`apeglm` / `ashr`) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage) — so a "top hits" list or volcano plot isn't dominated by junk genes with `baseMean = 2`.
+**Why shrink?** 
+
+- Weakly expressed genes have huge, noisy raw LFCs from sampling noise. 
+- Shrinkage (`apeglm` / `ashr`) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage)
+- So a "top hits" list or volcano plot isn't dominated by junk genes with `baseMean = 2`.
 :::
 
 ::: callout-important
-**Shrinkage is decoupled from the hypothesis test.** Since the 2016 pipeline change, DESeq2 computes `pvalue` / `padj` from the **unshrunken** (MLE) log-fold-changes — shrinkage does **not** enter the Wald test. The shrunken LFCs (and their SEs) are for **ranking, volcano/MA plots, and effect-size reporting**, *after* testing. So "shrink before ranking" means *before you sort and visualize results*, **not** *before DE testing*. Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.
+**Shrinkage is decoupled from the hypothesis test.** 
+
+- Since the 2016 pipeline change, DESeq2 computes `pvalue` / `padj` from the **unshrunken** (MLE) log-fold-changes — shrinkage does **not** enter the Wald test. 
+- The shrunken LFCs (and their SEs) are for **ranking, volcano/MA plots, and effect-size reporting**, *after* testing. 
+- So "shrink before ranking" means *before you sort and visualize results*, **not** *before DE testing*. 
+- Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.
 :::
 
 # Part 2 — Why per-cell DE goes wrong {background-color="#2c3e50"}
 
 ## The scientific question
 
-> In *cell type X*, which genes differ between **treated** and **control** subjects?
+> Scientific Question: In *cell type X*, which genes differ between **treated** and **control** subjects?
 
-## Why naïve per-cell tests fail
-
-::: incremental
 - Cells from one subject share genetics, library prep, batch, treatment — they are **not independent**
 - Treating each cell as an independent replicate inflates the effective N by 100×–10,000×
 - Result: **anti-conservative p-values** — thousands of spurious "significant" genes
 - Documented in benchmarks: Squair et al. 2021 (*Nat Commun*), Zimmerman et al. 2021
-:::
 
 ::: callout-important
-If your experimental unit is the **subject**, your statistical unit should be the **subject**. Within-cell methods (`FindMarkers`, `wilcox`, MAST) are fine for *exploratory marker discovery*; they are **not** condition-level DE.
+- If your experimental unit is the **subject**, your statistical unit should be the **subject**. 
+- Within-cell methods (`FindMarkers`, `wilcox`, MAST) are fine for *exploratory marker discovery*; they are **not** condition-level DE.
 :::
 
 ## Cell-level DE — the model-based camp
@@ -149,26 +166,35 @@ Pseudobulk is our default, but a second family models **each cell** while still 
 - **Mixed-effects / GLMM methods** (`nebula`, `glmmTMB`, MAST with a random effect) add a **per-sample random effect**, so the subject remains the unit of replication even though the model fits at cell level
 - **MAST** uses a two-part (hurdle) model tailored to scRNA-seq zero-inflation
 
-The literature is genuinely split — some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).
+The literature is genuinely split - some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).
 
 ::: callout-tip
-**Practical stance:** default to **pseudobulk** (simple, robust, hard to fool). Reach for a **mixed-effects cell-level model** when you have many cells per subject, need the extra power, and will check the random-effect specification. The cardinal sin isn't picking one — it's the **naïve per-cell test with no subject term**.
+**Practical stance:** 
+
+- Default to **pseudobulk** (simple, robust, hard to fool). 
+- Reach for a **mixed-effects cell-level model** when you have many cells per subject, need the extra power, and will check the random-effect specification. 
+- The cardinal sin isn't picking one — it's the **naïve per-cell test with no subject term**.
 :::
 
 # Part 3 — Pseudobulk in practice {background-color="#2c3e50"}
 
 ## What pseudobulk does
 
-![Pseudobulk aggregation: cells -\> per-sample-per-celltype](images/lec01_pseudobulk_concept.svg){fig-align="center" width="95%"}
+![](images/lec01_pseudobulk_concept.svg){fig-align="center" width="95%"}
 
 - **Aggregate** (sum) UMI counts per *(sample, cell type)* → a classic bulk-looking matrix
 - One column per (sample × cell type) replicate, one row per gene
-- Run a separate DE test **per cell type** with DESeq2 / edgeR / limma-voom
+- Run a separate DE test **per cell type** with `DESeq2` / `edgeR` / `limma-voom`
 
-## DESeq2 on pseudobulk in R
+## DESeq2 on pseudobulk
+
+::: {.panel-tabset}
+
+### Seurat & DEseq2 in R
 
 ``` r
-library(Seurat); library(DESeq2)
+library(Seurat)
+library(DESeq2)
 
 pb <- AggregateExpression(seu, assays = "RNA",
                           slot = "counts",   # sum raw counts, not log-normalized data
@@ -195,7 +221,7 @@ run_de <- function(ct) {
 de_all <- purrr::map_dfr(unique(meta$celltype), run_de)
 ```
 
-## DESeq2 on pseudobulk in Python
+### decoupler & PyDESeq2 in Python
 
 ``` python
 import decoupler as dc
@@ -217,6 +243,8 @@ dds.deseq2()
 DeseqStats(dds, contrast=["condition", "treated", "control"]).summary()
 ```
 
+:::
+
 ## Gotchas & good practice
 
 ::: callout-warning
@@ -230,7 +258,12 @@ DeseqStats(dds, contrast=["condition", "treated", "control"]).summary()
 :::
 
 ::: callout-note
-**ifnb-specific: the `ind` column and the `g`-prefix issue.** In the `ifnb` dataset, donor IDs are stored in the metadata column `ind` (values like `"101"`, `"1015"`, `"1016"`, ...). Because `AggregateExpression()` pastes group values into column names, a donor ID that starts with a digit produces an invalid R column name; R silently prepends `g` to make it syntactically valid (`g101`, `g1015`, ...). Tutorial 06 pre-empts this by creating a new column `donor_id = paste0("d", ind)` before aggregation, so all pseudobulk columns start with `"d"`. If your column names look like `g101_CD14 Mono`, you have hit this issue — just rename the column before running `DESeq2`.
+**ifnb-specific: the `ind` column and the `g`-prefix issue.** 
+
+- In the `ifnb` dataset, donor IDs are stored in the metadata column `ind` (values like `"101"`, `"1015"`, `"1016"`, ...). 
+- Because `AggregateExpression()` pastes group values into column names, a donor ID that starts with a digit produces an invalid R column name; R silently prepends `g` to make it syntactically valid (`g101`, `g1015`, ...). 
+- Tutorial 06 pre-empts this by creating a new column `donor_id = paste0("d", ind)` before aggregation, so all pseudobulk columns start with `"d"`. 
+- If your column names look like `g101_CD14 Mono`, you have hit this issue — just rename the column before running `DESeq2`.
 :::
 
 ## When *not* to use pseudobulk

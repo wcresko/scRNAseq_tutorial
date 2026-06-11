@@ -442,7 +442,7 @@
   <meta name="generator" content="quarto-1.9.38">
 
   <meta name="author" content="Bill Cresko">
-  <title>Single Cell RNA-seq Analysis Workshop – Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE</title>
+  <title>Single Cell RNA-seq Analysis Workshop – L6 — DESeq2: Bulk &amp; Pseudobulk DE</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
@@ -1160,7 +1160,7 @@ margin-right: 0; }
     <div class="slides">
 
 <section id="title-slide" class="quarto-title-block center">
-  <h1 class="title">Lecture 06 — DESeq2: Bulk Fundamentals + Pseudobulk DE</h1>
+  <h1 class="title">L6 — DESeq2: Bulk &amp; Pseudobulk DE</h1>
 
 <div class="quarto-title-authors">
 <div class="quarto-title-author">
@@ -1169,11 +1169,6 @@ Bill Cresko
 </div>
 </div>
 </div>
-
-</section>
-<section>
-<section id="lecture-06-deseq2-bulk-fundamentals-pseudobulk-de" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Lecture 06: DESeq2 — Bulk Fundamentals + Pseudobulk DE</h1>
 
 </section>
 <section id="where-this-lecture-fits" class="slide level2">
@@ -1205,23 +1200,22 @@ Bill Cresko
 <p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Why bulk DESeq2 first?</strong> Pseudobulk DE in scRNA-seq is <em>just bulk DESeq2 applied to per-cell-type aggregated counts</em>. So learn the bulk model cleanly first (Part 1); the single-cell scaffolding around it (Part 2) is then a small, well-defined wrapper.</p>
+<p><strong>Why bulk DESeq2 first?</strong></p>
+<ul>
+<li>Pseudobulk DE in scRNA-seq is <em>just bulk DESeq2 applied to per-cell-type aggregated counts</em>.</li>
+<li>So learn the bulk model cleanly first (Part 1); the single-cell scaffolding around it (Part 2) is then a small, well-defined wrapper.</li>
+</ul>
 </div>
 </div>
 </div>
-</section></section>
-<section>
-<section id="part-1-deseq2-fundamentals-on-bulk-rna-seq" class="title-slide slide level1 center" data-background-color="#2c3e50">
-<h1>Part 1 — DESeq2 fundamentals on bulk RNA-seq</h1>
-
 </section>
 <section id="what-deseq2-actually-does" class="slide level2">
 <h2>What DESeq2 actually does</h2>
 <ul>
-<li class="fragment">Models <strong>integer counts</strong> per gene with a <strong>negative binomial</strong> distribution</li>
-<li class="fragment">Estimates a <strong>size factor</strong> per sample (depth normalization), independent of the design</li>
-<li class="fragment"><strong>Shrinks</strong> per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)</li>
-<li class="fragment">Tests each gene’s coefficient with a <strong>Wald test</strong> (default) or LRT</li>
+<li>Models <strong>integer counts</strong> per gene with a <strong>negative binomial</strong> distribution</li>
+<li>Estimates a <strong>size factor</strong> per sample (depth normalization), independent of the design</li>
+<li><strong>Shrinks</strong> per-gene dispersion estimates toward a fitted trend (gives stable results when N is small)</li>
+<li>Tests each gene’s coefficient with a <strong>Wald test</strong> (default) or LRT</li>
 </ul>
 <div class="callout callout-note callout-titled callout-style-default">
 <div class="callout-body">
@@ -1232,30 +1226,36 @@ Bill Cresko
 <p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Why negative binomial, not Poisson?</strong> RNA-seq counts are <strong>over-dispersed</strong>: variance &gt; mean. Poisson would underestimate variance and inflate Type-I error. The NB adds a per-gene dispersion parameter.</p>
+<p><strong>Why negative binomial, not Poisson?</strong></p>
+<ul>
+<li>RNA-seq counts are <strong>over-dispersed</strong>: variance &gt; mean.</li>
+<li>Poisson would underestimate variance and inflate Type-I error.</li>
+<li>The NB adds a per-gene dispersion parameter.</li>
+</ul>
 </div>
 </div>
 </div>
 </section>
 <section id="a-canonical-bulk-deseq2-run-airway-data" class="slide level2">
 <h2>A canonical bulk DESeq2 run (<code>airway</code> data)</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(DESeq2); <span class="fu">library</span>(airway)</span>
-<span id="cb1-2"><a></a><span class="fu">data</span>(airway)</span>
-<span id="cb1-3"><a></a></span>
-<span id="cb1-4"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(</span>
-<span id="cb1-5"><a></a>  <span class="at">countData =</span> <span class="fu">assay</span>(airway),</span>
-<span id="cb1-6"><a></a>  <span class="at">colData   =</span> <span class="fu">colData</span>(airway),</span>
-<span id="cb1-7"><a></a>  <span class="at">design    =</span> <span class="sc">~</span> cell <span class="sc">+</span> dex)        <span class="co"># cell line as covariate, dex as test factor</span></span>
-<span id="cb1-8"><a></a></span>
-<span id="cb1-9"><a></a><span class="co"># Pre-filter: drop genes with &lt; 10 total reads (speed only — does not affect FDR)</span></span>
-<span id="cb1-10"><a></a>dds <span class="ot">&lt;-</span> dds[ <span class="fu">rowSums</span>(<span class="fu">counts</span>(dds)) <span class="sc">&gt;=</span> <span class="dv">10</span>, ]</span>
-<span id="cb1-11"><a></a></span>
-<span id="cb1-12"><a></a><span class="co"># Set the reference level so log2FC sign is interpretable</span></span>
-<span id="cb1-13"><a></a>dds<span class="sc">$</span>dex <span class="ot">&lt;-</span> <span class="fu">relevel</span>(dds<span class="sc">$</span>dex, <span class="at">ref =</span> <span class="st">&quot;untrt&quot;</span>)</span>
-<span id="cb1-14"><a></a></span>
-<span id="cb1-15"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb1-16"><a></a>res <span class="ot">&lt;-</span> <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;trt&quot;</span>, <span class="st">&quot;untrt&quot;</span>))</span>
-<span id="cb1-17"><a></a><span class="fu">summary</span>(res)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a></a><span class="fu">library</span>(DESeq2)</span>
+<span id="cb1-2"><a></a><span class="fu">library</span>(airway)</span>
+<span id="cb1-3"><a></a><span class="fu">data</span>(airway)</span>
+<span id="cb1-4"><a></a></span>
+<span id="cb1-5"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(</span>
+<span id="cb1-6"><a></a>  <span class="at">countData =</span> <span class="fu">assay</span>(airway),</span>
+<span id="cb1-7"><a></a>  <span class="at">colData   =</span> <span class="fu">colData</span>(airway),</span>
+<span id="cb1-8"><a></a>  <span class="at">design    =</span> <span class="sc">~</span> cell <span class="sc">+</span> dex)        <span class="co"># cell line as covariate, dex as test factor</span></span>
+<span id="cb1-9"><a></a></span>
+<span id="cb1-10"><a></a><span class="co"># Pre-filter: drop genes with &lt; 10 total reads (speed only — does not affect FDR)</span></span>
+<span id="cb1-11"><a></a>dds <span class="ot">&lt;-</span> dds[ <span class="fu">rowSums</span>(<span class="fu">counts</span>(dds)) <span class="sc">&gt;=</span> <span class="dv">10</span>, ]</span>
+<span id="cb1-12"><a></a></span>
+<span id="cb1-13"><a></a><span class="co"># Set the reference level so log2FC sign is interpretable</span></span>
+<span id="cb1-14"><a></a>dds<span class="sc">$</span>dex <span class="ot">&lt;-</span> <span class="fu">relevel</span>(dds<span class="sc">$</span>dex, <span class="at">ref =</span> <span class="st">&quot;untrt&quot;</span>)</span>
+<span id="cb1-15"><a></a></span>
+<span id="cb1-16"><a></a>dds <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
+<span id="cb1-17"><a></a>res <span class="ot">&lt;-</span> <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;dex&quot;</span>, <span class="st">&quot;trt&quot;</span>, <span class="st">&quot;untrt&quot;</span>))</span>
+<span id="cb1-18"><a></a><span class="fu">summary</span>(res)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1265,7 +1265,11 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p><strong><code>relevel()</code> matters.</strong> The reference level becomes the <em>denominator</em> in <code>log2FoldChange</code>. If you forget, your “up-regulated” and “down-regulated” labels can be backwards.</p>
+<p><strong><code>relevel()</code> matters.</strong></p>
+<ul>
+<li>The reference level becomes the <em>denominator</em> in <code>log2FoldChange</code>.</li>
+<li>If you forget, your “up-regulated” and “down-regulated” labels can be backwards.</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1274,9 +1278,9 @@ Bill Cresko
 <h2>Reading DESeq2 output</h2>
 <table class="caption-top">
 <colgroup>
-<col style="width: 33%">
-<col style="width: 33%">
-<col style="width: 33%">
+<col style="width: 26%">
+<col style="width: 36%">
+<col style="width: 36%">
 </colgroup>
 <thead>
 <tr class="header">
@@ -1327,7 +1331,11 @@ Bill Cresko
 <p><strong>Warning</strong></p>
 </div>
 <div class="callout-content">
-<p><strong><code>NA</code> in <code>padj</code>?</strong> DESeq2 sets <code>padj = NA</code> for genes filtered by independent filtering or with extreme outliers (Cook’s distance). That’s intentional, not a bug.</p>
+<p><strong><code>NA</code> in <code>padj</code>?</strong></p>
+<ul>
+<li>DESeq2 sets <code>padj = NA</code> for genes filtered by independent filtering or with extreme outliers (Cook’s distance).</li>
+<li>That’s intentional, not a bug.</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1346,7 +1354,12 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Why shrink?</strong> Weakly expressed genes have huge, noisy raw LFCs from sampling noise. Shrinkage (<code>apeglm</code> / <code>ashr</code>) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage) — so a “top hits” list or volcano plot isn’t dominated by junk genes with <code>baseMean = 2</code>.</p>
+<p><strong>Why shrink?</strong></p>
+<ul>
+<li>Weakly expressed genes have huge, noisy raw LFCs from sampling noise.</li>
+<li>Shrinkage (<code>apeglm</code> / <code>ashr</code>) pulls those down toward zero — by an amount set by how much information the gene carries (low counts, high dispersion, or few degrees of freedom → more shrinkage)</li>
+<li>So a “top hits” list or volcano plot isn’t dominated by junk genes with <code>baseMean = 2</code>.</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1359,11 +1372,17 @@ Bill Cresko
 <p><strong>Important</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Shrinkage is decoupled from the hypothesis test.</strong> Since the 2016 pipeline change, DESeq2 computes <code>pvalue</code> / <code>padj</code> from the <strong>unshrunken</strong> (MLE) log-fold-changes — shrinkage does <strong>not</strong> enter the Wald test. The shrunken LFCs (and their SEs) are for <strong>ranking, volcano/MA plots, and effect-size reporting</strong>, <em>after</em> testing. So “shrink before ranking” means <em>before you sort and visualize results</em>, <strong>not</strong> <em>before DE testing</em>. Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.</p>
+<p><strong>Shrinkage is decoupled from the hypothesis test.</strong></p>
+<ul>
+<li>Since the 2016 pipeline change, DESeq2 computes <code>pvalue</code> / <code>padj</code> from the <strong>unshrunken</strong> (MLE) log-fold-changes — shrinkage does <strong>not</strong> enter the Wald test.</li>
+<li>The shrunken LFCs (and their SEs) are for <strong>ranking, volcano/MA plots, and effect-size reporting</strong>, <em>after</em> testing.</li>
+<li>So “shrink before ranking” means <em>before you sort and visualize results</em>, <strong>not</strong> <em>before DE testing</em>.</li>
+<li>Earlier DESeq2 versions did use shrunken estimates in testing; that was removed to keep the FDR well-calibrated.</li>
+</ul>
 </div>
 </div>
 </div>
-</section></section>
+</section>
 <section>
 <section id="part-2-why-per-cell-de-goes-wrong" class="title-slide slide level1 center" data-background-color="#2c3e50">
 <h1>Part 2 — Why per-cell DE goes wrong</h1>
@@ -1372,16 +1391,13 @@ Bill Cresko
 <section id="the-scientific-question" class="slide level2">
 <h2>The scientific question</h2>
 <blockquote>
-<p>In <em>cell type X</em>, which genes differ between <strong>treated</strong> and <strong>control</strong> subjects?</p>
+<p>Scientific Question: In <em>cell type X</em>, which genes differ between <strong>treated</strong> and <strong>control</strong> subjects?</p>
 </blockquote>
-</section>
-<section id="why-naïve-per-cell-tests-fail" class="slide level2">
-<h2>Why naïve per-cell tests fail</h2>
 <ul>
-<li class="fragment">Cells from one subject share genetics, library prep, batch, treatment — they are <strong>not independent</strong></li>
-<li class="fragment">Treating each cell as an independent replicate inflates the effective N by 100×–10,000×</li>
-<li class="fragment">Result: <strong>anti-conservative p-values</strong> — thousands of spurious “significant” genes</li>
-<li class="fragment">Documented in benchmarks: Squair et al. 2021 (<em>Nat Commun</em>), Zimmerman et al. 2021</li>
+<li>Cells from one subject share genetics, library prep, batch, treatment — they are <strong>not independent</strong></li>
+<li>Treating each cell as an independent replicate inflates the effective N by 100×–10,000×</li>
+<li>Result: <strong>anti-conservative p-values</strong> — thousands of spurious “significant” genes</li>
+<li>Documented in benchmarks: Squair et al. 2021 (<em>Nat Commun</em>), Zimmerman et al. 2021</li>
 </ul>
 <div class="callout callout-important callout-titled callout-style-default">
 <div class="callout-body">
@@ -1392,7 +1408,10 @@ Bill Cresko
 <p><strong>Important</strong></p>
 </div>
 <div class="callout-content">
-<p>If your experimental unit is the <strong>subject</strong>, your statistical unit should be the <strong>subject</strong>. Within-cell methods (<code>FindMarkers</code>, <code>wilcox</code>, MAST) are fine for <em>exploratory marker discovery</em>; they are <strong>not</strong> condition-level DE.</p>
+<ul>
+<li>If your experimental unit is the <strong>subject</strong>, your statistical unit should be the <strong>subject</strong>.</li>
+<li>Within-cell methods (<code>FindMarkers</code>, <code>wilcox</code>, MAST) are fine for <em>exploratory marker discovery</em>; they are <strong>not</strong> condition-level DE.</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1404,7 +1423,7 @@ Bill Cresko
 <li><strong>Mixed-effects / GLMM methods</strong> (<code>nebula</code>, <code>glmmTMB</code>, MAST with a random effect) add a <strong>per-sample random effect</strong>, so the subject remains the unit of replication even though the model fits at cell level</li>
 <li><strong>MAST</strong> uses a two-part (hurdle) model tailored to scRNA-seq zero-inflation</li>
 </ul>
-<p>The literature is genuinely split — some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).</p>
+<p>The literature is genuinely split - some benchmarks favour pseudobulk (Squair 2021), others find well-specified mixed models competitive (Zimmerman 2021; Gagnon 2022).</p>
 <div class="callout callout-tip callout-titled callout-style-default">
 <div class="callout-body">
 <div class="callout-title">
@@ -1414,7 +1433,12 @@ Bill Cresko
 <p><strong>Tip</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>Practical stance:</strong> default to <strong>pseudobulk</strong> (simple, robust, hard to fool). Reach for a <strong>mixed-effects cell-level model</strong> when you have many cells per subject, need the extra power, and will check the random-effect specification. The cardinal sin isn’t picking one — it’s the <strong>naïve per-cell test with no subject term</strong>.</p>
+<p><strong>Practical stance:</strong></p>
+<ul>
+<li>Default to <strong>pseudobulk</strong> (simple, robust, hard to fool).</li>
+<li>Reach for a <strong>mixed-effects cell-level model</strong> when you have many cells per subject, need the extra power, and will check the random-effect specification.</li>
+<li>The cardinal sin isn’t picking one — it’s the <strong>naïve per-cell test with no subject term</strong>.</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1427,42 +1451,46 @@ Bill Cresko
 <section id="what-pseudobulk-does" class="slide level2">
 <h2>What pseudobulk does</h2>
 
-<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDQ2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC50aXRsZSB7IGZvbnQtc2l6ZTogMThweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLnBhbmVsIHsgZm9udC1zaXplOiAxNHB4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjMzMzOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubGJsIHsgZm9udC1zaXplOiAxMXB4OyBmaWxsOiAjNTU1OyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAudHh0IHsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMzMzOyB9CiAgICAuY2VsbEhkciB7IGZvbnQtc2l6ZTogMTFweDsgZm9udC13ZWlnaHQ6IDYwMDsgZmlsbDogIzIyMjsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjNTU1OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjUwMCIgeT0iMjgiPlBzZXVkb2J1bGs6IGFnZ3JlZ2F0ZSBjZWxscyDihpIgc2FtcGxlLWxldmVsIGNvdW50cyDihpIgYnVsayBERSBmcmFtZXdvcms8L3RleHQ+CgogIDwhLS0gUGFuZWwgMTogYW5ub3RhdGVkIGNlbGxzIGJ5IGNsdXN0ZXIgw5cgc2FtcGxlIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLDYwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMCI+MS4gU2luZ2xlIGNlbGxzIGxhYmVsZWQgYnk8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMTgiPihjbHVzdGVyLCBzYW1wbGUpPC90ZXh0PgogICAgPHJlY3QgeD0iMCIgeT0iMzAiIHdpZHRoPSIyODAiIGhlaWdodD0iMjkwIiBmaWxsPSIjZmFmYWZhIiBzdHJva2U9IiNjY2MiLz4KCiAgICA8IS0tIENsdXN0ZXIgQSAtLT4KICAgIDxnPgogICAgICA8IS0tIHNhbXBsZSBTMSAtLT4KICAgICAgPGNpcmNsZSBjeD0iNTAiICBjeT0iODAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjUiICBjeT0iNzUiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNzIiICBjeT0iMTAwIiByPSI1IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDwhLS0gc2FtcGxlIFMyIC0tPgogICAgICA8Y2lyY2xlIGN4PSI5MCIgIGN5PSI4MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI5MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIxMDIiIHI9IjUiIGZpbGw9IiMyYzdmYjgiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgIDwvZz4KICAgIDwhLS0gQ2x1c3RlciBCIC0tPgogICAgPGc+CiAgICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIxODAiIGN5PSIxODAiIHI9IjUiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTc1IiBjeT0iMTYwIiByPSI1IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIyMDUiIGN5PSIxNjUiIHI9IjUiIGZpbGw9IiNlNjYxMDEiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgICAgPGNpcmNsZSBjeD0iMjE1IiBjeT0iMTc1IiByPSI1IiBmaWxsPSIjZTY2MTAxIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjIyNSIgY3k9IjE2MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEMgLS0+CiAgICA8Zz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iMjQwIiByPSI1IiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjcwIiAgY3k9IjI1MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIvPgogICAgICA8Y2lyY2xlIGN4PSI4MCIgIGN5PSIyNDUiIHI9IjUiIGZpbGw9IiMxYjllNzciLz4KICAgICAgPGNpcmNsZSBjeD0iMTEwIiBjeT0iMjUwIiByPSI1IiBmaWxsPSIjMWI5ZTc3IiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjEyMCIgY3k9IjI0MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgoKICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjE0MCIgeT0iMzQwIj5jb2xvciA9IGNsdXN0ZXIgwrcgb3V0bGluZSA9IHNhbXBsZSBTMjwvdGV4dD4KICA8L2c+CgogIDwhLS0gQXJyb3cgLS0+CiAgPHBhdGggY2xhc3M9ImFycm93IiBkPSJNIDMyMCAyMTAgTCAzODAgMjEwIiBtYXJrZXItZW5kPSJ1cmwoI2FocCkiLz4KICA8dGV4dCBjbGFzcz0ibGJsIiB4PSIzNTAiIHk9IjIwMCI+c3VtPC90ZXh0PgoKICA8IS0tIFBhbmVsIDI6IHBzZXVkb2J1bGsgbWF0cml4IC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM5NSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjIuIFBlciAoY2x1c3Rlciwgc2FtcGxlKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTQwIiB5PSIxOCI+c3VtIG9mIGNvdW50czwvdGV4dD4KCiAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLDQwKSI+CiAgICAgIDwhLS0gaGVhZGVyIHJvdyAtLT4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9Ijc1IiAgeT0iMTUiPlMxwrdBPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMTI1IiB5PSIxNSI+UzLCt0E8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJjZWxsSGRyIiB4PSIxNzUiIHk9IjE1Ij5TMcK3QjwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9IjIyNSIgeT0iMTUiPlMywrdCPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMjc1IiB5PSIxNSI+UzHCt0M8L3RleHQ+CgogICAgICA8IS0tIHJvd3M6IGdlbmVzIC0tPgogICAgICA8ZyBmb250LWZhbWlseT0iTWVubG8sQ29uc29sYXMsbW9ub3NwYWNlIiBmb250LXNpemU9IjExIiBmaWxsPSIjMjIyIj4KICAgICAgICA8dGV4dCB4PSIwIiB5PSI0MCI+R2VuZTE8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE0MjwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIxMDAiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSIxMTciIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xNjg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NjI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Nzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjIxPC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSI2NSI+R2VuZTI8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjMzPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjEwMCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjExNyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjQxPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjE1MCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2ZmZDRhNiIvPjx0ZXh0IHg9IjE2NyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIwNTwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNmZmQ0YTYiLz48dGV4dCB4PSIyMTciIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI1MiIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTg8L3RleHQ+CgogICAgICAgIDx0ZXh0IHg9IjAiIHk9IjkwIj5HZW5lMzwvdGV4dD48cmVjdCB4PSI1NSIgeT0iNzciIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjcyIiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ODc8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYzZkYmVmIi8+PHRleHQgeD0iMTE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OTI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTQ8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTk8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTA3PC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSIxMTUiPuKApjwvdGV4dD4KICAgICAgPC9nPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTQwIiB5PSIxNzUiPmxvb2tzIGxpa2UgYSBidWxrIFJOQS1zZXEgY291bnQgbWF0cml4PC90ZXh0PgogIDwvZz4KCiAgPCEtLSBBcnJvdyBkb3duIC0tPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA1MjAgMjkwIEwgNTIwIDMzNSIgbWFya2VyLWVuZD0idXJsKCNhaHApIi8+CgogIDwhLS0gUGFuZWwgMzogREUgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzk1LDM0MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjMuIEZpdCBERSBwZXIgY2x1c3RlcjwvdGV4dD4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIwLDIwKSI+CiAgICAgIDxyZWN0IHg9IjAiICB5PSIwIiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc1IiByeD0iMTAiIGZpbGw9IiNlZWYzZmEiIHN0cm9rZT0iIzJjN2ZiOCIvPgogICAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxMCIgeT0iMjAiIGZvbnQtd2VpZ2h0PSI3MDAiPkRFU2VxMiAvIGVkZ2VSIC8gbGltbWEtdm9vbTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjQwIj5kZXNpZ24gPSB+IGNvbmRpdGlvbiAoKyBjb3ZhcmlhdGVzKTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjU4Ij5zaHJpbmthZ2UsIHByb3BlciByZXBsaWNhdGlvbiw8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjEwIiB5PSI3MyI+d2VsbC1jYWxpYnJhdGVkIHAtdmFsdWVzPC90ZXh0PgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBSaWdodCBwYW5lbDogd2h5IHBzZXVkb2J1bGsgbWF0dGVycyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MjAsNjApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNjAiIGhlaWdodD0iMzcwIiByeD0iMTAiIGZpbGw9IiNmZmY3ZDYiIHN0cm9rZT0iI2Q5YjQxYSIvPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMzAiIHk9IjI1Ij5XaHkgcHNldWRvYnVsaz88L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjU1IiBmb250LXdlaWdodD0iNzAwIj5QZXItY2VsbCBERSBwaXRmYWxsPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9Ijc1Ij5jZWxscyBmcm9tIG9uZSBzdWJqZWN0IGFyZSBub3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iOTEiPmluZGVwZW5kZW50IOKGkiBwLXZhbHVlcyB0b28gc21hbGw8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjEyMCIgZm9udC13ZWlnaHQ9IjcwMCI+UHNldWRvYnVsayBmaXhlcyB0aGlzPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE0MCI+c2FtcGxlcyBBUkUgaW5kZXBlbmRlbnQ7IGJ1bGs8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMTU2Ij5tZXRob2RzIGFyZSB3ZWxsLWNhbGlicmF0ZWQ8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE4NSIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiB0byB1c2UgaXQ8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjA1Ij7CtyBjb21wYXJpbmcgY29uZGl0aW9ucyBhY3Jvc3M8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjIxIj4gIGJpb2xvZ2ljYWwgcmVwbGljYXRlczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIyNDEiPsK3IOKJpSAzIHNhbXBsZXMgcGVyIGdyb3VwLCBpZGVhbGx5IG1vcmU8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjI3MCIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiBOT1Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjkwIj7CtyBmaW5kaW5nIGNsdXN0ZXIgbWFya2VyczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMDYiPiAgKHVzZSB3aXRoaW4tY2VsbCBtZXRob2RzKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMjYiPsK3IG9ubHkgMeKAkzIgc2FtcGxlcyB0b3RhbDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzNDYiPiAgKG5vIHJlcGxpY2F0aW9uIGF2YWlsYWJsZSk8L3RleHQ+CiAgPC9nPgoKICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImFocCIgdmlld0JveD0iMCAwIDEwIDEwIiByZWZYPSI4IiByZWZZPSI1IiBtYXJrZXJXaWR0aD0iNyIgbWFya2VySGVpZ2h0PSI3IiBvcmllbnQ9ImF1dG8tc3RhcnQtcmV2ZXJzZSI+CiAgICAgIDxwYXRoIGQ9Ik0gMCAwIEwgMTAgNSBMIDAgMTAgeiIgZmlsbD0iIzU1NSIvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgo8L3N2Zz4K" style="width:95.0%" class="r-stretch quarto-figure-center"><p class="caption">Pseudobulk aggregation: cells -&gt; per-sample-per-celltype</p><ul>
+<img role="img" data-src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDQ2MCIgZm9udC1mYW1pbHk9IkhlbHZldGljYSwgQXJpYWwsIHNhbnMtc2VyaWYiPgogIDxzdHlsZT4KICAgIC50aXRsZSB7IGZvbnQtc2l6ZTogMThweDsgZm9udC13ZWlnaHQ6IDcwMDsgZmlsbDogIzIyMjsgdGV4dC1hbmNob3I6IG1pZGRsZTsgfQogICAgLnBhbmVsIHsgZm9udC1zaXplOiAxNHB4OyBmb250LXdlaWdodDogNjAwOyBmaWxsOiAjMzMzOyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAubGJsIHsgZm9udC1zaXplOiAxMXB4OyBmaWxsOiAjNTU1OyB0ZXh0LWFuY2hvcjogbWlkZGxlOyB9CiAgICAudHh0IHsgZm9udC1zaXplOiAxMnB4OyBmaWxsOiAjMzMzOyB9CiAgICAuY2VsbEhkciB7IGZvbnQtc2l6ZTogMTFweDsgZm9udC13ZWlnaHQ6IDYwMDsgZmlsbDogIzIyMjsgfQogICAgLmFycm93IHsgc3Ryb2tlOiAjNTU1OyBzdHJva2Utd2lkdGg6IDI7IGZpbGw6IG5vbmU7IH0KICA8L3N0eWxlPgoKICA8dGV4dCBjbGFzcz0idGl0bGUiIHg9IjUwMCIgeT0iMjgiPlBzZXVkb2J1bGs6IGFnZ3JlZ2F0ZSBjZWxscyDihpIgc2FtcGxlLWxldmVsIGNvdW50cyDihpIgYnVsayBERSBmcmFtZXdvcms8L3RleHQ+CgogIDwhLS0gUGFuZWwgMTogYW5ub3RhdGVkIGNlbGxzIGJ5IGNsdXN0ZXIgw5cgc2FtcGxlIC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDMwLDYwKSI+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMCI+MS4gU2luZ2xlIGNlbGxzIGxhYmVsZWQgYnk8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0icGFuZWwiIHg9IjE0MCIgeT0iMTgiPihjbHVzdGVyLCBzYW1wbGUpPC90ZXh0PgogICAgPHJlY3QgeD0iMCIgeT0iMzAiIHdpZHRoPSIyODAiIGhlaWdodD0iMjkwIiBmaWxsPSIjZmFmYWZhIiBzdHJva2U9IiNjY2MiLz4KCiAgICA8IS0tIENsdXN0ZXIgQSAtLT4KICAgIDxnPgogICAgICA8IS0tIHNhbXBsZSBTMSAtLT4KICAgICAgPGNpcmNsZSBjeD0iNTAiICBjeT0iODAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iOTAiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNjUiICBjeT0iNzUiIHI9IjUiIGZpbGw9IiMyYzdmYjgiLz4KICAgICAgPGNpcmNsZSBjeD0iNzIiICBjeT0iMTAwIiByPSI1IiBmaWxsPSIjMmM3ZmI4Ii8+CiAgICAgIDwhLS0gc2FtcGxlIFMyIC0tPgogICAgICA8Y2lyY2xlIGN4PSI5MCIgIGN5PSI4MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSI5MCIgcj0iNSIgZmlsbD0iIzJjN2ZiOCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgICA8Y2lyY2xlIGN4PSI4NSIgIGN5PSIxMDIiIHI9IjUiIGZpbGw9IiMyYzdmYjgiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgIDwvZz4KICAgIDwhLS0gQ2x1c3RlciBCIC0tPgogICAgPGc+CiAgICAgIDxjaXJjbGUgY3g9IjE3MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIxODAiIGN5PSIxODAiIHI9IjUiIGZpbGw9IiNlNjYxMDEiLz4KICAgICAgPGNpcmNsZSBjeD0iMTc1IiBjeT0iMTYwIiByPSI1IiBmaWxsPSIjZTY2MTAxIi8+CiAgICAgIDxjaXJjbGUgY3g9IjE5MCIgY3k9IjE3MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIvPgogICAgICA8Y2lyY2xlIGN4PSIyMDUiIGN5PSIxNjUiIHI9IjUiIGZpbGw9IiNlNjYxMDEiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLXdpZHRoPSIxLjIiLz4KICAgICAgPGNpcmNsZSBjeD0iMjE1IiBjeT0iMTc1IiByPSI1IiBmaWxsPSIjZTY2MTAxIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjIyNSIgY3k9IjE2MCIgcj0iNSIgZmlsbD0iI2U2NjEwMSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgogICAgPCEtLSBDbHVzdGVyIEMgLS0+CiAgICA8Zz4KICAgICAgPGNpcmNsZSBjeD0iNjAiICBjeT0iMjQwIiByPSI1IiBmaWxsPSIjMWI5ZTc3Ii8+CiAgICAgIDxjaXJjbGUgY3g9IjcwIiAgY3k9IjI1MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIvPgogICAgICA8Y2lyY2xlIGN4PSI4MCIgIGN5PSIyNDUiIHI9IjUiIGZpbGw9IiMxYjllNzciLz4KICAgICAgPGNpcmNsZSBjeD0iMTEwIiBjeT0iMjUwIiByPSI1IiBmaWxsPSIjMWI5ZTc3IiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIi8+CiAgICAgIDxjaXJjbGUgY3g9IjEyMCIgY3k9IjI0MCIgcj0iNSIgZmlsbD0iIzFiOWU3NyIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjEuMiIvPgogICAgPC9nPgoKICAgIDx0ZXh0IGNsYXNzPSJsYmwiIHg9IjE0MCIgeT0iMzQwIj5jb2xvciA9IGNsdXN0ZXIgwrcgb3V0bGluZSA9IHNhbXBsZSBTMjwvdGV4dD4KICA8L2c+CgogIDwhLS0gQXJyb3cgLS0+CiAgPHBhdGggY2xhc3M9ImFycm93IiBkPSJNIDMyMCAyMTAgTCAzODAgMjEwIiBtYXJrZXItZW5kPSJ1cmwoI2FocCkiLz4KICA8dGV4dCBjbGFzcz0ibGJsIiB4PSIzNTAiIHk9IjIwMCI+c3VtPC90ZXh0PgoKICA8IS0tIFBhbmVsIDI6IHBzZXVkb2J1bGsgbWF0cml4IC0tPgogIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDM5NSw2MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjIuIFBlciAoY2x1c3Rlciwgc2FtcGxlKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJwYW5lbCIgeD0iMTQwIiB5PSIxOCI+c3VtIG9mIGNvdW50czwvdGV4dD4KCiAgICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgwLDQwKSI+CiAgICAgIDwhLS0gaGVhZGVyIHJvdyAtLT4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9Ijc1IiAgeT0iMTUiPlMxwrdBPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMTI1IiB5PSIxNSI+UzLCt0E8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJjZWxsSGRyIiB4PSIxNzUiIHk9IjE1Ij5TMcK3QjwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9ImNlbGxIZHIiIHg9IjIyNSIgeT0iMTUiPlMywrdCPC90ZXh0PgogICAgICA8dGV4dCBjbGFzcz0iY2VsbEhkciIgeD0iMjc1IiB5PSIxNSI+UzHCt0M8L3RleHQ+CgogICAgICA8IS0tIHJvd3M6IGdlbmVzIC0tPgogICAgICA8ZyBmb250LWZhbWlseT0iTWVubG8sQ29uc29sYXMsbW9ub3NwYWNlIiBmb250LXNpemU9IjExIiBmaWxsPSIjMjIyIj4KICAgICAgICA8dGV4dCB4PSIwIiB5PSI0MCI+R2VuZTE8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjE0MjwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIxMDAiIHk9IjI3IiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSIxMTciIHk9IjQwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4xNjg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+NjI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Nzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSIyNyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MjIxPC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSI2NSI+R2VuZTI8L3RleHQ+PHJlY3QgeD0iNTUiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNjNmRiZWYiLz48dGV4dCB4PSI3MiIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjMzPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjEwMCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjExNyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjQxPC90ZXh0PgogICAgICAgIDxyZWN0IHg9IjE1MCIgeT0iNTIiIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2ZmZDRhNiIvPjx0ZXh0IHg9IjE2NyIgeT0iNjUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPjIwNTwvdGV4dD4KICAgICAgICA8cmVjdCB4PSIyMDAiIHk9IjUyIiB3aWR0aD0iMzUiIGhlaWdodD0iMTYiIGZpbGw9IiNmZmQ0YTYiLz48dGV4dCB4PSIyMTciIHk9IjY1IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4yMzg8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI1MiIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTg8L3RleHQ+CgogICAgICAgIDx0ZXh0IHg9IjAiIHk9IjkwIj5HZW5lMzwvdGV4dD48cmVjdCB4PSI1NSIgeT0iNzciIHdpZHRoPSIzNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2M2ZGJlZiIvPjx0ZXh0IHg9IjcyIiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+ODc8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYzZkYmVmIi8+PHRleHQgeD0iMTE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+OTI8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMTUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMTY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTQ8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjAwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjZmZkNGE2Ii8+PHRleHQgeD0iMjE3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTk8L3RleHQ+CiAgICAgICAgPHJlY3QgeD0iMjUwIiB5PSI3NyIgd2lkdGg9IjM1IiBoZWlnaHQ9IjE2IiBmaWxsPSIjYjZlM2M0Ii8+PHRleHQgeD0iMjY3IiB5PSI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+MTA3PC90ZXh0PgoKICAgICAgICA8dGV4dCB4PSIwIiB5PSIxMTUiPuKApjwvdGV4dD4KICAgICAgPC9nPgogICAgPC9nPgogICAgPHRleHQgY2xhc3M9ImxibCIgeD0iMTQwIiB5PSIxNzUiPmxvb2tzIGxpa2UgYSBidWxrIFJOQS1zZXEgY291bnQgbWF0cml4PC90ZXh0PgogIDwvZz4KCiAgPCEtLSBBcnJvdyBkb3duIC0tPgogIDxwYXRoIGNsYXNzPSJhcnJvdyIgZD0iTSA1MjAgMjkwIEwgNTIwIDMzNSIgbWFya2VyLWVuZD0idXJsKCNhaHApIi8+CgogIDwhLS0gUGFuZWwgMzogREUgLS0+CiAgPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMzk1LDM0MCkiPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxNDAiIHk9IjAiPjMuIEZpdCBERSBwZXIgY2x1c3RlcjwvdGV4dD4KICAgIDxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIwLDIwKSI+CiAgICAgIDxyZWN0IHg9IjAiICB5PSIwIiB3aWR0aD0iMjQwIiBoZWlnaHQ9Ijc1IiByeD0iMTAiIGZpbGw9IiNlZWYzZmEiIHN0cm9rZT0iIzJjN2ZiOCIvPgogICAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxMCIgeT0iMjAiIGZvbnQtd2VpZ2h0PSI3MDAiPkRFU2VxMiAvIGVkZ2VSIC8gbGltbWEtdm9vbTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjQwIj5kZXNpZ24gPSB+IGNvbmRpdGlvbiAoKyBjb3ZhcmlhdGVzKTwvdGV4dD4KICAgICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTAiIHk9IjU4Ij5zaHJpbmthZ2UsIHByb3BlciByZXBsaWNhdGlvbiw8L3RleHQ+CiAgICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjEwIiB5PSI3MyI+d2VsbC1jYWxpYnJhdGVkIHAtdmFsdWVzPC90ZXh0PgogICAgPC9nPgogIDwvZz4KCiAgPCEtLSBSaWdodCBwYW5lbDogd2h5IHBzZXVkb2J1bGsgbWF0dGVycyAtLT4KICA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3MjAsNjApIj4KICAgIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyNjAiIGhlaWdodD0iMzcwIiByeD0iMTAiIGZpbGw9IiNmZmY3ZDYiIHN0cm9rZT0iI2Q5YjQxYSIvPgogICAgPHRleHQgY2xhc3M9InBhbmVsIiB4PSIxMzAiIHk9IjI1Ij5XaHkgcHNldWRvYnVsaz88L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjU1IiBmb250LXdlaWdodD0iNzAwIj5QZXItY2VsbCBERSBwaXRmYWxsPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9Ijc1Ij5jZWxscyBmcm9tIG9uZSBzdWJqZWN0IGFyZSBub3Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iOTEiPmluZGVwZW5kZW50IOKGkiBwLXZhbHVlcyB0b28gc21hbGw8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjEyMCIgZm9udC13ZWlnaHQ9IjcwMCI+UHNldWRvYnVsayBmaXhlcyB0aGlzPC90ZXh0PgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE0MCI+c2FtcGxlcyBBUkUgaW5kZXBlbmRlbnQ7IGJ1bGs8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMTU2Ij5tZXRob2RzIGFyZSB3ZWxsLWNhbGlicmF0ZWQ8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjE4NSIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiB0byB1c2UgaXQ8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjA1Ij7CtyBjb21wYXJpbmcgY29uZGl0aW9ucyBhY3Jvc3M8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjIxIj4gIGJpb2xvZ2ljYWwgcmVwbGljYXRlczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIyNDEiPsK3IOKJpSAzIHNhbXBsZXMgcGVyIGdyb3VwLCBpZGVhbGx5IG1vcmU8L3RleHQ+CgogICAgPHRleHQgY2xhc3M9InR4dCIgeD0iMTUiIHk9IjI3MCIgZm9udC13ZWlnaHQ9IjcwMCI+V2hlbiBOT1Q8L3RleHQ+CiAgICA8dGV4dCBjbGFzcz0idHh0IiB4PSIxNSIgeT0iMjkwIj7CtyBmaW5kaW5nIGNsdXN0ZXIgbWFya2VyczwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMDYiPiAgKHVzZSB3aXRoaW4tY2VsbCBtZXRob2RzKTwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzMjYiPsK3IG9ubHkgMeKAkzIgc2FtcGxlcyB0b3RhbDwvdGV4dD4KICAgIDx0ZXh0IGNsYXNzPSJ0eHQiIHg9IjE1IiB5PSIzNDYiPiAgKG5vIHJlcGxpY2F0aW9uIGF2YWlsYWJsZSk8L3RleHQ+CiAgPC9nPgoKICA8ZGVmcz4KICAgIDxtYXJrZXIgaWQ9ImFocCIgdmlld0JveD0iMCAwIDEwIDEwIiByZWZYPSI4IiByZWZZPSI1IiBtYXJrZXJXaWR0aD0iNyIgbWFya2VySGVpZ2h0PSI3IiBvcmllbnQ9ImF1dG8tc3RhcnQtcmV2ZXJzZSI+CiAgICAgIDxwYXRoIGQ9Ik0gMCAwIEwgMTAgNSBMIDAgMTAgeiIgZmlsbD0iIzU1NSIvPgogICAgPC9tYXJrZXI+CiAgPC9kZWZzPgo8L3N2Zz4K" class="quarto-figure quarto-figure-center r-stretch" style="width:95.0%"><ul>
 <li><strong>Aggregate</strong> (sum) UMI counts per <em>(sample, cell type)</em> → a classic bulk-looking matrix</li>
 <li>One column per (sample × cell type) replicate, one row per gene</li>
-<li>Run a separate DE test <strong>per cell type</strong> with DESeq2 / edgeR / limma-voom</li>
+<li>Run a separate DE test <strong>per cell type</strong> with <code>DESeq2</code> / <code>edgeR</code> / <code>limma-voom</code></li>
 </ul>
 </section>
-<section id="deseq2-on-pseudobulk-in-r" class="slide level2">
-<h2>DESeq2 on pseudobulk in R</h2>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(Seurat); <span class="fu">library</span>(DESeq2)</span>
-<span id="cb3-2"><a></a></span>
-<span id="cb3-3"><a></a>pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(seu, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>,</span>
-<span id="cb3-4"><a></a>                          <span class="at">slot =</span> <span class="st">&quot;counts&quot;</span>,   <span class="co"># sum raw counts, not log-normalized data</span></span>
-<span id="cb3-5"><a></a>                          <span class="at">group.by =</span> <span class="fu">c</span>(<span class="st">&quot;sample_id&quot;</span>, <span class="st">&quot;celltype&quot;</span>),</span>
-<span id="cb3-6"><a></a>                          <span class="at">return.seurat =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>RNA</span>
-<span id="cb3-7"><a></a></span>
-<span id="cb3-8"><a></a>meta <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb3-9"><a></a>  <span class="at">sample_id =</span> <span class="fu">sub</span>(<span class="st">&quot;_.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb)),</span>
-<span id="cb3-10"><a></a>  <span class="at">celltype  =</span> <span class="fu">sub</span>(<span class="st">&quot;^[^_]+_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
-<span id="cb3-11"><a></a>) <span class="sc">|&gt;</span></span>
-<span id="cb3-12"><a></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sample_meta, <span class="at">by =</span> <span class="st">&quot;sample_id&quot;</span>)</span>
-<span id="cb3-13"><a></a></span>
-<span id="cb3-14"><a></a>run_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct) {</span>
-<span id="cb3-15"><a></a>  keep <span class="ot">&lt;-</span> meta<span class="sc">$</span>celltype <span class="sc">==</span> ct</span>
-<span id="cb3-16"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> pb[, keep],</span>
-<span id="cb3-17"><a></a>                                 <span class="at">colData   =</span> meta[keep, ],</span>
-<span id="cb3-18"><a></a>                                 <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
-<span id="cb3-19"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
-<span id="cb3-20"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span></span>
-<span id="cb3-21"><a></a>    <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
-<span id="cb3-22"><a></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">celltype =</span> ct)</span>
-<span id="cb3-23"><a></a>}</span>
-<span id="cb3-24"><a></a></span>
-<span id="cb3-25"><a></a>de_all <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(<span class="fu">unique</span>(meta<span class="sc">$</span>celltype), run_de)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</section>
-<section id="deseq2-on-pseudobulk-in-python" class="slide level2">
-<h2>DESeq2 on pseudobulk in Python</h2>
+<section id="deseq2-on-pseudobulk" class="slide level2">
+<h2>DESeq2 on pseudobulk</h2>
+<div class="panel-tabset">
+<ul id="tabset-1" class="panel-tabset-tabby"><li><a data-tabby-default href="#tabset-1-1">Seurat &amp; DEseq2 in R</a></li><li><a href="#tabset-1-2">decoupler &amp; PyDESeq2 in Python</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1">
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a></a><span class="fu">library</span>(Seurat)</span>
+<span id="cb3-2"><a></a><span class="fu">library</span>(DESeq2)</span>
+<span id="cb3-3"><a></a></span>
+<span id="cb3-4"><a></a>pb <span class="ot">&lt;-</span> <span class="fu">AggregateExpression</span>(seu, <span class="at">assays =</span> <span class="st">&quot;RNA&quot;</span>,</span>
+<span id="cb3-5"><a></a>                          <span class="at">slot =</span> <span class="st">&quot;counts&quot;</span>,   <span class="co"># sum raw counts, not log-normalized data</span></span>
+<span id="cb3-6"><a></a>                          <span class="at">group.by =</span> <span class="fu">c</span>(<span class="st">&quot;sample_id&quot;</span>, <span class="st">&quot;celltype&quot;</span>),</span>
+<span id="cb3-7"><a></a>                          <span class="at">return.seurat =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>RNA</span>
+<span id="cb3-8"><a></a></span>
+<span id="cb3-9"><a></a>meta <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb3-10"><a></a>  <span class="at">sample_id =</span> <span class="fu">sub</span>(<span class="st">&quot;_.*&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb)),</span>
+<span id="cb3-11"><a></a>  <span class="at">celltype  =</span> <span class="fu">sub</span>(<span class="st">&quot;^[^_]+_&quot;</span>, <span class="st">&quot;&quot;</span>, <span class="fu">colnames</span>(pb))</span>
+<span id="cb3-12"><a></a>) <span class="sc">|&gt;</span></span>
+<span id="cb3-13"><a></a>  dplyr<span class="sc">::</span><span class="fu">left_join</span>(sample_meta, <span class="at">by =</span> <span class="st">&quot;sample_id&quot;</span>)</span>
+<span id="cb3-14"><a></a></span>
+<span id="cb3-15"><a></a>run_de <span class="ot">&lt;-</span> <span class="cf">function</span>(ct) {</span>
+<span id="cb3-16"><a></a>  keep <span class="ot">&lt;-</span> meta<span class="sc">$</span>celltype <span class="sc">==</span> ct</span>
+<span id="cb3-17"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeqDataSetFromMatrix</span>(<span class="at">countData =</span> pb[, keep],</span>
+<span id="cb3-18"><a></a>                                 <span class="at">colData   =</span> meta[keep, ],</span>
+<span id="cb3-19"><a></a>                                 <span class="at">design    =</span> <span class="sc">~</span> condition)</span>
+<span id="cb3-20"><a></a>  dds  <span class="ot">&lt;-</span> <span class="fu">DESeq</span>(dds)</span>
+<span id="cb3-21"><a></a>  <span class="fu">results</span>(dds, <span class="at">contrast =</span> <span class="fu">c</span>(<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb3-22"><a></a>    <span class="fu">as.data.frame</span>() <span class="sc">|&gt;</span> tibble<span class="sc">::</span><span class="fu">rownames_to_column</span>(<span class="st">&quot;gene&quot;</span>) <span class="sc">|&gt;</span></span>
+<span id="cb3-23"><a></a>    dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">celltype =</span> ct)</span>
+<span id="cb3-24"><a></a>}</span>
+<span id="cb3-25"><a></a></span>
+<span id="cb3-26"><a></a>de_all <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(<span class="fu">unique</span>(meta<span class="sc">$</span>celltype), run_de)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<div id="tabset-1-2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb4"><pre class="sourceCode numberSource python number-lines code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a></a><span class="im">import</span> decoupler <span class="im">as</span> dc</span>
 <span id="cb4-2"><a></a><span class="im">import</span> pydeseq2.dds <span class="im">as</span> dds_mod</span>
 <span id="cb4-3"><a></a><span class="im">from</span> pydeseq2.ds <span class="im">import</span> DeseqStats</span>
@@ -1480,6 +1508,9 @@ Bill Cresko
 <span id="cb4-15"><a></a>    design_factors <span class="op">=</span> <span class="st">&quot;condition&quot;</span>)</span>
 <span id="cb4-16"><a></a>dds.deseq2()</span>
 <span id="cb4-17"><a></a>DeseqStats(dds, contrast<span class="op">=</span>[<span class="st">&quot;condition&quot;</span>, <span class="st">&quot;treated&quot;</span>, <span class="st">&quot;control&quot;</span>]).summary()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</div>
+</div>
 </section>
 <section id="gotchas-good-practice" class="slide level2">
 <h2>Gotchas &amp; good practice</h2>
@@ -1512,7 +1543,13 @@ Bill Cresko
 <p><strong>Note</strong></p>
 </div>
 <div class="callout-content">
-<p><strong>ifnb-specific: the <code>ind</code> column and the <code>g</code>-prefix issue.</strong> In the <code>ifnb</code> dataset, donor IDs are stored in the metadata column <code>ind</code> (values like <code>&quot;101&quot;</code>, <code>&quot;1015&quot;</code>, <code>&quot;1016&quot;</code>, …). Because <code>AggregateExpression()</code> pastes group values into column names, a donor ID that starts with a digit produces an invalid R column name; R silently prepends <code>g</code> to make it syntactically valid (<code>g101</code>, <code>g1015</code>, …). Tutorial 06 pre-empts this by creating a new column <code>donor_id = paste0(&quot;d&quot;, ind)</code> before aggregation, so all pseudobulk columns start with <code>&quot;d&quot;</code>. If your column names look like <code>g101_CD14 Mono</code>, you have hit this issue — just rename the column before running <code>DESeq2</code>.</p>
+<p><strong>ifnb-specific: the <code>ind</code> column and the <code>g</code>-prefix issue.</strong></p>
+<ul>
+<li>In the <code>ifnb</code> dataset, donor IDs are stored in the metadata column <code>ind</code> (values like <code>&quot;101&quot;</code>, <code>&quot;1015&quot;</code>, <code>&quot;1016&quot;</code>, …).</li>
+<li>Because <code>AggregateExpression()</code> pastes group values into column names, a donor ID that starts with a digit produces an invalid R column name; R silently prepends <code>g</code> to make it syntactically valid (<code>g101</code>, <code>g1015</code>, …).</li>
+<li>Tutorial 06 pre-empts this by creating a new column <code>donor_id = paste0(&quot;d&quot;, ind)</code> before aggregation, so all pseudobulk columns start with <code>&quot;d&quot;</code>.</li>
+<li>If your column names look like <code>g101_CD14 Mono</code>, you have hit this issue — just rename the column before running <code>DESeq2</code>.</li>
+</ul>
 </div>
 </div>
 </div>
