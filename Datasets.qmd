@@ -45,6 +45,52 @@ download.file(file.path(base, "airway_raw.rds"),   "../data/airway_raw.rds",   m
 
 These `.rds` files are regenerated every time the site is rebuilt (`render_all.sh` runs `tools/build_workshop_rds.R` in the background), so they always match the package versions the tutorials use. The per-dataset sections below give the full **Option A** package commands and repeat the **Option B** `.rds` shortcut in context.
 
+### Splicing the `.rds` into the top of your Tutorial 01 script {#splice-tut01}
+
+Tutorial 01 builds `ifnb` from the package in its **"Step 1 — Load the `ifnb` dataset"** chunk (the block that starts with `sce <- Kang18_8vs8()` and ends by creating the `ifnb` object). To run from the `.rds` instead, **leave the rest of the tutorial alone** and make two small changes at the top:
+
+**1. (Optional) In the Setup chunk, comment out the two data-package libraries.** They are only needed to *build* the object from scratch, so they aren't required when you load the `.rds`:
+
+```r
+# library(muscData)              # not needed when loading from the .rds
+# library(SingleCellExperiment)  # not needed when loading from the .rds
+```
+
+**2. Replace the entire Step 1 load chunk with this block.** It downloads `ifnb_raw.rds` into your project `data/` the first time, then reads it in. The result is the same `ifnb` object Step 1 would have built, so QC, normalization, HVGs — everything after it — runs unchanged:
+
+```r
+# --- Load ifnb from the preassembled .rds (Option B) ----------------------
+# Drop-in replacement for the Kang18_8vs8() block. Downloads once, then reuses
+# the local copy. Run from your scripts/ folder so "../data" is the project data/.
+dir.create("../data", showWarnings = FALSE)
+ifnb_rds <- "../data/ifnb_raw.rds"
+if (!file.exists(ifnb_rds)) {
+  download.file("https://wcresko.github.io/scRNAseq_tutorial/rds/ifnb_raw.rds",
+                ifnb_rds, mode = "wb")   # mode="wb" is required for binary .rds files
+}
+ifnb <- readRDS(ifnb_rds)
+ifnb   # confirm: an ~24k-cell Seurat object with stim + seurat_annotations
+```
+
+If you already downloaded the file by clicking the link above, the `download.file()` step is skipped automatically and you just get the `readRDS()`.
+
+::: callout-note
+Keep all your tutorial `.qmd` files in one `scripts/` folder and run them from there, so `../data` always points at the same project `data/` folder (the same place Tutorial 01 writes `ifnb_preprocessed.rds` for Tutorial 02). Confirm with `getwd()` if a path doesn't resolve.
+:::
+
+**Tutorial 06 (`airway`) works the same way.** Its **Part A** loads the data with `data(airway)`; replace that one line with the equivalent block:
+
+```r
+# --- Load airway from the preassembled .rds (Option B) --------------------
+dir.create("../data", showWarnings = FALSE)
+airway_rds <- "../data/airway_raw.rds"
+if (!file.exists(airway_rds)) {
+  download.file("https://wcresko.github.io/scRNAseq_tutorial/rds/airway_raw.rds",
+                airway_rds, mode = "wb")
+}
+airway <- readRDS(airway_rds)   # identical to library(airway); data(airway)
+```
+
 ## Expected directory layout
 
 Make a **project folder** with a **`scripts/`** subfolder, save the downloaded tutorial `.qmd` files into `scripts/`, and run them from there. On first run each tutorial auto-creates two **sibling** folders at the project root: **`data/`** for the chained `.rds` objects passed from one tutorial to the next, and **`output/ModN/`** for that module's figures and tables. (See the downloadable **README** linked on the [Materials](Materials.html) page.)
