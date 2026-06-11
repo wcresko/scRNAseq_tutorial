@@ -34,6 +34,25 @@ cd ..
 echo "=== Rendering course website (pages + Resources_Folder) ==="
 quarto render
 
+# Build the downloadable .rds datasets (ifnb_raw.rds, airway_raw.rds) in the
+# BACKGROUND so the (slow, network-bound) muscData download overlaps the rest
+# of the render instead of blocking it. Output lands in docs/rds/ so the files
+# publish with the site and are linked from the Datasets page. We start it now
+# (after the website render, to avoid any chance of a docs/ clean clobbering
+# the files) and `wait` for it just before finishing. Non-fatal: if R or the
+# data packages are missing, the site still builds and the Datasets page also
+# documents the package-based load.
+RDS_PID=""
+if command -v Rscript >/dev/null 2>&1; then
+  echo "=== Building downloadable .rds datasets in background (docs/rds/) ==="
+  mkdir -p docs/rds
+  # Don't let a dataset-build failure trip `set -e`; we report status at `wait`.
+  Rscript tools/build_workshop_rds.R docs/rds > docs/rds/build_rds.log 2>&1 &
+  RDS_PID=$!
+else
+  echo "=== Rscript not found — skipping .rds dataset build (package-based load still documented) ==="
+fi
+
 echo "=== Rendering tutorials — core 00-10 + bonus 11-17 (student version, eval=false) ==="
 cd Exercise_Folder
 quarto render
@@ -77,6 +96,18 @@ if [ "${SOLUTIONS:-0}" = "1" ]; then
   quarto render --profile solutions
   cd ..
   echo "Solutions written to docs/Exercise_Folder/_solutions/"
+fi
+
+# Wait for the background .rds dataset build (started after the website render)
+# and report its status without aborting the build.
+if [ -n "$RDS_PID" ]; then
+  echo "=== Waiting for background .rds dataset build to finish ==="
+  if wait "$RDS_PID"; then
+    echo "    .rds datasets built — see docs/rds/ (log: docs/rds/build_rds.log)"
+  else
+    echo "    WARNING: .rds dataset build reported a problem — see docs/rds/build_rds.log"
+    echo "    The site still built; students can use the package-based load on the Datasets page."
+  fi
 fi
 
 echo "=== Done! ==="
