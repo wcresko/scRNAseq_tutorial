@@ -140,7 +140,7 @@ p_sft <- (a1 / a2) +
     caption  = "Module 13 · WGCNA")
 save_fig(file.path(OUT_DIR, "Mod13_C10_soft_threshold.png"), p_sft, width = 7, height = 8, dpi = 300)
 
-# Step 5 — Build the network (beta = 18 from Patel's example for this dataset)
+# Step 5 — Build the network (beta = 18 for this dataset)
 soft_power <- 18
 temp_cor <- cor; cor <- WGCNA::cor          # WGCNA shadows base::cor
 bwnet <- blockwiseModules(norm.counts, maxBlockSize = 14000, TOMType = "signed",
