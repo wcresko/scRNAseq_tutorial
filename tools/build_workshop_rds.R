@@ -11,7 +11,7 @@
 #                   Step 1 of Tutorial 01 (CTRL + STIM, cleaned gene symbols,
 #                   `stim` and `seurat_annotations` metadata) but BEFORE any
 #                   QC. Drop-in replacement for the Kang18_8vs8() block.
-#   airway.rds    - the `airway` RangedSummarizedExperiment, identical to
+#   airway_raw.rds    - the `airway` RangedSummarizedExperiment, identical to
 #                   `data(airway)`. Drop-in replacement for that line in
 #                   Tutorial 06.
 #
@@ -95,13 +95,13 @@ build_ifnb <- function() {
 }
 
 # -------------------------------------------------------------------------
-# 2. airway -> airway.rds
+# 2. airway -> airway_raw.rds
 #    Identical to `library(airway); data(airway)` in Tutorial 06 Part A.
 # -------------------------------------------------------------------------
 build_airway <- function() {
   suppressPackageStartupMessages(library(airway))
   data(airway)
-  path <- file.path(out_dir, "airway.rds")
+  path <- file.path(out_dir, "airway_raw.rds")
   saveRDS(airway, file = path, compress = "xz")
   report_size(path)
 }

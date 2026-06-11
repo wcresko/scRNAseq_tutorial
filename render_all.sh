@@ -34,7 +34,7 @@ cd ..
 echo "=== Rendering course website (pages + Resources_Folder) ==="
 quarto render
 
-# Build the downloadable .rds datasets (ifnb_raw.rds, airway.rds) in the
+# Build the downloadable .rds datasets (ifnb_raw.rds, airway_raw.rds) in the
 # BACKGROUND so the (slow, network-bound) muscData download overlaps the rest
 # of the render instead of blocking it. Output lands in docs/rds/ so the files
 # publish with the site and are linked from the Datasets page. We start it now
