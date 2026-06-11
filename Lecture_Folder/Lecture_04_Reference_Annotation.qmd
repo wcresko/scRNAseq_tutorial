@@ -1,6 +1,6 @@
 ---
-title: "Lecture 04 — Reference-based Annotation: Azimuth"
-author: "Bill Cresko"
+title: "L04 — Reference-based Annotation using Azimuth"
+author: ""
 format:
   revealjs:
     footer: Single Cell RNA-seq Workshop · Lecture 04
@@ -28,41 +28,36 @@ library(tidyverse); library(knitr)
 theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ```
 
-# Lecture 04: Reference-based Annotation {background-color="#2c3e50"}
-
 ## Where this lecture fits
 
--   Previous: [Lec 03 — Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
--   **You are here:** Lec 04 — *automated cell-type labelling using a reference*
--   Next: [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
--   **Companion tutorial:** [Tutorial 04 — Reference-based Annotation](../Exercise_Folder/Tutorial_04_Reference_Annotation.html)
--   **Companion book chapter:** [Chapter 4 — Reference-based Annotation](../Resources_Folder/Chapter_04_Reference_Annotation.html)
--   **Parallel reading:** [scNotebooks Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html) (automated cell-type annotation)
+- Previous: [Lec 03 — Markers & Manual Annotation](Lecture_03_Markers_Annotation.html)
+- **You are here:** Lec 04 — *automated cell-type labelling using a reference*
+- Next: [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
+- **Companion tutorial:** [Tutorial 04 — Reference-based Annotation](../Exercise_Folder/Tutorial_04_Reference_Annotation.html)
+- **Companion book chapter:** [Chapter 4 — Reference-based Annotation](../Resources_Folder/Chapter_04_Reference_Annotation.html)
 
 ## Goals of this lecture
 
 ::: incremental
--   See what an **annotated reference** is and how it's used
--   Run **Azimuth** — anchor-based reference mapping — as our hands-on method
--   Know the other paradigms you'll meet: **correlation** (SingleR) and **classifiers** (CellTypist)
--   Read confidence scores so you know when *not* to trust the label
--   Reconcile reference labels against the manual labels from Lec 03
+- See what an **annotated reference** is and how it's used
+- Run **Azimuth** — anchor-based reference mapping — as our hands-on method
+- Know the other paradigms you'll meet: **correlation** (SingleR) and **classifiers** (CellTypist)
+- Read confidence scores so you know when *not* to trust the label
+- Reconcile reference labels against the manual labels from Lec 03
 :::
 
 ::: callout-note
 **Why a second annotation method?** Manual annotation (Lec 03) is interpretable but biased by the annotator's experience. Reference-based annotation is reproducible but biased by the reference's coverage. Running both and reconciling is the modern best practice.
 :::
 
-# Azimuth — our hands-on method {background-color="#2c3e50"}
 
 ## Azimuth — anchor-based reference mapping
 
-::: incremental
--   Built on Seurat's **anchor finding** + supervised classification on a published reference
--   Best for tissues with a **curated Azimuth reference** (PBMC, lung, kidney, BMMC, ...)
--   Returns labels at multiple **resolutions** (l1 broad → l3 fine) plus a per-cell mapping score
--   Downloads its reference on demand — **no Bioconductor reference-data packages to install**
-:::
+- Built on Seurat's **anchor finding** + supervised classification on a published reference
+- Best for tissues with a **curated Azimuth reference** (PBMC, lung, kidney, BMMC, ...)
+- Returns labels at multiple **resolutions** (l1 broad → l3 fine) plus a per-cell mapping score
+- Downloads its reference on demand — **no Bioconductor reference-data packages to install**
+
 
 ``` r
 library(Azimuth)
@@ -75,12 +70,13 @@ DimPlot(seu, group.by = "predicted.celltype.l2", label = TRUE)
 You'll see these in the literature; we don't install them for the workshop, but it's worth knowing how they differ from Azimuth.
 
 ::: incremental
--   **SingleR** — *correlation*: Spearman-correlate each cell against per-label reference profiles (Aran et al. 2019). Works on **bulk** references (classically via `celldex`); returns a `delta` confidence margin.
--   **CellTypist** — *classifier* (Python): pre-trained logistic-regression models per cell type; fast, returns a probability per class; the largest model library.
+- **SingleR** — *correlation*: Spearman-correlate each cell against per-label reference profiles (Aran et al. 2019). Works on **bulk** references (classically via `celldex`); returns a `delta` confidence margin.
+- **CellTypist** — *classifier* (Python): pre-trained logistic-regression models per cell type; fast, returns a probability per class; the largest model library.
 :::
 
 ::: callout-note
-All three degrade the same way when the reference doesn't cover your cells — the lesson is identical: **read the confidence score and reconcile against markers.**
+- All three degrade the same way when the reference doesn't cover your cells
+- The lesson is identical: **read the confidence score and reconcile against markers.**
 :::
 
 # Confidence — how to read the scores {background-color="#2c3e50"}
@@ -88,7 +84,7 @@ All three degrade the same way when the reference doesn't cover your cells — t
 ## Azimuth diagnostics
 
 | Column | Meaning | Threshold |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | `predicted.celltype.l2` | the label | — |
 | `predicted.celltype.l2.score` | classification confidence | \> 0.7 = strong |
 | `mapping.score` | how well the cell projects onto the reference manifold | \> 0.7 = mappable; lower = novel state |
@@ -98,16 +94,19 @@ FeaturePlot(seu, features = "mapping.score")   # spot off-manifold cells
 ```
 
 ::: callout-warning
-**Low mapping score = the reference doesn't cover this cell type.** Don't take the label at face value — your data may contain a population the reference doesn't know about (a tumour-specific state, a perturbed phenotype, a developmental intermediate).
-:::
+- **Low mapping score = the reference doesn't cover this cell type.** 
+- Don't take the label at face value — your data may contain a population the reference doesn't know about (a tumour-specific state, a perturbed phenotype, a developmental intermediate).
 
-::: callout-important
-**IFN-β stimulated cells will have systematically lower mapping scores — this is expected, not a bug.** The Azimuth PBMC reference was built from *resting* PBMCs. After IFN-β stimulation, cells shift their transcriptional state away from the resting manifold: ISG expression drives them off-reference. In Tutorial 04, STIM cells map correctly to their cell type but with noticeably lower `mapping.score` than their CTRL counterparts. When you plot `FeaturePlot(seu, "mapping.score")` you will see STIM and CTRL cells separate by score — interpret this as the stimulation signal, not evidence of labelling failure.
+- **IFN-β stimulated cells will have systematically lower mapping scores — this is expected, not a bug.** 
+- The Azimuth PBMC reference was built from *resting* PBMCs. 
+- After IFN-β stimulation, cells shift their transcriptional state away from the resting manifold: ISG expression drives them off-reference. 
+- In Tutorial 04, STIM cells map correctly to their cell type but with noticeably lower `mapping.score` than their CTRL counterparts. 
+- When you plot `FeaturePlot(seu, "mapping.score")` you will see STIM and CTRL cells separate by score — interpret this as the stimulation signal, not evidence of labelling failure.
 :::
 
 # Reconciling manual + reference labels {background-color="#2c3e50"}
 
-## Checkpoint — would you trust it? {background-color="#1a5276"}
+## Checkpoint — would you trust it?
 
 ::: callout-important
 **Predict before you click.** For each case, decide: trust the automatic label, trust your manual label, or flag for review?
@@ -116,15 +115,21 @@ FeaturePlot(seu, features = "mapping.score")   # spot off-manifold cells
 2.  A cluster maps to **"CD14 Mono"** at `0.92`, but you had called it "unknown" because no single marker stood out.
 3.  Your **STIM** cells map to the right cell types but at consistently lower scores than the matched **CTRL** cells.
 
-(Answers: 1 — low score on a type the reference *does* contain → trust manual, investigate; 2 — high score resolves your ambiguity → trust Azimuth; 3 — expected ISG-driven off-manifold shift, *not* a failure.)
+Answers: 
+
+- 1 — low score on a type the reference *does* contain → trust manual, investigate; 
+- 2 — high score resolves your ambiguity → trust Azimuth; 
+- 3 — expected ISG-driven off-manifold shift, *not* a failure.
 :::
 
 ## What disagreements tell you
 
 ::: incremental
--   **Reference doesn't include this cell type** → trust manual labels for that cluster (low mapping score is the tell)
--   **Marker plot is ambiguous** → trust the automatic mapping (especially Azimuth at l2 / l3)
--   **Both confident, but different** → look at the score distribution; you may have a *transitional* state, or the manual marker was hijacked by a treatment effect (re-run `FindConservedMarkers`)
+- **Reference doesn't include this cell type** → trust manual labels for that cluster (low mapping score is the tell)
+- **Marker plot is ambiguous** → trust the automatic mapping (especially Azimuth at l2 / l3)
+- **Both confident, but different** → 
+  - look at the score distribution; you may have a *transitional* state, 
+  - or the manual marker was hijacked by a treatment effect (re-run `FindConservedMarkers`)
 :::
 
 ## A workable reconciliation workflow
@@ -136,22 +141,22 @@ FeaturePlot(seu, features = "mapping.score")   # spot off-manifold cells
 5.  Persist a **`celltype_final`** column with the resolved label and a **`celltype_method`** column ("manual" / "azimuth" / "consensus")
 
 ::: callout-tip
-**Document the conflicts.** A line in your methods like *"Cluster 7 was labelled NK by manual marker inspection but Azimuth predicted ILC; mapping score 0.62 — we kept NK based on KLRD1+/NCAM1+ pattern"* is exactly what reviewers want to see.
-:::
-
-::: callout-warning
-**Vocabulary mismatch: manual labels vs. Azimuth labels.** Manual annotation uses free-text names you choose (e.g. `"CD14+ Monocytes"`, `"Memory CD4 T"`). Azimuth returns its own controlled vocabulary (e.g. `"CD14 Mono"`, `"CD4 Memory"`). The cross-tab in step 3 will show real overlap that *looks* like a disagreement purely because of different naming conventions. Tutorial 04 solves this by mapping both vocabularies to **Azimuth level-1 coarse labels** before computing the confusion heatmap. Always harmonize to a common vocabulary — or use the level-1 (broadest) label — before declaring a conflict.
+- **Document the conflicts.** A line in your methods like *"Cluster 7 was labelled NK by manual marker inspection but Azimuth predicted ILC; mapping score 0.62 — we kept NK based on KLRD1+/NCAM1+ pattern"* is exactly what reviewers want to see.
+- **Vocabulary mismatch: manual labels vs. Azimuth labels.** Manual annotation uses free-text names you choose (e.g. `"CD14+ Monocytes"`, `"Memory CD4 T"`). Azimuth returns its own controlled vocabulary (e.g. `"CD14 Mono"`, `"CD4 Memory"`). 
+- The cross-tab in step 3 will show real overlap that *looks* like a disagreement purely because of different naming conventions. 
+- Tutorial 04 solves this by mapping both vocabularies to **Azimuth level-1 coarse labels** before computing the confusion heatmap. 
+- Always harmonize to a common vocabulary — or use the level-1 (broadest) label — before declaring a conflict.
 :::
 
 # Pitfalls of automated annotation {background-color="#2c3e50"}
 
-## Things that bite
+## Things that bite you in the butt
 
 ::: incremental
--   **Reference / query species mismatch** (mouse data vs. human reference) — use orthologous gene names or species-matched refs
--   **Tissue mismatch** — a PBMC reference will gleefully assign "B cell" labels to anything in your tumour sample
--   **Sub-cell-type resolution exceeds reference resolution** — fine subsets (e.g. CD4 Tfh) may collapse to a parent label
--   **Treatment-induced states** are usually absent from references — they show up as low mapping score, not as a wrong label
+- **Reference / query species mismatch** (mouse data vs. human reference) — use orthologous gene names or species-matched refs
+- **Tissue mismatch** — a PBMC reference will gleefully assign "B cell" labels to anything in your tumour sample
+- **Sub-cell-type resolution exceeds reference resolution** — fine subsets (e.g. CD4 Tfh) may collapse to a parent label
+- **Treatment-induced states** are usually absent from references — they show up as low mapping score, not as a wrong label
 :::
 
 ::: callout-warning
@@ -162,12 +167,12 @@ FeaturePlot(seu, features = "mapping.score")   # spot off-manifold cells
 
 LLM tools (and wrappers like GPTCelltype) can suggest labels from a cluster's marker list. Fine as a *brainstorm*, risky as an answer:
 
--   They can return **confident, plausible, wrong** labels — markers that look right but don't fit your tissue
--   They see **only the gene names you paste** — no access to your expression, no grounded confidence score
--   **Reproducibility is weak** — model versions drift between runs
-
-::: callout-warning
-**Treat an LLM suggestion like an over-eager rotation student:** a source of hypotheses to verify against markers and a real reference (Azimuth), never the final call. Anything you keep must be backed by a marker `DotPlot` and the literature.
+- They can return **confident, plausible, wrong** labels — markers that look right but don't fit your tissue
+- They see **only the gene names you paste** — no access to your expression, no grounded confidence score
+- **Reproducibility is weak** — model versions drift between runs
+- **Treat an LLM suggestion like an over-eager rotation student:** 
+  - A source of hypotheses to verify against markers and a real reference (Azimuth), never the final call. 
+  - Anything you keep must be backed by a marker `DotPlot` and the literature.
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
@@ -175,14 +180,10 @@ LLM tools (and wrappers like GPTCelltype) can suggest labels from a cluster's ma
 ## What to remember from Lecture 04
 
 ::: incremental
--   This is the automated complement to the **manual annotation** of [Lec 03](Lecture_03_Markers_Annotation.html) — for model organisms it is often the first pass; for non-model systems, manual markers still lead
--   **Azimuth** = anchor mapping + supervised classifier, best when a curated ref exists for your tissue; downloads its reference, nothing extra to install
--   **SingleR** (correlation) and **CellTypist** (classifier) are the other paradigms you'll meet
--   **Always read confidence scores** — they tell you when the reference doesn't cover your biology
--   The output of an annotation pass is *a label plus a confidence flag*, not just a label
+- This is the automated complement to the **manual annotation** of [Lec 03](Lecture_03_Markers_Annotation.html) — for model organisms it is often the first pass; for non-model systems, manual markers still lead
+- **Azimuth** = anchor mapping + supervised classifier, best when a curated ref exists for your tissue; downloads its reference, nothing extra to install
+- **SingleR** (correlation) and **CellTypist** (classifier) are the other paradigms you'll meet
+- **Always read confidence scores** — they tell you when the reference doesn't cover your biology
+- The output of an annotation pass is *a label plus a confidence flag*, not just a label
 :::
 
-## Coming up next
-
--   **Lec 05** — [Multi-Sample Integration](Lecture_05_Integration.html): aligning datasets before joint analysis
--   **Hands-on:** [Tutorial 04 — Reference-based Annotation](../Exercise_Folder/Tutorial_04_Reference_Annotation.html)

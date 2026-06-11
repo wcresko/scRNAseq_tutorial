@@ -1,6 +1,6 @@
 ---
-title: "Lecture 03 — Markers & Manual Cell-Type Annotation"
-author: "Bill Cresko"
+title: "L03 — Markers & Manual Cell-Type Annotation"
+author: ""
 format:
   revealjs:
     footer: Single Cell RNA-seq Workshop · Lecture 03
@@ -28,25 +28,22 @@ library(tidyverse); library(knitr)
 theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 ```
 
-# Lecture 03: Markers & Manual Annotation {background-color="#2c3e50"}
-
 ## Where this lecture fits
 
--   Previous: [Lec 02 — Dim Reduction & Clustering](Lecture_02_DimReduction_Clustering.html)
--   **You are here:** Lec 03 — *finding markers and turning clusters into named cell types by hand*
--   Next: [Lec 04 — Reference-based Annotation](Lecture_04_Reference_Annotation.html)
--   Multi-sample integration follows in [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
--   **Companion tutorial:** [Tutorial 03 — Markers & Manual Annotation](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)
--   **Companion book chapter:** [Chapter 3 — Markers & Manual Cell-Type Annotation](../Resources_Folder/Chapter_03_Markers_Annotation.html)
--   **Parallel reading:** [scNotebooks Module 04](https://integrativebioinformatics.github.io/scNotebooks/modules/en/module04/module04.html) covers manual + automated annotation in one notebook
+- Previous: [Lec 02 — Dim Reduction & Clustering](Lecture_02_DimReduction_Clustering.html)
+- **You are here:** Lec 03 — *finding markers and turning clusters into named cell types by hand*
+- Next: [Lec 04 — Reference-based Annotation](Lecture_04_Reference_Annotation.html)
+- Multi-sample integration follows in [Lec 05 — Multi-Sample Integration](Lecture_05_Integration.html)
+- **Companion tutorial:** [Tutorial 03 — Markers & Manual Annotation](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)
+- **Companion book chapter:** [Chapter 3 — Markers & Manual Cell-Type Annotation](../Resources_Folder/Chapter_03_Markers_Annotation.html)
 
 ## Goals of this lecture
 
 ::: incremental
--   Distinguish **clusters** (a graph property) from **cell types** (a biological label)
--   Find robust cluster markers with `FindAllMarkers` / `FindConservedMarkers`
--   Read DotPlots / FeaturePlots like a clinician
--   Assign labels you can defend with literature
+- Distinguish **clusters** (a graph property) from **cell types** (a biological label)
+- Find robust cluster markers with `FindAllMarkers` / `FindConservedMarkers`
+- Read DotPlots / FeaturePlots like a clinician
+- Assign labels you can defend with literature
 :::
 
 ::: callout-note
@@ -57,19 +54,27 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 
 ## The annotation workflow
 
-![Annotation workflow: clusters to cell types](images/lec01_annotation_workflow.svg){fig-align="center" width="92%"}
+![](images/lec01_annotation_workflow.svg){fig-align="center" width="92%"}
 
--   **Manual** (this lecture) — interpretable but biased by the annotator
--   **Automatic / reference-based** (Lec 04) — fast and reproducible but biased by the reference
--   Best practice: run both, reconcile disagreements, document choices
+## The annotation workflow
+
+- **Manual** (this lecture) — interpretable but biased by the annotator
+- **Automatic / reference-based** (Lec 04) — fast and reproducible but biased by the reference
+- Best practice: run both, reconcile disagreements, document choices
 
 ::: callout-note
-**Which do you reach for first?** For **well-referenced model organisms (human, mouse)**, reference-based annotation (Lec 04 — Azimuth; other tools include SingleR and CellTypist) is increasingly the practical *starting* point, with manual markers used to confirm and to catch novel states. For **non-model systems** — where no curated reference exists — manual, marker-driven annotation remains essential and is often the *only* option. This workshop teaches both so you can choose based on your system; the two lectures are a connected pair, not alternatives.
+**Which do you reach for first?** 
+
+- For **well-referenced model organisms (human, mouse)**, reference-based annotation (Lec 04 — Azimuth; other tools include SingleR and CellTypist) is increasingly the practical *starting* point, with manual markers used to confirm and to catch novel states. 
+
+- For **non-model systems** — where no curated reference exists — manual, marker-driven annotation remains essential and is often the *only* option. This workshop teaches both so you can choose based on your system; the two lectures are a connected pair, not alternatives.
 :::
 
 # Finding markers {background-color="#2c3e50"}
 
 ## `FindAllMarkers` — every cluster vs. all others
+
+This step allows you to identify markers that differentiate a cluster against all other clusters:
 
 ``` r
 markers <- FindAllMarkers(seu,
@@ -82,9 +87,9 @@ markers |>
   slice_max(avg_log2FC, n = 10)
 ```
 
--   `only.pos = TRUE` keeps just the up-regulated markers (what you'd actually use to *name* a cluster)
--   `min.pct = 0.25` requires the gene be detected in at least 25% of cells in either group
--   Default test is the Wilcoxon rank-sum
+- `only.pos = TRUE` keeps just the up-regulated markers (what you'd actually use to *name* a cluster)
+- `min.pct = 0.25` requires the gene be detected in at least 25% of cells in either group
+- Default test is the Wilcoxon rank-sum
 
 ::: callout-tip
 **Defaults that work for most 10x datasets.** `min.pct = 0.25`, `logfc.threshold = 0.25`. Loosen them for very small clusters, tighten them only if results are overwhelming.
@@ -105,29 +110,58 @@ head(cluster3_markers)
 This runs the marker test **inside each condition** and reports genes that come up in both — protecting you from labelling a cluster by a treatment-induced gene rather than its lineage marker.
 
 ::: callout-warning
-**Don't skip this step in case-control designs.** Naïve `FindAllMarkers` on a stim-vs-ctrl dataset will surface treatment-response genes as "cluster markers", and you'll mis-label populations.
+**Don't skip this step in case-control designs.** 
+
+- Naïve `FindAllMarkers` on a stim-vs-ctrl dataset will surface treatment-response genes as "cluster markers", and you'll mis-label populations.
 :::
 
-::: callout-important
-**Interferon-stimulated genes (ISGs) on un-integrated data.** In the ifnb dataset, the STIM condition activates dozens of ISGs (`IFIT1`, `ISG15`, `MX1`, `IFI6`, …). When you run `FindAllMarkers` on *un-integrated* data (Tutorial 02 / Tutorial 03), ISGs will appear at the **top of the marker list for multiple clusters** — not because those clusters are distinct cell types, but because every STIM cell expresses them. Using `FindConservedMarkers(grouping.var = "stim")` filters these out; so does using integrated data (Tutorial 05 onward). If your top hit is `ISG15` or `MX1`, that is a condition signature, not a cell-type marker.
+## `FindAllMarkers` & `FindConservedMarkers` — what's shared
+
+Both answer the same underlying question — **"which genes mark this cluster?"** — with the **same machinery**:
+
+- Compare **one cluster vs. all other cells** (a one-vs-rest contrast)
+- Run the **same per-gene DE test** under the hood — default **Wilcoxon rank-sum** (`test.use` applies to both)
+- Honor the **same filters**: `min.pct`, `logfc.threshold`, `only.pos`
+- Return the **same per-gene statistics**: `avg_log2FC`, `p_val`, `p_val_adj`, and the detection rates `pct.1` / `pct.2`
+
+::: callout-note
+So the *building block* is identical — `FindConservedMarkers` is essentially `FindMarkers` run repeatedly. What changes is **how condition is handled** (next slide).
 :::
+
+
+## `FindAllMarkers` vs. `FindConservedMarkers` — what differs
+
+| | `FindAllMarkers` | `FindConservedMarkers` |
+|---|---|---|
+| **Question** | What distinguishes a cluster? | What marks a cluster *in every condition*? |
+| **Condition** | Pools all cells, **ignores** it | Splits by `grouping.var`, tests **within each** |
+| **Clusters** | **Loops over all** automatically | **One** per call (`ident.1`) |
+| **Significance** | Single test per gene | Per-condition tests **combined** (meta-analysis) |
+| **Output** | One frame, has a `cluster` column | Per-condition columns (`CTRL_…`, `STIM_…`) + combined p-values |
+| **Needs** | — | `metap`; enough cluster cells **in each** group |
+| **Use when** | Single condition, or just want identity | Case–control / multi-condition designs |
+
+::: callout-tip
+**The trap it avoids.** Pooling stim-vs-ctrl, `FindAllMarkers` can surface a **treatment-response** gene as a "cluster marker." `FindConservedMarkers` keeps only genes that mark the cluster **within both** CTRL and STIM — so you label by **lineage**, not treatment.
+:::
+
 
 # Reading marker plots well {background-color="#2c3e50"}
 
 ## What a "good" marker looks like
 
-::: incremental
--   **Specific** — high in the cluster, low elsewhere (DotPlot's dot *intensity*)
--   **Pervasive** — expressed in most cells of the cluster (DotPlot's dot *size*)
--   **Backed by literature** — appears in canonical lineage panels for the tissue
-:::
 
-## The five marker visualizations — what each one shows
+- **Specific** — high in the cluster, low elsewhere (DotPlot's dot *intensity*)
+- **Pervasive** — expressed in most cells of the cluster (DotPlot's dot *size*)
+- **Backed by literature** — appears in canonical lineage panels for the tissue
 
-Tutorial 03 walks through five canonical plots. They overlap, and each one is best for a different question:
+
+## The five marker visualizations
+
+Tutorial 03 walks through five canonical plots that are each best for a different question:
 
 | Plot | What it shows | When to use it |
-|----|----|----|
+|----------|------------------------|------------------------|
 | `VlnPlot` | distribution per cluster, one gene at a time | Bimodality, outliers, comparing 4–8 candidate markers |
 | `FeaturePlot` | one gene, every cell, on the UMAP | Spatial structure on the embedding |
 | `DoHeatmap` | top-N markers across clusters, cell-by-cell | Eyeballing the global cluster ↔ marker structure |
@@ -172,7 +206,9 @@ ggplot(dat, aes(cluster, expr, fill = cluster)) +
         legend.position = "none")
 ```
 
-A "good marker" violin: **one cluster bulges, the rest sit at zero**. If two clusters bulge similarly, the marker is shared by two cell types — keep looking for a discriminator.
+
+- A "good marker" violin: **one cluster bulges, the rest sit at zero**. 
+- If two clusters bulge similarly, the marker is shared by two cell types — keep looking for a discriminator.
 
 ## FeaturePlot — single gene on UMAP
 
@@ -221,7 +257,9 @@ ggplot(dat, aes(umap1, umap2, color = expr)) +
   theme(axis.text = element_blank(), strip.text = element_text(face = "bold"))
 ```
 
-`FeaturePlot` is the "geographic" view of a marker — does it have a single home on the UMAP, or is it scattered? Scattered = bad marker (or technical artifact).
+- `FeaturePlot` is the "geographic" view of a marker
+- Does it have a single home on the UMAP, or is it scattered? 
+- Scattered = bad marker (or technical artifact).
 
 ## DotPlot — the workhorse panel figure
 
@@ -268,14 +306,16 @@ ggplot(dat, aes(gene, fct_rev(cluster), size = pct_expr, color = mean_expr)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-The single best plot for a publication figure: panel of canonical markers along x, clusters along y, dot **size** = % cells expressing, dot **color** = mean expression. Eight clusters fit on one row; you can scale to 30+ clusters easily.
+- A very good plot for a publication figure
+- Panel of canonical markers along x, clusters along y, dot **size** = % cells expressing, dot **color** = mean expression. 
+- Eight clusters fit on one row; you can scale to 30+ clusters easily.
 
 ## Heatmap — global cluster ↔ marker structure
 
 ```{r}
 #| label: heatmap-cartoon
 #| echo: false
-#| fig-width: 10
+#| fig-width: 14
 #| fig-height: 4
 
 set.seed(2026)
@@ -308,27 +348,27 @@ ggplot(dat, aes(cell_id, gene, fill = expr)) +
   geom_tile() +
   scale_fill_gradient2(low = "#3498db", mid = "black", high = "#f1c40f",
                        midpoint = 1, name = "expr") +
-  labs(title = "DoHeatmap — top-3 markers per cluster, every cell as a column",
+  labs(title = "",
        x = NULL, y = NULL) +
   theme_minimal(base_size = 11) +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
         panel.grid = element_blank())
 ```
 
-Each cluster's diagonal block "lights up" — its top markers are high in its cells and low elsewhere. A heatmap that doesn't show this pattern means the markers aren't actually specific to their assigned cluster.
+- Each cluster's diagonal block "lights up" — its top markers are high in its cells and low elsewhere. 
+- A heatmap that doesn't show this pattern means the markers aren't actually specific to their assigned cluster.
+- **One trap.** Heatmaps show *cells*, not *clusters*
+- A dominant cluster (40% of cells) visually monopolizes the plot.
 
-::: callout-tip
-**One trap.** Heatmaps show *cells*, not *clusters* — a dominant cluster (40% of cells) visually monopolizes the plot. For balanced display, prefer the DotPlot.
-:::
 
 ## Picking a plot
 
 ::: incremental
--   **Confirming one candidate marker for one cluster** → `VlnPlot` (4 candidates side-by-side)
--   **Showing where one gene "lives" on the UMAP** → `FeaturePlot`
--   **Reviewer wants every cluster on one figure** → `DotPlot`
--   **Showing the overall cluster ↔ marker block structure** → `DoHeatmap`
--   **Comparing graded / continuum expression** → `RidgePlot`
+- **Confirming one candidate marker for one cluster** → `VlnPlot` (4 candidates side-by-side)
+- **Showing where one gene "lives" on the UMAP** → `FeaturePlot`
+- **Reviewer wants every cluster on one figure** → `DotPlot`
+- **Showing the overall cluster ↔ marker block structure** → `DoHeatmap`
+- **Comparing graded / continuum expression** → `RidgePlot`
 :::
 
 ::: callout-warning
@@ -340,11 +380,13 @@ Genes that are merely *enriched* on a Wilcoxon test are not always **markers** i
 ## More clusters than cell types — the un-integrated over-split
 
 ::: callout-warning
-**On un-integrated data you will see more clusters than named cell types.** In Tutorial 03 (which follows Tutorial 02's un-integrated clustering), a resolution of ≈ 0.5 on the ifnb dataset typically yields **~15–20 clusters** even though the data contain roughly **13 annotatable PBMC cell types**. The excess clusters arise because each cell type appears as a CTRL version and a STIM version — two islands in the UMAP that get separate cluster IDs. Attempting to find conserved markers for all of them and label every one can trigger downstream errors (too few cells in a condition slice). The practical solutions:
+- **On un-integrated data you will see more clusters than named cell types.** 
+- In Tutorial 03 (which follows Tutorial 02's un-integrated clustering), a resolution of ≈ 0.5 on the ifnb dataset typically yields **\~15–20 clusters** even though the data contain roughly **13 annotatable PBMC cell types**. 
+- The excess clusters arise because each cell type appears as a CTRL version and a STIM version — two islands in the UMAP that get separate cluster IDs. - Attempting to find conserved markers for all of them and label every one can trigger downstream errors (too few cells in a condition slice). The practical solutions:
 
--   Use `FindConservedMarkers` only for clusters where both conditions are present in sufficient numbers.
--   Accept that some cluster pairs will be annotated as the same cell type and merged before further analysis.
--   Or move straight to integrated data (Tutorial 05) where CTRL and STIM cells of the same type co-cluster correctly.
+- Use `FindConservedMarkers` only for clusters where both conditions are present in sufficient numbers.
+- Accept that some cluster pairs will be annotated as the same cell type and merged before further analysis.
+- Or move straight to integrated data (Tutorial 05) where CTRL and STIM cells of the same type co-cluster correctly.
 :::
 
 ## The decision loop
@@ -363,9 +405,10 @@ seu$celltype <- Idents(seu)
 
 ::: callout-tip
 **Reference panels worth bookmarking:**
--   [CellMarker 2.0](http://bio-bigdata.hrbmu.edu.cn/CellMarker/) — curated, searchable by tissue/disease
--   [PanglaoDB](https://panglaodb.se/) — large, scRNA-derived
--   [The Human Protein Atlas — Cell types](https://www.proteinatlas.org/humanproteome/celltype) — expression-supported markers
+
+- [CellMarker 2.0](http://bio-bigdata.hrbmu.edu.cn/CellMarker/) — curated, searchable by tissue/disease
+- [PanglaoDB](https://panglaodb.se/) — large, scRNA-derived
+- [The Human Protein Atlas — Cell types](https://www.proteinatlas.org/humanproteome/celltype) — expression-supported markers
 :::
 
 # Recap & what's next {background-color="#2c3e50"}
@@ -373,14 +416,8 @@ seu$celltype <- Idents(seu)
 ## What to remember from Lecture 03
 
 ::: incremental
--   Clusters ≠ cell types. The biology is in the labels you give the clusters.
--   `FindAllMarkers` finds *enriched* genes; `FindConservedMarkers` finds *condition-robust* ones — use the latter in case-control designs.
--   Document why you assigned each label — future-you (and reviewers) will thank you
--   Manual + reference-based (Lec 04) annotation are *complementary*, not redundant
+- Clusters ≠ cell types. The biology is in the labels you give the clusters.
+- `FindAllMarkers` finds *enriched* genes; `FindConservedMarkers` finds *condition-robust* ones — use the latter in case-control designs.
+- Document why you assigned each label — future-you (and reviewers) will thank you
+- Manual + reference-based (Lec 04) annotation are *complementary*, not redundant
 :::
-
-## Coming up next
-
--   **Lec 04** — [Reference-based Annotation](Lecture_04_Reference_Annotation.html): the automated complement to today's manual workflow
--   **Lec 05** — [Multi-Sample Integration](Lecture_05_Integration.html): aligning datasets before joint analysis
--   **Hands-on:** [Tutorial 03 — Markers & Manual Annotation](../Exercise_Folder/Tutorial_03_Markers_Annotation.html)
