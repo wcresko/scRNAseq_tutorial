@@ -11,6 +11,86 @@ This page describes every dataset the workshop uses — what it is, how to load 
 
 Where a tutorial mirrors Khushbu Patel's [YouTube Tutorials](https://github.com/kpatel427/YouTubeTutorials), we use the same dataset so her video walkthroughs serve as supplementary material.
 
+## Loading the core data — two options {#core-data-load}
+
+The two **core-module** datasets — `ifnb` (Modules 01–08, 10) and `airway` (Module 06) — normally load straight from a Bioconductor package. If a package won't install (the most common Day-1 snag is `muscData` / `ExperimentHub`), use the **ready-made `.rds`** instead: download one file and read it in with `readRDS()`. Both options give you the **same object** — pick whichever works on your machine.
+
+| Dataset | **Option A — from the package** (default) | **Option B — from the `.rds`** (fallback) |
+|---|---|---|
+| `ifnb`   | `muscData::Kang18_8vs8()`, then assemble the Seurat object (Tutorial 01, Step 1) | `readRDS("../data/ifnb_raw.rds")` |
+| `airway` | `library(airway); data(airway)` | `readRDS("../data/airway_raw.rds")` |
+
+::: callout-tip
+## Quick start with the `.rds` (no Bioconductor data packages needed)
+
+1.  Download the file into your project's `data/` folder:
+    -   **ifnb** → <a href="rds/ifnb_raw.rds" download>`ifnb_raw.rds`</a> — the assembled Seurat object *before* QC, i.e. Tutorial 01's starting point
+    -   **airway** → <a href="rds/airway_raw.rds" download>`airway_raw.rds`</a> — the bulk-RNA-seq `RangedSummarizedExperiment` used in Tutorial 06 Part A
+2.  Read it in at the top of the tutorial, in place of the package load:
+
+    ```r
+    ifnb   <- readRDS("../data/ifnb_raw.rds")   # Tutorial 01 — instead of the Kang18_8vs8() block
+    airway <- readRDS("../data/airway_raw.rds")     # Tutorial 06 — instead of library(airway); data(airway)
+    ```
+:::
+
+Prefer to pull the files from inside R rather than clicking the links? Download them straight into your project `data/` folder:
+
+```r
+dir.create("../data", showWarnings = FALSE)
+base <- "https://wcresko.github.io/scRNAseq_tutorial/rds"
+download.file(file.path(base, "ifnb_raw.rds"), "../data/ifnb_raw.rds", mode = "wb")
+download.file(file.path(base, "airway_raw.rds"),   "../data/airway_raw.rds",   mode = "wb")
+```
+
+These `.rds` files are regenerated every time the site is rebuilt (`render_all.sh` runs `tools/build_workshop_rds.R` in the background), so they always match the package versions the tutorials use. The per-dataset sections below give the full **Option A** package commands and repeat the **Option B** `.rds` shortcut in context.
+
+### Splicing the `.rds` into the top of your Tutorial 01 script {#splice-tut01}
+
+Tutorial 01 builds `ifnb` from the package in its **"Step 1 — Load the `ifnb` dataset"** chunk (the block that starts with `sce <- Kang18_8vs8()` and ends by creating the `ifnb` object). To run from the `.rds` instead, **leave the rest of the tutorial alone** and make two small changes at the top:
+
+**1. (Optional) In the Setup chunk, comment out the two data-package libraries.** They are only needed to *build* the object from scratch, so they aren't required when you load the `.rds`:
+
+```r
+# library(muscData)              # not needed when loading from the .rds
+# library(SingleCellExperiment)  # not needed when loading from the .rds
+```
+
+**2. Replace the entire Step 1 load chunk with this block.** It downloads `ifnb_raw.rds` into your project `data/` the first time, then reads it in. The result is the same `ifnb` object Step 1 would have built, so QC, normalization, HVGs — everything after it — runs unchanged:
+
+```r
+# --- Load ifnb from the preassembled .rds (Option B) ----------------------
+# Drop-in replacement for the Kang18_8vs8() block. Downloads once, then reuses
+# the local copy. Run from your scripts/ folder so "../data" is the project data/.
+dir.create("../data", showWarnings = FALSE)
+ifnb_rds <- "../data/ifnb_raw.rds"
+if (!file.exists(ifnb_rds)) {
+  download.file("https://wcresko.github.io/scRNAseq_tutorial/rds/ifnb_raw.rds",
+                ifnb_rds, mode = "wb")   # mode="wb" is required for binary .rds files
+}
+ifnb <- readRDS(ifnb_rds)
+ifnb   # confirm: an ~24k-cell Seurat object with stim + seurat_annotations
+```
+
+If you already downloaded the file by clicking the link above, the `download.file()` step is skipped automatically and you just get the `readRDS()`.
+
+::: callout-note
+Keep all your tutorial `.qmd` files in one `scripts/` folder and run them from there, so `../data` always points at the same project `data/` folder (the same place Tutorial 01 writes `ifnb_preprocessed.rds` for Tutorial 02). Confirm with `getwd()` if a path doesn't resolve.
+:::
+
+**Tutorial 06 (`airway`) works the same way.** Its **Part A** loads the data with `data(airway)`; replace that one line with the equivalent block:
+
+```r
+# --- Load airway from the preassembled .rds (Option B) --------------------
+dir.create("../data", showWarnings = FALSE)
+airway_rds <- "../data/airway_raw.rds"
+if (!file.exists(airway_rds)) {
+  download.file("https://wcresko.github.io/scRNAseq_tutorial/rds/airway_raw.rds",
+                airway_rds, mode = "wb")
+}
+airway <- readRDS(airway_rds)   # identical to library(airway); data(airway)
+```
+
 ## Expected directory layout
 
 Make a **project folder** with a **`scripts/`** subfolder, save the downloaded tutorial `.qmd` files into `scripts/`, and run them from there. On first run each tutorial auto-creates two **sibling** folders at the project root: **`data/`** for the chained `.rds` objects passed from one tutorial to the next, and **`output/ModN/`** for that module's figures and tables. (See the downloadable **README** linked on the [Materials](Materials.html) page.)
@@ -64,6 +144,18 @@ invisible(muscData::Kang18_8vs8())   # first call downloads ~25 MB via Experimen
 
 The first `Kang18_8vs8()` call downloads \~25 MB into your local `ExperimentHub` cache; every subsequent call is instant. Tutorial 01 converts the returned `SingleCellExperiment` into the Seurat object used throughout Modules 01–08, and Module 10 loads the same data on Talapas (script `01_qc_preprocessing.R`).
 
+::: callout-tip
+## Option B — preassembled `.rds` (skip the `muscData` install)
+
+If `muscData` / `ExperimentHub` won't install, download <a href="rds/ifnb_raw.rds" download>`ifnb_raw.rds`</a> into your project `data/` and read it in **instead of** running `Kang18_8vs8()`:
+
+```r
+ifnb <- readRDS("../data/ifnb_raw.rds")
+```
+
+This is the same assembled Seurat object Tutorial 01 builds in Step 1 — CTRL + STIM, cleaned gene symbols, with the `stim` and `seurat_annotations` metadata — so you pick up right at the QC step. See [Loading the core data — two options](#core-data-load) for the download link and an in-R `download.file()` snippet.
+:::
+
 - Reference: Kang *et al.* (2017) *Nat Biotechnol* **36**: 89–94, [doi:10.1038/nbt.4042](https://doi.org/10.1038/nbt.4042) · GEO [GSE96583](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE96583)
 
 ## `airway` — Himes *et al.* 2014 (Module 06, DESeq2 primer)
@@ -84,6 +176,18 @@ The first `Kang18_8vs8()` call downloads \~25 MB into your local `ExperimentHub`
 BiocManager::install("airway")
 library(airway); data(airway)
 ```
+
+::: callout-tip
+## Option B — preassembled `.rds`
+
+The `airway` package is small and usually installs cleanly, but if it won't, download <a href="rds/airway_raw.rds" download>`airway_raw.rds`</a> into your project `data/` and read it in **instead of** `library(airway); data(airway)`:
+
+```r
+airway <- readRDS("../data/airway_raw.rds")   # identical RangedSummarizedExperiment
+```
+
+(`DESeq2`, loaded in Tutorial 06, brings in `SummarizedExperiment`, so `assay(airway)` and `colData(airway)` work exactly as in Option A.)
+:::
 
 - Reference: Himes *et al.* (2014) *PLoS ONE* **9**: e99625, [doi:10.1371/journal.pone.0099625](https://doi.org/10.1371/journal.pone.0099625) · Bioconductor: <https://bioconductor.org/packages/airway/>
 
