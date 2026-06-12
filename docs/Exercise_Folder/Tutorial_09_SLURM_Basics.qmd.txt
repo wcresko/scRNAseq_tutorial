@@ -26,7 +26,6 @@ Every code chunk here is tagged with `#| eval: false`, so the published page sho
 - **Render the whole tutorial:** click the **Render** button in RStudio (or run `quarto render` in a terminal) to execute the chunks top-to-bottom and knit a finished HTML. To run everything on render, set `eval: true` once in the YAML header at the top.
 :::
 
-
 ## About this tutorial
 
 This is the **first of the two Friday-morning Talapas modules** (the second is [Tutorial 10 — the analysis pipeline](Tutorial_10_Talapas_Pipeline.html)). It has two parts: first you **connect VS Code to Talapas** over Remote-SSH, explore the Lmod module system, and navigate the file systems; then you learn the **basics of SLURM** (the job scheduler on the University of Oregon's Talapas HPC cluster) --- both in **interactive mode** and through **batch scripts** --- and end with an example batch script that runs the whole `01`–`08` analysis series. It is aimed at workshop participants who have a Duck ID and Talapas account and are connecting for the first time on Friday morning.
@@ -38,7 +37,7 @@ This is the **first of the two Friday-morning Talapas modules** (the second is [
 All examples are specific to UO and Talapas. The VS Code Remote-SSH connection to Talapas is the **first step of this module** (Section 2 below) — you do not need any prior cluster login to start here. Material is adapted from the [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) and the [How-To articles](https://uoracs.github.io/talapas2-knowledge-base/) in the Talapas Knowledge Base, and from **Shannon Snyder's *Talapas Basics*** workshop guide (the `hello_world.R` / `salloc` / job-monitoring walkthroughs below).
 
 ::: {.callout-tip title="How to use this page"}
-Read this page top to bottom the first time. Later, treat it as a reference --- the commands here cover ~95% of what you will do in the workshop.
+Read this page top to bottom the first time. Later, treat it as a reference --- the commands here cover \~95% of what you will do in the workshop.
 :::
 
 ------------------------------------------------------------------------
@@ -49,9 +48,9 @@ Talapas is a shared cluster with thousands of CPU cores, hundreds of GPUs, and m
 
 At UO, this means:
 
--   You **never** run heavy computation directly on a login node (`login.talapas.uoregon.edu`). Login nodes are for editing, short commands, and submitting jobs only.
--   Instead, you ask SLURM for resources --- CPUs, GPUs, memory, time --- and SLURM allocates a **compute node** for you.
--   Every job at UO must specify an **account** (your PIRG, Principal Investigator Research Group) for correct service charging.
+- You **never** run heavy computation directly on a login node (`login.talapas.uoregon.edu`). Login nodes are for editing, short commands, and submitting jobs only.
+- Instead, you ask SLURM for resources --- CPUs, GPUs, memory, time --- and SLURM allocates a **compute node** for you.
+- Every job at UO must specify an **account** (your PIRG, Principal Investigator Research Group) for correct service charging.
 
 ## 2. Prerequisites
 
@@ -76,8 +75,8 @@ If you do not yet have a Talapas account, request one at [racs.uoregon.edu/reque
 
 In VS Code's **Activity Bar** (left edge), click the **Extensions** icon (four-squares) and search for and install:
 
--   **Remote — SSH** — lets you open folders and run terminals on Talapas directly from VS Code.
--   **Remote Explorer** — the sidebar panel for managing SSH hosts.
+- **Remote — SSH** — lets you open folders and run terminals on Talapas directly from VS Code.
+- **Remote Explorer** — the sidebar panel for managing SSH hosts.
 
 After installing, a new **Remote Explorer** icon appears in the Activity Bar.
 
@@ -114,7 +113,9 @@ If the connection hangs or is refused: confirm you are on the **UO VPN** (if off
 ::: {.callout-important title="Think about it"}
 You are now connected, and the green banner says `login.talapas.uoregon.edu`. Which kind of node are you on — and what are you allowed to do here?
 
-<details><summary>Show answers</summary>
+<details>
+
+<summary>Show answers</summary>
 
 You are on a **login (head) node**. Login nodes are **shared by everyone** and are for *light* tasks only: browsing and editing files, managing data, and submitting jobs. They are **not** for running real analysis — heavy processes on a login node will be throttled or killed, and they slow the node down for every other user. To do actual computing you must move onto a **compute node**, which you do through SLURM in Sections 7–8.
 
@@ -140,7 +141,9 @@ pwd                    # where am I? -> /home/<yourduckid>
 ::: {.callout-important title="Think about it"}
 Why do you need a PIRG just to run a job? What is it used for?
 
-<details><summary>Show answers</summary>
+<details>
+
+<summary>Show answers</summary>
 
 A PIRG is your research group's **account** on Talapas. SLURM uses it to track and charge resource usage to the right group, and to enforce each group's share of the cluster. Every job you submit — interactive or batch — must name an account with `--account=<myPIRG>`, or it will be rejected.
 
@@ -165,7 +168,9 @@ module purge           # unload everything (reset) when you want a clean slate
 ::: {.callout-important title="Think about it"}
 You ran `R --version` before `module load R` and got "command not found", but after loading it worked. Why isn't R just always available?
 
-<details><summary>Show answers</summary>
+<details>
+
+<summary>Show answers</summary>
 
 On a shared cluster, many versions of many tools coexist, and different projects need different (sometimes conflicting) versions. Rather than putting everything on everyone's `PATH` at once — which would cause clashes — Talapas keeps software **modular**: nothing analysis-related is loaded by default, and you opt in to exactly what you need with `module load`. Because this happens **per shell**, a fresh terminal (or a new job) starts clean, so you must load your modules again. For reproducibility, pin the version — `module load R/4.4.1` rather than bare `R` — so you get the same R every time.
 
@@ -203,7 +208,9 @@ Files in `/scratch` that have not been accessed for **90 days are automatically 
 ::: {.callout-important title="Think about it"}
 You have a 40 GB intermediate file you'll re-read many times this week, the small R scripts that generate it, and the final figures you want to keep. Where does each belong — `/home`, `/projects`, or `/scratch`?
 
-<details><summary>Show answers</summary>
+<details>
+
+<summary>Show answers</summary>
 
 - **Scripts and final figures → `/home`** (or `/projects` if the group should share them). `/home` is small (250 GB) but persistent and snapshotted; it is the right place for code and small keepers.
 - **The 40 GB intermediate → `/scratch`**. Scratch is large and fast and exactly meant for big working files — but remember the **90-day purge**, so never leave anything there you can't recreate.
@@ -230,25 +237,25 @@ Replace `<myPIRG>` with your actual PIRG name.
 
 ## 5. Key SLURM commands at a glance
 
-| Command               | Purpose                                                      |
-|-----------------------|--------------------------------------------------------------|
-| `sinfo`               | Show partitions and node states.                             |
-| `squeue -u $USER`     | Show *your* queued/running jobs.                             |
-| `sbatch script.sh`    | Submit a batch job.                                          |
-| `srun ... --pty bash` | Start an **interactive** session on a compute node.          |
-| `scancel <JOBID>`     | Cancel a queued or running job.                              |
-| `sacct -j <JOBID>`    | Show accounting info (state, memory, runtime) for past jobs. |
-| `seff <JOBID>`        | Friendly summary of resources used by a finished job.        |
+| Command | Purpose |
+|----|----|
+| `sinfo` | Show partitions and node states. |
+| `squeue -u $USER` | Show *your* queued/running jobs. |
+| `sbatch script.sh` | Submit a batch job. |
+| `srun ... --pty bash` | Start an **interactive** session on a compute node. |
+| `scancel <JOBID>` | Cancel a queued or running job. |
+| `sacct -j <JOBID>` | Show accounting info (state, memory, runtime) for past jobs. |
+| `seff <JOBID>` | Friendly summary of resources used by a finished job. |
 
 ::: {.callout-note title="Key SLURM flags you will use constantly"}
--   `--account=<myPIRG>` --- PIRG / account for charging (required).
--   `--partition=<name>` --- queue (e.g. `compute`, `gpu`, `interactive`).
--   `--time=<HH:MM:SS>` or `--time=<minutes>` --- wall-clock time limit.
--   `--mem=<size>` --- total memory per node (e.g. `8G`, `100M`).
--   `--mem-per-cpu=<size>` --- memory per core.
--   `--cpus-per-task=<N>` --- cores for a multi-threaded task.
--   `--gpus=<N>` --- request GPUs (paired with `--partition=gpu`).
--   `--constraint=gpu-10gb` / `gpu-40gb` / `gpu-80gb` --- GPU memory tier.
+- `--account=<myPIRG>` --- PIRG / account for charging (required).
+- `--partition=<name>` --- queue (e.g. `compute`, `gpu`, `interactive`).
+- `--time=<HH:MM:SS>` or `--time=<minutes>` --- wall-clock time limit.
+- `--mem=<size>` --- total memory per node (e.g. `8G`, `100M`).
+- `--mem-per-cpu=<size>` --- memory per core.
+- `--cpus-per-task=<N>` --- cores for a multi-threaded task.
+- `--gpus=<N>` --- request GPUs (paired with `--partition=gpu`).
+- `--constraint=gpu-10gb` / `gpu-40gb` / `gpu-80gb` --- GPU memory tier.
 :::
 
 ------------------------------------------------------------------------
@@ -257,14 +264,14 @@ Replace `<myPIRG>` with your actual PIRG name.
 
 Every job must target a **partition**. Common ones at UO:
 
-| Partition                          | What it's for                                          | Max time  |
-|------------------------------------|--------------------------------------------------------|-----------|
-| `compute`                          | Standard CPU jobs.                                     | 1 day     |
-| `computelong`                      | Long-running CPU jobs.                                 | 14 days   |
-| `gpu` / `gpulong`                  | GPU jobs, short / long.                                | 1 / 14 d  |
-| `memory` / `memorylong`            | High-memory CPU jobs (up to 4 TB RAM).                 | 1 / 14 d  |
-| `interactive` / `interactivegpu`   | Short interactive sessions.                            | 12 / 8 h  |
-| `preempt`                          | All nodes; your job may be **preempted** by its owner. | Variable  |
+| Partition | What it's for | Max time |
+|----|----|----|
+| `compute` | Standard CPU jobs. | 1 day |
+| `computelong` | Long-running CPU jobs. | 14 days |
+| `gpu` / `gpulong` | GPU jobs, short / long. | 1 / 14 d |
+| `memory` / `memorylong` | High-memory CPU jobs (up to 4 TB RAM). | 1 / 14 d |
+| `interactive` / `interactivegpu` | Short interactive sessions. | 12 / 8 h |
+| `preempt` | All nodes; your job may be **preempted** by its owner. | Variable |
 
 Run `sinfo` to see the current state of each partition on the cluster.
 
@@ -295,12 +302,12 @@ srun --account=<myPIRG> \
 
 What each flag does:
 
--   `--account` --- your PIRG (required on Talapas; omit if you set `SLURM_ACCOUNT` in your profile).
--   `--partition=compute` --- standard CPU queue.
--   `--time=1:00:00` --- 1 hour; after this the session is killed.
--   `--mem=4G` --- 4 GB of RAM total on that node.
--   `--cpus-per-task=2` --- two CPU cores.
--   `--pty bash` --- give me a pseudo-terminal running bash.
+- `--account` --- your PIRG (required on Talapas; omit if you set `SLURM_ACCOUNT` in your profile).
+- `--partition=compute` --- standard CPU queue.
+- `--time=1:00:00` --- 1 hour; after this the session is killed.
+- `--mem=4G` --- 4 GB of RAM total on that node.
+- `--cpus-per-task=2` --- two CPU cores.
+- `--pty bash` --- give me a pseudo-terminal running bash.
 
 When the resources are available, your prompt will change to show the hostname of a compute node (e.g. `n0123`). You are now running on a compute node. When you're done, type `exit` to release the resources --- do not leave idle sessions running.
 
@@ -378,7 +385,7 @@ Rscript hello_world.R
 
 It reports the node it ran on and writes two files **in the directory you ran it from**:
 
-```
+```         
 hello_world_plot.pdf
 hello_world_summary.csv
 ```
@@ -394,7 +401,9 @@ With VS Code connected to Talapas (Section 3 above) and the PDF/CSV viewer exten
 ::: {.callout-important title="Think about it"}
 The output says `Hello from n0123`. On your laptop earlier (in the P1 session), the same script said `Hello from <your-laptop-name>`. Why does the hostname tell you where the job actually ran — and why does confirming a compute-node name matter?
 
-<details><summary>Show answers</summary>
+<details>
+
+<summary>Show answers</summary>
 
 The script prints `Sys.info()[["nodename"]]`, so the hostname is proof of execution location. Seeing a compute node (`n0123`) confirms you ran on the node SLURM allocated — **not** on the login node. Running heavy analysis on the login node is the golden rule violation: it slows the machine for every other user and gets your process killed. The hostname test is a quick sanity check every time you run a job.
 
@@ -459,7 +468,7 @@ sbatch hostname.sbatch
 
 SLURM prints a job ID:
 
-```
+```         
 Submitted batch job 123456
 ```
 
@@ -610,18 +619,16 @@ seff <jobid>                 # confirm State: COMPLETED
 tail -f logs/ifnb_pipeline_*.out
 ```
 
-This is the simplest way to "run the series of R scripts" on the cluster. For finer
-control — running one step at a time, or right-sizing memory per step — use
-`run_rscript.sbatch` (above) as documented in [Module 10](Tutorial_10_Talapas_Pipeline.html).
+This is the simplest way to "run the series of R scripts" on the cluster. For finer control — running one step at a time, or right-sizing memory per step — use `run_rscript.sbatch` (above) as documented in [Module 10](Tutorial_10_Talapas_Pipeline.html).
 
 ------------------------------------------------------------------------
 
 ## 9. Choosing the right resources
 
--   **Smaller requests run sooner.** SLURM finds small gaps in the schedule more easily, so over-requesting memory or time will delay your job.
--   **But specify enough.** If your job exceeds its `--mem` or `--time`, SLURM **kills it** (`OUT_OF_MEMORY` or `TIMEOUT`). Err slightly on the high side the first time you run a new pipeline.
--   The default per-core memory is about **3.7 GB**. Request `--mem-per-cpu` or `--mem` explicitly if you need more.
--   The `compute` partition default wall time is **24 hours**; `computelong` defaults to two weeks. Both cap at those values.
+- **Smaller requests run sooner.** SLURM finds small gaps in the schedule more easily, so over-requesting memory or time will delay your job.
+- **But specify enough.** If your job exceeds its `--mem` or `--time`, SLURM **kills it** (`OUT_OF_MEMORY` or `TIMEOUT`). Err slightly on the high side the first time you run a new pipeline.
+- The default per-core memory is about **3.7 GB**. Request `--mem-per-cpu` or `--mem` explicitly if you need more.
+- The `compute` partition default wall time is **24 hours**; `computelong` defaults to two weeks. Both cap at those values.
 
 After a job finishes, check what it actually used:
 
@@ -669,15 +676,17 @@ sacct -j 123456 --format=JobID,State,ExitCode,Elapsed,MaxRSS,ReqMem
 
 Common reasons a job stays `PD` (pending):
 
--   `Priority` / `Resources` --- normal queueing; too many users ahead of you, or the resources you asked for are not free yet.
--   `QOSMaxJobsPerUserLimit` --- you have hit a per-user submission limit; let earlier jobs finish.
--   `ReqNodeNotAvail, Reserved for maintenance` --- your `--time` would run into an upcoming quarterly maintenance window. Shorten `--time`, or add `--time-min=` to let SLURM start the job sooner with a reduced limit:
+- `Priority` / `Resources` --- normal queueing; too many users ahead of you, or the resources you asked for are not free yet.
 
-    ```{bash}
-    #| eval: false
-    #SBATCH --time=0-08:00:00
-    #SBATCH --time-min=0-01:00:00
-    ```
+- `QOSMaxJobsPerUserLimit` --- you have hit a per-user submission limit; let earlier jobs finish.
+
+- `ReqNodeNotAvail, Reserved for maintenance` --- your `--time` would run into an upcoming quarterly maintenance window. Shorten `--time`, or add `--time-min=` to let SLURM start the job sooner with a reduced limit:
+
+  ```{bash}
+  #| eval: false
+  #SBATCH --time=0-08:00:00
+  #SBATCH --time-min=0-01:00:00
+  ```
 
 See also the Knowledge Base FAQ [*Why is my SLURM job not running?*](https://uoracs.github.io/talapas2-knowledge-base/docs/faqs/why_is_my_job_not_running/).
 
@@ -687,20 +696,20 @@ See also the Knowledge Base FAQ [*Why is my SLURM job not running?*](https://uor
 
 Talapas is shared across all of UO's research community. Please:
 
--   **Never** run intensive work on login nodes; use `srun` or `sbatch`.
--   Don't leave idle interactive sessions open. `exit` when you're done.
--   Don't request more CPUs, memory, or GPUs than you will actually use.
--   Put large output (caches, intermediate files) in `/scratch/<PIRG>/`, not in `/home/`.
-    -   Remember that `/scratch` purges files not accessed in 90 days.
--   **Back up anything you care about.** RACS does not back up Talapas.
--   If you have a deadline and need special scheduling, email RACS rather than trying to game the queue.
+- **Never** run intensive work on login nodes; use `srun` or `sbatch`.
+- Don't leave idle interactive sessions open. `exit` when you're done.
+- Don't request more CPUs, memory, or GPUs than you will actually use.
+- Put large output (caches, intermediate files) in `/scratch/<PIRG>/`, not in `/home/`.
+  - Remember that `/scratch` purges files not accessed in 90 days.
+- **Back up anything you care about.** RACS does not back up Talapas.
+- If you have a deadline and need special scheduling, email RACS rather than trying to game the queue.
 
 ------------------------------------------------------------------------
 
 ## 12. Where to go next
 
--   [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) --- the official UO source for everything on this page.
--   [Talapas Partition List](https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html) --- up-to-date details on hardware per partition.
--   [SLURM Workload Manager documentation](https://slurm.schedmd.com/) --- the canonical SLURM reference.
--   [RACS Service Desk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) --- for tickets (include your job ID, script, and any error output).
--   **RACS Office Hours** --- Knight Campus 1st Floor tables; see the [Talapas Knowledge Base homepage](https://uoracs.github.io/talapas2-knowledge-base/) for the current term's schedule.
+- [Talapas Quick Start Guide](https://uoracs.github.io/talapas2-knowledge-base/docs/quickstart_guide.html) --- the official UO source for everything on this page.
+- [Talapas Partition List](https://uoracs.github.io/talapas2-knowledge-base/docs/partition_list.html) --- up-to-date details on hardware per partition.
+- [SLURM Workload Manager documentation](https://slurm.schedmd.com/) --- the canonical SLURM reference.
+- [RACS Service Desk](https://hpcrcf.atlassian.net/servicedesk/customer/portal/1) --- for tickets (include your job ID, script, and any error output).
+- **RACS Office Hours** --- Knight Campus 1st Floor tables; see the [Talapas Knowledge Base homepage](https://uoracs.github.io/talapas2-knowledge-base/) for the current term's schedule.

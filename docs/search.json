@@ -2552,7 +2552,7 @@
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#each-output-feeds-the-next",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
     "section": "01–08: each output feeds the next",
-    "text": "01–08: each output feeds the next\n\nThe eight core scripts chain on a shared ifnb object.\nEach step reads the previous step’s .rds/.csv and writes the next one’s input.\nOnly external input is ifnb itself, fetched by script 01.\nThey must run in order — a missing or corrupt hand-off breaks the chain."
+    "text": "01–08: each output feeds the next\n\nThe eight core scripts chain on a shared ifnb object.\nEach step reads the previous step’s .rds/.csv and writes the next one’s input.\nOnly external input is ifnb itself, fetched by script 01 (I have also already loaded it for you).\nThey must run in order — a missing or corrupt hand-off breaks the chain."
   },
   {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#the-hand-off-chain",
@@ -2569,13 +2569,6 @@
     "text": "Why .rds hand-offs?\n\nEach .rds is a checkpoint — a fully-formed Seurat object on disk.\nRe-run step 6 without re-running 1–5; just point it at the saved object.\nSteps can be right-sized independently (06 and 08 want more memory).\nA clean, inspectable contract between steps — exactly how reproducible pipelines are built."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#run_rscript.sbatch-the-generic-wrapper",
-    "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#run_rscript.sbatch-the-generic-wrapper",
-    "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
-    "section": "run_rscript.sbatch — the generic wrapper",
-    "text": "run_rscript.sbatch — the generic wrapper\n\nYou don’t write a separate .sbatch for every R script.\nOne wrapper loads R and runs whatever script you pass it; its last line is just Rscript \"${SCRIPT}\".\nOverride the job name (and memory) per run.\n\nmkdir -p logs\nsbatch --job-name=qc            run_rscript.sbatch 01_qc_preprocessing.R\nsbatch --job-name=cluster       run_rscript.sbatch 02_dimreduction_clustering.R\nsbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R"
-  },
-  {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#confirm-before-launching-the-next",
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#confirm-before-launching-the-next",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
@@ -2583,32 +2576,32 @@
     "text": "Confirm before launching the next\n\nThe steps are chained — don’t fire step 2 until step 1 truly finished.\nCheck the .out log for the Wrote ... line.\nRun seff &lt;jobid&gt; and confirm State: COMPLETED (not OUT_OF_MEMORY / TIMEOUT).\nA job killed mid-write leaves a corrupt .rds that poisons the next step."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#run_core_pipeline.sbatch-the-whole-series-at-once",
-    "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#run_core_pipeline.sbatch-the-whole-series-at-once",
+    "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#run_sc_pipeline.sbatch-the-whole-series-at-once",
+    "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#run_sc_pipeline.sbatch-the-whole-series-at-once",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
-    "section": "run_core_pipeline.sbatch — the whole series at once",
-    "text": "run_core_pipeline.sbatch — the whole series at once\nSTEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)\nfor step in \"${STEPS[@]}\"; do\n  echo \"==== RUNNING ${step} ====\"\n  Rscript \"${step}\"\ndone\n\nRuns all eight in order, in a single allocation (~12 h, ~96 GB).\nSubmit once: sbatch run_core_pipeline.sbatch, then seff &lt;jobid&gt; to confirm COMPLETED.\nSimplest way to reproduce the entire core analysis end-to-end."
+    "section": "run_sc_pipeline.sbatch — the whole series at once",
+    "text": "run_sc_pipeline.sbatch — the whole series at once\nSTEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)\nfor step in \"${STEPS[@]}\"; do\n  echo \"==== RUNNING ${step} ====\"\n  Rscript \"${step}\"\ndone\n\nRuns all eight in order, in a single allocation (~12 h, ~96 GB).\nSubmit once: sbatch run_sc_pipeline.sbatch\nSimplest way to reproduce the entire core analysis end-to-end."
   },
   {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#memory-per-step-not-all-steps-are-equal",
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#memory-per-step-not-all-steps-are-equal",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
     "section": "Memory per step — not all steps are equal",
-    "text": "Memory per step — not all steps are equal\n\nSteps 06 (pseudobulk_de) and 08 (differential_abundance) use more RAM — override with --mem=96G.\nThe generic wrapper supports this inline: sbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R\nConfirm each step is COMPLETED with seff before firing the next — a job killed mid-write leaves a corrupt .rds that poisons the chain."
+    "text": "Memory per step — not all steps are equal\n\nSteps 06 (pseudobulk_de) and 08 (differential_abundance) use more RAM — override with --mem=96G.\nConfirm each step is COMPLETED — a job killed mid-write leaves a corrupt .rds that poisons the chain."
   },
   {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#pre-caching-ifnb",
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#pre-caching-ifnb",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
     "section": "Pre-caching ifnb",
-    "text": "Pre-caching ifnb\n\nScript 01 downloads ifnb (~25 MB) via ExperimentHub on first use.\nCompute nodes may have no outbound internet — the download would fail inside the job.\nSo populate the cache once on a login node (which has internet) before submitting:\n\nRscript -e 'invisible(muscData::Kang18_8vs8())'"
+    "text": "Pre-caching ifnb\n\nScript 01 downloads ifnb (~25 MB) via ExperimentHub on first use.\nCompute nodes may have no outbound internet — the download would fail inside the job.\nSo populate the cache once on a login node (which has internet) before submitting:\nIf this doesn’t work for you, I have already download the data and intermediate data files so you don’t get stuck"
   },
   {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#data_dir-where-the-hand-off-files-land",
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#data_dir-where-the-hand-off-files-land",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
     "section": "DATA_DIR — where the hand-off files land",
-    "text": "DATA_DIR — where the hand-off files land\n\nBy default the scripts write their .rds/.csv hand-offs to ../data/.\nSet DATA_DIR to redirect them — e.g. to fast, roomy /scratch:\n\nexport DATA_DIR=/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/ifnb/data\n\nKeeps large intermediates off /home/ and makes the run reproducible and relocatable."
+    "text": "DATA_DIR — where the hand-off files land\n\nBy default the scripts write their .rds/.csv hand-offs to ../data/.\nSet DATA_DIR to redirect them — e.g. to fast, roomy /scratch:\n\n\nKeeps large intermediates off /home/ and makes the run reproducible and relocatable."
   },
   {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#why-ifnb-gives-real-results",
@@ -2632,25 +2625,18 @@
     "text": "Scripts 13–17 — standalone tracks\n\nParallel the downstream bonus notebooks; run after the core, not in sequence.\n13_wgcna — co-expression modules, its own GSE152418 dataset.\n14_trajectory_cellcomm — runs on the annotated ifnb object.\n15_scatac_signac — scATAC on PBMC 10k, its own data.\n16_spatial — stxBrain spatial data.\n17_fair_metadata — exports ifnb for submission (.h5ad)."
   },
   {
-    "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#what-stays-interactive",
-    "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#what-stays-interactive",
-    "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
-    "section": "What stays interactive",
-    "text": "What stays interactive\n\nInherently interactive / Python steps are kept as commented sketches, exactly as in the notebooks.\nE.g. Monocle3 root selection, scVelo, CellChat plotting, the cellxgene-schema validator.\nThe scripts mirror the runnable core of each notebook."
-  },
-  {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#whats-next",
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#whats-next",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
     "section": "What’s next",
-    "text": "What’s next\n\nYou can now run the full ifnb analysis on Talapas as chained SLURM jobs.\nAdapt the scripts to your own counts matrix — swap script 01’s loader, keep the chain (see the companion chapter).\nFor the raw-FASTQ upstream path, see the Cell Ranger bonus modules and the full Talapas run roadmap."
+    "text": "What’s next\n\nYou can now run the full ifnb analysis on Talapas as chained SLURM jobs.\nFor the raw-FASTQ upstream path, see the Cell Ranger bonus modules and the full Talapas run roadmap."
   },
   {
     "objectID": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#key-takeaways",
     "href": "Lecture_Folder/Lecture_10_Talapas_Pipeline.html#key-takeaways",
     "title": "Lecture 10 — Running the Analysis Pipeline on Talapas",
     "section": "Key takeaways",
-    "text": "Key takeaways\n\nThe pipeline is a chain: .rds checkpoints hand off step to step, in order.\nrun_rscript.sbatch runs any one step; run_core_pipeline.sbatch runs all eight.\nPre-cache ifnb on a login node; use DATA_DIR to relocate outputs.\nifnb’s condition + donor design yields real ISG biology.\nConfirm COMPLETED with seff before chaining onward."
+    "text": "Key takeaways\n\nThe pipeline is a chain: .rds checkpoints hand off step to step, in order.\nrun_sc_pipeline.sbatch runs all eight analysis scripts.\nPre-cache ifnb on a login node; use DATA_DIR to relocate outputs."
   },
   {
     "objectID": "Lecture_Folder/Lecture_08_DifferentialAbundance.html#where-this-lecture-fits",
@@ -6087,7 +6073,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#goals-of-this-lecture",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Goals of this lecture",
-    "text": "Goals of this lecture\n\nConnect to Talapas with VS Code Remote-SSH (Duck ID + Duo)\nNavigate the Talapas file systems — home, projects, scratch\nLoad software with Lmod (module load)\nUnderstand why a shared cluster needs a scheduler at all\nTell apart login nodes and compute nodes — and why it matters\nChoose between interactive and batch work\nRead the key SLURM flags and partitions you’ll use constantly\nSubmit, monitor, and right-size jobs with sbatch / squeue / seff\nBe a good cluster citizen at UO"
+    "text": "Goals of this lecture\n\nConnect to Talapas with VS Code Remote-SSH (Duck ID + Duo)\nNavigate the Talapas file systems — home, projects\nLoad software with Lmod (module load)\nUnderstand why a shared cluster needs a scheduler at all\nTell apart login nodes and compute nodes — and why it matters\nChoose between interactive and batch work\nRead the key SLURM flags and partitions you’ll use constantly\nSubmit, monitor, and right-size jobs with sbatch / squeue\nBe a good cluster citizen at UO"
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#many-nodes-one-scheduler",
@@ -6101,7 +6087,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#meet-talapas-uos-cluster",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Meet Talapas — UO’s cluster",
-    "text": "Meet Talapas — UO’s cluster\n\nTalapas is managed by UO Research Advanced Computing Services (RACS).\nThousands of CPU cores, GPUs, high-memory nodes, and petabytes of storage.\nAccess is through a PIRG (PI Research Group) — your PI requests an account for the lab.\nOnce you have an account your Duck ID grants access via SSH and Open OnDemand.\n\n\n\n\n\n\n\nTip\n\n\nRun groups after logging in to see your PIRG name — you’ll need it for every SLURM job."
+    "text": "Meet Talapas — UO’s cluster\n\nTalapas is managed by UO Research Advanced Computing Services (RACS).\nThousands of CPU cores, GPUs, high-memory nodes, and petabytes of storage.\nAccess is through a PIRG (PI Research Group) — your PI requests an account for the lab (for this workshop your PIRG is cbds)\nOnce you have an account your Duck ID grants access via SSH and Open OnDemand (ask your PI to add you to their PIRG)\n\n\n\n\n\n\n\nTip\n\n\nRun groups after logging in to see your PIRG name — you’ll need it for every SLURM job."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#vs-code-remote-ssh-overview",
@@ -6129,14 +6115,14 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#the-integrated-terminal-is-a-shell-on-talapas",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "The integrated terminal is a shell on Talapas",
-    "text": "The integrated terminal is a shell on Talapas\n\nOpen it: Terminal → New Terminal (or Ctrl/Cmd+`).\nThis is not your laptop’s terminal — it is a shell running on the Talapas login node.\nThe green SSH: login.talapas.uoregon.edu banner in the status bar confirms you’re remote. Verify with:\n\nhostname   # e.g. login1.talapas.uoregon.edu\nwhoami     # your Duck ID\n\nAll the shell commands from P1 (Computer Systems & the Command Line) — pwd, ls, cd, pipes — work here, now on the cluster.\nmodule load, srun, and sbatch are all typed in this terminal.\n\n\n\n\n\n\n\n\n🔑 Key concept — the integrated terminal is a remote shell\n\n\nWhen VS Code is connected via Remote-SSH, its integrated terminal opens a shell on the Talapas login node, not on your laptop. You edit files in the VS Code editor (left) while running commands in the terminal (bottom) — both operating on the same remote files."
+    "text": "The integrated terminal is a shell on Talapas\n\nOpen it: Terminal → New Terminal (or Ctrl/Cmd+`).\nThis is not your laptop’s terminal — it is a shell running on the Talapas login node.\nThe green SSH: login.talapas.uoregon.edu banner in the status bar confirms you’re remote.\n\nhostname   # e.g. login1.talapas.uoregon.edu\nwhoami     # your Duck ID\n\nAll the shell commands from P1 (Computer Systems & the Command Line) — pwd, ls, cd, pipes — work here, now on the cluster.\nmodule load, srun, and sbatch are all typed in this terminal.\n\n\n\n\n\n\n\n\n🔑 Key concept — the integrated terminal is a remote shell\n\n\nWhen VS Code is connected via Remote-SSH, its integrated terminal opens a shell on the Talapas login node, not on your laptop. You edit files in the VS Code editor (left) while running commands in the terminal (bottom) — both operating on the same remote files."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#the-edit-in-editor-run-in-terminal-loop",
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#the-edit-in-editor-run-in-terminal-loop",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "The edit-in-editor / run-in-terminal loop",
-    "text": "The edit-in-editor / run-in-terminal loop\n\nEditor pane (left/top): open and edit .R, .qmd, or .sbatch files on Talapas — changes are saved directly on the cluster filesystem.\nTerminal pane (bottom): run the file, submit the job, or tail the log — all on the same machine.\nThis is the core workflow for scRNA-seq analysis on Talapas:\n\n# In the integrated terminal (on the login node):\nmodule load R/4.3.2\nRscript scripts/01_qc_preprocessing.R   # quick smoke-test on login\nsbatch run_rscript.sbatch 01_qc_preprocessing.R  # or submit as a batch job\ntail -f logs/seurat_qc_*.out            # watch the job as it runs\n\nFor anything real (full data, long runs): always use sbatch — the job survives you closing the laptop.\nFor .qmd rendering on the cluster: quarto render my_analysis.qmd in the terminal."
+    "text": "The edit-in-editor / run-in-terminal loop\n\nEditor pane (left/top): open and edit .R, .qmd, or .sbatch files on Talapas — changes are saved directly on the cluster filesystem.\nTerminal pane (bottom): run the file, submit the job, or tail the log — all on the same machine.\n\n# In the integrated terminal (on the login node):\nmodule load R/4.3.2\nRscript scripts/01_qc_preprocessing.R   # quick smoke-test on login\nsbatch run_sc_pipeline.sbatch # submit as a batch job\n\nFor anything real (full data, long runs): always use sbatch — the job survives you closing the laptop.\nFor .qmd rendering on the cluster: quarto render my_analysis.qmd in the terminal."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#open-ondemand-browser-alternative",
@@ -6150,14 +6136,14 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#three-places-to-put-files",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Three places to put files",
-    "text": "Three places to put files\n\n\n\n\n\n\n\n\n\n\nLocation\nPath\nQuota\nBacked up?\nUse for\n\n\n\n\nHome\n/home/&lt;duckid&gt;/\n~20 GB\nYes\nscripts, configs, small results\n\n\nProjects\n/projects/&lt;PIRG&gt;/\nshared lab quota\nYes\nshared data, final outputs\n\n\nScratch\n/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/\nlarge\nNo (purged 90 d)\nlarge intermediates\n\n\n\n\n\n\n\n\n\nWarning\n\n\nScratch purges files older than 90 days automatically and is never backed up. Keep only transient intermediates there; copy results to /projects/."
+    "text": "Three places to put files\n\n\n\n\n\n\n\n\n\n\nLocation\nPath\nQuota\nBacked up?\nUse for\n\n\n\n\nHome\n/home/&lt;duckid&gt;/\n~20 GB\nYes\nscripts, configs, small results\n\n\nProjects\n/projects/&lt;PIRG&gt;/\nshared lab quota\nYes\nshared data, final outputs\n\n\nScratch\n/scratch/&lt;PIRG&gt;/&lt;duckid&gt;/\nlarge\nNo (purged 90 d)\nlarge intermediates\n\n\nParticipants\n/projects/cbds/participants\nshared lab quota\nNo - we will remove you after the workshop\nRunning scripts for this workshop\n\n\n\n\n\n\n\n\n\nWarning\n\n\nScratch purges files older than 90 days automatically and is never backed up. Keep only transient intermediates there; copy results to /projects/.\n\nIf you want to access your scripts after the workshop, either download or scp them to your local computer."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#navigating-on-login",
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#navigating-on-login",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Navigating on login",
-    "text": "Navigating on login\n\nAll commands run in the VS Code integrated terminal — the shell on the login node.\nShell basics (pwd, ls, cd, pipes) were covered in P1 — Computer Systems & the Command Line; the focus here is what’s different on the cluster.\nCheck your quotas: df -h /home/$USER and df -h /projects/&lt;PIRG&gt;.\nYour first visit: ls /projects/&lt;PIRG&gt; and ls /scratch/&lt;PIRG&gt;/ to see the lab space.\nWorkshop data lives in /projects/&lt;PIRG&gt;/ — copy or symlink it into your working directory."
+    "text": "Navigating on login\n\nAll commands run in the VS Code integrated terminal — the shell on the login node.\nShell basics (pwd, ls, cd, pipes) were covered in P1 — Computer Systems & the Command Line; the focus here is what’s different on the cluster.\nCheck your quotas: df -h /home/$USER and df -h /projects/&lt;PIRG&gt;.\nYour first visit: ls /projects/&lt;PIRG&gt; and ls /scratch/&lt;PIRG&gt;/ to see the lab space.\nWorkshop data lives in /projects/&lt;PIRG&gt;/participants/&lt;your-duck-id&gt; — copy or symlink it into your working directory."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#what-are-modules",
@@ -6171,7 +6157,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#common-module-commands",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Common module commands",
-    "text": "Common module commands\nmodule avail              # list all available modules\nmodule avail R            # filter by name\nmodule load R/4.3.2       # load a specific version\nmodule list               # see what is currently loaded\nmodule purge              # unload everything (good start for scripts)\n\nAlways load a specific version (e.g. R/4.3.2) — module load R picks whatever is default today, which may change.\nmodule purge at the top of every batch script ensures a clean, reproducible environment.\n\n\n\n\n\n\n\nTip\n\n\nAdd module purge && module load R/4.3.2 to your ~/.bash_profile if you want R ready on every login — but always put explicit loads inside batch scripts too."
+    "text": "Common module commands\nmodule avail              # list all available modules\nmodule spider R            # filter by name\nmodule load R/4.3.2       # load a specific version\nmodule list               # see what is currently loaded\nmodule purge              # unload everything (good start for scripts)\n\nAlways load a specific version (e.g. R/4.3.2) — module load R picks whatever is default today, which may change.\nmodule purge at the top of every batch script ensures a clean, reproducible environment.\n\n\n\n\n\n\n\nTip\n\n\nAdd module purge && module load R/4.3.2 to your ~/.bash_profile if you want R ready on every login — but always put explicit loads inside batch scripts too."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#explore-before-you-batch",
@@ -6213,7 +6199,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#the-golden-rule",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "The golden rule",
-    "text": "The golden rule\n\nLogin nodes are the front desk. Compute nodes are the workshop.\n\n\nAsk SLURM (via srun/salloc/sbatch) to send your work to a compute node.\nModules you load on a login node do not follow you into a job — load them inside the job."
+    "text": "The golden rule\n\nLogin nodes are the front desk. Compute nodes are where you should run jobs.\n\n\nAsk SLURM (via srun/salloc/sbatch) to send your work to a compute node.\nModules you load on a login node do not follow you into a job — load them inside the job."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#which-mode-when",
@@ -6227,7 +6213,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#a-minimal-interactive-session",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "A minimal interactive session",
-    "text": "A minimal interactive session\nsrun --account=&lt;myPIRG&gt; \\\n     --partition=compute \\\n     --time=1:00:00 \\\n     --mem=4G \\\n     --cpus-per-task=2 \\\n     --pty bash\n\nWhen granted, your prompt changes to a compute node (e.g. n0123).\nsalloc is the close cousin — request an allocation, prompt jumps to the node.\nType exit the moment you’re done — idle sessions hoard the node."
+    "text": "A minimal interactive session\nsrun --account=&lt;myPIRG&gt; \\ \n     --partition=compute \\\n     --time=1:00:00 \\\n     --mem=4G \\\n     --cpus-per-task=2 \\\n     --pty bash\n\nWhen granted, your prompt changes to a compute node (e.g. n0123).\nsalloc is the close cousin — request an allocation, prompt jumps to the node.\nType exit the moment you’re done — idle sessions hoard the node."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#partitions-queues",
@@ -6255,7 +6241,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#anatomy-of-an-sbatch-script",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Anatomy of an sbatch script",
-    "text": "Anatomy of an sbatch script\n#!/bin/bash\n#SBATCH --account=&lt;myPIRG&gt;\n#SBATCH --partition=compute\n#SBATCH --job-name=seurat_qc\n#SBATCH --output=logs/seurat_qc_%j.out\n#SBATCH --error=logs/seurat_qc_%j.err\n#SBATCH --time=04:00:00\n#SBATCH --cpus-per-task=8\n#SBATCH --mem=64G\n\nmodule purge\nmodule load R/4.3.2\nRscript scripts/01_qc_preprocessing.R\n\nAll #SBATCH lines sit at the top, before any command.\n%j is the job ID; module load happens inside the job."
+    "text": "Anatomy of an sbatch script\n#!/bin/bash\n#SBATCH --account=&lt;myPIRG&gt;\n#SBATCH --partition=compute\n#SBATCH --job-name=seurat_qc\n#SBATCH --output=logs/seurat_qc_%j.out\n#SBATCH --error=logs/seurat_qc_%j.err\n#SBATCH --time=04:00:00\n#SBATCH --cpus-per-task=8\n#SBATCH --mem=64G\n\nmodule purge\nmodule load R/4.3.2\nRscript 01_qc_preprocessing.R\n\nAll #SBATCH lines sit at the top, before any command.\n%j is the job ID; module load happens inside the job."
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#create-logs-first-one-time",
@@ -6339,7 +6325,7 @@
     "href": "Lecture_Folder/Lecture_09_SLURM_Basics.html#monitoring-a-running-job",
     "title": "Lecture 09 — VS Code & SLURM Basics on Talapas",
     "section": "Monitoring a running job",
-    "text": "Monitoring a running job\n# Live log tail (follow output as it writes)\ntail -f logs/seurat_qc_*.out\n\n# Friendly resource summary after completion\nseff 123456\n\ntail -f lets you watch progress without opening an interactive session\nAfter each step confirms State: COMPLETED (not OUT_OF_MEMORY/TIMEOUT), move to the next\nA job killed mid-write leaves a corrupt .rds — always confirm before chaining"
+    "text": "Monitoring a running job\n# Live log tail (follow output as it writes)\ntail -f logs/seurat_qc_*.out\n\ntail -f lets you watch progress without opening an interactive session\nAfter each step confirms State: COMPLETED (not OUT_OF_MEMORY/TIMEOUT), move to the next\nA job killed mid-write leaves a corrupt .rds — always confirm before chaining"
   },
   {
     "objectID": "Lecture_Folder/Lecture_09_SLURM_Basics.html#design-considerations",

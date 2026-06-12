@@ -1,6 +1,6 @@
 ---
 title: "Lecture 10 — Running the Analysis Pipeline on Talapas"
-author: "Bill Cresko"
+author: "Bill Cresko and Shannon Snyder"
 format:
   revealjs:
     footer: "Single Cell RNA-seq Workshop · Lecture 10 — Running the Analysis Pipeline on Talapas"
@@ -73,14 +73,14 @@ editor: visual
 ::: incremental
 -   The eight core scripts **chain** on a shared `ifnb` object.
 -   Each step **reads** the previous step's `.rds`/`.csv` and **writes** the next one's input.
--   Only external input is `ifnb` itself, fetched by script `01`.
+-   Only external input is `ifnb` itself, fetched by script `01` (I have also already loaded it for you).
 -   They must run **in order** — a missing or corrupt hand-off breaks the chain.
 :::
 
 ## The hand-off chain
 
 | Script | Reads | Writes |
-|---|---|---|
+|------------------------|------------------------|------------------------|
 | `01_qc_preprocessing` | `muscData::Kang18_8vs8()` | `ifnb_preprocessed.rds` |
 | `02_dimreduction_clustering` | `ifnb_preprocessed.rds` | `ifnb_clustered.rds` |
 | `03_markers_annotation` | `ifnb_clustered.rds` | `ifnb_annotated.rds` |
@@ -99,23 +99,6 @@ editor: visual
 -   A clean, inspectable contract between steps — exactly how reproducible pipelines are built.
 :::
 
-# The wrappers {background-color="#2c3e50"}
-
-## `run_rscript.sbatch` — the generic wrapper
-
-::: incremental
--   You don't write a separate `.sbatch` for every R script.
--   One wrapper loads R and runs whatever script you pass it; its last line is just `Rscript "${SCRIPT}"`.
--   Override the job name (and memory) per run.
-:::
-
-``` bash
-mkdir -p logs
-sbatch --job-name=qc            run_rscript.sbatch 01_qc_preprocessing.R
-sbatch --job-name=cluster       run_rscript.sbatch 02_dimreduction_clustering.R
-sbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
-```
-
 ## Confirm before launching the next
 
 ::: incremental
@@ -125,7 +108,7 @@ sbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R
 -   A job killed mid-write leaves a **corrupt `.rds`** that poisons the next step.
 :::
 
-## `run_core_pipeline.sbatch` — the whole series at once
+## `run_sc_pipeline.sbatch` — the whole series at once
 
 ``` bash
 STEPS=(01_qc_preprocessing.R 02_dimreduction_clustering.R … 08_differential_abundance.R)
@@ -136,8 +119,8 @@ done
 ```
 
 ::: incremental
--   Runs all eight **in order**, in a single allocation (~12 h, ~96 GB).
--   Submit once: `sbatch run_core_pipeline.sbatch`, then `seff <jobid>` to confirm `COMPLETED`.
+-   Runs all eight **in order**, in a single allocation (\~12 h, \~96 GB).
+-   Submit once: `sbatch run_sc_pipeline.sbatch`
 -   Simplest way to reproduce the entire core analysis end-to-end.
 :::
 
@@ -145,8 +128,7 @@ done
 
 ::: incremental
 -   Steps 06 (`pseudobulk_de`) and 08 (`differential_abundance`) use more RAM — override with `--mem=96G`.
--   The generic wrapper supports this inline: `sbatch --job-name=pb_de --mem=96G run_rscript.sbatch 06_pseudobulk_de.R`
--   Confirm each step is `COMPLETED` with `seff` before firing the next — a job killed mid-write leaves a **corrupt `.rds`** that poisons the chain.
+-   Confirm each step is `COMPLETED` — a job killed mid-write leaves a **corrupt `.rds`** that poisons the chain.
 :::
 
 # Setup details {background-color="#2c3e50"}
@@ -154,14 +136,11 @@ done
 ## Pre-caching `ifnb`
 
 ::: incremental
--   Script `01` downloads `ifnb` (~25 MB) via `ExperimentHub` on first use.
+-   Script `01` downloads `ifnb` (\~25 MB) via `ExperimentHub` on first use.
 -   **Compute nodes may have no outbound internet** — the download would fail inside the job.
 -   So populate the cache **once** on a login node (which has internet) before submitting:
+-   If this doesn't work for you, I have already download the data and intermediate data files so you don't get stuck
 :::
-
-``` bash
-Rscript -e 'invisible(muscData::Kang18_8vs8())'
-```
 
 ## `DATA_DIR` — where the hand-off files land
 
@@ -169,10 +148,6 @@ Rscript -e 'invisible(muscData::Kang18_8vs8())'
 -   By default the scripts write their `.rds`/`.csv` hand-offs to `../data/`.
 -   Set `DATA_DIR` to redirect them — e.g. to fast, roomy `/scratch`:
 :::
-
-``` bash
-export DATA_DIR=/scratch/<PIRG>/<duckid>/ifnb/data
-```
 
 -   Keeps large intermediates off `/home/` and makes the run **reproducible and relocatable**.
 
@@ -208,19 +183,10 @@ export DATA_DIR=/scratch/<PIRG>/<duckid>/ifnb/data
 -   `17_fair_metadata` — exports `ifnb` for submission (`.h5ad`).
 :::
 
-## What stays interactive
-
-::: incremental
--   Inherently interactive / Python steps are kept as **commented sketches**, exactly as in the notebooks.
--   E.g. Monocle3 root selection, scVelo, CellChat plotting, the `cellxgene-schema` validator.
--   The scripts mirror the **runnable core** of each notebook.
-:::
-
 ## What's next
 
 ::: incremental
 -   You can now run the **full ifnb analysis on Talapas** as chained SLURM jobs.
--   Adapt the scripts to **your own counts matrix** — swap script 01's loader, keep the chain (see the [companion chapter](../Resources_Folder/Chapter_10_Talapas_Pipeline.html)).
 -   For the raw-FASTQ upstream path, see the Cell Ranger bonus modules and the full Talapas run roadmap.
 :::
 
@@ -228,8 +194,6 @@ export DATA_DIR=/scratch/<PIRG>/<duckid>/ifnb/data
 
 ::: incremental
 -   The pipeline is a **chain**: `.rds` checkpoints hand off step to step, in order.
--   `run_rscript.sbatch` runs any one step; `run_core_pipeline.sbatch` runs all eight.
+-   `run_sc_pipeline.sbatch` runs all eight analysis scripts.
 -   **Pre-cache `ifnb`** on a login node; use `DATA_DIR` to relocate outputs.
--   `ifnb`'s condition + donor design yields **real ISG biology**.
--   Confirm `COMPLETED` with `seff` before chaining onward.
 :::
