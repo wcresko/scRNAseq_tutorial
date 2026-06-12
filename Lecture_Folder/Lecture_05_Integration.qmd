@@ -47,10 +47,10 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 :::
 
 ::: callout-note
-**Mental model.** 
+**Mental model.**
 
-- Multiple samples / batches / donors of the same biology should produce overlapping clusters of the same cell types. 
-- If they don't — if every sample becomes its own island on the UMAP — the technical axis is dominating PC space. 
+- Multiple samples / batches / donors of the same biology should produce overlapping clusters of the same cell types.
+- If they don't — if every sample becomes its own island on the UMAP — the technical axis is dominating PC space.
 - Integration warps the embedding to move shared cell types together while leaving genuine biological differences in place.
 :::
 
@@ -61,7 +61,6 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 - Multiple samples / batches / donors → the same cell type can split into per-sample clusters
 - Integration aligns shared cell types while preserving real biological differences
 - **Diagnostic:** color a UMAP by sample. If cell types co-cluster across samples, you don't need integration. If each sample forms its own island, you do.
-
 
 ## Tools to integrate
 
@@ -74,17 +73,17 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 | **MNN / fastMNN**     | R / Py    | Mutual nearest neighbors              |
 
 ::: callout-tip
-**Rule of thumb:** 
+**Rule of thumb:**
 
-- try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases. 
-- The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks Harmony and Seurat anchors on the `ifnb` dataset (CTRL vs IFN-β-stimulated PBMCs) — the canonical small two-sample integration case. 
+- try a simple method (Harmony) first; move to scVI/scANVI for very large or heterogeneous atlases.
+- The workshop's [Tutorial 05](../Exercise_Folder/Tutorial_05_Integration.html) walks Harmony and Seurat anchors on the `ifnb` dataset (CTRL vs IFN-β-stimulated PBMCs) — the canonical small two-sample integration case.
 - For a complementary, notebook-driven walkthrough see also the [scNotebooks](https://integrativebioinformatics.github.io/scNotebooks/) integration chapter.
 :::
 
 ::: callout-warning
-**Over-integration is real.** 
+**Over-integration is real.**
 
-- If you push integration too hard, real biological differences (e.g. tumor vs. normal) get squashed away with the batch effect. 
+- If you push integration too hard, real biological differences (e.g. tumor vs. normal) get squashed away with the batch effect.
 - Always plot *both* batch and a known biological covariate after integration to confirm only the unwanted axis was removed.
 :::
 
@@ -92,9 +91,7 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 
 ![](images/integration_overview_figure.jpeg){alt="Integration overview — raster reference" fig-align="center" width="92%"}
 
-
 ## Seurat CCA integration
-
 
 ![](images/lec02_seurat_anchor_integration.svg){fig-align="center" width="95%"}
 
@@ -102,7 +99,6 @@ theme_set(theme_minimal(base_size = 14)); set.seed(2026)
 - Find pairs of cells that are **mutual nearest neighbours** across the two samples — these are the **anchors**
 - **Score** each anchor by how well its local neighbourhoods agree across the two samples
 - Apply the anchor-derived correction to bring matching cell types into register
-
 
 ## Harmony integration
 
@@ -166,7 +162,6 @@ p_after <- post |>
 gridExtra::grid.arrange(p_before, p_after, nrow = 1)
 ```
 
-
 ## What integration looks like — before vs after
 
 - **Left:** raw PCA — the biggest axis is *which sample the cell came from*, not *what cell type it is*. Each sample looks like its own island.
@@ -192,18 +187,17 @@ These three checks generalize to any batch-integrated dataset. The third is part
 The three checks above are qualitative. Two common **numerical** scores:
 
 - **iLISI / LISI** (Local Inverse Simpson's Index)
-  - within each cell's neighbourhood, how many **batches** are represented. 
-  - High iLISI = batches well mixed. Pair it with **cLISI** (cell-type LISI), which should stay **low** (each neighbourhood is one cell type). 
+  - within each cell's neighbourhood, how many **batches** are represented.
+  - High iLISI = batches well mixed. Pair it with **cLISI** (cell-type LISI), which should stay **low** (each neighbourhood is one cell type).
   - Good integration = **high iLISI *and* low cLISI**.
 - **kBET** — tests whether the batch composition of local neighbourhoods matches the global composition (a rejection rate; lower = better mixed).
 
 ::: callout-warning
 **A mixing metric alone can be gamed by over-correction**
 
-- blend distinct cell types and iLISI looks great. 
+- blend distinct cell types and iLISI looks great.
 - Always read a mixing score **together** with a biology-preservation check (cLISI, or the ISG-score gap on the next slides), never one alone.
 :::
-
 
 ## ISG score gap survives integration — the over-correction check
 
@@ -259,5 +253,3 @@ The integration moved cells *spatially* (the bottom panels of the previous figur
 - The over-correction check that matters: a **known biological signal** (e.g. ISG score) should still differ between conditions *within* the same cluster after integration
 - Always plot the post-integration UMAP coloured by **batch** AND by **biology** — both dimensions
 :::
-
-
